@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
 import { upsertCritic } from '../../lib/critics';
 
-export default function CriticReviewsEditor({ filmId, onUpdated }) {
+export default function CriticReviewsEditor({ filmId, playId, onUpdated }) {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -35,10 +35,10 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    if (filmId) {
+    if (filmId || playId) {
       fetchReviews();
     }
-  }, [filmId]);
+  }, [filmId, playId]);
 
   // Close search dropdown on outside click
   useEffect(() => {
@@ -54,10 +54,20 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
   const fetchReviews = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let q = supabase
         .from('critic_reviews')
-        .select('*, critic:critics(id, name, avatar_url, publication, is_verified)')
-        .eq('film_id', filmId)
+        .select('*, critic:critics(id, name, avatar_url, publication, is_verified)');
+
+      if (playId) {
+        q = q.eq('play_id', playId);
+      } else if (filmId) {
+        q = q.eq('film_id', filmId);
+      } else {
+        setReviews([]);
+        return;
+      }
+
+      const { data, error } = await q
         .order('is_featured', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -105,8 +115,8 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
     setCriticResults([]);
 
     const titleText = critic.publication
-      ? `${critic.title || 'Film Critic'} · ${critic.publication}`
-      : critic.title || 'Film Critic';
+      ? `${critic.title || (playId ? 'Theatre Critic' : 'Film Critic')} · ${critic.publication}`
+      : critic.title || (playId ? 'Theatre Critic' : 'Film Critic');
 
     setFormData(prev => ({
       ...prev,
@@ -122,7 +132,7 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
     try {
       const newCritic = await upsertCritic({
         name: name.trim(),
-        title: 'Film Critic',
+        title: playId ? 'Theatre Critic' : 'Film Critic',
         is_verified: true,
       });
       selectCritic(newCritic);
@@ -178,8 +188,8 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
       e.stopPropagation();
     }
 
-    if (!filmId) {
-      toast.error('Film ID is missing. Please save the film first.');
+    if (!filmId && !playId) {
+      toast.error('Production ID is missing. Please save first.');
       return;
     }
 
@@ -201,7 +211,8 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
           : null;
 
       const payload = {
-        film_id: filmId,
+        film_id: playId ? null : filmId,
+        play_id: playId || null,
         critic_id: formData.is_anonymous ? null : formData.critic_id,
         critic_name: formData.is_anonymous ? null : formData.critic_name.trim(),
         critic_title: formData.critic_title.trim() || null,
@@ -266,7 +277,7 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
             Expert Critic Reviews & Pull-Quotes
           </h3>
           <p className="text-xs text-text-muted">
-            Search & link verified film critics (or add new critic profiles) to attach pull-quotes and ratings to this film.
+            Search & link verified critics (or add new critic profiles) to attach pull-quotes and ratings to this {playId ? 'stage play' : 'film'}.
           </p>
         </div>
       </div>
@@ -327,7 +338,7 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
                   value={criticSearch}
                   onChange={(e) => handleCriticSearch(e.target.value)}
                   onFocus={() => criticSearch.length >= 2 && setShowCriticDropdown(true)}
-                  placeholder="Search critic by name (e.g. Tolu Fagbure)..."
+                  placeholder="Search critic by name (e.g. Oris Aigbokhaevbolo)..."
                   className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand focus:outline-none pr-8"
                 />
                 {isSearchingCritics ? (
@@ -401,7 +412,7 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
               type="text"
               value={formData.critic_title}
               onChange={(e) => setFormData({ ...formData, critic_title: e.target.value })}
-              placeholder="e.g. Film Critic · In Nollywood"
+              placeholder="e.g. Theatre Critic · Film Efiko"
               className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand focus:outline-none"
             />
           </div>
@@ -447,7 +458,7 @@ export default function CriticReviewsEditor({ filmId, onUpdated }) {
             rows={3}
             value={formData.quote}
             onChange={(e) => setFormData({ ...formData, quote: e.target.value })}
-            placeholder="e.g. A masterclass in Nollywood suspense. Magnificent performances and tight direction throughout."
+            placeholder="e.g. A powerhouse stage performance that illuminates Nigerian dramatic heritage."
             className="w-full bg-surface border border-border rounded-lg p-3 text-xs text-text-primary focus:border-brand focus:outline-none"
           />
         </div>

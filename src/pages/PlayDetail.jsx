@@ -2,11 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { Icon } from '@iconify/react';
 import { fetchPlayBySlug, getPlayDateLabel } from '../lib/plays';
+import { useAuth } from '../context/AuthContext';
 import SEO from '../components/SEO';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+import CriticReviewsSection from '../components/film/CriticReviewsSection';
+import ReviewSection from '../components/film/ReviewSection';
 
 export default function PlayDetail() {
   const { slug } = useParams();
+  const { user } = useAuth();
   const [play, setPlay] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -140,56 +144,65 @@ export default function PlayDetail() {
         </div>
       </section>
 
-      {/* Ensemble Stage Cast Section */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12">
-        <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-2">
-          <Icon icon="solar:users-group-two-rounded-bold" className="text-brand w-6 h-6" />
-          Stage Ensemble & Performers ({credits.length})
-        </h2>
+      {/* Main Content Area */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        {/* Ensemble Stage Cast Section */}
+        <section className="pt-12">
+          <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-2">
+            <Icon icon="solar:users-group-two-rounded-bold" className="text-brand w-6 h-6" />
+            Stage Ensemble & Performers ({credits.length})
+          </h2>
 
-        {credits.length === 0 ? (
-          <div className="bg-surface border border-border rounded-2xl p-12 text-center">
-            <Icon icon="solar:user-rounded-line-duotone" className="w-16 h-16 text-text-muted mx-auto mb-3 opacity-40" />
-            <p className="text-lg font-bold text-text-primary mb-1">No stage performers linked yet</p>
-            <p className="text-xs text-text-muted">Performers for this production will appear here as cast credits are added.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {credits.map((cred) => {
-              const person = cred.person || {};
-              return (
-                <Link
-                  key={cred.id}
-                  to={`/people/${person.slug || person.id}`}
-                  className="group bg-surface border border-border hover:border-brand/50 rounded-xl p-3.5 flex flex-col items-center text-center transition-all hover:-translate-y-1"
-                >
-                  <ImageWithFallback
-                    src={person.photo_url}
-                    alt={person.name || 'Performer'}
-                    fallbackType="avatar"
-                    name={person.name || 'Performer'}
-                    className="w-20 h-20 rounded-full object-cover border-2 border-border group-hover:border-brand transition-colors mb-3 shadow-md"
-                    width={160}
-                    sizes="80px"
-                    loading="lazy"
-                  />
-                  <h3 className="text-xs font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
-                    {person.name || 'Unknown Performer'}
-                  </h3>
-                  <span className="text-[11px] font-semibold text-brand mt-0.5">
-                    {cred.role || 'Actor'}
-                  </span>
-                  {cred.character_name && (
-                    <span className="text-[10px] text-text-muted italic line-clamp-1 mt-0.5">
-                      as {cred.character_name}
+          {credits.length === 0 ? (
+            <div className="bg-surface border border-border rounded-2xl p-12 text-center">
+              <Icon icon="solar:user-rounded-line-duotone" className="w-16 h-16 text-text-muted mx-auto mb-3 opacity-40" />
+              <p className="text-lg font-bold text-text-primary mb-1">No stage performers linked yet</p>
+              <p className="text-xs text-text-muted">Performers for this production will appear here as cast credits are added.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {credits.map((cred) => {
+                const person = cred.person || {};
+                return (
+                  <Link
+                    key={cred.id}
+                    to={`/people/${person.slug || person.id}`}
+                    className="group bg-surface border border-border hover:border-brand/50 rounded-xl p-3.5 flex flex-col items-center text-center transition-all hover:-translate-y-1"
+                  >
+                    <ImageWithFallback
+                      src={person.photo_url}
+                      alt={person.name || 'Performer'}
+                      fallbackType="avatar"
+                      name={person.name || 'Performer'}
+                      className="w-20 h-20 rounded-full object-cover border-2 border-border group-hover:border-brand transition-colors mb-3 shadow-md"
+                      width={160}
+                      sizes="80px"
+                      loading="lazy"
+                    />
+                    <h3 className="text-xs font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                      {person.name || 'Unknown Performer'}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-brand mt-0.5">
+                      {cred.role || 'Actor'}
                     </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                    {cred.character_name && (
+                      <span className="text-[10px] text-text-muted italic line-clamp-1 mt-0.5">
+                        as {cred.character_name}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Critic Reviews Section */}
+        <CriticReviewsSection playId={play.id} user={user} />
+
+        {/* Audience Reviews & Reactions */}
+        <ReviewSection playId={play.id} currentUser={user} />
+      </div>
     </div>
   );
 }

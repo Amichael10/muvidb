@@ -16,10 +16,10 @@ export function assertUuid(value: unknown, label: string): asserts value is stri
  */
 const DEFAULT_TEMPLATE_SLUGS: Record<SocialContentType, string> = {
   actor_spotlight: 'actor-spotlight-v1',
-  birthday_spotlight: 'birthday-spotlight-v1',
-  upcoming_movie: 'upcoming-movie-v1',
+  birthday_spotlight: 'actor-spotlight-v1',
+  upcoming_movie: 'now-showing-cinemas-v1',
   critics_say: 'critics-say-v1',
-  where_to_watch: 'upcoming-movie-v1',
+  where_to_watch: 'now-showing-cinemas-v1',
   weekend_watchlist: 'watchlist-this-week-v1',
   whats_on_stage: 'on-stage-theatre-v1',
   film_conversation: 'nollywood-debate-v1',

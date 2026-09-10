@@ -989,10 +989,10 @@ export function defaultTemplateSlugForSeries(seriesSlug: string, candidateType: 
   if (seriesSlug === 'weekend_watchlist') return 'watchlist-this-week-v1';
   if (seriesSlug === 'whats_on_stage') return 'on-stage-theatre-v1';
   if (seriesSlug === 'film_conversation') return 'nollywood-debate-v1';
-  if (seriesSlug === 'new_and_upcoming') return 'now-showing-cinemas-v1';
+  if (seriesSlug === 'new_and_upcoming' || seriesSlug === 'where_to_watch' || seriesSlug === 'upcoming_movie' || seriesSlug === 'now_showing') return 'now-showing-cinemas-v1';
   if (candidateType === 'play') return 'on-stage-theatre-v1';
   if (candidateType === 'person') return 'actor-spotlight-v1';
-  return 'upcoming-movie-v1';
+  return 'now-showing-cinemas-v1';
 }
 
 /**
@@ -1199,7 +1199,7 @@ export async function generateSocialDraft(
     const content = buildVariantContent({ snapshot, platform });
     const format = preferredAssetFormat(platform, availableFormats);
     const slideAssets = format ? (assets.carouselAssets?.[format] || []) : [];
-    const useCarousel = input.contentType === 'critics_say' && platform !== 'tiktok' && slideAssets.length >= 2;
+    const useCarousel = (input.contentType === 'critics_say' || input.contentType === 'weekend_watchlist') && platform !== 'tiktok' && slideAssets.length >= 2;
     return {
       content_item_id: contentItem.id,
       platform,

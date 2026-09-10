@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import CriticReviewsEditor from '../admin/CriticReviewsEditor';
 
-export default function CriticReviewsSection({ filmId, user }) {
+export default function CriticReviewsSection({ filmId, playId, user }) {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -15,18 +15,28 @@ export default function CriticReviewsSection({ filmId, user }) {
     user?.user_metadata?.role === 'admin';
 
   useEffect(() => {
-    if (filmId) {
+    if (filmId || playId) {
       fetchCriticReviews();
     }
-  }, [filmId]);
+  }, [filmId, playId]);
 
   const fetchCriticReviews = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let q = supabase
         .from('critic_reviews')
-        .select('*, critic:critics(id, name, slug, avatar_url, publication, is_verified)')
-        .eq('film_id', filmId)
+        .select('*, critic:critics(id, name, slug, avatar_url, publication, is_verified)');
+
+      if (playId) {
+        q = q.eq('play_id', playId);
+      } else if (filmId) {
+        q = q.eq('film_id', filmId);
+      } else {
+        setReviews([]);
+        return;
+      }
+
+      const { data, error } = await q
         .order('is_featured', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -61,7 +71,7 @@ export default function CriticReviewsSection({ filmId, user }) {
               Critic Reviews & Quotes
             </h2>
             <p className="text-xs text-text-muted">
-              Praise & commentary from film critics and publications
+              Praise & commentary from theatre and film critics
             </p>
           </div>
         </div>
@@ -83,7 +93,7 @@ export default function CriticReviewsSection({ filmId, user }) {
         <div className="bg-surface/50 border border-dashed border-border rounded-2xl p-8 text-center">
           <Icon icon="solar:quote-up-bold-duotone" className="text-4xl text-text-muted mx-auto mb-2 opacity-50" />
           <p className="text-sm font-semibold text-text-primary">No critic reviews added yet</p>
-          <p className="text-xs text-text-muted mt-1">As an admin, click "Manage Critic Quotes" above to add quotes from critics like Tolu Fagbure.</p>
+          <p className="text-xs text-text-muted mt-1">As an admin, click "Manage Critic Quotes" above to add quotes from critics.</p>
         </div>
       ) : (
         <div className={`grid grid-cols-1 ${reviews.length > 1 ? 'md:grid-cols-2' : ''} gap-6`}>
@@ -226,6 +236,7 @@ export default function CriticReviewsSection({ filmId, user }) {
 
             <CriticReviewsEditor
               filmId={filmId}
+              playId={playId}
               onUpdated={() => {
                 fetchCriticReviews();
               }}

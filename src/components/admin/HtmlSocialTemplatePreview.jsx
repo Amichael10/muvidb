@@ -6,7 +6,8 @@ const NATIVE_ARTBOARD_SIZE = {
   'critics-say-v1': 1080,
   'watchlist-this-week-v1': 1254,
   'nollywood-debate-v1': 1254,
-  'now-showing-cinemas-v1': 1254,
+  'now-showing-cinemas-v1': 1080,
+  'actor-spotlight-v1': 1254,
 };
 
 function formatDate(value) {
@@ -18,7 +19,7 @@ function formatDate(value) {
 
 function templateData(candidate, templateSlug) {
   const source = candidate?.data || {};
-  const poster = candidate?.imageUrl || source.poster_url || source.backdrop_url || '';
+  const poster = candidate?.imageUrl || source.poster_url || source.backdrop_url || source.photo_url || '';
   const title = candidate?.name || source.title || 'MuviDB Pick';
   const synopsis = source.synopsis || candidate?.subtext || '';
   const genres = Array.isArray(source.genres) ? source.genres : [];
@@ -31,8 +32,78 @@ function templateData(candidate, templateSlug) {
     return { title, description: synopsis || `${title} is on stage soon. Save the date and follow MuviDB for the theatre run details.`, venue, date: start && end && start !== end ? `${start} - ${end}` : start || end || (source.year ? String(source.year) : 'Date TBA'), time: source.performance_time || 'Time TBA', poster, posterAlt: title, handle: DEFAULT_HANDLE };
   }
   if (templateSlug === 'critics-say-v1') return { poster, review: source.tagline || synopsis || `The conversation around ${title} is heating up.`, criticImage: '', criticName: 'MuviDB Critics', criticRole: 'African cinema review desk', rating: 4, ratingMax: 5, handle: DEFAULT_HANDLE };
-  if (templateSlug === 'watchlist-this-week-v1') return { picks: [{ title, subtitle: source.year ? String(source.year) : '', poster, reason: source.watchAvailability || 'MuviDB pick', description: source.tagline || synopsis || 'Add this to your weekend watchlist.', platform: '', channelName: '' }], backPosters: [poster, source.backdrop_url].filter(Boolean), handle: DEFAULT_HANDLE };
+  if (templateSlug === 'watchlist-this-week-v1') {
+    const rawPicks = source.watchlistPicks || (source.picks ? source.picks : [source]);
+    const picksSource = [...rawPicks];
+    while (picksSource.length < 3) picksSource.push(picksSource[0]);
+    const picks = picksSource.slice(0, 3).map((film) => ({
+      title: film.title || film.name || title,
+      subtitle: film.year ? String(film.year) : '',
+      poster: film.poster_url || film.posterUrl || film.backdrop_url || film.backdropUrl || poster,
+      reason: film.watchAvailability || 'MuviDB pick',
+      description: film.synopsis || film.tagline || 'Add this to your weekend watchlist.',
+      platform: film.youtubeChannelName || film.youtube_channel_name ? 'youtube' : (film.watchAvailability || ''),
+      channelName: film.youtubeChannelName || film.youtube_channel_name || '',
+    }));
+    return {
+      picks,
+      backPosters: picks.map(p => p.poster).filter(Boolean),
+      handle: DEFAULT_HANDLE,
+    };
+  }
   if (templateSlug === 'nollywood-debate-v1') return { poster, handle: DEFAULT_HANDLE };
+  if (templateSlug === 'actor-spotlight-v1') {
+    const name = candidate?.name || source.name || 'Featured Talent';
+    const parts = name.trim().split(/\s+/);
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || '';
+    const dept = source.known_for_department || (source.roles && source.roles.length ? source.roles.join(' . ') : 'ACTOR');
+    return {
+      name,
+      firstName,
+      lastName,
+      roles: dept.toUpperCase(),
+      department: dept.toUpperCase(),
+      country: (source.nationality || source.country || 'NIGERIAN').toUpperCase(),
+      creditsCount: String(source.creditsCount || (source.knownFor && source.knownFor.length ? source.knownFor.length : (source.credits ? source.credits.length : 12))),
+      photo: poster,
+      handle: DEFAULT_HANDLE,
+    };
+  }
+  if (templateSlug === 'now-showing-cinemas-v1') {
+    const rawAvailability = `${source.watchAvailability || ''} ${source.platform || ''} ${candidate?.category || ''}`.toLowerCase();
+    let platform = 'docuth';
+    if (source.youtube_channel_name || source.youtubeChannelName || rawAvailability.includes('youtube')) {
+      platform = 'youtube';
+    } else if (rawAvailability.includes('docuth')) {
+      platform = 'docuth';
+    } else if (rawAvailability.includes('kav') || rawAvailability.includes('kàv')) {
+      platform = 'kava';
+    } else if (rawAvailability.includes('ebony')) {
+      platform = 'ebonyonplus';
+    } else if (rawAvailability.includes('circuit')) {
+      platform = 'circuits';
+    } else if (rawAvailability.includes('nollie')) {
+      platform = 'nolliestream';
+    } else if (rawAvailability.includes('netflix')) {
+      platform = 'netflix';
+    } else if (rawAvailability.includes('prime') || rawAvailability.includes('amazon')) {
+      platform = 'primevideo';
+    } else if (source.watchAvailability) {
+      platform = source.watchAvailability;
+    }
+
+    return {
+      title,
+      poster,
+      badge: source.watchAvailability || (source.coming_soon ? 'Coming Soon' : 'Now Streaming'),
+      platform,
+      year: source.year ? String(source.year) : '',
+      genres: genres,
+      synopsis: synopsis || source.tagline || title,
+      handle: DEFAULT_HANDLE,
+    };
+  }
   return { poster, badge: source.platformDisplayName || source.watchAvailability || (source.coming_soon ? 'Coming Soon' : 'Now Showing'), description: source.tagline || synopsis || title, feature1Title: title, feature1Subtitle: source.year ? String(source.year) : 'MuviDB pick', feature2Title: date || 'Release date TBA', feature2Subtitle: genres.slice(0, 2).join(' / ') || 'African cinema', feature3Title: source.topCast?.[0]?.name || 'On MuviDB', feature3Subtitle: source.watchAvailability || 'Track, rate, and save', handle: DEFAULT_HANDLE };
 }
 

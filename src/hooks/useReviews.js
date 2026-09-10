@@ -1,16 +1,29 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-export const useReviews = (filmId, currentUser) => {
+export const useReviews = (target, currentUser, optionalPlayId) => {
+    let filmId = null
+    let playId = null
+
+    if (typeof target === 'object' && target !== null) {
+        filmId = target.filmId || null
+        playId = target.playId || null
+    } else if (optionalPlayId) {
+        playId = optionalPlayId
+        filmId = target || null
+    } else {
+        filmId = target || null
+    }
+
     const [reviews, setReviews] = useState([])            // real user reviews
     const [externalReviews, setExternalReviews] = useState([]) // youtube/tmdb, badged
     const [userReview, setUserReview] = useState(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        if (!filmId) return
+        if (!filmId && !playId) return
         fetchReviews()
-    }, [filmId])
+    }, [filmId, playId])
 
     // Split a raw row set into real user reviews vs. third-party (badged) ones.
     const applyRows = (rows) => {
@@ -32,17 +45,25 @@ export const useReviews = (filmId, currentUser) => {
         setLoading(true)
         try {
             const fetchDirect = async () => {
-                const { data, error } = await supabase
+                let q = supabase
                     .from('reviews')
                     .select('*, users:user_id (name, avatar_url)')
-                    .eq('film_id', filmId)
-                    .order('created_at', { ascending: false })
+
+                if (playId) {
+                    q = q.eq('play_id', playId)
+                } else if (filmId) {
+                    q = q.eq('film_id', filmId)
+                } else {
+                    return []
+                }
+
+                const { data, error } = await q.order('created_at', { ascending: false })
                 if (error) throw error
                 return data || []
             }
 
             let rows = []
-            if (import.meta.env.DEV) {
+            if (playId || import.meta.env.DEV) {
                 rows = await fetchDirect()
             } else {
                 const res = await fetch(`/api/content?resource=film-reviews&filmId=${encodeURIComponent(filmId)}`)
@@ -64,7 +85,7 @@ export const useReviews = (filmId, currentUser) => {
         if (!currentUser?.id) return false
 
         try {
-            // Check if review exists and if it's within the 2-minute window
+            // Check if review exists and if it's within the 5-minute window
             if (userReview) {
                 const createdTime = new Date(userReview.created_at).getTime();
                 const now = Date.now();
@@ -74,19 +95,29 @@ export const useReviews = (filmId, currentUser) => {
                 }
             }
 
-            const { error } = await supabase
-                .from('reviews')
-                .upsert({
-                    user_id: currentUser.id,
-                    film_id: filmId,
-                    rating,
-                    body: bodyContent,
-                    updated_at: new Date().toISOString()
-                }, { 
-                    onConflict: 'user_id, film_id' 
-                });
+            const payload = {
+                user_id: currentUser.id,
+                rating,
+                body: bodyContent,
+                updated_at: new Date().toISOString()
+            }
 
-            if (error) throw error;
+            if (playId) {
+                payload.play_id = playId
+                payload.film_id = null
+            } else if (filmId) {
+                payload.film_id = filmId
+            }
+
+            let query
+            if (userReview?.id) {
+                query = supabase.from('reviews').update(payload).eq('id', userReview.id)
+            } else {
+                query = supabase.from('reviews').insert([payload])
+            }
+
+            const { error } = await query
+            if (error) throw error
             await fetchReviews()
             return true
         } catch (err) {
@@ -99,7 +130,6 @@ export const useReviews = (filmId, currentUser) => {
         if (!currentUser?.id) return false;
         
         try {
-            // Fetch the review to check its creation time
             const { data: review, error: fetchError } = await supabase
                 .from('reviews')
                 .select('created_at, user_id')

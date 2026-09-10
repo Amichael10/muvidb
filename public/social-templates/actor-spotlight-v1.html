@@ -1,0 +1,179 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MuviDB — Actor Spotlight</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Host+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#ececec;font-family:"Host Grotesk",Arial,sans-serif}
+.stage{width:1254px;height:1254px;position:relative;overflow:hidden;background:#fff;color:#000}
+.orange{color:#ff5a1f}
+
+/* top brand */
+.brand{position:absolute;left:60px;top:55px;display:flex;align-items:center;gap:12px}
+.mark{width:68px;height:68px;position:relative}
+.mark i{position:absolute;width:37px;height:24px;border-radius:5px;transform-origin:center}
+.mark i:nth-child(1){background:#ff4f12;left:16px;top:2px;transform:rotate(8deg) skew(-10deg)}
+.mark i:nth-child(2){background:#111820;left:2px;top:31px;transform:rotate(68deg) skew(-10deg)}
+.mark i:nth-child(3){background:#666;left:31px;top:33px;transform:rotate(-48deg) skew(-10deg)}
+.wordmark{font-size:54px;line-height:.8;letter-spacing:-2px;font-weight:700}
+.tag{font-size:10px;letter-spacing:4px;color:#ff5a1f;margin-top:10px;font-weight:700}
+.divider{height:74px;width:1px;background:#111;margin-left:34px}
+.mantra{font-size:20px;line-height:1.1;margin-left:22px;font-weight:600}
+.mantra span{color:#ff5a1f}
+.dots{position:absolute;right:56px;top:39px;width:110px;height:95px;background-image:radial-gradient(#ff5a1f 1.6px,transparent 1.8px);background-size:27px 23px}
+
+/* left copy section */
+.copy{position:absolute;left:65px;top:185px;width:500px}
+.name-first{font-family:"Bebas Neue",sans-serif;font-size:115px;line-height:.85;color:#1E3A5F;letter-spacing:1px;text-transform:uppercase}
+.name-last{font-family:"Bebas Neue",sans-serif;font-size:115px;line-height:.85;color:#ff5a1f;letter-spacing:1px;text-transform:uppercase;margin-top:4px}
+.roles-sub{font-size:26px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:#111;margin-top:22px}
+.rule{width:180px;height:5px;background:#ff5a1f;margin-top:16px;margin-bottom:34px}
+
+/* features */
+.features{display:flex;flex-direction:column;gap:20px;width:460px}
+.feature{display:flex;align-items:center;gap:18px}
+.feat-icon{width:56px;height:56px;border-radius:50%;background:#ffefe8;display:grid;place-items:center;flex-shrink:0}
+.feat-icon svg{width:28px;height:28px;fill:#ff5a1f}
+.ftxt{display:flex;flex-direction:column;border-left:2px solid #ff5a1f;padding-left:14px}
+.ftxt b{font-size:26px;font-weight:700;line-height:1;color:#000;text-transform:uppercase;letter-spacing:.5px}
+.ftxt span{font-size:18px;color:#666;font-weight:500;margin-top:4px}
+
+/* cta button */
+.cta-box{margin-top:40px}
+.profile-btn{display:inline-flex;align-items:center;gap:14px;border:2px solid #ff5a1f;border-radius:50px;padding:8px 24px 8px 10px;background:#fff;text-decoration:none}
+.btn-circle{width:48px;height:48px;border-radius:50%;background:#ff5a1f;display:grid;place-items:center}
+.btn-circle svg{width:22px;height:22px;fill:#fff}
+.btn-text{display:flex;flex-direction:column}
+.btn-text span{font-size:14px;font-weight:700;letter-spacing:1.5px;color:#111;text-transform:uppercase}
+.btn-text strong{font-size:19px;font-weight:700;color:#ff5a1f}
+
+/* right photo mask */
+.side-reel{position:absolute;right:0;top:280px;width:45px;height:650px;background-image:radial-gradient(#ddd 6px,transparent 7px);background-size:20px 36px;opacity:.7}
+.photo-frame{position:absolute;left:560px;top:190px;width:630px;height:840px;border-radius:32px;overflow:hidden;background:#f0f0f0;box-shadow:0 16px 40px rgba(0,0,0,0.12)}
+.photo-frame img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block}
+
+/* footer */
+.footer-line{position:absolute;left:45px;right:45px;bottom:95px;height:2px;background:#ff5a1f}
+.exact-footer-socials{position:absolute;left:53px;bottom:38px;height:35px;display:flex;align-items:center;gap:19px}
+.exact-social{width:27px;height:27px;flex:0 0 27px}
+.exact-social svg{width:27px;height:27px;display:block}
+.handle{margin-left:8px;font-size:20px;font-weight:600;letter-spacing:0}
+</style>
+</head>
+<body>
+<div class="stage">
+  <!-- Brand -->
+  <div class="brand">
+    <div class="mark"><i></i><i></i><i></i></div>
+    <div><div class="wordmark">MuviDB</div><div class="tag">EVERY FILM. EVERY CREDIT</div></div>
+    <div class="divider"></div>
+    <div class="mantra">DISCOVER.<div>CREDIT.</div><div><span>CELEBRATE.</span></div></div>
+  </div>
+  <div class="dots"></div>
+
+  <!-- Left Content -->
+  <div class="copy">
+    <div class="name-first" id="first">ADEDIMEJI</div>
+    <div class="name-last orange" id="last">LATEEF</div>
+    <div class="roles-sub" id="roles">ACTOR . DIRECTOR</div>
+    <div class="rule"></div>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feat-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+        </div>
+        <div class="ftxt">
+          <b id="creditsCount">164</b>
+          <span>Verified Credits</span>
+        </div>
+      </div>
+
+      <div class="feature">
+        <div class="feat-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        </div>
+        <div class="ftxt">
+          <b id="country">NIGERIAN</b>
+          <span>Country / Origin</span>
+        </div>
+      </div>
+
+      <div class="feature">
+        <div class="feat-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        </div>
+        <div class="ftxt">
+          <b id="department">ACTOR . DIRECTOR</b>
+          <span>Department & Craft</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta-box">
+      <div class="profile-btn">
+        <div class="btn-circle">
+          <svg viewBox="0 0 24 24"><path d="M5 13h11.86l-5.43 5.43 1.42 1.42L21.14 12l-8.29-7.85-1.42 1.42L16.86 11H5v2z"/></svg>
+        </div>
+        <div class="btn-text">
+          <span>VIEW PROFILE</span>
+          <strong>MuviDB.com</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side Photo -->
+  <div class="side-reel"></div>
+  <div class="photo-frame">
+    <img id="photo" src="" alt="Talent Portrait">
+  </div>
+
+  <!-- Footer -->
+  <div class="footer-line"></div>
+  <div class="exact-footer-socials">
+    <div class="exact-social">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+    </div>
+    <div class="exact-social">
+      <svg viewBox="0 0 24 24" fill="#111"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+    </div>
+    <div class="exact-social">
+      <svg viewBox="0 0 24 24" fill="#111"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+    </div>
+    <div class="exact-social">
+      <svg viewBox="0 0 24 24" fill="#111"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298-.002.595.042.88.13V9.4a6.33 6.33 0 0 0-1-.08A6.34 6.34 0 0 0 3 15.66a6.34 6.34 0 0 0 10.82 4.46 6.27 6.27 0 0 0 1.87-4.46V8.7a8.27 8.27 0 0 0 4.9 1.58V6.84a4.85 4.85 0 0 1-1-.15z"/></svg>
+    </div>
+    <div class="exact-social">
+      <svg viewBox="0 0 24 24" fill="#111"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c2.42 0 4.64-.86 6.39-2.31l-1.39-1.39c-1.38 1.15-3.12 1.84-5 1.84-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8c0 1.48-.42 2.86-1.14 4.04l1.49 1.49C21.36 15.89 22 14.02 22 12c0-5.52-4.48-10-10-10z"/></svg>
+    </div>
+    <div class="handle" id="handle">@muvidb_</div>
+  </div>
+</div>
+
+<script>
+const q = new URLSearchParams(window.location.search);
+let d = window.MUVIDB_DATA || {};
+if (q.get('data')) {
+  try {
+    d = JSON.parse(decodeURIComponent(escape(atob(q.get('data')))));
+  } catch(e) {}
+}
+
+if (d.name) {
+  const parts = String(d.name).trim().split(/\s+/);
+  document.getElementById('first').textContent = d.firstName || parts[0] || '';
+  document.getElementById('last').textContent = d.lastName || parts.slice(1).join(' ') || '';
+}
+if (d.roles) document.getElementById('roles').textContent = d.roles;
+if (d.creditsCount) document.getElementById('creditsCount').textContent = d.creditsCount;
+if (d.country || d.nationality) document.getElementById('country').textContent = d.country || d.nationality;
+if (d.department || d.roles) document.getElementById('department').textContent = d.department || d.roles;
+if (d.photo || d.photoUrl || d.poster) document.getElementById('photo').src = d.photo || d.photoUrl || d.poster;
+if (d.handle) document.getElementById('handle').textContent = d.handle;
+</script>
+</body>
+</html>

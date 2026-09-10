@@ -41,7 +41,6 @@ const ReviewCard = ({
     const [expanded, setExpanded] = useState(false);
     
     // Check if the review is still editable (within 5 minutes of creation).
-    // NB: this is UX only — the real enforcement is the RLS policy on the DB.
     const getEditStatus = () => {
         const createdTime = new Date(review.created_at).getTime();
         const now = Date.now();
@@ -153,8 +152,7 @@ const ReviewCard = ({
     )
 }
 
-// Third-party review (YouTube comment) — clearly badged, author NOT clickable
-// (they're not our users), no edit/delete, links out to the original comment.
+// Third-party review (YouTube comment)
 const ExternalReviewCard = ({ review }) => {
     const [expanded, setExpanded] = useState(false);
     const name = review.author_name || 'YouTube viewer';
@@ -175,14 +173,12 @@ const ExternalReviewCard = ({ review }) => {
                             </div>
                         )}
                         <div className="min-w-0">
-                            {/* plain text — deliberately not a link */}
                             <p className="text-text-primary font-bold text-sm tracking-tight truncate">{name}</p>
                             <span className="inline-flex items-center gap-1 mt-0.5 text-[8px] font-black uppercase tracking-widest text-red-500/90 bg-red-500/5 border border-red-500/10 px-1.5 py-0.5 rounded">
                                 <Icon icon="mdi:youtube" className="text-[10px]" /> via YouTube
                             </span>
                         </div>
                     </div>
-                    {/* Like count */}
                     {review.likes > 0 && (
                         <span className="text-text-muted text-[10px] font-bold flex items-center gap-1 shrink-0 bg-surface-2/60 px-2 py-0.5 rounded-lg border border-border">
                             <Icon icon="solar:like-bold" className="text-xs text-text-secondary" /> {review.likes.toLocaleString()}
@@ -224,7 +220,8 @@ const ReviewForm = ({
     onCancel,
     initialRating = 0,
     initialBody = '',
-    isEditing = false
+    isEditing = false,
+    itemLabel = 'production'
 }) => {
     const [rating, setRating] = useState(initialRating)
     const [body, setBody] = useState(initialBody)
@@ -256,10 +253,10 @@ const ReviewForm = ({
             
             <div className="relative z-10">
                 <h4 className="text-text-primary text-lg font-bold tracking-tight">
-                    {isEditing ? 'Edit Your Review' : 'Write a Review'}
+                    {isEditing ? 'Edit Your Review' : `Write a Review for this ${itemLabel}`}
                 </h4>
                 <p className="text-text-muted text-[10px] font-bold tracking-wider mt-1">
-                    {isEditing ? 'Update your feedback' : 'Share your thoughts with the community'}
+                    {isEditing ? 'Update your feedback' : 'Share your thoughts with the theatre & film community'}
                 </p>
             </div>
 
@@ -297,7 +294,7 @@ const ReviewForm = ({
                 <button
                     type="submit"
                     disabled={submitting}
-                    className="flex-[2] bg-brand text-white font-bold py-4 rounded-xl text-sm btn-hover shadow-lg shadow-brand/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="flex-[2] bg-brand text-white font-bold py-4 rounded-xl text-sm btn-hover shadow-lg shadow-brand/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                     {submitting ? (
                         <>
@@ -312,7 +309,7 @@ const ReviewForm = ({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="flex-1 bg-surface-2 text-text-secondary font-bold py-4 rounded-xl text-sm transition-all hover:bg-surface-3"
+                        className="flex-1 bg-surface-2 text-text-secondary font-bold py-4 rounded-xl text-sm transition-all hover:bg-surface-3 cursor-pointer"
                     >
                         Cancel
                     </button>
@@ -322,7 +319,7 @@ const ReviewForm = ({
     )
 }
 
-const ReviewSection = ({ filmId, currentUser }) => {
+const ReviewSection = ({ filmId, playId, currentUser }) => {
     const navigate = useNavigate()
     const {
         reviews,
@@ -331,12 +328,14 @@ const ReviewSection = ({ filmId, currentUser }) => {
         loading,
         submitReview,
         deleteReview
-    } = useReviews(filmId, currentUser)
+    } = useReviews({ filmId, playId }, currentUser)
 
     const [showForm, setShowForm] = useState(false)
     const [editingReview, setEditingReview] = useState(null)
     const [activeTab, setActiveTab] = useState('all') // 'all' | 'community' | 'audience'
     const [visibleLimit, setVisibleLimit] = useState(6)
+
+    const isPlay = Boolean(playId);
 
     const handleSubmit = async (rating, body) => {
         const success = await submitReview(rating, body)
@@ -376,7 +375,6 @@ const ReviewSection = ({ filmId, currentUser }) => {
         return Math.min(9.7, adjusted).toFixed(1)
     })()
 
-    // Normalize reviews into a combined list for flexible display
     const communityItems = reviews
         .filter(r => editingReview?.id !== r.id)
         .map(r => ({ type: 'community', data: r, id: `comm_${r.id}` }))
@@ -399,12 +397,12 @@ const ReviewSection = ({ filmId, currentUser }) => {
     const totalCount = allItems.length
 
     return (
-        <div className="space-y-6 pt-2">
+        <div id="reviews-section" className="space-y-6 pt-2 my-10">
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-6">
                 <div>
                     <h3 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary tracking-tight leading-none">
-                        Reviews & Reactions
+                        Audience Reviews & Reactions
                     </h3>
                     <div className="text-text-muted text-xs font-bold tracking-wide mt-2 flex flex-wrap items-center gap-2.5">
                         <span>{totalCount} total reaction{totalCount !== 1 ? 's' : ''}</span>
@@ -432,10 +430,10 @@ const ReviewSection = ({ filmId, currentUser }) => {
                 {!userReview && !showForm && !editingReview && (
                     <button
                         onClick={() => currentUser ? setShowForm(true) : navigate('/login')}
-                        className="bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs sm:text-sm btn-hover shadow-lg shadow-brand/20 flex items-center justify-center gap-2 shrink-0"
+                        className="bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs sm:text-sm btn-hover shadow-lg shadow-brand/20 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
                     >
                         <Icon icon="solar:pen-new-square-linear" width="16" />
-                        <span>{currentUser ? 'Write a Review' : 'Sign in to review'}</span>
+                        <span>{currentUser ? `Review this ${isPlay ? 'Play' : 'Film'}` : 'Sign in to review'}</span>
                     </button>
                 )}
             </div>
@@ -449,6 +447,7 @@ const ReviewSection = ({ filmId, currentUser }) => {
                         initialRating={editingReview?.rating}
                         initialBody={editingReview?.body}
                         isEditing={!!editingReview}
+                        itemLabel={isPlay ? 'Stage Play' : 'Film'}
                     />
                 </div>
             )}
@@ -543,7 +542,7 @@ const ReviewSection = ({ filmId, currentUser }) => {
                                     <button
                                         type="button"
                                         onClick={() => setVisibleLimit(prev => Math.min(displayedList.length, prev + 6))}
-                                        className="px-5 py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-text-primary text-xs font-bold transition-all flex items-center gap-2 hover:border-brand/40 shadow-sm"
+                                        className="px-5 py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-text-primary text-xs font-bold transition-all flex items-center gap-2 hover:border-brand/40 shadow-sm cursor-pointer"
                                     >
                                         <span>Show more reviews (+{displayedList.length - visibleLimit} remaining)</span>
                                         <Icon icon="solar:alt-arrow-down-linear" className="text-sm" />
@@ -556,7 +555,7 @@ const ReviewSection = ({ filmId, currentUser }) => {
                                             setVisibleLimit(6)
                                             document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' })
                                         }}
-                                        className="px-5 py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-text-muted hover:text-text-primary text-xs font-bold transition-all flex items-center gap-2"
+                                        className="px-5 py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-text-muted hover:text-text-primary text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
                                     >
                                         <span>Show less</span>
                                         <Icon icon="solar:alt-arrow-up-linear" className="text-sm" />
@@ -568,12 +567,12 @@ const ReviewSection = ({ filmId, currentUser }) => {
                 ) : (
                     <div className="bg-surface-2/40 border border-dashed border-border rounded-xl py-8 px-4 text-center">
                         <Icon icon="solar:clapperboard-play-linear" className="text-3xl mx-auto mb-3 opacity-25 text-brand" />
-                        <h4 className="text-text-primary text-base font-bold tracking-tight">No reviews in this category yet</h4>
-                        <p className="text-text-muted text-xs mt-1 max-w-xs mx-auto">Be the first to share your thoughts.</p>
+                        <h4 className="text-text-primary text-base font-bold tracking-tight">No audience reviews for this {isPlay ? 'stage play' : 'film'} yet</h4>
+                        <p className="text-text-muted text-xs mt-1 max-w-xs mx-auto">Be the first to share your experience.</p>
                         {!showForm && (
                             <button
                                 onClick={() => currentUser ? setShowForm(true) : navigate('/login')}
-                                className="mt-4 text-brand font-bold text-xs hover:text-brand/80 transition-colors flex items-center justify-center gap-2 mx-auto"
+                                className="mt-4 text-brand font-bold text-xs hover:text-brand/80 transition-colors flex items-center justify-center gap-2 mx-auto cursor-pointer"
                             >
                                 <Icon icon="solar:add-circle-linear" width="16" />
                                 Write a Review

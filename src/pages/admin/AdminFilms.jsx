@@ -717,7 +717,7 @@ export default function AdminFilms() {
         genres: film.genres || [],
         runtime_minutes: film.runtime_minutes || '',
         is_featured: film.is_featured || false,
-        release_type: film.release_type || 'cinema',
+        release_type: film.release_type || '',
         youtube_watch_url: film.youtube_watch_url || '',
         streaming_links: film.streaming_links || {},
         awards: Array.isArray(film.awards) ? film.awards : [],
@@ -2975,20 +2975,32 @@ export default function AdminFilms() {
                             type="button"
                             onClick={() => {
                               if (type === 'cinema') {
-                                setFormData({ ...formData, release_type: 'cinema' });
+                                setFormData({
+                                  ...formData,
+                                  release_type: isActive ? '' : 'cinema',
+                                  is_in_cinemas: isActive ? false : formData.is_in_cinemas
+                                });
                               } else {
                                 const newLinks = { ...formData.streaming_links };
-                                if (isActive && !isPrimary) {
+                                if (isActive) {
                                   delete newLinks[type];
+                                  const remainingTypes = Object.keys(newLinks);
+                                  const nextPrimary = formData.release_type === type
+                                    ? (remainingTypes[0] || '')
+                                    : formData.release_type;
+                                  setFormData({
+                                    ...formData,
+                                    streaming_links: newLinks,
+                                    release_type: nextPrimary
+                                  });
                                 } else {
                                   newLinks[type] = newLinks[type] || '';
+                                  setFormData({
+                                    ...formData,
+                                    streaming_links: newLinks,
+                                    release_type: (!formData.release_type || formData.release_type === 'cinema') ? type : formData.release_type
+                                  });
                                 }
-                                setFormData({ 
-                                  ...formData, 
-                                  streaming_links: newLinks,
-                                  // If we just activated it and nothing is primary, make it primary
-                                  release_type: (!formData.release_type || formData.release_type === 'cinema') ? type : formData.release_type
-                                });
                               }
                             }}
                             className={`py-1.5 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all flex items-center gap-2 ${

@@ -33,6 +33,7 @@ export const HTML_SOCIAL_TEMPLATES: Record<string, HtmlTemplateSpec> = {
     file: 'watchlist-this-week-v1.html',
     formats: ['square_1_1'],
     data: watchlistData,
+    slides: 5,
   },
   'nollywood-debate-v1': {
     file: 'nollywood-debate-v1.html',
@@ -43,6 +44,11 @@ export const HTML_SOCIAL_TEMPLATES: Record<string, HtmlTemplateSpec> = {
     file: 'now-showing-cinemas-v1.html',
     formats: ['square_1_1'],
     data: nowShowingData,
+  },
+  'actor-spotlight-v1': {
+    file: 'actor-spotlight-v1.html',
+    formats: ['square_1_1'],
+    data: actorData,
   },
 };
 
@@ -129,7 +135,7 @@ function watchlistData(snapshot: SocialSourceSnapshot): Record<string, unknown> 
     poster: film.posterUrl || film.backdropUrl || '',
     reason: film.watchAvailability || 'MuviDB pick',
     description: buildMovieHook(film.tagline, film.synopsis, film.title) || 'Add this to your weekend watchlist.',
-    platform: film.youtubeChannelName ? 'youtube' : '',
+    platform: film.youtubeChannelName ? 'youtube' : (film.watchAvailability || ''),
     channelName: film.youtubeChannelName || '',
   }));
   return {
@@ -149,16 +155,61 @@ function debateData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
 
 function nowShowingData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   const s = movie(snapshot);
+  const rawAvailability = `${s.watchAvailability || ''} ${s.platform || ''}`.toLowerCase();
+  let platform = 'docuth';
+  if (s.youtubeChannelName || rawAvailability.includes('youtube')) {
+    platform = 'youtube';
+  } else if (rawAvailability.includes('docuth')) {
+    platform = 'docuth';
+  } else if (rawAvailability.includes('kav') || rawAvailability.includes('kàv')) {
+    platform = 'kava';
+  } else if (rawAvailability.includes('ebony')) {
+    platform = 'ebonyonplus';
+  } else if (rawAvailability.includes('circuit')) {
+    platform = 'circuits';
+  } else if (rawAvailability.includes('nollie')) {
+    platform = 'nolliestream';
+  } else if (rawAvailability.includes('netflix')) {
+    platform = 'netflix';
+  } else if (rawAvailability.includes('prime') || rawAvailability.includes('amazon')) {
+    platform = 'primevideo';
+  } else if (s.watchAvailability) {
+    platform = s.watchAvailability;
+  }
+
   return {
+    title: s.title,
     poster: s.posterUrl || s.backdropUrl || '',
-    badge: s.watchAvailability || (s.comingSoon ? 'Coming Soon' : 'Now Showing'),
+    badge: s.watchAvailability || (s.comingSoon ? 'Coming Soon' : 'Now Streaming'),
+    platform,
+    year: s.year ? String(s.year) : '',
+    genres: s.genres || [],
+    synopsis: s.synopsis || s.tagline || buildMovieHook(s.tagline, s.synopsis, s.title) || s.title,
     description: buildMovieHook(s.tagline, s.synopsis, s.title) || s.title,
-    feature1Title: s.title,
-    feature1Subtitle: s.year ? String(s.year) : 'MuviDB pick',
-    feature2Title: s.releaseDate ? formatDate(s.releaseDate) : 'Release date TBA',
-    feature2Subtitle: s.genres.slice(0, 2).join(' / ') || 'African cinema',
-    feature3Title: s.topCast[0]?.name || 'On MuviDB',
-    feature3Subtitle: s.watchAvailability || 'Track, rate, and save',
+    handle: DEFAULT_HANDLE,
+  };
+}
+
+function actorData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
+  const s = snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight' ? (snapshot as any) : {};
+  const name = String(s.name || '').trim();
+  const parts = name ? name.split(/\s+/) : ['Featured', 'Talent'];
+  const firstName = parts[0] || '';
+  const lastName = parts.slice(1).join(' ') || '';
+  const department = s.knownForDepartment || (s.roles && s.roles.length ? s.roles.join(' . ') : 'ACTOR');
+  const country = s.nationality || s.country || 'NIGERIAN';
+  const creditsCount = s.creditCount || (s.knownFor && s.knownFor.length ? s.knownFor.length : 12);
+  const photo = s.photoUrl || s.photoCutoutUrl || s.backdropUrl || s.posterUrl || '';
+
+  return {
+    name,
+    firstName,
+    lastName,
+    roles: department.toUpperCase(),
+    department: department.toUpperCase(),
+    country: country.toUpperCase(),
+    creditsCount: String(creditsCount),
+    photo,
     handle: DEFAULT_HANDLE,
   };
 }

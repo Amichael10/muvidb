@@ -867,19 +867,34 @@ function getPlatformTheme(snapshot: UpcomingMovieSnapshot): {
   cta: string;
 } {
   const textVal = `${snapshot.watchAvailability || ''} ${snapshot.title || ''}`.toLowerCase();
+  if (textVal.includes('docuth')) {
+    return { accent: '#004BAF', name: 'Docuth', eyebrow: 'NOW ON DOCUTH', cta: 'STREAM ON DOCUTH' };
+  }
+  if (textVal.includes('kav') || textVal.includes('kàv')) {
+    return { accent: '#EB4296', name: 'Kava', eyebrow: 'NOW ON KAVA', cta: 'STREAM ON KAVA' };
+  }
+  if (textVal.includes('ebony')) {
+    return { accent: '#FF8310', name: 'EbonyLife ON', eyebrow: 'NOW ON EBONYLIFE ON', cta: 'STREAM ON EBONYLIFE ON' };
+  }
+  if (textVal.includes('circuit')) {
+    return { accent: '#F15A24', name: 'Circuits', eyebrow: 'NOW ON CIRCUITS', cta: 'STREAM ON CIRCUITS' };
+  }
+  if (textVal.includes('nollie')) {
+    return { accent: '#FFB302', name: 'Nolliestream', eyebrow: 'NOW ON NOLLIESTREAM', cta: 'STREAM ON NOLLIESTREAM' };
+  }
   if (textVal.includes('prime') || textVal.includes('amazon')) {
-    return { accent: '#00A8E1', name: 'Prime Video', eyebrow: 'NEW ON PRIME VIDEO', cta: 'STREAM ON PRIME VIDEO' };
+    return { accent: '#00A8E1', name: 'Prime Video', eyebrow: 'NOW ON PRIME VIDEO', cta: 'STREAM ON PRIME VIDEO' };
   }
   if (textVal.includes('netflix')) {
-    return { accent: '#E50914', name: 'Netflix', eyebrow: 'NEW ON NETFLIX', cta: 'STREAM ON NETFLIX' };
+    return { accent: '#E50914', name: 'Netflix', eyebrow: 'NOW ON NETFLIX', cta: 'STREAM ON NETFLIX' };
   }
-  if (textVal.includes('youtube')) {
+  if (textVal.includes('youtube') || snapshot.youtubeChannelName) {
     return { accent: '#FF0000', name: 'YouTube', eyebrow: 'FREE ON YOUTUBE', cta: 'WATCH ON YOUTUBE' };
   }
-  if (textVal.includes('cinema')) {
+  if (snapshot.isInCinemas || (textVal.includes('cinema') && !textVal.includes('not in cinema'))) {
     return { accent: '#FF5A1F', name: 'In Cinemas', eyebrow: 'IN CINEMAS NOW', cta: 'BUY TICKETS' };
   }
-  return { accent: '#FF5A1F', name: 'MuviDB', eyebrow: snapshot.comingSoon ? 'COMING SOON' : 'STREAMING SPOTLIGHT', cta: 'DISCOVER ON MUVIDB' };
+  return { accent: '#004BAF', name: 'Streaming', eyebrow: snapshot.comingSoon ? 'COMING SOON' : 'NOW STREAMING', cta: 'DISCOVER ON MUVIDB' };
 }
 
 /**
@@ -901,17 +916,18 @@ function buildMovieSpotlightCard(
 
   const theme = getPlatformTheme(snapshot);
   const density = {
-    portrait_4_5: { synLen: 140, castCount: 3, headline: 1, gap: 1 },
-    square_1_1: { synLen: 75, castCount: 2, headline: 0.78, gap: 0.65 },
-    vertical_9_16: { synLen: 180, castCount: 3, headline: 1.05, gap: 1.15 },
+    portrait_4_5: { synLen: 75, castCount: 3, headline: 1, gap: 1 },
+    square_1_1: { synLen: 63, castCount: 2, headline: 0.78, gap: 0.65 },
+    vertical_9_16: { synLen: 90, castCount: 3, headline: 1.05, gap: 1.15 },
   }[format];
 
   const g = s * density.gap;
   const titleParts = splitHeadlineName(snapshot.title);
   const castList = (snapshot.topCast || []).slice(0, density.castCount).map(c => c.name).join(', ');
-  const synopsis = snapshot.synopsis && snapshot.synopsis.length > density.synLen
-    ? `${snapshot.synopsis.slice(0, density.synLen - 3).trimEnd()}…`
-    : snapshot.synopsis;
+  const rawSynopsis = (snapshot.synopsis || '').trim().replace(/\s+/g, ' ');
+  const synopsis = rawSynopsis && rawSynopsis.length > density.synLen
+    ? `${rawSynopsis.slice(0, density.synLen - 1).trimEnd()}…`
+    : rawSynopsis;
 
   const children: unknown[] = [];
 

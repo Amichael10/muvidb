@@ -35,6 +35,10 @@ const HTML_TEMPLATE_BY_SERIES = {
   whats_on_stage: 'on-stage-theatre-v1',
   film_conversation: 'nollywood-debate-v1',
   new_and_upcoming: 'now-showing-cinemas-v1',
+  actor_spotlight: 'actor-spotlight-v1',
+  birthday_spotlight: 'actor-spotlight-v1',
+  where_to_watch: 'now-showing-cinemas-v1',
+  now_showing: 'now-showing-cinemas-v1',
 };
 
 const HTML_TEMPLATE_SLUGS = new Set([
@@ -43,11 +47,19 @@ const HTML_TEMPLATE_SLUGS = new Set([
   'on-stage-theatre-v1',
   'nollywood-debate-v1',
   'now-showing-cinemas-v1',
+  'actor-spotlight-v1',
 ]);
 
 function normalizeCandidateTemplate(nextCandidate, seriesSlug) {
   if (!nextCandidate) return null;
-  const templateSlug = HTML_TEMPLATE_BY_SERIES[seriesSlug] || nextCandidate.templateSlug;
+  let templateSlug = nextCandidate.templateSlug;
+  if (!templateSlug || !HTML_TEMPLATE_SLUGS.has(templateSlug)) {
+    templateSlug = HTML_TEMPLATE_BY_SERIES[seriesSlug] || 'now-showing-cinemas-v1';
+  }
+  const rawPicks = nextCandidate.data?.watchlistPicks || nextCandidate.data?.picks;
+  if (templateSlug === 'watchlist-this-week-v1' && (!rawPicks || !Array.isArray(rawPicks) || rawPicks.length < 2)) {
+    templateSlug = 'now-showing-cinemas-v1';
+  }
   return templateSlug ? { ...nextCandidate, templateSlug } : nextCandidate;
 }
 

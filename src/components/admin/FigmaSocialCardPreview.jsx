@@ -7,49 +7,60 @@ import { Icon } from '@iconify/react';
 export function getPlatformBranding(candidate, series) {
   const text = `${candidate?.data?.watchAvailability || ''} ${candidate?.data?.platformDisplayName || ''} ${candidate?.data?.platform || ''} ${candidate?.category || ''} ${candidate?.name || ''} ${series?.slug || ''} ${series?.name || ''}`.toLowerCase();
 
-  if (candidate?.data?.lifecycle === 'upcoming' || candidate?.data?.coming_soon) {
+  if (text.includes('kav') || text.includes('kàv')) {
     return {
-      name: 'Coming Soon',
-      badge: 'UPCOMING RELEASE',
-      accent: '#FF7A00',
-      bgGlow: 'rgba(255, 122, 0, 0.25)',
-      platformIcon: 'solar:calendar-date-bold',
-      status: candidate?.data?.release_date ? `RELEASES ${candidate.data.release_date}` : 'COMING SOON',
-      subtext: 'Track this release on MuviDB',
-      ctaText: 'EXPLORE ON MUVIDB.COM',
+      name: 'Kava',
+      badge: 'NOW ON KAVA',
+      accent: '#EB4296',
+      bgGlow: 'rgba(235, 66, 150, 0.25)',
+      platformIcon: 'solar:tv-bold',
+      status: 'NOW STREAMING',
+      subtext: 'Stream on Kava App',
+      ctaText: 'STREAM ON KAVA',
     };
   }
-  
-  if (text.includes('nollistream')) {
+  if (text.includes('circuit')) {
+    return {
+      name: 'Circuits',
+      badge: 'NOW ON CIRCUITS',
+      accent: '#F15A24',
+      bgGlow: 'rgba(241, 90, 36, 0.25)',
+      platformIcon: 'solar:tv-bold',
+      status: 'NOW STREAMING',
+      subtext: 'Stream on Circuits',
+      ctaText: 'STREAM ON CIRCUITS',
+    };
+  }
+  if (text.includes('nollistream') || text.includes('nolliestream')) {
     return {
       name: 'NolliStream',
-      badge: 'NOLLISTREAM EXCLUSIVE',
-      accent: '#FF7A00',
-      bgGlow: 'rgba(255, 122, 0, 0.25)',
+      badge: 'NOW ON NOLLIESTREAM',
+      accent: '#FFB302',
+      bgGlow: 'rgba(255, 179, 2, 0.25)',
       platformIcon: 'solar:play-circle-bold',
       status: 'NOW STREAMING',
-      subtext: 'Watch on Nollistream.com',
-      ctaText: 'STREAM ON NOLLISTREAM',
+      subtext: 'Watch on Nolliestream.com',
+      ctaText: 'STREAM ON NOLLIESTREAM',
     };
   }
   if (text.includes('docuth')) {
     return {
       name: 'Docuth',
       badge: 'NOW ON DOCUTH',
-      accent: '#06B6D4',
-      bgGlow: 'rgba(6, 182, 212, 0.25)',
+      accent: '#004BAF',
+      bgGlow: 'rgba(0, 75, 175, 0.25)',
       platformIcon: 'solar:tv-bold',
       status: 'NOW STREAMING',
       subtext: 'Documentaries & Cinema on Docuth',
       ctaText: 'STREAM ON DOCUTH',
     };
   }
-  if (text.includes('ebonylife')) {
+  if (text.includes('ebonylife') || text.includes('ebonyonplus') || text.includes('ebony')) {
     return {
       name: 'EbonyLife ON',
       badge: 'EBONYLIFE ON PLUS',
-      accent: '#E11D48',
-      bgGlow: 'rgba(225, 29, 72, 0.25)',
+      accent: '#FF8310',
+      bgGlow: 'rgba(255, 131, 16, 0.25)',
       platformIcon: 'solar:clapperboard-bold',
       status: 'NOW STREAMING',
       subtext: 'Stream on EbonyLife ON Plus',
@@ -59,7 +70,7 @@ export function getPlatformBranding(candidate, series) {
   if (text.includes('prime') || text.includes('amazon')) {
     return {
       name: 'Prime Video',
-      badge: 'NOW ON PRIME',
+      badge: 'NOW ON PRIME VIDEO',
       accent: '#00A8E1',
       bgGlow: 'rgba(0, 168, 225, 0.25)',
       platformIcon: 'ri:amazon-fill',
@@ -72,15 +83,15 @@ export function getPlatformBranding(candidate, series) {
     return {
       name: 'Netflix',
       badge: 'NOW ON NETFLIX',
-      accent: '#E50914',
-      bgGlow: 'rgba(229, 9, 20, 0.25)',
+      accent: '#E60A12',
+      bgGlow: 'rgba(230, 10, 18, 0.25)',
       platformIcon: 'simple-icons:netflix',
       status: 'NOW STREAMING',
       subtext: 'Only on Netflix',
       ctaText: 'STREAM ON NETFLIX',
     };
   }
-  if (text.includes('youtube')) {
+  if (text.includes('youtube') || candidate?.data?.youtubeChannelName) {
     const channelName = candidate?.data?.youtubeChannelName;
     return {
       name: 'YouTube',
@@ -93,7 +104,7 @@ export function getPlatformBranding(candidate, series) {
       ctaText: 'WATCH ON YOUTUBE',
     };
   }
-  if (text.includes('cinema') || candidate?.data?.is_in_cinemas) {
+  if (candidate?.data?.is_in_cinemas || (text.includes('cinema') && !text.includes('not in cinema'))) {
     return {
       name: 'In Cinemas',
       badge: 'IN CINEMAS NOW',
@@ -103,6 +114,18 @@ export function getPlatformBranding(candidate, series) {
       status: 'IN CINEMAS NOW',
       subtext: 'Check showtimes at cinemas near you',
       ctaText: 'BOOK CINEMA TICKETS',
+    };
+  }
+  if (candidate?.data?.lifecycle === 'upcoming' || candidate?.data?.coming_soon) {
+    return {
+      name: 'Coming Soon',
+      badge: 'UPCOMING RELEASE',
+      accent: '#FF7A00',
+      bgGlow: 'rgba(255, 122, 0, 0.25)',
+      platformIcon: 'solar:calendar-date-bold',
+      status: candidate?.data?.release_date ? `RELEASES ${candidate.data.release_date}` : 'COMING SOON',
+      subtext: 'Track this release on MuviDB',
+      ctaText: 'EXPLORE ON MUVIDB.COM',
     };
   }
 
