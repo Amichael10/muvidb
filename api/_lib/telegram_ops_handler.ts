@@ -513,6 +513,119 @@ Respond ONLY with a valid JSON object matching this schema:
     return;
   }
 
+  if (data.startsWith('post_approve:')) {
+    const contentItemId = data.slice('post_approve:'.length).trim();
+    const { data: item, error: itemErr } = await supabase
+      .from('social_content_items')
+      .select('id, title, status, scheduled_for')
+      .eq('id', contentItemId)
+      .maybeSingle();
+
+    if (itemErr || !item) {
+      await answerTelegramCallback(callbackId, 'Post not found');
+      return;
+    }
+
+    await supabase
+      .from('social_content_items')
+      .update({
+        status: item.scheduled_for ? 'scheduled' : 'approved',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', contentItemId);
+
+    await answerTelegramCallback(callbackId, '🚀 Post Approved!');
+    if (chatId) {
+      await reply(
+        chatId,
+        `✅ *Post Approved!*\n\n📌 *Title:* ${item.title || 'Untitled'}\n⏰ *Status:* ${item.scheduled_for ? `Scheduled for ${new Date(item.scheduled_for).toLocaleTimeString()}` : 'Ready to Publish'}\n\nOur automated publisher will post this directly to your connected social channels.`,
+      );
+    }
+    return;
+  }
+
+  if (data.startsWith('post_regen:')) {
+    const contentItemId = data.slice('post_regen:'.length).trim();
+    await answerTelegramCallback(callbackId, '🔄 Regenerating caption...');
+    if (chatId) await reply(chatId, '⏳ Rotating to a fresh conversational/editorial caption variation…');
+
+    try {
+      const { data: item } = await supabase
+        .from('social_content_items')
+        .select('*, social_copy_variants(*)')
+        .eq('id', contentItemId)
+        .maybeSingle();
+
+      if (!item) throw new Error('Content item not found');
+
+      // Generate fresh captions with conversational / editorial priority
+      const { generateAICaptions } = await import('./editorial/social_copy_ai.js');
+      const aiRes = await generateAICaptions({
+        candidate: {
+          id: item.source_entity_id || item.id,
+          type: item.source_entity_type || 'movie',
+          name: item.title,
+          subtext: item.metadata?.synopsis || item.description || '',
+          data: item.metadata || {},
+        },
+        angle: 'fun_relatable',
+      });
+
+      const newCaption = aiRes.instagram || aiRes.facebook || aiRes.threads || '';
+
+      // Update primary copy variants
+      if (item.social_copy_variants?.length) {
+        for (const variant of item.social_copy_variants) {
+          const platformText = aiRes[variant.platform as keyof typeof aiRes] || newCaption;
+          if (typeof platformText === 'string') {
+            await supabase
+              .from('social_copy_variants')
+              .update({ caption_text: platformText, updated_at: new Date().toISOString() })
+              .eq('id', variant.id);
+          }
+        }
+      }
+
+      if (chatId) {
+        const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+        await sendTelegramMessage({
+          text: `✨ *New Caption Generated (${aiRes.selectedVariation === 'C' ? 'Conversational' : 'Editorial'}):*\n\n${newCaption}\n\n👇 Approve or reject below:`,
+          chatId: String(chatId),
+          replyMarkup: {
+            inline_keyboard: [
+              [
+                { text: '🚀 Approve & Post', callback_data: `post_approve:${contentItemId}` },
+                { text: '🔄 Regen Again', callback_data: `post_regen:${contentItemId}` },
+              ],
+              [
+                { text: '❌ Reject Post', callback_data: `post_reject:${contentItemId}` },
+                { text: '🎨 Edit in Studio', url: `${site}/admin/social-studio` },
+              ],
+            ],
+          },
+        });
+      }
+    } catch (e: any) {
+      if (chatId) await reply(chatId, `⚠️ Caption regeneration failed: ${e.message}`);
+    }
+    return;
+  }
+
+  if (data.startsWith('post_reject:')) {
+    const contentItemId = data.slice('post_reject:'.length).trim();
+    await supabase
+      .from('social_content_items')
+      .update({
+        status: 'rejected',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', contentItemId);
+
+    await answerTelegramCallback(callbackId, '❌ Post Rejected');
+    if (chatId) await reply(chatId, '🗑 Post rejected and removed from publishing queue.');
+    return;
+  }
+
   if (data.startsWith('ignore:')) {
     const ip = data.slice('ignore:'.length).trim();
     // Stretch cooldown so we don't re-alert for 30m
@@ -1048,3 +1161,86 @@ export async function handleTelegramOps(req: VercelRequest, res: VercelResponse)
     return res.status(200).json({ ok: false });
   }
 }
+
+/**
+ * Dispatches pre-flight review alert to Telegram 1-2 hours before scheduled posting.
+ */
+export async function sendPreflightPostAlert(contentItemId: string, targetChatId?: string | number): Promise<boolean> {
+  const chatId = targetChatId || process.env.TELEGRAM_CHAT_ID;
+  if (!chatId) {
+    console.warn('[sendPreflightPostAlert] No Telegram chat ID configured');
+    return false;
+  }
+
+  const { data: item, error } = await supabase
+    .from('social_content_items')
+    .select('*, social_rendered_assets(*), social_copy_variants(*)')
+    .eq('id', contentItemId)
+    .maybeSingle();
+
+  if (error || !item) {
+    console.warn('[sendPreflightPostAlert] Content item not found:', error?.message);
+    return false;
+  }
+
+  const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+  const asset = item.social_rendered_assets?.[0];
+  const videoUrl = asset?.media_type === 'video' ? asset.asset_url : (item.metadata?.video_url || null);
+  const imageUrl = asset?.media_type === 'image' ? asset.asset_url : (item.metadata?.image_url || null);
+
+  const copyVariant = item.social_copy_variants?.find((v: any) => v.platform === 'instagram') || item.social_copy_variants?.[0];
+  const caption = copyVariant?.caption_text || item.description || item.title || '';
+  const scheduledTime = item.scheduled_for ? new Date(item.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Soon';
+
+  const alertText = [
+    `🎬 *Upcoming Post Pre-Flight Review*`,
+    `⏰ *Scheduled For:* Today at ${scheduledTime}`,
+    '',
+    `📌 *Title:* ${item.title || 'Untitled Post'}`,
+    '',
+    `📝 *Generated Caption:*`,
+    caption,
+    '',
+    '👇 *Approve to auto-publish, or regenerate caption:*',
+  ].join('\n');
+
+  const inlineKeyboard = [
+    [
+      { text: '🚀 Approve & Post', callback_data: `post_approve:${item.id}` },
+      { text: '🔄 Regen Caption', callback_data: `post_regen:${item.id}` },
+    ],
+    [
+      { text: '❌ Reject Post', callback_data: `post_reject:${item.id}` },
+      { text: '🎨 Edit in Studio', url: `${site}/admin/social-studio` },
+    ],
+  ];
+
+  if (videoUrl) {
+    const res = await sendTelegramVideo({
+      video: videoUrl,
+      caption: alertText,
+      chatId: String(chatId),
+      replyMarkup: { inline_keyboard: inlineKeyboard },
+    });
+    return res.ok;
+  }
+
+  if (imageUrl) {
+    const res = await sendTelegramPhoto({
+      photo: imageUrl,
+      caption: alertText,
+      chatId: String(chatId),
+      replyMarkup: { inline_keyboard: inlineKeyboard },
+    });
+    return res.ok;
+  }
+
+  const res = await sendTelegramMessage({
+    text: alertText,
+    chatId: String(chatId),
+    disablePreview: false,
+    replyMarkup: { inline_keyboard: inlineKeyboard },
+  });
+  return res.ok;
+}
+

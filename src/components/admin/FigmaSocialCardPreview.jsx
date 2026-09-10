@@ -141,7 +141,10 @@ export default function FigmaSocialCardPreview({
   const title = candidate?.name || (isPerson ? 'Nollywood Star' : 'Featured Film');
   const year = candidate?.data?.year || candidate?.year || '';
   const country = candidate?.country || candidate?.data?.country || 'Nollywood';
-  const heroImage = displayImage || candidate?.imageUrl || candidate?.data?.photo_url || candidate?.data?.poster_url;
+  const isYoutube = branding.name === 'YouTube' || Boolean(candidate?.data?.youtubeChannelName || candidate?.data?.youtube_watch_url);
+  const heroImage = displayImage || (isYoutube
+    ? (candidate?.data?.backdrop_url || candidate?.data?.thumbnail_url || candidate?.imageUrl || candidate?.data?.poster_url)
+    : (candidate?.imageUrl || candidate?.data?.poster_url || candidate?.data?.photo_url || candidate?.data?.backdrop_url));
 
   // ──────────────────────────────────────────────────────────────────────────
   // 1. TALENT / ACTOR SPOTLIGHT CARD (Dark Luxury Editorial Aesthetic)

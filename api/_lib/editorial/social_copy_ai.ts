@@ -476,6 +476,49 @@ function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
     ];
   }
 
+  const isPlay = candidate.type === 'play' || (series?.slug || '').includes('stage') || (series?.slug || '').includes('theatre');
+
+  if (isPlay) {
+    const venue = String(data.venue || [data.venue, data.city].filter(Boolean).join(', ') || 'Theatre venue TBA');
+    const dateStr = data.run_start_date && data.run_end_date && data.run_start_date !== data.run_end_date
+      ? `${data.run_start_date} – ${data.run_end_date}`
+      : (data.run_start_date || data.run_end_date || data.date || (data.year ? String(data.year) : 'Dates TBA'));
+    const timeStr = data.performance_time || data.time || '';
+
+    return [
+      {
+        key: 'A',
+        label: 'Informative',
+        captions: {
+          instagram: `On stage: ${name} 🎭\n\n📍 ${venue}\n📅 ${dateStr}${timeStr ? `\n⏰ ${timeStr}` : ''}\n\n${synopsis ? `${synopsis.slice(0, 180)}…\n\n` : ''}Find full cast, crew, and stage production details on MuviDB.\n\n#MuviDB #AfricanTheatre #LiveTheatre #${cleanTag}`,
+          threads: `Live on stage: ${name} at ${venue} (${dateStr}). Save the date and discover the production on MuviDB. #AfricanTheatre`,
+          facebook: `What's On Stage: ${name}\n\n📍 Venue: ${venue}\n📅 Dates: ${dateStr}\n\n${synopsis ? `${synopsis.slice(0, 200)}…\n\n` : ''}Explore live African theatre on MuviDB.`,
+          tiktok: `On stage now: ${name} at ${venue} 🎭 Find dates & details on MuviDB! #MuviDB #AfricanTheatre #${cleanTag}`,
+        },
+      },
+      {
+        key: 'B',
+        label: 'Editorial',
+        captions: {
+          instagram: `Looking for live theatre this week? Put ${name} on your radar.\n\n${synopsis ? `${synopsis.slice(0, 200)}…\n\n` : ''}📍 ${venue}\n📅 ${dateStr}\n\nExplore full stage credits and dates on MuviDB.\n\n#MuviDB #AfricanTheatre #StagePlay #${cleanTag}`,
+          threads: `Put ${name} on your radar. Live on stage at ${venue} (${dateStr}). Explore credits on MuviDB. #AfricanTheatre`,
+          facebook: `Spotlight on Live Theatre: ${name}\n\n${synopsis ? `${synopsis.slice(0, 220)}…\n\n` : ''}Catch it live at ${venue} (${dateStr}). Find more on MuviDB.`,
+          tiktok: `If live African theatre is on your radar, don't miss ${name} at ${venue}. #MuviDB #AfricanTheatre #${cleanTag}`,
+        },
+      },
+      {
+        key: 'C',
+        label: 'Conversational',
+        captions: {
+          instagram: `Are you catching any live theatre soon? ${name} is taking the stage.\n\n${synopsis ? `${synopsis.slice(0, 180)}…\n\n` : ''}📍 ${venue}\n📅 ${dateStr}\n\nPlan your visit and explore more stage productions on MuviDB.\n\n#MuviDB #AfricanTheatre #StagePlay #${cleanTag}`,
+          threads: `Are you seeing any stage plays this month? ${name} is live at ${venue} (${dateStr}). Let us know if you're attending! 👇 #AfricanTheatre`,
+          facebook: `Have you planned your next theatre night? ${name} is live at ${venue} (${dateStr}).\n\nDiscover the cast and crew on MuviDB!`,
+          tiktok: `Who's pulling up for ${name} at ${venue}? Drop a 🎭 below! #MuviDB #AfricanTheatre #${cleanTag}`,
+        },
+      },
+    ];
+  }
+
   if (isPerson) {
     const knownFor = Array.isArray(data.knownFor) ? data.knownFor : [];
     const known = knownFor.slice(0, 3).map((k: any) => `🎬 ${k.title}${k.year ? ` (${k.year})` : ''}`).join('\n');
@@ -588,6 +631,10 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
   if (lifecycle === 'now_streaming' && allCaptions.some(caption => /\b(coming soon|upcoming release|releases on)\b/i.test(caption))) {
     return false;
   }
+  const isPlay = req.candidate?.type === 'play' || seriesSlug.includes('stage') || seriesSlug.includes('theatre');
+  if (isPlay && allCaptions.some(caption => /\b(streaming|stream on|now streaming|currently streaming|available on streaming)\b/i.test(caption))) {
+    return false;
+  }
   if (seriesSlug === 'where_to_watch' && platform) {
     const normalizedPlatform = String(platform).toLowerCase();
     if (allCaptions.some(caption => !caption.toLowerCase().includes(normalizedPlatform))) return false;
@@ -658,11 +705,13 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
     variations = applyVerifiedMovieAttribution(req, variations);
 
     if (areGeneratedVariationsGrounded(req, variations)) {
-      const primary = variations[0].captions;
+      // Default to Variation B (Editorial) if present, else first variation
+      const editorialVar = variations.find(v => v.key === 'B') || variations[0];
+      const primary = editorialVar.captions;
       return {
         success: true,
         variations,
-        selectedVariation: 'A',
+        selectedVariation: editorialVar.key,
         instagram: primary.instagram,
         threads: primary.threads,
         facebook: primary.facebook,
@@ -675,14 +724,15 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
   }
 
   const fallbackVars = generateGroundedFallbackCaptions(req);
+  const editorialFallback = fallbackVars.find(v => v.key === 'B') || fallbackVars[0];
   return {
     success: true,
     variations: fallbackVars,
-    selectedVariation: 'A',
-    instagram: fallbackVars[0].captions.instagram,
-    threads: fallbackVars[0].captions.threads,
-    facebook: fallbackVars[0].captions.facebook,
-    tiktok: fallbackVars[0].captions.tiktok,
+    selectedVariation: editorialFallback.key,
+    instagram: editorialFallback.captions.instagram,
+    threads: editorialFallback.captions.threads,
+    facebook: editorialFallback.captions.facebook,
+    tiktok: editorialFallback.captions.tiktok,
     engine: 'muvidb_clean_fallback',
   };
 }
