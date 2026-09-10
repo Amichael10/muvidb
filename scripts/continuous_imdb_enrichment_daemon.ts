@@ -183,25 +183,47 @@ async function getOrCreateFilm(filmData: {
 
   const { data: existingList } = await supabase
     .from('films')
-    .select('id, poster_url, backdrop_url, synopsis, imdb_id, tmdb_id, genres')
+    .select('id, poster_url, backdrop_url, synopsis, imdb_id, tmdb_id, genres, source, youtube_watch_url, source_video_id, streaming_links')
     .ilike('title', cleanTitle)
     .limit(1);
 
   const existing = existingList?.[0];
 
   if (existing) {
-    const updates: Record<string, any> = {};
-    if (!existing.poster_url && filmData.poster_url) updates.poster_url = filmData.poster_url;
-    if (!existing.backdrop_url && filmData.backdrop_url) updates.backdrop_url = filmData.backdrop_url;
-    if (!existing.synopsis && filmData.synopsis) updates.synopsis = filmData.synopsis;
-    if (!existing.imdb_id && filmData.imdb_id) updates.imdb_id = filmData.imdb_id;
-    if (!existing.tmdb_id && filmData.tmdb_id) updates.tmdb_id = filmData.tmdb_id;
-    if (filmData.genres && (!existing.genres || existing.genres.length === 0)) updates.genres = filmData.genres;
+    const isYoutube =
+      existing.source === 'youtube' ||
+      !!existing.youtube_watch_url ||
+      !!existing.source_video_id ||
+      (Array.isArray(existing.streaming_links) &&
+        existing.streaming_links.some((l: any) => l?.platform?.toLowerCase?.().includes('youtube') || l?.url?.includes('youtu')));
 
-    if (Object.keys(updates).length > 0) {
-      await supabase.from('films').update(updates).eq('id', existing.id);
+    // If existing film is a YouTube upload and we don't have matching explicit IDs,
+    // do NOT hijack the YouTube indie film for IMDb/TMDB credits or metadata!
+    if (isYoutube) {
+      const matchesExplicitId =
+        (filmData.tmdb_id && existing.tmdb_id === filmData.tmdb_id) ||
+        (filmData.imdb_id && existing.imdb_id === filmData.imdb_id);
+
+      if (!matchesExplicitId) {
+        // Fall through to insert a separate film entry for the IMDb title
+        // instead of attaching foreign credits to the YouTube indie film
+      } else {
+        return existing.id;
+      }
+    } else {
+      const updates: Record<string, any> = {};
+      if (!existing.poster_url && filmData.poster_url) updates.poster_url = filmData.poster_url;
+      if (!existing.backdrop_url && filmData.backdrop_url) updates.backdrop_url = filmData.backdrop_url;
+      if (!existing.synopsis && filmData.synopsis) updates.synopsis = filmData.synopsis;
+      if (!existing.imdb_id && filmData.imdb_id) updates.imdb_id = filmData.imdb_id;
+      if (!existing.tmdb_id && filmData.tmdb_id) updates.tmdb_id = filmData.tmdb_id;
+      if (filmData.genres && (!existing.genres || existing.genres.length === 0)) updates.genres = filmData.genres;
+
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('films').update(updates).eq('id', existing.id);
+      }
+      return existing.id;
     }
-    return existing.id;
   }
 
   const { data: created, error } = await supabase

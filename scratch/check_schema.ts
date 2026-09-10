@@ -1,14 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
-dotenv.config();
+import { supabase } from '../scripts/lib/db.js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl!, supabaseKey!);
+async function checkSchema() {
+  const { data } = await supabase.from('films').select('release_type').limit(20);
+  console.log('Sample release_types:', data);
+  
+  // Count how many films have release_type = 'cinema' with no box office and no showtimes
+  const { count: cinemaCount } = await supabase.from('films').select('id', { count: 'exact', head: true }).eq('release_type', 'cinema');
+  console.log('Total cinema release_type:', cinemaCount);
 
-async function check() {
-  const { data, error } = await supabase.from('channel_videos').select('*').limit(1);
-  if (error) console.error(error);
-  else console.log(Object.keys(data[0] || {}));
+  // Check films where release_type is null
+  const { count: nullCount } = await supabase.from('films').select('id', { count: 'exact', head: true }).is('release_type', null);
+  console.log('Total null release_type:', nullCount);
+
+  // Check how many have box office
+  const { count: boCount } = await supabase.from('films').select('id', { count: 'exact', head: true }).eq('release_type', 'cinema').not('box_office_domestic', 'is', null);
+  console.log('Cinema with box office:', boCount);
 }
-check();
+checkSchema().catch(console.error);

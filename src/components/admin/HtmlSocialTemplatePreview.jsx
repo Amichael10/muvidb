@@ -19,7 +19,7 @@ function formatDate(value) {
 
 function templateData(candidate, templateSlug) {
   const source = candidate?.data || {};
-  const poster = candidate?.imageUrl || source.poster_url || source.backdrop_url || source.photo_url || '';
+  const poster = candidate?.imageUrl || source.poster_url || source.backdrop_url || source.photo_url || source.posterUrl || source.backdropUrl || '';
   const title = candidate?.name || source.title || 'MuviDB Pick';
   const synopsis = source.synopsis || candidate?.subtext || '';
   const genres = Array.isArray(source.genres) ? source.genres : [];
@@ -153,7 +153,7 @@ export default function HtmlSocialTemplatePreview({ candidate, templateSlug }) {
             title={`${candidate?.name || 'MuviDB'} social graphic preview`}
             src={`/social-templates/${templateSlug}.html?${params.toString()}`}
             scrolling="no"
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-same-origin"
             className="h-full w-full border-0 bg-transparent block"
             style={{
               width: `${nativeSize}px`,
