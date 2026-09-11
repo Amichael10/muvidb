@@ -11,6 +11,7 @@ type HtmlTemplateSpec = {
   slides?: number;
   data: (snapshot: SocialSourceSnapshot) => Record<string, unknown>;
   ratio?: (format: SocialAssetFormat) => string;
+  dimensions?: Partial<Record<SocialAssetFormat, { width: number; height: number }>>;
 };
 
 const TEMPLATE_DIR = path.join(getLibDir(), 'social-html-templates');
@@ -49,6 +50,9 @@ export const HTML_SOCIAL_TEMPLATES: Record<string, HtmlTemplateSpec> = {
     file: 'actor-spotlight-v1.html',
     formats: ['square_1_1'],
     data: actorData,
+    dimensions: {
+      square_1_1: { width: 1280, height: 1280 },
+    },
   },
 };
 
@@ -155,7 +159,7 @@ function debateData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
 
 function nowShowingData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   const s = movie(snapshot);
-  const rawAvailability = `${s.watchAvailability || ''} ${s.platform || ''}`.toLowerCase();
+  const rawAvailability = `${s.watchAvailability || ''} ${(s as any).platform || ''}`.toLowerCase();
   let platform = 'docuth';
   if (s.youtubeChannelName || rawAvailability.includes('youtube')) {
     platform = 'youtube';
@@ -194,22 +198,28 @@ function actorData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   const s = snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight' ? (snapshot as any) : {};
   const name = String(s.name || '').trim();
   const parts = name ? name.split(/\s+/) : ['Featured', 'Talent'];
-  const firstName = parts[0] || '';
-  const lastName = parts.slice(1).join(' ') || '';
-  const department = s.knownForDepartment || (s.roles && s.roles.length ? s.roles.join(' . ') : 'ACTOR');
-  const country = s.nationality || s.country || 'NIGERIAN';
-  const creditsCount = s.creditCount || (s.knownFor && s.knownFor.length ? s.knownFor.length : 12);
-  const photo = s.photoUrl || s.photoCutoutUrl || s.backdropUrl || s.posterUrl || '';
+  const firstName = s.firstName || parts[0] || '';
+  const lastName = s.lastName || parts.slice(1).join(' ') || '';
+  const department = s.knownForDepartment || (s.roles && s.roles.length ? (Array.isArray(s.roles) ? s.roles.join(' . ') : s.roles) : 'ACTOR');
+  const country = (s.nationality || s.country || 'NIGERIAN').toUpperCase();
+  const creditsCount = s.creditCount || s.creditsCount || (s.knownFor && s.knownFor.length ? s.knownFor.length : 12);
+  const photo = s.photoUrl || s.photoCutoutUrl || s.backdropUrl || s.posterUrl || s.photo || '';
 
   return {
     name,
     firstName,
     lastName,
-    roles: department.toUpperCase(),
-    department: department.toUpperCase(),
-    country: country.toUpperCase(),
+    nameLine1: firstName,
+    nameLine2: lastName,
+    roles: String(department).toUpperCase(),
+    department: String(department).toUpperCase(),
+    occupations: String(department).toUpperCase(),
+    country,
+    nationality: country,
     creditsCount: String(creditsCount),
+    creditsLabel: 'Verified Credits',
     photo,
+    portrait: photo,
     handle: DEFAULT_HANDLE,
   };
 }
@@ -227,11 +237,12 @@ async function renderHtmlTemplate(input: {
   const templatePath = path.join(TEMPLATE_DIR, spec.file);
   await readFile(templatePath);
 
-  const { width, height } = {
+  const defaultDimensions = {
     square_1_1: { width: 1080, height: 1080 },
     portrait_4_5: { width: 1080, height: 1350 },
     vertical_9_16: { width: 1080, height: 1920 },
   }[input.format];
+  const { width, height } = spec.dimensions?.[input.format] || defaultDimensions;
   const ratio = spec.ratio?.(input.format);
   const url = new URL(pathToFileURL(templatePath).toString());
   if (ratio) url.searchParams.set('ratio', ratio);
@@ -280,11 +291,13 @@ export async function renderHtmlSocialTemplateAsset(input: {
   format: SocialAssetFormat;
   slide?: number;
 }): Promise<RenderedAsset> {
-  const { width, height } = {
+  const spec = HTML_SOCIAL_TEMPLATES[input.templateSlug];
+  const defaultDimensions = {
     square_1_1: { width: 1080, height: 1080 },
     portrait_4_5: { width: 1080, height: 1350 },
     vertical_9_16: { width: 1080, height: 1920 },
   }[input.format];
+  const { width, height } = spec?.dimensions?.[input.format] || defaultDimensions;
 
   const png = await renderHtmlTemplate(input);
   return { format: input.format, png, width, height, usedArtwork: true, slide: input.slide };

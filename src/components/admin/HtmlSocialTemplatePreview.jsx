@@ -7,7 +7,7 @@ const NATIVE_ARTBOARD_SIZE = {
   'watchlist-this-week-v1': 1254,
   'nollywood-debate-v1': 1254,
   'now-showing-cinemas-v1': 1080,
-  'actor-spotlight-v1': 1254,
+  'actor-spotlight-v1': 1280,
 };
 
 function formatDate(value) {
@@ -55,18 +55,26 @@ function templateData(candidate, templateSlug) {
   if (templateSlug === 'actor-spotlight-v1') {
     const name = candidate?.name || source.name || 'Featured Talent';
     const parts = name.trim().split(/\s+/);
-    const firstName = parts[0] || '';
-    const lastName = parts.slice(1).join(' ') || '';
-    const dept = source.known_for_department || (source.roles && source.roles.length ? source.roles.join(' . ') : 'ACTOR');
+    const firstName = candidate?.firstName || source.firstName || parts[0] || '';
+    const lastName = candidate?.lastName || source.lastName || parts.slice(1).join(' ') || '';
+    const dept = source.known_for_department || source.knownForDepartment || (source.roles && source.roles.length ? (Array.isArray(source.roles) ? source.roles.join(' . ') : source.roles) : 'ACTOR');
+    const creditsCount = String(source.creditsCount || source.creditCount || (source.knownFor && source.knownFor.length ? source.knownFor.length : (source.credits ? source.credits.length : 12)));
+    const nationality = (source.nationality || source.country || 'NIGERIAN').toUpperCase();
     return {
       name,
       firstName,
       lastName,
+      nameLine1: firstName,
+      nameLine2: lastName,
       roles: dept.toUpperCase(),
       department: dept.toUpperCase(),
-      country: (source.nationality || source.country || 'NIGERIAN').toUpperCase(),
-      creditsCount: String(source.creditsCount || (source.knownFor && source.knownFor.length ? source.knownFor.length : (source.credits ? source.credits.length : 12))),
+      occupations: dept.toUpperCase(),
+      country: nationality,
+      nationality,
+      creditsCount,
+      creditsLabel: 'Verified Credits',
       photo: poster,
+      portrait: poster,
       handle: DEFAULT_HANDLE,
     };
   }
