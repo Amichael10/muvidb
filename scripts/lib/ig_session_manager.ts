@@ -99,34 +99,56 @@ export async function loginInteractive(): Promise<boolean> {
     const maxWaitMs = 180000; // 3 mins
 
     while (Date.now() - startTime < maxWaitMs) {
-      await page.waitForTimeout(3000);
-      const currentCookies = await context.cookies('https://www.instagram.com');
-      hasAuthCookie = currentCookies.some((c) => c.name === 'sessionid');
+      await new Promise(r => setTimeout(r, 2000));
+      if (page.isClosed()) break;
 
-      // Or check if user is on direct or feed
-      const currentUrl = page.url();
-      if (
-        hasAuthCookie ||
-        currentUrl.includes('/direct/') ||
-        (currentUrl === 'https://www.instagram.com/' && (await page.$('svg[aria-label="Home"], svg[aria-label="Direct"]')))
-      ) {
-        hasAuthCookie = true;
-        break;
+      try {
+        const currentCookies = await context.cookies('https://www.instagram.com');
+        hasAuthCookie = currentCookies.some((c) => c.name === 'sessionid');
+      } catch {
+        // ignore cookie read error during active browser transitions
+      }
+
+      if (hasAuthCookie) break;
+
+      try {
+        const currentUrl = page.url();
+        if (
+          currentUrl.includes('/direct/') ||
+          currentUrl.includes('/accounts/onetap') ||
+          currentUrl.includes('/explore/')
+        ) {
+          hasAuthCookie = true;
+          break;
+        }
+
+        const loggedInElement = await page.$(
+          'svg[aria-label="Home"], svg[aria-label="Direct"], svg[aria-label="Messages"], svg[aria-label="Search"], svg[aria-label="New post"]'
+        ).catch(() => null);
+
+        if (loggedInElement) {
+          hasAuthCookie = true;
+          break;
+        }
+      } catch {
+        // Ignore navigation execution context destroyed errors while Instagram is redirecting
       }
     }
   }
 
   if (hasAuthCookie) {
     console.log('💾 Saving session cookies to scratch/ig_session.json...');
-    await page.waitForTimeout(2000);
-    await context.storageState({ path: SESSION_FILE });
+    await new Promise(r => setTimeout(r, 2500));
+    await context.storageState({ path: SESSION_FILE }).catch(err => {
+      console.warn('Warning saving storage state:', err.message);
+    });
     console.log('🎉 Instagram session successfully saved!');
     console.log('You can now run automated outreach batches.');
-    await browser.close();
+    await browser.close().catch(() => {});
     return true;
   } else {
     console.error('❌ Login timed out or was not completed.');
-    await browser.close();
+    await browser.close().catch(() => {});
     return false;
   }
 }
