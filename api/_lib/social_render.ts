@@ -891,7 +891,7 @@ function getPlatformTheme(snapshot: UpcomingMovieSnapshot): {
   if (textVal.includes('youtube') || snapshot.youtubeChannelName) {
     return { accent: '#FF0000', name: 'YouTube', eyebrow: 'FREE ON YOUTUBE', cta: 'WATCH ON YOUTUBE' };
   }
-  if (snapshot.isInCinemas || (textVal.includes('cinema') && !textVal.includes('not in cinema'))) {
+  if ((snapshot as any).isInCinemas || (textVal.includes('cinema') && !textVal.includes('not in cinema'))) {
     return { accent: '#FF5A1F', name: 'In Cinemas', eyebrow: 'IN CINEMAS NOW', cta: 'BUY TICKETS' };
   }
   return { accent: '#004BAF', name: 'Streaming', eyebrow: snapshot.comingSoon ? 'COMING SOON' : 'NOW STREAMING', cta: 'DISCOVER ON MUVIDB' };

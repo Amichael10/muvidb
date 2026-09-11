@@ -41,7 +41,6 @@ export async function syncFilmEmbedding(film: { id: string; title: string | null
     }
 
     const [vec] = await embedWithCohere([text], {
-      model: MODEL,
       inputType: 'search_document',
     });
 

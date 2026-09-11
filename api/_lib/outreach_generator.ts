@@ -90,12 +90,9 @@ Write a natural, concise Instagram DM (3-5 short sentences max):
 Output ONLY the final DM text.`;
 
   try {
-    const aiResponse = await generateAIContent(prompt, {
-      temperature: 0.7,
-      maxTokens: 300,
-    });
-
-    let message = (typeof aiResponse === 'string' ? aiResponse : JSON.stringify(aiResponse)).trim().replace(/^["']|["']$/g, '');
+    const aiResponse = await generateAIContent(prompt);
+    const rawText = (aiResponse as any)?.text || (typeof aiResponse === 'string' ? aiResponse : '');
+    let message = rawText.trim().replace(/^["']|["']$/g, '');
     if (!message || message.length < 20) {
       throw new Error('AI generated empty response');
     }
@@ -110,18 +107,44 @@ Output ONLY the final DM text.`;
   }
 }
 
+export interface FetchCandidatesOptions {
+  limit?: number;
+  offset?: number;
+  minFilms?: number;
+  maxFilms?: number;
+  craft?: string | null;
+}
+
 /**
- * Build candidate list from DB
+ * Build candidate list from DB with optional film count and craft filters
  */
-export async function fetchOutreachCandidates(limit = 25, offset = 0): Promise<OutreachCandidate[]> {
+export async function fetchOutreachCandidates(options?: FetchCandidatesOptions | number): Promise<OutreachCandidate[]> {
+  const opts: FetchCandidatesOptions = typeof options === 'number' ? { limit: options } : (options || {});
+  const limit = opts.limit ?? 25;
+  const offset = opts.offset ?? 0;
+  const minFilms = opts.minFilms ?? 1;
+  const maxFilms = opts.maxFilms ?? 10;
+  const craft = opts.craft && opts.craft !== 'all' ? opts.craft.trim() : null;
+
   // 1. Fetch people with instagram_url who haven't been claimed
-  const { data: people, error } = await serviceSupabase
+  let query = serviceSupabase
     .from('people')
     .select('id, name, slug, instagram_url, known_for_department, film_count, claimed_by')
     .not('instagram_url', 'is', null)
+    .neq('instagram_url', '')
     .is('claimed_by', null)
+    .gte('film_count', minFilms);
+
+  if (maxFilms) {
+    query = query.lte('film_count', maxFilms);
+  }
+  if (craft) {
+    query = query.ilike('known_for_department', `%${craft}%`);
+  }
+
+  const { data: people, error } = await query
     .order('film_count', { ascending: true })
-    .range(offset, offset + limit * 3 - 1);
+    .range(offset, offset + limit * 4 - 1);
 
   if (error || !people) {
     console.error('Error fetching outreach candidates:', error);
@@ -179,8 +202,8 @@ export async function fetchOutreachCandidates(limit = 25, offset = 0): Promise<O
 /**
  * Generate queue batch with personalized AI messages and store in DB
  */
-export async function generateQueueBatch(count = 25): Promise<{ queued: number; candidates: OutreachCandidate[] }> {
-  const candidates = await fetchOutreachCandidates(count);
+export async function generateQueueBatch(options?: FetchCandidatesOptions | number): Promise<{ queued: number; candidates: OutreachCandidate[] }> {
+  const candidates = await fetchOutreachCandidates(options);
   const results: OutreachCandidate[] = [];
 
   for (const candidate of candidates) {
