@@ -26,14 +26,27 @@ dotenv.config({ path: '.env.local' });
 dotenv.config(); // fall back to .env for anything not set in .env.local
 
 // CI workflows usually set SUPABASE_URL; local scripts often use VITE_SUPABASE_URL.
-const url = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
-const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const url = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://pkenrmorywmuvnzfoylp.supabase.co').trim();
+const serviceKey = (
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_KEY ||
+  ''
+).trim();
 
 if (!url || !serviceKey) {
   console.error(
-    'Missing VITE_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY (checked .env.local, then .env)'
+    '❌ Missing VITE_SUPABASE_URL/SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY (checked .env.local, then .env)'
   );
   process.exit(1);
+}
+
+if (serviceKey.startsWith('sb_publishable_')) {
+  console.warn('⚠️ WARNING: SUPABASE_SERVICE_ROLE_KEY is set to a publishable (anon) key.');
+  console.warn('⚠️ Admin/Worker operations that access RLS-protected tables (like artist_outreach) will fail.');
+  console.warn('👉 Please set SUPABASE_SERVICE_ROLE_KEY to your Supabase project\'s secret "service_role" key in .env.local.');
 }
 
 // Retry transient network blips so a long batch job doesn't abort on one hiccup.
