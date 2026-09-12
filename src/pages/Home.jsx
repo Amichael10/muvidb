@@ -12,7 +12,6 @@ import { PLATFORMS, platformFilter } from '../lib/platforms';
 import { toTitleCase } from '../utils/format';
 import { getZonedClock, getNextDate, isPublicCinemaShowtime, compareShowtimes, isLiveCinemaFilm } from '../utils/showtimes';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
-import PopcornField from '../components/ui/PopcornField';
 import HomeIntroSection from '../components/film/HomeIntroSection';
 import { collapseSeriesFilms } from '../utils/series';
 import { fetchPlays, getPlayDateLabel } from '../lib/plays';
@@ -22,6 +21,7 @@ const TopTenSection = lazy(() => import('../components/film/TopTenSection'));
 const GenreRail = lazy(() => import('../components/film/GenreRail'));
 const PersonCard = lazy(() => import('../components/person/PersonCard'));
 const FilmCard = lazy(() => import('../components/film/FilmCard'));
+const CriticsLoungeSection = lazy(() => import('../components/film/CriticsLoungeSection'));
 
 const HOME_ROW_CAP = 12;
 
@@ -896,13 +896,10 @@ export default function Home() {
   ];
 
   return (
-    <div className="muvi-landing w-full pb-20 min-h-screen">
+    <div className="muvi-landing w-full pb-20 min-h-screen bg-[#0B0D10] text-[#E0E2E6]">
       <h1 className="sr-only">MuviDB | The Ultimate African Film & Entertainment Database</h1>
-      <div className="muvi-film-rail muvi-film-rail--left" aria-hidden="true" />
-      <div className="muvi-film-rail muvi-film-rail--right" aria-hidden="true" />
-      <PopcornField />
 
-      {/* 1. HERO (Progressive Above-the-Fold Loading) (Issue 1) */}
+      {/* 1. HERO (Progressive Above-the-Fold Loading) */}
       <HeroSection
         featuredFilms={featuredFilms}
         isLoading={isHeroLoading}
@@ -1155,6 +1152,9 @@ export default function Home() {
             />
           </div>
         )}
+
+        {/* 5b. THE CRITICS' LOUNGE */}
+        <CriticsLoungeSection />
 
         {/* 6a. COMING SOON (keep existing horizontal scroll cards) */}
         {(isSecondaryLoading || isComingSoonLoading || comingSoon.length > 0) && (

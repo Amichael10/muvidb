@@ -7,7 +7,7 @@ import { formatFilmTitle } from '../../utils/format';
 import ImageWithFallback from '../ui/ImageWithFallback';
 
 const formatRuntime = (minutes) => {
-  if (!minutes) return 'Runtime TBA';
+  if (!minutes) return null;
   const total = Number(minutes);
   const hours = Math.floor(total / 60);
   const mins = total % 60;
@@ -15,15 +15,26 @@ const formatRuntime = (minutes) => {
 };
 
 const getRating = (film) => {
-  return film.liked_percent == null ? 'Not rated' : `${Math.round(Number(film.liked_percent))}%`;
+  if (film.imdb_rating != null && film.imdb_rating > 0) {
+    return (film.imdb_rating / 2).toFixed(1);
+  }
+  if (film.tmdb_rating != null && film.tmdb_rating > 0) {
+    return (film.tmdb_rating / 2).toFixed(1);
+  }
+  if (film.liked_percent != null && film.liked_percent > 0) {
+    return (film.liked_percent / 20).toFixed(1);
+  }
+  return null;
 };
 
 export default function StreamingCard({ film, platformId }) {
   const platform = getPlatform(platformId || film.release_type || film.source);
   const title = formatFilmTitle(film.title);
   const filmPath = `/films/${film.slug || film.id}`;
-  const genres = film.genres?.slice(0, 2).join(' / ') || 'Genre unavailable';
-  const synopsis = film.synopsis || film.tagline || 'Synopsis unavailable.';
+  const genres = film.genres?.slice(0, 2).join(' • ') || null;
+  const starScore = getRating(film);
+  const runtime = formatRuntime(film.runtime_minutes || film.runtime);
+  const year = film.year || film.release_date?.slice(0, 4) || null;
   const { user } = useAuth();
   const navigate = useNavigate();
   const { inWatchlist, loading, toggleWatchlist } = useWatchlist(film.id, user);
@@ -39,85 +50,95 @@ export default function StreamingCard({ film, platformId }) {
   };
 
   return (
-    <article className="group relative grid h-[242px] w-[330px] min-w-[330px] shrink-0 grid-cols-[138px_minmax(0,1fr)] overflow-hidden rounded-lg border border-border bg-surface shadow-sm cinema-card-glow card-sheen transition-transform duration-300 hover:z-20 sm:h-[258px] sm:w-[390px] sm:min-w-[390px] sm:grid-cols-[160px_minmax(0,1fr)]">
-      <span
-        className="absolute inset-x-0 top-0 z-30 h-1"
-        style={{ backgroundColor: platform?.color || '#FF5A1F' }}
-      />
-
-      <div className="relative min-h-0 overflow-hidden border-r border-border bg-surface-2">
-        <Link to={filmPath} className="block h-full" title={title}>
+    <article className="group relative w-[170px] sm:w-[195px] shrink-0 flex flex-col transition-all duration-300 select-none">
+      {/* 2:3 Streaming Poster Art */}
+      <div className="relative aspect-[2/3] w-full rounded-[4px] overflow-hidden border border-white/10 group-hover:border-white/30 bg-[#14181c] shadow-lg transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-[0_12px_28px_rgba(0,0,0,0.85)]">
+        <Link to={filmPath} className="block w-full h-full" title={title}>
           <ImageWithFallback
             src={film.poster_url || film.backdrop_url}
             alt={title}
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
+            className="h-full w-full object-cover"
             fallbackType="film"
             name={title}
             loading="lazy"
-            width={360}
-            sizes="(max-width: 640px) 42vw, 180px"
+            width={400}
+            sizes="195px"
           />
         </Link>
 
-        {/* Central Play Quick Action Indicator */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-20">
-          <div className="w-10 h-10 rounded-full bg-brand/90 text-white flex items-center justify-center shadow-xl backdrop-blur-md transform scale-75 group-hover:scale-100 transition-transform duration-300 border border-white/25">
-            <Icon icon="solar:play-bold" className="text-lg ml-0.5" />
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleWatchlist}
-          disabled={loading}
-          className="absolute left-2 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-md border border-white/20 bg-black/65 text-white backdrop-blur-sm transition hover:border-brand hover:bg-brand disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          aria-label={inWatchlist ? `Remove ${title} from watchlist` : `Add ${title} to watchlist`}
-          title={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
-        >
-          <Icon icon={inWatchlist ? 'solar:check-read-linear' : 'solar:add-circle-linear'} width="20" height="20" />
-        </button>
-      </div>
-
-      <div className="flex min-w-0 flex-col p-3 pt-4 sm:p-4 sm:pt-5">
-        <div className="flex min-h-6 items-center gap-2 text-[10px] font-bold uppercase text-text-muted">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded bg-surface-2">
+        {/* Platform Badge (Top Left) */}
+        <div className="absolute top-2 left-2 z-10">
+          <span className="inline-flex items-center gap-1 bg-black/85 backdrop-blur-sm border border-white/15 px-1.5 py-0.5 rounded-[3px] text-[10px] font-mono font-bold text-white shadow">
             {platform?.logo ? (
-              <img src={platform.logo} alt="" className="h-full w-full bg-white object-contain p-0.5" />
+              <img src={platform.logo} alt="" className="w-3.5 h-3.5 object-contain" />
             ) : (
-              <Icon icon={platform?.icon || 'solar:play-circle-bold'} style={{ color: platform?.color || '#FF5A1F' }} />
+              <Icon icon={platform?.icon || 'solar:play-circle-bold'} style={{ color: platform?.color || '#FF5A1F' }} className="text-xs" />
             )}
+            <span className="text-[9px] uppercase tracking-wider">{platform?.name || 'Stream'}</span>
           </span>
-          <span className="line-clamp-1">New on {platform?.name || 'streaming'}</span>
         </div>
 
+        {/* Hover Watchlist Action (Top Right) */}
+        <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <button
+            type="button"
+            onClick={handleWatchlist}
+            disabled={loading}
+            className="w-7 h-7 rounded-[3px] bg-black/80 hover:bg-brand text-white flex items-center justify-center border border-white/20 transition-all cursor-pointer"
+            aria-label={inWatchlist ? `Remove ${title} from watchlist` : `Add ${title} to watchlist`}
+            title={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+          >
+            <Icon icon={inWatchlist ? 'solar:check-read-linear' : 'solar:bookmark-linear'} width="15" />
+          </button>
+        </div>
+
+        {/* Central Play Indicator on Hover */}
         <Link
           to={filmPath}
-          className="mt-2 min-h-10 line-clamp-2 font-heading text-sm font-bold leading-snug text-text-primary transition-colors duration-200 group-hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:text-base"
+          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+          tabIndex={-1}
+          aria-hidden="true"
+        >
+          <div className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center shadow-xl border border-white/20 transform scale-90 group-hover:scale-100 transition-transform duration-200">
+            <Icon icon="solar:play-bold" className="text-sm ml-0.5" />
+          </div>
+        </Link>
+
+        {/* Rating inside poster bottom */}
+        {starScore && (
+          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 bg-black/80 backdrop-blur-sm border border-amber-400/30 text-amber-400 px-1.5 py-0.5 rounded-[3px] text-[10px] font-bold">
+            <span>★</span>
+            <span>{starScore}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Letterboxd Stack Below Poster */}
+      <div className="pt-2 pb-1 flex flex-col text-left">
+        <Link 
+          to={filmPath} 
+          className="font-heading font-semibold text-xs sm:text-sm text-white/90 group-hover:text-brand line-clamp-1 leading-snug transition-colors"
           title={title}
         >
           {title}
         </Link>
 
-        <p className="mt-1 min-h-4 line-clamp-1 text-[11px] font-semibold text-brand">
-          {genres}
-        </p>
-
-        <p className="mt-2 min-h-[48px] line-clamp-3 text-[11px] leading-relaxed text-text-secondary sm:text-xs">
-          {synopsis}
-        </p>
-
-        <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-1 border-t border-border pt-3 text-[10px] font-medium text-text-muted sm:text-[11px]">
-          <span className="inline-flex items-center gap-1 font-semibold text-text-primary">
-            <Icon icon="mdi:popcorn" className="text-[#FA320A]" />
-            {getRating(film)}
-          </span>
-          <span>{formatRuntime(film.runtime_minutes || film.runtime)}</span>
-          <span>{film.year || film.release_date?.slice(0, 4) || 'Year TBA'}</span>
+        <div className="flex items-center gap-1.5 text-[11px] text-white/50 font-mono mt-0.5 truncate">
+          {year && <span>{year}</span>}
+          {genres && (
+            <>
+              <span className="opacity-40">•</span>
+              <span className="truncate">{genres}</span>
+            </>
+          )}
+          {runtime && (
+            <>
+              <span className="opacity-40">•</span>
+              <span>{runtime}</span>
+            </>
+          )}
         </div>
       </div>
-
-      {/* Bottom glowing accent bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand via-orange-500 to-amber-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-400 origin-left z-30" />
     </article>
   );
 }

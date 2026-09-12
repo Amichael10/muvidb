@@ -6,7 +6,16 @@ import ImageWithFallback from '../ui/ImageWithFallback';
 import { formatFilmTitle } from '../../utils/format';
 
 const getRating = (film) => {
-  return film.liked_percent == null ? null : Math.round(Number(film.liked_percent));
+  if (film.imdb_rating != null && film.imdb_rating > 0) {
+    return (film.imdb_rating / 2).toFixed(1);
+  }
+  if (film.tmdb_rating != null && film.tmdb_rating > 0) {
+    return (film.tmdb_rating / 2).toFixed(1);
+  }
+  if (film.liked_percent != null && film.liked_percent > 0) {
+    return (film.liked_percent / 20).toFixed(1);
+  }
+  return null;
 };
 
 const CINEMA_TIME_ZONE = 'Africa/Lagos';
@@ -43,9 +52,9 @@ const formatShowDate = (dateString) => {
 export default function CinemaCard({ film }) {
   const title = formatFilmTitle(film.title);
   const filmPath = `/films/${film.slug || film.id}`;
-  const rating = getRating(film);
+  const starScore = getRating(film);
   const runtime = formatRuntime(film.runtime_minutes);
-  const genres = film.genres?.slice(0, 2).join(' • ') || 'Now showing in cinemas';
+  const genres = film.genres?.slice(0, 2).join(' • ') || 'Now in Cinemas';
   const nextShowtime = film.next_showtime;
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -62,103 +71,100 @@ export default function CinemaCard({ film }) {
   };
 
   return (
-    <article className="group relative w-[280px] min-w-[280px] shrink-0 overflow-hidden rounded-lg border border-border bg-surface shadow-sm cinema-card-glow card-sheen transition-transform duration-300 hover:z-20">
-      <div className="relative aspect-[2/3] overflow-hidden bg-surface-2">
-        <Link to={filmPath} className="block h-full" title={title}>
+    <article className="group relative w-[230px] sm:w-[250px] shrink-0 flex flex-col transition-all duration-300 select-none">
+      {/* 2:3 Theatrical Poster Art */}
+      <div className="relative aspect-[2/3] w-full rounded-[4px] overflow-hidden border border-white/10 group-hover:border-white/30 bg-[#14181c] shadow-lg transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-[0_12px_28px_rgba(0,0,0,0.85)]">
+        <Link to={filmPath} className="block w-full h-full" title={title}>
           <ImageWithFallback
             src={film.poster_url || film.backdrop_url}
             alt={title}
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
+            className="h-full w-full object-cover"
             fallbackType="film"
             name={title}
             loading="lazy"
-            width={640}
-            sizes="280px"
+            width={480}
+            sizes="250px"
           />
         </Link>
 
-        {/* Central Play/Explore Quick Action Indicator */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-20">
-          <div className="w-12 h-12 rounded-full bg-brand/90 text-white flex items-center justify-center shadow-2xl backdrop-blur-md transform scale-75 group-hover:scale-100 transition-transform duration-300 border border-white/25">
-            <Icon icon="solar:ticket-bold" className="text-2xl ml-0.5" />
-          </div>
+        {/* Theatrical Eyebrow Tag */}
+        <div className="absolute top-2 left-2 z-10">
+          <span className="inline-flex items-center gap-1 bg-black/80 backdrop-blur-sm border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-[3px] text-[9px] font-mono font-bold uppercase tracking-wider">
+            <Icon icon="solar:ticket-bold" className="text-xs" />
+            In Cinemas
+          </span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleWatchlist}
-          disabled={loading}
-          className="absolute left-0 top-0 z-20 flex h-14 w-12 items-start justify-center bg-black/65 pt-2 text-white transition hover:bg-brand disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          aria-label={inWatchlist ? `Remove ${title} from watchlist` : `Add ${title} to watchlist`}
-          title={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+        {/* Hover Watchlist Action */}
+        <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <button
+            type="button"
+            onClick={handleWatchlist}
+            disabled={loading}
+            className="w-7 h-7 rounded-[3px] bg-black/80 hover:bg-brand text-white flex items-center justify-center border border-white/20 transition-all cursor-pointer"
+            aria-label={inWatchlist ? `Remove ${title} from watchlist` : `Add ${title} to watchlist`}
+            title={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+          >
+            <Icon icon={inWatchlist ? 'solar:check-read-linear' : 'solar:bookmark-linear'} width="15" />
+          </button>
+        </div>
+
+        {/* Central Explore Indicator on Hover */}
+        <Link
+          to={filmPath}
+          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+          tabIndex={-1}
+          aria-hidden="true"
         >
-          <Icon icon={inWatchlist ? 'solar:check-read-linear' : 'solar:add-circle-linear'} width="25" height="25" />
-        </button>
+          <div className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center shadow-xl border border-white/20 transform scale-90 group-hover:scale-100 transition-transform duration-200">
+            <Icon icon="solar:ticket-bold" className="text-lg ml-0.5" />
+          </div>
+        </Link>
+
+        {/* Rating inside poster bottom */}
+        {starScore && (
+          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 bg-black/80 backdrop-blur-sm border border-amber-400/30 text-amber-400 px-1.5 py-0.5 rounded-[3px] text-[10px] font-bold">
+            <span>★</span>
+            <span>{starScore}</span>
+          </div>
+        )}
       </div>
 
-      <div className="flex min-h-[245px] flex-col p-3">
-        <Link to={filmPath} className="line-clamp-2 min-h-14 font-heading text-xl font-semibold leading-tight text-text-primary transition-colors duration-200 group-hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand" title={title}>
+      {/* Letterboxd Stack Below Poster */}
+      <div className="pt-2.5 pb-1 flex flex-col text-left">
+        <Link 
+          to={filmPath} 
+          className="font-heading font-semibold text-sm text-white/95 group-hover:text-brand line-clamp-1 leading-snug transition-colors"
+          title={title}
+        >
           {title}
         </Link>
 
-        <p className="mt-2 line-clamp-1 text-sm font-medium text-text-secondary">
-          {genres}
-        </p>
-
-        <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-text-secondary">
-          {film.synopsis || 'Catch this title on the big screen while it is showing in cinemas.'}
-        </p>
-
-        <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary">
-          {rating != null && (
-            <span className="inline-flex items-center gap-1 font-semibold text-text-primary">
-              <Icon icon="mdi:popcorn" className="text-[#FA320A]" />
-              {rating}%
-            </span>
+        <div className="flex items-center gap-1.5 text-[11px] text-white/50 font-mono mt-0.5 truncate">
+          <span>{genres}</span>
+          {runtime && (
+            <>
+              <span className="opacity-40">•</span>
+              <span>{runtime}</span>
+            </>
           )}
-          {rating && runtime && <span className="text-text-muted">•</span>}
-          {runtime && <span>{runtime}</span>}
-          {runtime && film.nfvcb_rating && <span className="text-text-muted">•</span>}
-          {film.nfvcb_rating && <span>{film.nfvcb_rating}</span>}
         </div>
 
+        {/* Next Showtime Pill */}
         {nextShowtime && (
-          <div className="mt-3">
-            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-semibold text-brand">
-              <span>
-                {nextShowtime.is_today
-                  ? film.remaining_today_showtime_count === 1
-                    ? 'Last show today'
-                    : 'Showing today'
-                  : nextShowtime.is_tomorrow
-                    ? 'Showing tomorrow'
-                    : `Showing ${formatShowDate(nextShowtime.show_date)}`}
-              </span>
-              {formatShowTime(nextShowtime.show_time) && (
-                <>
-                  <span className="text-text-muted">•</span>
-                  <span>Next show {formatShowTime(nextShowtime.show_time)}</span>
-                </>
-              )}
-            </p>
-            {nextShowtime.cinemas?.name && (
-              <p className="mt-1 truncate text-[10px] font-medium text-text-muted">
-                at {nextShowtime.cinemas.name}
-              </p>
-            )}
+          <div className="mt-2 flex items-center gap-1.5 bg-[#181d24] border border-white/10 px-2.5 py-1.5 rounded-[4px] text-[11px] font-mono">
+            <Icon icon="solar:clock-circle-linear" className="text-brand text-xs shrink-0" />
+            <span className="text-white/90 truncate font-semibold">
+              {nextShowtime.is_today
+                ? 'Today'
+                : nextShowtime.is_tomorrow
+                  ? 'Tomorrow'
+                  : formatShowDate(nextShowtime.show_date)}
+              {formatShowTime(nextShowtime.show_time) ? ` • ${formatShowTime(nextShowtime.show_time)}` : ''}
+            </span>
           </div>
         )}
-
-        <div className="mt-auto pt-5">
-          <Link to="/showtimes" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-base font-medium text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
-            <Icon icon="solar:ticket-bold" className="text-xl" />
-            Showtimes
-          </Link>
-        </div>
       </div>
-
-      {/* Bottom glowing accent bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand via-orange-500 to-amber-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-400 origin-left z-30" />
     </article>
   );
 }

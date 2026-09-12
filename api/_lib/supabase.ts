@@ -1,4 +1,17 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import dns from 'dns';
+try { dns.setDefaultResultOrder('ipv4first'); } catch {}
+
+import { Agent, setGlobalDispatcher } from 'undici';
+try {
+  setGlobalDispatcher(
+    new Agent({
+      connect: { timeout: 60_000 },
+      headersTimeout: 300_000,
+      bodyTimeout: 300_000,
+    })
+  );
+} catch {}
 
 function readEnv(name: string): string {
   try {

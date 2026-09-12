@@ -77,7 +77,7 @@ async function withGeminiRotation(model: string, fn: (m: any) => Promise<any>): 
 
 // Groq: same multi-key rotation as Gemini.
 const GROQ_KEYS = collectKeys('GROQ_API_KEY');
-const GROQ_TEXT_MODELS = (process.env.GROQ_TEXT_MODELS || 'llama-3.3-70b-versatile')
+const GROQ_TEXT_MODELS = (process.env.GROQ_TEXT_MODELS || 'qwen/qwen3.8-27b,qwen/qwen3.6-27b,openai/gpt-oss-20b,openai/gpt-oss-120b')
   .split(',')
   .map((model) => model.trim())
   .filter(Boolean);
@@ -226,16 +226,26 @@ export function parseJSON(text: string) {
         const extracted = text.substring(bracketStart, bracketEnd + 1);
         return JSON.parse(extracted);
       }
-    } catch (err2) {
-      // Also try extracting a JSON object
-      try {
-        const objStart = text.indexOf('{');
-        const objEnd = text.lastIndexOf('}');
-        if (objStart !== -1 && objEnd > objStart) {
-          const extracted = '[' + text.substring(objStart, objEnd + 1) + ']';
-          return JSON.parse(extracted);
+      // Truncated array: closing bracket was cut off by token limit
+      if (bracketStart !== -1) {
+        const lastCurly = text.lastIndexOf('}');
+        if (lastCurly > bracketStart) {
+          const recovered = text.substring(bracketStart, lastCurly + 1) + ']';
+          return JSON.parse(recovered);
         }
-      } catch (err3) {}
+      }
+    } catch (err2) {
+      // Regex extraction of all individual { ... } objects
+      try {
+        const matches = text.match(/\{[^{}]*\}/g);
+        if (matches && matches.length > 0) {
+          const parsedArr = [];
+          for (const m of matches) {
+            try { parsedArr.push(JSON.parse(m)); } catch {}
+          }
+          if (parsedArr.length > 0) return parsedArr;
+        }
+      } catch {}
     }
     console.error('Failed to parse AI JSON. Raw text was:', text.substring(0, 500) + '...');
     return [];
@@ -298,6 +308,7 @@ export async function generateAIContent(
             const response = await client.chat.completions.create({
               messages: [{ role: 'user', content: prompt }],
               model,
+              max_completion_tokens: 4096,
             }).asResponse();
             const data = await response.json();
             if (data.error) throw new Error(data.error.message);
@@ -324,19 +335,11 @@ export async function generateAIContent(
         for (const model of models) {
           try {
             let response: any;
-            if (client.v2?.chat) {
-              response = await client.v2.chat({
-                model,
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0.4,
-              });
-            } else {
-              response = await client.chat({
-                model,
-                message: prompt,
-                temperature: 0.4,
-              });
-            }
+            const chatPromise = (client.v2?.chat)
+              ? client.v2.chat({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.4 })
+              : client.chat({ model, message: prompt, temperature: 0.4 });
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Cohere timeout (10s)')), 10000));
+            response = await Promise.race([chatPromise, timeoutPromise]);
             const text = extractCohereText(response);
             if (!text.trim()) throw new Error(`Cohere model ${model} returned an empty response`);
             return { text, engine: `cohere (${model})`, headers: null };
@@ -354,19 +357,20 @@ export async function generateAIContent(
     throw new Error('No AI providers configured. Please check GEMINI_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, or COHERE_API_KEY.');
   }
 
-  // Order providers: if preferredProvider is specified, put it first, then shuffle the rest
+  // Order providers: if preferredProvider is specified, put it first.
+  // Otherwise, prioritize fastest and most reliable providers (Groq > Gemini > OpenAI > Cohere).
   let orderedProviders = [];
   if (options?.preferredProvider) {
     const prefIndex = providers.findIndex(p => p.name === options.preferredProvider);
     if (prefIndex !== -1) {
       const preferred = providers.splice(prefIndex, 1)[0];
-      const rest = providers.sort(() => Math.random() - 0.5);
-      orderedProviders = [preferred, ...rest];
+      orderedProviders = [preferred, ...providers];
     } else {
-      orderedProviders = providers.sort(() => Math.random() - 0.5);
+      orderedProviders = providers;
     }
   } else {
-    orderedProviders = providers.sort(() => Math.random() - 0.5);
+    const rank: Record<string, number> = { groq: 1, gemini: 2, openai: 3, cohere: 4 };
+    orderedProviders = providers.sort((a, b) => (rank[a.name] || 99) - (rank[b.name] || 99));
   }
 
   let lastError = null;

@@ -20,7 +20,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ENTRIES_PATH = path.resolve(__dirname, '..', 'scratch', 'amvca', 'entries.json');
+const argOf = (flag: string) => (process.argv.find((a) => a.startsWith(`--${flag}=`)) || '').split('=')[1] || '';
+const ENTRIES_PATH = argOf('entries') || path.resolve(__dirname, '..', 'scratch', 'amvca', 'entries.json');
 const FALLBACK_WINS = path.resolve(__dirname, '..', 'scratch', 'amvca', 'winners.json');
 const REPORT_PATH = path.resolve(__dirname, '..', 'scratch', 'amvca', 'apply-report.json');
 
@@ -34,6 +35,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 const db = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
 const DRY = process.argv.includes('--dry-run');
 const NO_CREATE = process.argv.includes('--no-create');
+const NO_CREATE_FILMS = NO_CREATE || process.argv.includes('--no-create-films');
 
 type Entry = {
   season: number;
@@ -299,7 +301,7 @@ async function main() {
   }
 
   // ── Create missing films ──────────────────────────────────────
-  if (!NO_CREATE) {
+  if (!NO_CREATE_FILMS) {
     for (const [, meta] of workMeta) {
       const k = normalizeName(meta.title);
       if (filmsByTitle.has(k)) continue;
