@@ -1,4 +1,8 @@
-import { purgeStaleUnmappedChannelVideos, runVideosSync } from '../api/_lib/sync_service.js';
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+dotenv.config();
+
+import { purgeStaleUnmappedChannelVideos, runVideosSync, refreshYouTubeViewCounts } from '../api/_lib/sync_service.js';
 import { runCastExtraction, runTitleCleanup } from '../api/_lib/ai_maintenance.js';
 
 async function main() {
@@ -6,6 +10,14 @@ async function main() {
   try {
     const result = await runVideosSync();
     console.log("Sync complete:", JSON.stringify(result, null, 2));
+
+    // Refresh view counts on existing YouTube films in a round-robin pass (up to 3,000 films per 8h run)
+    try {
+      const viewsResult = await refreshYouTubeViewCounts({ maxBatches: 60 });
+      console.log("Views refresh complete:", JSON.stringify(viewsResult, null, 2));
+    } catch (e: any) {
+      console.warn("Views refresh failed:", e?.message || e);
+    }
 
     // Backstop the inline enrichment before the workflow exits. This catches
     // recent legacy/noisy rows too and keeps title cleanup coupled to the sync

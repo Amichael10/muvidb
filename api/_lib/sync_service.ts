@@ -484,6 +484,17 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
           const cvMap = new Map();
           if (existingCVs) existingCVs.forEach((cv: any) => cvMap.set(cv.video_id, cv.film_id));
 
+          // Also refresh view counts on existing linked films for this channel batch
+          if (existingCVs && existingCVs.length > 0) {
+            const filmViewsToUpdate = existingCVs
+              .filter((cv: any) => cv.film_id && typeof meta[cv.video_id]?.views === 'number' && meta[cv.video_id].views > 0)
+              .map((cv: any) => ({ id: cv.film_id, view_count: meta[cv.video_id].views }));
+            for (let b = 0; b < filmViewsToUpdate.length; b += 10) {
+              const slice = filmViewsToUpdate.slice(b, b + 10);
+              await Promise.all(slice.map((u: any) => supabase.from('films').update({ view_count: u.view_count }).eq('id', u.id)));
+            }
+          }
+
           // The retired manual endpoint created linked films before the shared
           // cleaner existed. Repair those records during the same channel sync
           // instead of requiring a separate cron/serverless function.
@@ -682,6 +693,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                     needs_review: true,
                     status: 'released',
                     runtime_minutes: Math.round(v.duration_seconds / 60),
+                    view_count: meta[v.video_id]?.views || 0,
                     language: detectVideoLanguage(cleanedTitle, ch.name, ch.primary_language),
                     content_type: 'series',
                     series_id: parentId || null,
@@ -702,6 +714,9 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                     .limit(1);
                   if (dupFilm?.[0]) {
                     existingFilmsMap.set(v.video_id, dupFilm[0].id);
+                    if (typeof meta[v.video_id]?.views === 'number' && meta[v.video_id].views > 0) {
+                      await supabase.from('films').update({ view_count: meta[v.video_id].views }).eq('id', dupFilm[0].id);
+                    }
                   } else {
                     const tmdb = await enrichFromTMDB(cleanedTitle, vidYear);
                     const rawPoster = tmdb?.poster_url || v.thumbnail_url;
@@ -730,6 +745,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                       needs_review: !(ai?.synopsis || tmdb?.synopsis),
                       status: 'released',
                       runtime_minutes: Math.round(v.duration_seconds / 60),
+                      view_count: meta[v.video_id]?.views || 0,
                       language: detectVideoLanguage(cleanedTitle, ch.name, ch.primary_language),
                       content_type: 'movie',
                     });
@@ -1069,5 +1085,95 @@ export async function runTMDBSync() {
     discovered: movies.length,
     films_created: filmsCreated,
     films_enriched: filmsEnriched,
+  };
+}
+
+/**
+ * Refreshes YouTube view counts for existing films in the catalog.
+ * Uses the YouTube Data API videos endpoint (statistics part, up to 50 videos per call).
+ * Costs only 1 YouTube quota unit per 50 films.
+ */
+export async function refreshYouTubeViewCounts(options: { maxBatches?: number; onlyMissing?: boolean } = {}) {
+  const maxBatches = options.maxBatches ?? 60; // default 60 batches = 3000 films
+  console.log(`[refreshYouTubeViewCounts] Starting YouTube views refresh (maxBatches=${maxBatches}, onlyMissing=${!!options.onlyMissing})...`);
+
+  let query = supabase
+    .from('films')
+    .select('id, source_video_id, view_count, updated_at')
+    .not('source_video_id', 'is', null);
+
+  if (options.onlyMissing) {
+    query = query.or('view_count.is.null,view_count.eq.0');
+  } else {
+    // Round-robin over all films by updated_at ascending so every film gets periodically refreshed
+    query = query.order('updated_at', { ascending: true, nullsFirst: true });
+  }
+
+  const { data: films, error } = await query.limit(maxBatches * 50);
+  if (error || !films || films.length === 0) {
+    console.log('[refreshYouTubeViewCounts] No films found to refresh views.', error?.message || '');
+    return { processed: 0, updated: 0, message: 'No films found' };
+  }
+
+  console.log(`[refreshYouTubeViewCounts] Processing ${films.length} films for view updates...`);
+  let updatedCount = 0;
+  let batchCount = 0;
+  const nowIso = new Date().toISOString();
+
+  for (let i = 0; i < films.length; i += 50) {
+    const chunk = films.slice(i, i + 50);
+    const videoIds = chunk.map((f: any) => f.source_video_id).filter(Boolean);
+    if (!videoIds.length) continue;
+
+    try {
+      batchCount++;
+      const stats: any = await ytGet('videos', {
+        part: 'statistics',
+        id: videoIds.join(','),
+      });
+
+      const viewsMap = new Map<string, number>();
+      for (const item of stats.items ?? []) {
+        if (item.statistics?.viewCount) {
+          viewsMap.set(item.id, parseInt(item.statistics.viewCount, 10));
+        }
+      }
+
+      // Update films in database
+      const updates = chunk.map(async (f: any) => {
+        const liveViews = viewsMap.get(f.source_video_id);
+        if (typeof liveViews === 'number' && liveViews > 0) {
+          if (liveViews !== f.view_count) {
+            const { error: updErr } = await supabase
+              .from('films')
+              .update({ view_count: liveViews, updated_at: nowIso })
+              .eq('id', f.id);
+            if (!updErr) updatedCount++;
+          } else {
+            // Touch updated_at so it rotates to the back of the queue
+            await supabase.from('films').update({ updated_at: nowIso }).eq('id', f.id);
+          }
+        } else {
+          // Video may be deleted/privated or 0 views - touch updated_at so it rotates in queue
+          await supabase.from('films').update({ updated_at: nowIso }).eq('id', f.id);
+        }
+      });
+
+      await Promise.all(updates);
+    } catch (e: any) {
+      console.warn(`[refreshYouTubeViewCounts] Batch ${batchCount} failed:`, e?.message || e);
+      if (/quota|unusable/i.test(e?.message || '')) {
+        console.warn('[refreshYouTubeViewCounts] YouTube API quota exceeded, stopping.');
+        break;
+      }
+    }
+  }
+
+  console.log(`[refreshYouTubeViewCounts] Finished: ${updatedCount} view counts updated across ${films.length} films (${batchCount} batches).`);
+  return {
+    task: 'views',
+    processed: films.length,
+    updated: updatedCount,
+    batches: batchCount,
   };
 }

@@ -106,7 +106,7 @@ Return ONLY a JSON array, no prose: [{"i":<number>,"keep":<true|false>,"score":<
 Comments:
 ${numbered}`;
 
-  const { text } = await generateAIContent(prompt);
+  const { text } = await generateAIContent(prompt, { preferredProvider: 'groq' });
   const parsed = parseJSON(text);
   const scores = new Map<number, number>();
   if (Array.isArray(parsed)) {
@@ -311,7 +311,17 @@ export async function runCommentMining(opts: { scan?: number; aiCap?: number; mi
     'popular films',
   );
 
-  // 3. Fill the remaining budget with the most recently added films.
+  // 3. Unviewed / zero-view films needing mining + view backfill
+  const unviewed = await withRetry<any[]>(
+    () =>
+      needsMining(supabase.from('films').select(COLS))
+        .or('view_count.is.null,view_count.eq.0')
+        .order('created_at', { ascending: false })
+        .limit(scan),
+    'unviewed films',
+  );
+
+  // 4. Fill the remaining budget with the most recently added films.
   const recent = await withRetry<any[]>(
     () =>
       needsMining(supabase.from('films').select(COLS))
@@ -320,9 +330,9 @@ export async function runCommentMining(opts: { scan?: number; aiCap?: number; mi
     'recent films',
   );
 
-  // Priority, then popular, then recent; dedupe and cap at the scan budget.
+  // Priority, then popular, then unviewed, then recent; dedupe and cap at the scan budget.
   const byId = new Map<string, any>();
-  for (const f of [...priorityFilms, ...(popular || []), ...(recent || [])]) {
+  for (const f of [...priorityFilms, ...(popular || []), ...(unviewed || []), ...(recent || [])]) {
     if (f?.id && !byId.has(f.id)) byId.set(f.id, f);
   }
   const films = [...byId.values()].slice(0, scan);

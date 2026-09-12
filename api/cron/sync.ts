@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../_lib/supabase.js';
 import { isValidAuth } from '../_lib/auth.js';
 import { runCastExtraction, runTitleCleanup } from '../_lib/ai_maintenance.js';
-import { runShowtimesSync, runVideosSync, runTMDBSync, purgeStaleUnmappedChannelVideos } from '../_lib/sync_service.js';
+import { runShowtimesSync, runVideosSync, runTMDBSync, purgeStaleUnmappedChannelVideos, refreshYouTubeViewCounts } from '../_lib/sync_service.js';
 import { enrichMissingSynopsesConcurrent } from '../_lib/cohere_enrichment.js';
 import { sweepStaleCinemas } from '../_lib/cinema-adapters/index.js';
 import refreshVideosHandler from '../_lib/refresh_videos_handler.js';
@@ -139,6 +139,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'purge_stale_buffer': result = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 }); break;
       case 'theatre_status_sweep': result = await sweepAndUpdatePlayStatuses(); break;
       case 'youtube_watch':        result = await runYouTubeUploadWatch(); break;
+      case 'views':                result = await refreshYouTubeViewCounts({ maxBatches: 5 }); break;
+      case 'comments': {
+        const { runCommentMining } = await import('../_lib/comment_reviews.js');
+        result = await runCommentMining({ scan: 50, aiCap: 10 });
+        break;
+      }
       case 'critics':              result = await runCriticsSync(); break;
       case 'kava':      
         return res.status(200).json({ 
