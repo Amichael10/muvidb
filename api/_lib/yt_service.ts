@@ -122,6 +122,12 @@ export function cleanTitle(raw: string): string {
   title = title.replace(/\s+[-–—](Nigerian|Nollywood|African).*/i, '');
   title = title.replace(/\s*Latest\s*(Nigerian|Nollywood|Yoruba|Igbo)?\s*(Epic\s*)?(New\s*)?(Drama\s*)?(Movie|Film|Movies|Films)s?\s*(\d{4})?\s*$/i, '');
   title = title.replace(/\s+[-–—]\s+[A-Z][a-z]+\s+[A-Z][a-z]+\s*[\/,]\s*[A-Z].*$/i, '');
+  // Strip prominent star cast suffixes after dash (e.g. " - Ruth Kadiri Stephen Odimgbe Flash BOY")
+  title = title.replace(/\s*[-–—]\s*(?:Ruth Kadiri|Stephen Odimgbe|Deza the Great|Eddie Watson|Van Vicker|Anton Jefta|Chizzy Alichi|Uchenancy|Frederick Leonard|Bolaji Ogunmola|Eniola Ajao|Muyiwa Ademola|Maurice Sam|Ken Erics|Yul Edochie|Destiny Etiko|Mercy Johnson|Zubby Michael).*/i, '');
+  // Strip genre and channel noise after dash/em-dash (e.g. " — Drama & Romance Movie", " - Uchenancy Movies")
+  title = title.replace(/\s*[-–—]\s*(?:(?:Full\s+)?(?:Romance|Drama|Comedy|Action|Epic|Family|Crime)\s+Movie|Uchenancy\s+Movies?|Nigeria\s+Movies?|African\s+Movies?).*$/i, '');
+  // Strip multi-actor chains after dash
+  title = title.replace(/\s+[-–—]\s+(?:[A-Z][a-zA-Z]+\s+){2,}[A-Z][a-zA-Z]+.*$/u, '');
   title = title.replace(/\s*(Full|Complete)\s*(Movie|Film|Season)\s*$/i, '');
   
   // Aggressive pipe/separator stripping for common noise words

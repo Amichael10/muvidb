@@ -139,6 +139,36 @@ async function main() {
   for (let i = 0; i < plans.length; i++) {
     const plan = plans[i];
     await supabase.from('people').update({ mubi_slug: null }).in('id', plan.duplicateIds);
+
+    // 1. Insert duplicate names as aliases on primary
+    for (const dupName of plan.duplicateNames) {
+      if (dupName && dupName.trim().toLowerCase() !== (plan.primaryName || '').trim().toLowerCase()) {
+        const key = dupName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '');
+        if (key) {
+          const { data: existing } = await supabase
+            .from('person_aliases')
+            .select('id')
+            .eq('person_id', plan.primaryId)
+            .eq('alias_key', key)
+            .maybeSingle();
+          if (!existing) {
+            await supabase.from('person_aliases').insert({
+              person_id: plan.primaryId,
+              alias: dupName.trim(),
+              source: 'duplicate_merge',
+            });
+          }
+        }
+      }
+    }
+
+    // 2. Re-point existing aliases from duplicates to primary
+    await supabase
+      .from('person_aliases')
+      .update({ person_id: plan.primaryId })
+      .in('person_id', plan.duplicateIds);
+
+    // 3. Execute merge via RPC
     const { error } = await supabase.rpc('merge_people_group', {
       p_master_id: plan.primaryId,
       p_duplicate_ids: plan.duplicateIds,
@@ -149,7 +179,15 @@ async function main() {
       console.warn(`  ❌ ${plan.primaryName}: ${error.message}`);
     } else {
       ok++;
-      if ((i + 1) % 50 === 0 || i === plans.length - 1) {
+      // 4. Update canonical film count
+      const { count: actualFilmCount } = await supabase
+        .from('credits')
+        .select('film_id', { count: 'exact', head: true })
+        .eq('person_id', plan.primaryId);
+      if (actualFilmCount !== undefined) {
+        await supabase.from('people').update({ film_count: actualFilmCount }).eq('id', plan.primaryId);
+      }
+      if ((i + 1) % 25 === 0 || i === plans.length - 1) {
         console.log(`  ✓ ${i + 1}/${plans.length} (ok=${ok} fail=${fail})`);
       }
     }

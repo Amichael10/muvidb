@@ -11,6 +11,9 @@ import CriticReviewsSection from '../components/film/CriticReviewsSection';
 import PersonCard from '../components/person/PersonCard';
 import FilmCard from '../components/film/FilmCard';
 import LikedScore from '../components/film/LikedScore';
+import RottenTomatoesScorecard from '../components/film/RottenTomatoesScorecard';
+import FilmSpecsTable from '../components/film/FilmSpecsTable';
+import RateMoviePrompt from '../components/film/RateMoviePrompt';
 import WatchOptions from '../components/film/WatchOptions';
 import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
 import { getFilmBackdrop, getFilmPoster } from '../lib/filmImages';
@@ -275,7 +278,7 @@ export default function FilmDetail() {
     toggleReaction
   } = useReactions(filmId, user);
 
-  const [criticSummary, setCriticSummary] = useState({ score: null, count: 0 });
+  const [criticSummary, setCriticSummary] = useState({ score: null, count: 0, featuredQuote: null });
   const [showFilmEdit, setShowFilmEdit] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
@@ -285,16 +288,22 @@ export default function FilmDetail() {
     try {
       const { data } = await supabase
         .from('critic_reviews')
-        .select('rating')
+        .select('rating, quote, is_featured, critic_name, publication, critic:critics(name, publication)')
         .eq('film_id', uuid);
       if (data && data.length > 0) {
         const valid = data
           .map((r) => (r.rating != null && r.rating !== '' ? Number(r.rating) : null))
           .filter((n) => n !== null && !isNaN(n) && n > 0 && n <= 10);
-        if (valid.length > 0) {
-          const avg = Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10;
-          setCriticSummary({ score: avg, count: valid.length });
-        }
+        
+        const featured = data.find((r) => r.is_featured && r.quote) || data.find((r) => r.quote) || null;
+        const featuredObj = featured ? {
+          quote: featured.quote,
+          critic_name: featured.critic_name || featured.critic?.name,
+          publication: featured.publication || featured.critic?.publication
+        } : null;
+
+        const avg = valid.length > 0 ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10 : null;
+        setCriticSummary({ score: avg, count: valid.length, featuredQuote: featuredObj });
       }
     } catch (e) {
       console.error('Error fetching critic summary:', e);
@@ -565,51 +574,83 @@ export default function FilmDetail() {
 
   const trailerVideoId = youtubeId(film.trailer_youtube_id);
   const availablePlatforms = PLATFORMS.filter((platform) => isFilmOnPlatform(film, platform.id));
+  const fullYoutubeUrl = film.youtube_watch_url || (isFilmOnPlatform(film, 'youtube') ? getWatchUrl(film, 'youtube') : null);
 
   return (
     <div className="w-full bg-bg min-h-screen pb-20">
       {/* 1. CINEMATIC HEADER */}
-      <div className="relative w-full h-[60vh] min-h-[500px] border-b border-border overflow-hidden">
-        <ImageWithFallback
-          src={getFilmBackdrop(film)}
-          alt={`${formatFilmTitle(film.title)} Backdrop`} 
-          className="absolute inset-0 w-full h-full object-cover"
-          fallbackType="film"
-          name={formatFilmTitle(film.title)}
-          width={1600}
-          quality={78}
-          sizes="100vw"
-          loading="eager"
-          fetchPriority="high"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent w-full md:w-1/2"></div>
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-bg to-transparent"></div>
+      <div className="relative w-full border-b border-border">
+        {/* Backdrop image & gradients (strictly clipped to this container) */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <ImageWithFallback
+            src={getFilmBackdrop(film)}
+            alt={`${formatFilmTitle(film.title)} Backdrop`} 
+            className="w-full h-full object-cover"
+            fallbackType="film"
+            name={formatFilmTitle(film.title)}
+            width={1600}
+            quality={78}
+            sizes="100vw"
+            loading="eager"
+            fetchPriority="high"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/70 to-black/30"></div>
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-bg via-bg/80 to-transparent"></div>
+        </div>
 
-        <div className="absolute bottom-0 left-0 w-full">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 flex flex-col md:flex-row items-start md:items-end gap-6 md:gap-8 pb-8">
-            <div className="hidden md:block w-64 shrink-0 translate-y-16 z-10">
-              <ImageWithFallback
-                src={getFilmPoster(film)}
-                alt={`${formatFilmTitle(film.title)} Poster`} 
-                className="w-full rounded-xl shadow-2xl border border-white/10 object-cover aspect-[2/3]"
-                fallbackType="film"
-                name={formatFilmTitle(film.title)}
-                width={512}
-                sizes="256px"
-                loading="eager"
-              />
+        {/* Hero Content Container (Relative layout so poster and content never get clipped) */}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 pt-8 md:pt-12 pb-10">
+          <div className="flex flex-col md:flex-row items-start md:items-end gap-6 md:gap-8">
+            
+            {/* Desktop Poster */}
+            <div className="hidden md:block w-56 lg:w-64 shrink-0 relative group self-end">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/15 bg-surface-2">
+                <ImageWithFallback
+                  src={getFilmPoster(film)}
+                  alt={`${formatFilmTitle(film.title)} Poster`} 
+                  className="w-full aspect-[2/3] object-cover"
+                  fallbackType="film"
+                  name={formatFilmTitle(film.title)}
+                  width={512}
+                  sizes="256px"
+                  loading="eager"
+                />
+              </div>
+              {/* Floating Rotten Tomatoes-style "Watch Trailer" / "Play on YouTube" Pill Button */}
+              {(fullYoutubeUrl || trailerVideoId) && (
+                <div className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap">
+                  {fullYoutubeUrl ? (
+                    <a
+                      href={fullYoutubeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-[#0d0f12]/95 hover:bg-[#FF0000] text-white text-xs font-black px-4 py-2 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 group/btn"
+                    >
+                      <div className="w-4 h-4 rounded-full bg-[#FF0000] group-hover/btn:bg-white text-white group-hover/btn:text-[#FF0000] flex items-center justify-center shrink-0 transition-colors">
+                        <Icon icon="solar:play-bold" className="text-[9px] ml-0.5" />
+                      </div>
+                      <span>Play on YouTube</span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById('trailer-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="inline-flex items-center gap-2 bg-[#0d0f12]/95 hover:bg-brand text-white text-xs font-black px-4 py-2 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer group/btn"
+                    >
+                      <div className="w-4 h-4 rounded-full bg-[#FF0000] flex items-center justify-center text-white shrink-0 group-hover/btn:scale-110 transition-transform">
+                        <Icon icon="solar:play-bold" className="text-[9px] ml-0.5" />
+                      </div>
+                      <span>Watch Trailer</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex-1 z-10 w-full">
-              {/* Breadcrumbs Navigation */}
-              <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-bold text-white/70 mb-3 flex-wrap">
-                <Link to="/" className="hover:text-brand transition-colors">Home</Link>
-                <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-white/40" />
-                <Link to="/browse" className="hover:text-brand transition-colors">Films</Link>
-                <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-white/40" />
-                <span className="text-white truncate max-w-[240px]">{formatFilmTitle(film.title)}</span>
-              </nav>
-
               {parentSeries && (
                 <Link 
                   to={`/films/${parentSeries.slug || parentSeries.id}`}
@@ -619,11 +660,35 @@ export default function FilmDetail() {
                   <span>Part of Series: {parentSeries.title}</span>
                 </Link>
               )}
-              <h1 className="font-heading font-bold text-3xl sm:text-4xl md:text-6xl text-white mb-4 leading-tight tracking-tighter drop-shadow-2xl">
+
+              {/* Mobile Poster + Title for mobile screens */}
+              <div className="flex md:hidden items-center gap-4 mb-3">
+                <div className="w-20 shrink-0 rounded-xl overflow-hidden border border-white/15 shadow-xl bg-surface-2 aspect-[2/3]">
+                  <ImageWithFallback
+                    src={getFilmPoster(film)}
+                    alt={formatFilmTitle(film.title)}
+                    className="w-full h-full object-cover"
+                    fallbackType="film"
+                    name={formatFilmTitle(film.title)}
+                    width={160}
+                    sizes="80px"
+                    loading="eager"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h1 className="font-heading font-bold text-2xl sm:text-3xl text-white leading-tight tracking-tight drop-shadow-2xl">
+                    {formatFilmTitle(film.title)}
+                  </h1>
+                </div>
+              </div>
+
+              {/* Desktop Title */}
+              <h1 className="hidden md:block font-heading font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-white mb-3 leading-tight tracking-tighter drop-shadow-2xl">
                 {formatFilmTitle(film.title)}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs text-white/90 font-bold mb-4">
+              {/* Metadata Row with Genres INLINE (replacing box office pill) */}
+              <div className="flex flex-wrap items-center gap-2.5 text-xs text-white/90 font-bold mb-5">
                 <span>{film.year}</span>
                 <span className="w-1 h-1 rounded-full bg-white/30"></span>
                 <span>
@@ -634,77 +699,63 @@ export default function FilmDetail() {
                 {film.nfvcb_rating && (
                   <>
                     <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                    <span className="bg-brand text-white px-2 py-0.5 rounded text-xs font-bold">
+                    <span className="bg-brand text-white px-2 py-0.5 rounded text-[11px] font-bold">
                       {film.nfvcb_rating}
                     </span>
                   </>
                 )}
-                {(() => {
-                  const domGross = film.box_office_domestic || film.streaming_links?.box_office?.domestic;
-                  if (!domGross) return null;
-                  const currency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
-                  const symbol = currency === 'NGN' ? '₦' : `${currency} `;
-                  const formatted = domGross >= 1_000_000_000 
-                    ? `${(domGross / 1_000_000_000).toFixed(2)}B` 
-                    : `${(domGross / 1_000_000).toFixed(1)}M`;
-
-                  return (
-                    <>
-                      <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                      <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500/30 to-brand/30 border border-amber-500/50 text-amber-300 px-2.5 py-0.5 rounded text-xs font-black shadow-lg backdrop-blur-md">
-                        <Icon icon="solar:ticket-bold" className="text-amber-400 text-xs" />
-                        <span>Box Office: {symbol}{formatted}</span>
-                      </span>
-                    </>
-                  );
-                })()}
                 {film.is_in_cinemas && (
-                  <span className="bg-gold text-bg px-2.5 py-0.5 rounded text-xs font-bold border border-gold uppercase tracking-wider">
-                    In Cinemas
-                  </span>
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
+                    <span className="bg-gold text-bg px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider">
+                      In Cinemas
+                    </span>
+                  </>
                 )}
                 {(film.coming_soon || film.status === 'upcoming') && (
-                  <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-500/30 uppercase tracking-wider">
-                    Coming Soon
-                  </span>
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
+                    <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-500/30 uppercase tracking-wider">
+                      Coming Soon
+                    </span>
+                  </>
                 )}
-                {film.status && !['released', 'upcoming'].includes(film.status) && (
-                  <span className="bg-surface-2 text-text-primary px-2 py-0.5 rounded text-[10px] font-bold border border-border capitalize">
-                    {film.status.replace('-', ' ')}
-                  </span>
+                {film.genres && film.genres.length > 0 && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {film.genres.map(genre => (
+                        <span key={genre} className="px-2.5 py-0.5 text-[10px] font-bold bg-white/10 backdrop-blur-md text-white/90 rounded-md border border-white/15">
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2 mb-6">
-                {(film.genres || []).map(genre => (
-                  <span key={genre} className="px-3 py-1 text-[10px] font-bold bg-black/40 backdrop-blur-md text-white rounded-lg border border-white/10">
-                    {genre}
-                  </span>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap items-end gap-6">
-                {(film.liked_percent != null || film.imdb_rating != null || film.tmdb_rating != null || film.audience_rating != null || criticSummary.score != null) ? (
-                  <LikedScore
-                    percent={film.liked_percent}
-                    starRating={film.imdb_rating || film.tmdb_rating || film.audience_rating}
-                    criticScore={criticSummary.score}
-                    criticCount={criticSummary.count}
-                    votesCount={film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count || (likesCount + dislikesCount)}
-                    variant="hero"
-                  />
-                ) : (
-                  <button 
-                    onClick={() => {
-                      const el = document.getElementById('reviews-section');
-                      if (el) el.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="flex items-center gap-2 bg-brand/10 border border-brand/20 text-brand px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-brand/20 transition-all duration-300 cursor-pointer active:scale-95 shadow-md shadow-brand/5 mb-1 shrink-0"
-                  >
-                    <Icon icon="solar:star-bold" className="text-xs" />
-                    <span>Be the first to rate</span>
-                  </button>
-                )}
+              <div className="w-full max-w-2xl mt-1">
+                <RottenTomatoesScorecard
+                  film={film}
+                  criticScore={criticSummary.score}
+                  criticCount={criticSummary.count}
+                  featuredQuote={criticSummary.featuredQuote}
+                  audiencePercent={film.liked_percent}
+                  starRating={film.imdb_rating || film.tmdb_rating || film.audience_rating}
+                  votesCount={film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count || (likesCount + dislikesCount)}
+                  onRateClick={() => {
+                    const el = document.getElementById('rate-prompt-section') || document.getElementById('reviews-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  onWatchClick={() => {
+                    const el = document.getElementById('watch-options-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  onTrailerClick={trailerVideoId ? () => {
+                    const el = document.getElementById('trailer-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  } : null}
+                />
               </div>
             </div>
 
@@ -807,52 +858,38 @@ export default function FilmDetail() {
         </section>
         <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border">
 
-          {/* MAIN CONTENT (70%) — story → media → people → reviews → awards */}
+          {/* MAIN CONTENT (70%) — movie info (synopsis + specs) → episodes → trailer → cast → crew → awards → reviews */}
           <div className="lg:col-span-2">
-            {/* Synopsis */}
-            <section className="p-8 md:p-12 border-b border-border">
-              <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-6 tracking-tight leading-none">Synopsis</h2>
-              <p className="text-text-secondary text-base sm:text-lg leading-relaxed border-l-2 border-brand pl-6">
-                {toSentenceCase(film.synopsis)}
-              </p>
-              <div className="flex flex-wrap items-center gap-4 mt-6">
-                <button
-                  onClick={() => setShowFilmEdit(true)}
-                  className="inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold transition-colors min-h-[36px]"
-                >
-                  <Icon icon="solar:pen-2-linear" width="14" />
-                  Suggest an edit
-                </button>
-                <button
-                  onClick={() => setShowReport(true)}
-                  className="inline-flex items-center gap-1.5 text-text-secondary hover:text-red-500 text-xs font-bold transition-colors min-h-[36px]"
-                >
-                  <Icon icon="solar:flag-linear" width="14" />
-                  Report a broken / pirate link
-                </button>
-              </div>
-              {showFilmEdit && (
-                <SuggestEditModal
-                  target="film"
-                  targetId={filmId}
-                  targetName={formatFilmTitle(film.title)}
-                  current={{
-                    title: film.title,
-                    year: film.year,
-                    synopsis: film.synopsis,
-                    runtime_minutes: film.runtime_minutes ?? film.duration,
-                    language: film.language,
-                    countries: film.countries,
-                    trailer_youtube_id: film.trailer_youtube_id,
-                    tagline: film.tagline,
-                  }}
-                  onClose={() => setShowFilmEdit(false)}
-                />
-              )}
-              {showReport && (
-                <ReportModal kind="link" targetId={filmId} targetName={formatFilmTitle(film.title)} onClose={() => setShowReport(false)} />
-              )}
-            </section>
+            {/* Unified Movie Info (Storyline & Synopsis + Production & Industry Specs) */}
+            <FilmSpecsTable
+              film={film}
+              cast={cast}
+              crew={crew}
+              synopsis={film.synopsis}
+              onSuggestEdit={() => setShowFilmEdit(true)}
+              onReport={() => setShowReport(true)}
+            />
+            {showFilmEdit && (
+              <SuggestEditModal
+                target="film"
+                targetId={filmId}
+                targetName={formatFilmTitle(film.title)}
+                current={{
+                  title: film.title,
+                  year: film.year,
+                  synopsis: film.synopsis,
+                  runtime_minutes: film.runtime_minutes ?? film.duration,
+                  language: film.language,
+                  countries: film.countries,
+                  trailer_youtube_id: film.trailer_youtube_id,
+                  tagline: film.tagline,
+                }}
+                onClose={() => setShowFilmEdit(false)}
+              />
+            )}
+            {showReport && (
+              <ReportModal kind="link" targetId={filmId} targetName={formatFilmTitle(film.title)} onClose={() => setShowReport(false)} />
+            )}
 
             {/* Episodes (for series) */}
             {episodes.length > 0 && (() => {
@@ -1060,7 +1097,7 @@ export default function FilmDetail() {
                           {formatPersonName(person.name)}
                         </span>
                         <span className="text-xs text-text-muted font-medium mt-0.5 line-clamp-1">
-                          {toTitleCase(person.role)}
+                          {person.character_name ? `as ${toTitleCase(person.character_name)}` : toTitleCase(person.role || 'Cast')}
                         </span>
                       </div>
                     </Link>
@@ -1187,6 +1224,21 @@ export default function FilmDetail() {
               <CriticReviewsSection filmId={film.id} user={user} />
             </div>
 
+            {/* Rotten Tomatoes "What did you think? / Rate it" interactive banner */}
+            <div id="rate-prompt-section" className="px-8 md:px-12 pt-6">
+              <RateMoviePrompt
+                filmTitle={formatFilmTitle(film.title)}
+                userReaction={userReaction}
+                likesCount={likesCount}
+                dislikesCount={dislikesCount}
+                onReaction={handleReaction}
+                onWriteReviewClick={() => {
+                  const el = document.getElementById('reviews-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+              />
+            </div>
+
             {/* Reviews */}
             <section id="reviews-section" className="p-8 md:p-12">
               <ReviewSection
@@ -1240,232 +1292,68 @@ export default function FilmDetail() {
                 title={formatFilmTitle(film.title)}
                 text={`Check out ${formatFilmTitle(film.title)} on MuviDB`}
               />
+
+              <button
+                type="button"
+                onClick={() => setShowFilmEdit(true)}
+                className="w-full mt-2 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-surface-2 hover:bg-brand/10 hover:text-brand border border-dashed border-border hover:border-brand/40 text-text-muted text-xs font-bold transition-all active:scale-95 cursor-pointer"
+              >
+                <Icon icon="solar:pen-2-bold" className="text-brand text-sm" />
+                <span>Notice missing info? Suggest an edit</span>
+              </button>
             </div>
 
-            <div className="p-8 space-y-6">
-              {(() => {
-                const prodCompanies = (film.film_companies || []).filter(
-                  (fc) => !fc.role || fc.role === 'production' || fc.role === 'co_production'
-                );
-                const distCompanies = (film.film_companies || []).filter(
-                  (fc) => fc.role === 'distribution' || fc.role === 'international_distribution'
-                );
-
-                return (
-                  <>
-                    {/* Production Companies */}
-                    <div>
-                      <div className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                        <Icon icon="solar:buildings-bold" className="text-brand text-xs" />
-                        <span>Production {prodCompanies.length > 1 ? 'Partners' : 'Company'}</span>
-                      </div>
-
-                      {prodCompanies.length > 0 ? (
-                        <div className="space-y-3">
-                          {prodCompanies.map((fc, idx) => (
-                            <Link
-                              key={idx}
-                              to={`/companies/${fc.companies?.slug || fc.companies?.id}`}
-                              className="flex items-center gap-3 group"
-                            >
-                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-border group-hover:border-brand transition-colors">
-                                <ImageWithFallback
-                                  src={fc.companies?.logo_url}
-                                  alt={fc.companies?.name || 'Studio'}
-                                  fallbackType="company"
-                                  name={fc.companies?.name || 'Studio'}
-                                  className="w-full h-full object-cover"
-                                  width={72}
-                                  sizes="36px"
-                                  loading="lazy"
-                                />
-                              </div>
-                              <span className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1">
-                                {fc.companies?.name}
-                              </span>
-                            </Link>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-text-muted font-medium">Independent Production</p>
-                      )}
-                    </div>
-
-                    {/* Distribution Partners / Distributor */}
-                    {(distCompanies.length > 0 || film.distributor || film.streaming_links?.distributor) && (
-                      <div>
-                        <div className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                          <Icon icon="solar:delivery-bold" className="text-brand text-xs" />
-                          <span>Distribution {distCompanies.length > 1 ? 'Partners' : 'Partner / Distributor'}</span>
-                        </div>
-                        {distCompanies.length > 0 ? (
-                          <div className="space-y-3">
-                            {distCompanies.map((fc, idx) => (
-                              <Link
-                                key={idx}
-                                to={`/companies/${fc.companies?.slug || fc.companies?.id}`}
-                                className="flex items-center gap-3 group"
-                              >
-                                <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-border group-hover:border-brand transition-colors">
-                                  <ImageWithFallback
-                                    src={fc.companies?.logo_url}
-                                    alt={fc.companies?.name || 'Distributor'}
-                                    fallbackType="company"
-                                    name={fc.companies?.name || 'Distributor'}
-                                    className="w-full h-full object-cover"
-                                    width={72}
-                                    sizes="36px"
-                                    loading="lazy"
-                                  />
-                                </div>
-                                <span className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-1">
-                                  {fc.companies?.name}
-                                </span>
-                              </Link>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-text-primary text-xs bg-surface-2/80 border border-border px-3 py-2 rounded-lg inline-flex items-center gap-2">
-                              <Icon icon="solar:box-minimalistic-bold" className="text-brand text-sm shrink-0" />
-                              <span>{film.distributor || film.streaming_links?.distributor}</span>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-
-            <div className="p-8">
-              <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight">About</h3>
-              <div className="space-y-4 text-[11px] font-bold">
-                <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted tracking-wider">Status</span>
-                  <span className="text-text-primary">{film.status}</span>
-                </div>
-                {(film.distributor || film.streaming_links?.distributor) && (
-                  <div className="flex justify-between items-center border-b border-border pb-3">
-                    <span className="text-text-muted tracking-wider">Distributor</span>
-                    <span className="text-text-primary font-bold">{film.distributor || film.streaming_links?.distributor}</span>
-                  </div>
-                )}
-                {film.countries && film.countries.length > 0 && (
-                  <div className="flex justify-between items-start gap-4 border-b border-border pb-3">
-                    <span className="text-text-muted tracking-wider shrink-0">Country</span>
-                    <span className="text-right flex flex-wrap justify-end gap-x-1 gap-y-1">
-                      {film.countries.map((country, i) => (
-                        <span key={country} className="inline-flex items-center">
-                          <Link
-                            to={`/browse?country=${encodeURIComponent(country)}`}
-                            className="text-text-primary hover:text-brand transition-colors underline-offset-2 hover:underline"
-                          >
-                            {country}
-                          </Link>
-                          {i < film.countries.length - 1 ? <span className="text-text-muted">,</span> : null}
-                        </span>
-                      ))}
-                    </span>
-                  </div>
-                )}
-                {/* Language row hidden until detection is accurate — re-enable with getFilmLanguages(film) */}
-                <div className="flex justify-between items-center border-b border-border pb-3">
-                  <span className="text-text-muted tracking-wider">{film.content_type === 'series' ? 'Seasons' : 'Runtime'}</span>
-                  <span className="text-text-primary">
-                    {film.content_type === 'series'
-                      ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
-                      : `${film.runtime_minutes || film.runtime} min`}
-                  </span>
-                </div>
-                {film.content_type === 'series' && film.episode_count && (
-                  <div className="flex justify-between items-center border-b border-border pb-3">
-                    <span className="text-text-muted tracking-wider">Episodes</span>
-                    <span className="text-text-primary">{film.episode_count} Episodes</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center">
-                  <span className="text-text-muted tracking-wider">Rating</span>
-                  <span className="bg-surface-2 text-text-primary px-2 py-0.5 rounded text-[10px] border border-border font-bold">
-                    {film.nfvcb_rating}
-                  </span>
-                </div>
+            {/* MORE LIKE THIS — Modern card stack (desktop) and smooth swipeable carousel (mobile) */}
+            <div className="p-6 md:p-8">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-heading font-bold text-base text-text-primary tracking-tight">More Like This</h3>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Recommended</span>
               </div>
-            </div>
-
-            {/* WHERE TO WATCH — explicit per-platform list (answers the #1 query) */}
-            {PLATFORMS.some((p) => isFilmOnPlatform(film, p.id)) && (
-              <div className="hidden lg:block p-8">
-                <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight flex items-center gap-2">
-                  <Icon icon="solar:tv-bold" className="text-brand" />
-                  Where to Watch
-                </h3>
-                <div className="flex flex-col gap-2">
-                  {PLATFORMS.filter((p) => isFilmOnPlatform(film, p.id)).map((p) => {
-                    const url = getWatchUrl(film, p.id);
-                    const inner = (
-                      <>
-                        <span className="flex items-center gap-3">
-                          {p.logo ? (
-                            <span className="w-6 h-6 rounded-md bg-white overflow-hidden flex items-center justify-center border border-border shrink-0">
-                              <img src={p.logo} alt="" className="w-full h-full object-contain p-0.5" loading="lazy" />
-                            </span>
-                          ) : (
-                            <span
-                              className="w-6 h-6 rounded-md flex items-center justify-center border border-white/10 shrink-0"
-                              style={{ background: `${p.color}22`, color: p.color }}
-                            >
-                              <Icon icon={p.icon} width="14" height="14" />
-                            </span>
-                          )}
-                          <span className="text-[11px] font-black uppercase tracking-widest text-text-primary">{p.name}</span>
-                        </span>
-                        <Icon icon={url ? 'solar:arrow-right-up-linear' : 'solar:alt-arrow-right-linear'} className="text-text-muted group-hover:text-brand transition-colors" />
-                      </>
-                    );
-                    const className = 'group flex items-center justify-between px-4 py-3 rounded-lg bg-surface-2/40 border border-border hover:border-brand/50 transition-all';
-                    return url ? (
-                      <a key={p.id} href={url} target="_blank" rel="noopener noreferrer" className={className}>{inner}</a>
-                    ) : (
-                      <Link key={p.id} to={`/watch/${p.id}`} className={className}>{inner}</Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="p-8">
-              <h3 className="font-heading font-bold text-sm text-text-primary mb-5 tracking-tight">More Like This</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-1 gap-3 lg:gap-0 lg:border lg:border-border lg:rounded-lg lg:overflow-hidden lg:shadow-sm">
+              <div className="flex lg:flex-col gap-3.5 overflow-x-auto lg:overflow-visible no-scrollbar pb-3 lg:pb-0 snap-x">
                 {relatedFilms.slice(0, RELATED_FILMS_LIMIT).map(relatedFilm => (
                   <Link
                     key={relatedFilm.id}
                     to={`/films/${relatedFilm.slug || relatedFilm.id}`}
-                    className="flex flex-col lg:flex-row gap-3 lg:gap-4 bg-surface hover:bg-surface-2 p-3 lg:p-4 border border-border lg:border-0 lg:border-b lg:last:border-b-0 rounded-lg lg:rounded-none group transition-all min-w-0"
+                    className="group flex flex-col sm:flex-row lg:flex-row gap-3 p-3 rounded-xl bg-surface hover:bg-surface-2 border border-border hover:border-brand/40 transition-all duration-300 min-w-[200px] sm:min-w-0 snap-start shadow-sm"
                   >
-                    <ImageWithFallback
-                      src={relatedFilm.poster_url || relatedFilm.poster} 
-                      alt={relatedFilm.title}
-                      className="w-full aspect-[2/3] lg:w-12 lg:h-16 lg:aspect-auto object-cover rounded-md border border-border"
-                      fallbackType="film"
-                      name={relatedFilm.title}
-                      width={192}
-                      sizes="(max-width: 639px) 40vw, (max-width: 1023px) 20vw, 48px"
-                      loading="lazy"
-                    />
-                    <div className="flex flex-col justify-center">
-                      <h4 className="font-bold text-text-primary text-xs group-hover:text-brand transition-colors line-clamp-2 mb-1 tracking-tight">
-                        {formatFilmTitle(relatedFilm.title)}
-                      </h4>
-                      <div className="text-[10px] font-bold text-text-muted mb-1">
-                        {relatedFilm.year} • {relatedFilm.genres && relatedFilm.genres.length > 0 ? relatedFilm.genres[0] : 'Media'}
-                      </div>
-                      {relatedFilm._reason && (
-                        <div className="text-[9px] font-bold text-brand/80 uppercase tracking-wide line-clamp-1">
-                          {relatedFilm._reason}
+                    <div className="w-full sm:w-16 lg:w-16 aspect-[2/3] shrink-0 rounded-lg overflow-hidden border border-border group-hover:border-brand/40 shadow-sm relative bg-surface-2">
+                      <ImageWithFallback
+                        src={relatedFilm.poster_url || relatedFilm.poster} 
+                        alt={relatedFilm.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        fallbackType="film"
+                        name={relatedFilm.title}
+                        width={160}
+                        sizes="64px"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="flex flex-col justify-between flex-1 min-w-0">
+                      <div>
+                        <h4 className="font-bold text-text-primary text-xs sm:text-sm group-hover:text-brand transition-colors line-clamp-1 leading-snug tracking-tight mb-1">
+                          {formatFilmTitle(relatedFilm.title)}
+                        </h4>
+                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-text-muted">
+                          <span>{relatedFilm.year}</span>
+                          {relatedFilm.genres && relatedFilm.genres.length > 0 && (
+                            <>
+                              <span>•</span>
+                              <span className="text-text-secondary truncate">{relatedFilm.genres[0]}</span>
+                            </>
+                          )}
                         </div>
-                      )}
+                      </div>
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40 text-[10px] text-text-muted">
+                        <span className="font-bold text-brand group-hover:underline flex items-center gap-1 text-[11px]">
+                          <span>View film</span>
+                          <Icon icon="solar:arrow-right-linear" className="text-xs group-hover:translate-x-0.5 transition-transform" />
+                        </span>
+                        {relatedFilm.view_count > 0 && (
+                          <span className="text-[9px] font-medium text-text-muted">
+                            {relatedFilm.view_count.toLocaleString()} views
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </Link>
                 ))}

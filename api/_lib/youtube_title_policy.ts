@@ -102,8 +102,21 @@ function isPlausibleFilmTitle(raw: string): boolean {
 }
 
 function suffixLooksLikeUploadNoise(suffix: string): boolean {
-  return suffix.length >= 4
-    && (isSensationalizedYouTubeTitle(suffix) || NOISE.test(suffix) || (SUBJECT.test(suffix) && PLOT_VERB.test(suffix)) || /^[\{\[]/.test(suffix) || /^-\s*(?:NG|Nollywood|African)/i.test(suffix));
+  if (suffix.length < 4) return false;
+  if (isSensationalizedYouTubeTitle(suffix) || NOISE.test(suffix) || (SUBJECT.test(suffix) && PLOT_VERB.test(suffix)) || /^[\{\[]/.test(suffix) || /^-\s*(?:NG|Nollywood|African)/i.test(suffix)) {
+    return true;
+  }
+  // Known Nollywood channel / distributor / genre noise
+  if (/(?:full\s+)?(?:romance|drama|comedy|action|epic|family|crime)\s+movie/i.test(suffix)) return true;
+  if (/\b(?:uchenancy|yorubahood|mrlatintv|apata\s*tv|ruthtv|nigeria\s+movies?)\b/i.test(suffix)) return true;
+  // Prominent star billing after title (e.g. Ruth Kadiri, Stephen Odimgbe, Deza the Great, Van Vicker)
+  if (/\b(?:ruth kadiri|stephen odimgbe|deza the great|eddie watson|van vicker|anton jefta|chizzy alichi|frederick leonard|bolaji ogunmola|eniola ajao|muyiwa ademola|mercy johnson|destiny etiko|zubby michael|maurice sam)\b/i.test(suffix)) return true;
+  // Space-separated or comma-separated multi-actor chains (3+ capitalized words)
+  const words = suffix.split(/\s+/).filter(Boolean);
+  if (words.length >= 3 && words.length <= 10 && words.every(w => /^[A-Z]/.test(w) || ['the', 'and', 'van', 'de', 'boy'].includes(w.toLowerCase()))) {
+    return true;
+  }
+  return false;
 }
 
 type EmbeddedTitle = { prefix: string; suffix: string };

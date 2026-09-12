@@ -21,4 +21,26 @@ describe('separate person aliases in OCR matching', () => {
     expect(pickAutoMatch('Ibrahim Yekini', [person])).toBe(person);
     expect(pickAutoMatch('Yekini Ibrahim', [person])).toBe(person);
   });
+
+  it('matches composite identities across name and aliases (e.g. Ibrahim Bakare Itele)', () => {
+    const actor = {
+      id: '1',
+      name: 'Ibrahim Yekini',
+      film_count: 107,
+      aliases: ['Itele', 'Itele D Icon', 'Ibrahim Yekini Bakare', 'Ibrahim Yekini Itele', 'Kesari'],
+    };
+    expect(pickAutoMatch('Ibrahim Bakare Itele', [actor])).toBe(actor);
+    expect(pickAutoMatch("Itele D'Icon", [actor])).toBe(actor);
+  });
+
+  it('matches Yoruba theophoric stem variations (e.g. Oluwakemi Apesin -> Kemi Apesin)', () => {
+    const actress = {
+      id: '2',
+      name: 'Kemi Apesin Ariyo',
+      film_count: 88,
+      aliases: ['Kemity', 'Kemi Ariyo', 'Kemi Apesin'],
+    };
+    expect(pickAutoMatch('Oluwakemi Apesin', [actress])).toBe(actress);
+    expect(pickAutoMatch('Kemi Apesin', [actress])).toBe(actress);
+  });
 });

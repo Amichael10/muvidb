@@ -740,7 +740,7 @@ const PersonDetail = () => {
     <div className="min-h-screen bg-bg overflow-x-hidden">
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-        <div className="max-w-7xl mx-auto px-4 py-8 pt-20 border-x border-border relative z-10">
+        <div className="max-w-7xl mx-auto px-4 py-8 md:py-12 border-x border-border relative z-10">
           
           {/* ─── UNIFIED HERO SECTION (Always features prominent Headshot, Bio & Stats) ─── */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
@@ -776,14 +776,6 @@ const PersonDetail = () => {
 
             {/* Middle Column: Name, Badges, Roles, Aliases, Bio, Vital Facts & Actions */}
             <div className="md:col-span-8 lg:col-span-6 space-y-4">
-              <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-bold text-text-secondary mb-1 flex-wrap">
-                <Link to="/" className="hover:text-brand transition-colors">Home</Link>
-                <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
-                <Link to="/people" className="hover:text-brand transition-colors">People</Link>
-                <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5 text-text-muted" />
-                <span className="text-text-primary truncate max-w-[240px]">{formatPersonName(person.name)}</span>
-              </nav>
-
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-3xl md:text-5xl font-heading font-black text-text-primary tracking-tight">

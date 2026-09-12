@@ -113,7 +113,7 @@ async function repairLinkedYouTubeFilms(
   const filmIds = Array.from(new Set(linked.map((video) => linkedFilmByVideo.get(video.video_id)).filter(Boolean))) as string[];
   const { data: films, error } = await supabase
     .from('films')
-    .select('id,title,original_title,synopsis,needs_review')
+    .select('id,title,original_title,synopsis,needs_review,source')
     .in('id', filmIds);
   if (error) throw error;
 
@@ -121,6 +121,8 @@ async function repairLinkedYouTubeFilms(
   const candidates = linked.filter((video) => {
     const film: any = filmById.get(linkedFilmByVideo.get(video.video_id));
     if (!film) return false;
+    // Never allow automated YouTube sync to overwrite films curated manually by an admin
+    if (film.source === 'manual') return false;
     const policy = curateYouTubeTitle(video.title);
     const deterministicTitleChanged = policy.action !== 'skip'
       && policy.title
@@ -145,6 +147,7 @@ async function repairLinkedYouTubeFilms(
   for (const video of candidates) {
     const filmId = linkedFilmByVideo.get(video.video_id)!;
     const film: any = filmById.get(filmId);
+    if (film.source === 'manual') continue; // Extra safety guard
     const policy = curateYouTubeTitle(video.title);
     const ai = aiMap.get(video.video_id);
     const aiTitle = ai?.title?.trim();

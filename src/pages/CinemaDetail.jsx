@@ -351,14 +351,6 @@ const CinemaDetail = () => {
         {/* Content Box */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10 pb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-4 text-left">
-            {/* Breadcrumbs */}
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-white/40">
-              <Link to="/" className="hover:text-brand transition-colors">Home</Link>
-              <span>/</span>
-              <Link to="/cinemas" className="hover:text-brand transition-colors">Cinemas</Link>
-              <span>/</span>
-              <span className="text-white/70">{toTitleCase(cinema.name)}</span>
-            </div>
 
             <div className="space-y-2">
               <div className="flex items-center gap-2.5 flex-wrap">

@@ -53,3 +53,34 @@ export function formatDateOfBirth(value) {
 
   return date.toLocaleDateString('en-NG', options);
 }
+
+const LANGUAGE_MAP = {
+  yo: 'Yoruba',
+  yor: 'Yoruba',
+  ig: 'Igbo',
+  ibo: 'Igbo',
+  ha: 'Hausa',
+  hau: 'Hausa',
+  en: 'English',
+  eng: 'English',
+  pcm: 'Nigerian Pidgin',
+  fr: 'French',
+  fra: 'French',
+  ar: 'Arabic',
+  ara: 'Arabic',
+  sw: 'Swahili',
+  swa: 'Swahili',
+  es: 'Spanish',
+  spa: 'Spanish',
+  pt: 'Portuguese',
+  por: 'Portuguese',
+  de: 'German',
+  ger: 'German',
+  deu: 'German',
+};
+
+export function formatLanguage(code) {
+  if (!code) return 'English';
+  const trimmed = String(code).trim().toLowerCase();
+  return LANGUAGE_MAP[trimmed] || toTitleCase(code);
+}

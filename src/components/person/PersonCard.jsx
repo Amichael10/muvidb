@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { formatPersonName, toTitleCase, toSentenceCase } from '../../utils/format';
+import ImageWithFallback from '../ui/ImageWithFallback';
 
 export default function PersonCard({ person, variant = 'compact', isLoading }) {
   if (isLoading) {
@@ -46,10 +47,13 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
         className="flex flex-col items-center text-center group"
       >
         <div className="relative mb-3">
-          <img 
+          <ImageWithFallback 
             src={person.photo_url || person.photo} 
             alt={formatPersonName(person.name)} 
-            className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
+            name={formatPersonName(person.name)}
+            fallbackType="avatar"
+            width={192}
+            className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300 shadow-sm"
           />
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-surface-2 border border-border text-text-primary text-[10px] font-bold px-2 py-0.5 rounded-xl whitespace-nowrap">
             {person.film_count || 0} Films
@@ -59,7 +63,7 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
           {formatPersonName(person.name)}
         </h4>
         <p className="text-xs text-text-muted mt-0.5 line-clamp-1">
-          {toTitleCase(person.role)}
+          {toTitleCase(person.role || person.known_for_department || '')}
         </p>
       </Link>
     );
@@ -69,10 +73,13 @@ export default function PersonCard({ person, variant = 'compact', isLoading }) {
   return (
     <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
       <Link to={`/people/${person.slug || person.id}`} className="shrink-0 group relative overflow-hidden rounded-lg">
-        <img 
+        <ImageWithFallback 
           src={person.photo_url || person.photo} 
           alt={formatPersonName(person.name)} 
-          className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300"
+          name={formatPersonName(person.name)}
+          fallbackType="avatar"
+          width={320}
+          className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg object-cover border-2 border-transparent group-hover:border-gold transition-colors duration-300 shadow-sm"
         />
         <div className="absolute bottom-2 left-2 z-10 w-7 h-7 rounded-full bg-white/75 backdrop-blur-md border border-white/50 shadow-lg shadow-black/40 p-1 flex items-center justify-center select-none pointer-events-none">
           <img src="/images/muvidb-icon-watermark.png" alt="MuviDB" className="w-full h-full object-contain" />

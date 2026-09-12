@@ -102,9 +102,56 @@ function editDistance(a, b) {
   return row[n];
 }
 
+/** Strip Yoruba theophoric prefixes and nicknames (oluwakemi -> kemi, babatunde -> tunde). */
+export function yorubaStem(token) {
+  const t = String(token || '').toLowerCase().trim();
+  if (t.startsWith('oluwa') && t.length >= 8) return t.slice(5); // oluwakemi -> kemi, oluwaseun -> seun, oluwatobiloba -> tobiloba
+  if (t.startsWith('baba') && t.length >= 7) return t.slice(4);  // babatunde -> tunde, babajide -> jide
+  if (t.startsWith('mobo') && t.length >= 7) return t.slice(2);  // mobolaji -> bolaji
+  if (t === 'ayodeji') return 'deji';
+  if (t === 'abimbola') return 'bimbo';
+  return t;
+}
+
+/** Match single name tokens allowing typos, vowel shifts, prefixes, or suffixes. */
+export function isTokenNearMatch(token, u) {
+  if (token === u) return true;
+  if (!token || !u) return false;
+  const minLen = Math.min(token.length, u.length);
+  if (minLen < 3) return false;
+
+  // 1) Yoruba theophoric stem equality (e.g. oluwakemi vs kemi, babatunde vs tunde)
+  const st1 = yorubaStem(token);
+  const st2 = yorubaStem(u);
+  if (st1 === st2 || st1 === u || st2 === token) return true;
+  if (st1.length >= 4 && st2.length >= 4 && editDistance(st1, st2) <= 1) return true;
+
+  // 2) Small edit distance: <= 1 for short tokens (<= 4 chars), <= 2 for longer tokens (>= 5 chars)
+  if (Math.abs(u.length - token.length) <= 2) {
+    const maxDist = minLen <= 4 ? 1 : 2;
+    if (editDistance(token, u) <= maxDist) return true;
+  }
+
+  // 3) Stem, prefix, and suffix matches for Nigerian / common name variations
+  const [shorter, longer] = token.length <= u.length ? [token, u] : [u, token];
+  if (shorter.length >= 4) {
+    // Exact prefix (soliu -> soliudeen, kemi -> kemity)
+    if (longer.startsWith(shorter)) return true;
+    // Exact suffix (tunde -> babatunde, lateef -> abdullateef)
+    if (longer.endsWith(shorter)) return true;
+    // Prefix with single vowel/char variation (saliu vs soliudeen -> saliu vs soliu)
+    const prefix = longer.slice(0, shorter.length);
+    if (editDistance(shorter, prefix) <= 1) return true;
+    // Suffix with single vowel/char variation
+    const suffix = longer.slice(-shorter.length);
+    if (editDistance(shorter, suffix) <= 1) return true;
+  }
+  return false;
+}
+
 /**
  * True when query and candidate share the same token multiset modulo one
- * near-typo token (edit distance ≤ 2 on tokens longer than 3 chars).
+ * near-typo or stem/diminutive token.
  */
 export function namesNearMatch(a, b) {
   const ta = personNameTokens(a);
@@ -121,18 +168,14 @@ export function namesNearMatch(a, b) {
       continue;
     }
     let bestIdx = -1;
-    let bestDist = Infinity;
     for (let i = 0; i < unused.length; i++) {
       const u = unused[i];
-      if (Math.abs(u.length - token.length) > 2) continue;
-      if (token.length < 4 || u.length < 4) continue;
-      const d = editDistance(token, u);
-      if (d < bestDist) {
-        bestDist = d;
+      if (isTokenNearMatch(token, u)) {
         bestIdx = i;
+        break;
       }
     }
-    if (bestIdx >= 0 && bestDist > 0 && bestDist <= 2) {
+    if (bestIdx >= 0) {
       typoSlots += 1;
       if (typoSlots > 1) return false;
       unused.splice(bestIdx, 1);
@@ -141,6 +184,60 @@ export function namesNearMatch(a, b) {
     return false;
   }
   return unused.length <= 1 && typoSlots <= 1 && (typoSlots === 1 || unused.length === 0);
+}
+
+/** Aggregate all identity tokens from a candidate's canonical name and all their aliases. */
+export function getCandidateIdentityTokens(person) {
+  const tokens = new Set();
+  if (!person) return tokens;
+  for (const t of personNameTokens(person.name || '')) {
+    tokens.add(t);
+    const stem = yorubaStem(t);
+    if (stem && stem !== t) tokens.add(stem);
+  }
+  for (const alias of person.aliases || []) {
+    for (const t of personNameTokens(alias)) {
+      tokens.add(t);
+      const stem = yorubaStem(t);
+      if (stem && stem !== t) tokens.add(stem);
+    }
+  }
+  return tokens;
+}
+
+/**
+ * Matches composite identities like "Ibrahim Bakare Itele" where different
+ * tokens come from the real name, middle/family name, and moniker aliases.
+ */
+export function matchesCompositeIdentity(query, person) {
+  const qTokens = personNameTokens(query);
+  if (qTokens.length < 2 || !person) return false;
+  const identityTokens = getCandidateIdentityTokens(person);
+  if (!identityTokens.size) return false;
+
+  let matchCount = 0;
+  for (const q of qTokens) {
+    const qStem = yorubaStem(q);
+    let matched = false;
+    for (const idToken of identityTokens) {
+      if (
+        idToken === q ||
+        idToken === qStem ||
+        isTokenNearMatch(q, idToken) ||
+        isTokenNearMatch(qStem, idToken)
+      ) {
+        matched = true;
+        break;
+      }
+    }
+    if (matched) matchCount++;
+  }
+
+  // Exactly 2 tokens: both must match (e.g. "Oluwakemi Apesin" vs "Kemi Apesin")
+  if (qTokens.length === 2 && matchCount === 2) return true;
+  // 3 or more tokens: at least 2 tokens and at most 1 missing (e.g. "Ibrahim Bakare Itele")
+  if (qTokens.length >= 3 && matchCount >= qTokens.length - 1 && matchCount >= 2) return true;
+  return false;
 }
 
 /**
@@ -168,7 +265,21 @@ export function pickAutoMatch(query, candidates = [], { minSemantic = 0.42 } = {
   // Shared stage names require a manual choice, regardless of popularity.
   if (aliases.length) return new Set(aliases.map(p => p.id)).size === 1 ? aliases[0] : null;
 
-  const near = candidates.filter((p) => namesNearMatch(q, p.name));
+  // Composite identity match (e.g. "Ibrahim Bakare Itele" or "Oluwakemi Apesin")
+  const composite = candidates.filter((p) => matchesCompositeIdentity(q, p));
+  if (composite.length) {
+    const uniqueIds = new Set(composite.map((p) => p.id));
+    if (uniqueIds.size === 1) return composite[0];
+    const sorted = [...composite].sort(rankPersonMatch);
+    if (
+      sorted.length >= 2 &&
+      Number(sorted[0].film_count || 0) > Number(sorted[1].film_count || 0) * 2
+    ) {
+      return sorted[0];
+    }
+  }
+
+  const near = candidates.filter((p) => namesNearMatch(q, p.name) || (p.aliases || []).some((a) => namesNearMatch(q, a)));
   if (near.length) return [...near].sort(rankPersonMatch)[0];
 
   const withScore = candidates
@@ -183,6 +294,7 @@ export function pickAutoMatch(query, candidates = [], { minSemantic = 0.42 } = {
   const qTokens = personNameTokens(q);
   const tTokens = personNameTokens(top.name);
   const shared = qTokens.some((t) => t.length >= 4 && tTokens.includes(t));
-  if (!shared && !namesNearMatch(q, top.name)) return null;
+  const topNear = namesNearMatch(q, top.name) || (top.aliases || []).some((a) => namesNearMatch(q, a));
+  if (!shared && !topNear) return null;
   return top;
 }

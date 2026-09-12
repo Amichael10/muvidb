@@ -130,20 +130,6 @@ export default function AwardDetail() {
   return (
     <div className="min-h-screen bg-bg text-text-primary">
       <div className="mx-auto max-w-7xl border-x border-border min-h-screen">
-        {/* Top Breadcrumb Header */}
-        <div className="border-b border-border bg-surface/50 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
-            <Link to="/" className="hover:text-brand transition-colors">
-              Home
-            </Link>
-            <Icon icon="solar:alt-arrow-right-linear" width="12" />
-            <Link to="/awards" className="hover:text-brand transition-colors">
-              Awards &amp; Festivals
-            </Link>
-            <Icon icon="solar:alt-arrow-right-linear" width="12" />
-            <span className="font-bold text-text-primary">{meta.label}</span>
-          </div>
-        </div>
 
         {/* Hero Section */}
         <header className="relative overflow-hidden border-b border-border bg-surface/40">

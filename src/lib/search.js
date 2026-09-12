@@ -167,11 +167,11 @@ export async function searchAll(query) {
         return [...new Set((data || []).map((credit) => credit.film_id).filter(Boolean))];
       };
 
-      if (import.meta.env.DEV) {
-        filmIds = await fetchDirect();
-      } else {
+      if (typeof window !== 'undefined') {
         const res = await fetch(`/api/content?resource=person-films&personIds=${encodeURIComponent(ids.join(','))}`);
         filmIds = res.ok ? (await res.json()).filmIds || [] : await fetchDirect();
+      } else {
+        filmIds = await fetchDirect();
       }
     } catch (e) {
       // Search still works on title matches alone if the cast lookup fails.
@@ -197,7 +197,7 @@ export async function searchAll(query) {
     .sort((a, b) => b._score - a._score)
     .slice(0, 48);
 
-  if (!confidentPersonMatch) {
+  if (typeof window !== 'undefined' && !confidentPersonMatch) {
     try {
       if (films.length >= 3) {
         const res = await fetch('/api/semantic-search', {

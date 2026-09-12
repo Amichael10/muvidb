@@ -14,26 +14,61 @@ export async function fetchCritics() {
     return [];
   }
 
-  // Also count reviews per critic
+  // Also fetch review metadata (counts, average rating, latest review)
   const { data: reviews } = await supabase
     .from('critic_reviews')
-    .select('critic_name, critic_id');
+    .select(`
+      id,
+      critic_id,
+      rating,
+      quote,
+      created_at,
+      film:films (
+        id,
+        title,
+        year,
+        poster_url,
+        slug,
+        genres
+      )
+    `)
+    .order('created_at', { ascending: false });
 
-  const counts = {};
+  const stats = {};
   (reviews || []).forEach(r => {
-    if (r.critic_id) {
-      counts[r.critic_id] = (counts[r.critic_id] || 0) + 1;
+    if (!r.critic_id) return;
+    if (!stats[r.critic_id]) {
+      stats[r.critic_id] = {
+        count: 0,
+        ratings: [],
+        latestReview: r
+      };
+    }
+    stats[r.critic_id].count += 1;
+    if (r.rating !== null && r.rating !== undefined) {
+      stats[r.critic_id].ratings.push(Number(r.rating));
     }
   });
 
-  return (critics || []).map(c => ({
-    ...c,
-    review_count: counts[c.id] || 0
-  }));
+  return (critics || []).map(c => {
+    const criticStat = stats[c.id];
+    const reviewCount = criticStat ? criticStat.count : 0;
+    const ratings = criticStat ? criticStat.ratings : [];
+    const avgRating = ratings.length > 0
+      ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
+      : null;
+
+    return {
+      ...c,
+      review_count: reviewCount,
+      avg_rating: avgRating,
+      latest_review: criticStat?.latestReview || null
+    };
+  });
 }
 
 /**
- * Fetch a single critic by slug with all their linked reviews & films
+ * Fetch a single critic by slug with all their linked reviews, films & plays
  */
 export async function fetchCriticBySlug(slug) {
   const { data: critic, error } = await supabase
@@ -58,7 +93,19 @@ export async function fetchCriticBySlug(slug) {
         year,
         poster_url,
         backdrop_url,
-        slug
+        slug,
+        genres,
+        runtime_minutes,
+        content_type
+      ),
+      play:plays (
+        id,
+        title,
+        year,
+        poster_url,
+        banner_url,
+        slug,
+        venue
       )
     `)
     .or(`critic_id.eq.${critic.id},critic_name.ilike.%${critic.name}%`)

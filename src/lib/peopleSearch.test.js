@@ -44,6 +44,7 @@ describe('shared people search relevance', () => {
         eq: () => { rows = []; return builder; },
         ilike: (field, value) => { rows = table === 'people' && value === 'Toyin Abraham' ? [{ ...exact, bio: 'Full profile' }] : []; return builder; },
         or: () => builder,
+        order: () => builder,
         limit: () => builder,
         in: () => { rows = [{ ...exact, bio: 'Full profile' }, partial]; return builder; },
         then: resolve => Promise.resolve({ data: rows, error: null }).then(resolve),
