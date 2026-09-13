@@ -5,6 +5,7 @@ import { Icon } from '@iconify/react';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { formatFilmTitle } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
+import { slugOrId } from '../utils/slug';
 
 const formatRuntime = (minutes) => {
   if (!minutes) return null;
@@ -95,58 +96,78 @@ export default function FilmReviews() {
       setLoading(true);
       setError(null);
       try {
-        // 1. Fetch film by slug or id
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
-        const col = isUuid ? 'id' : 'slug';
+        const { col, val } = slugOrId(slug);
 
-        const { data: filmData, error: filmErr } = await supabase
-          .from('films')
-          .select(`
-            id,
-            title,
-            slug,
-            poster_url,
-            backdrop_url,
-            year,
-            release_date,
-            runtime_minutes,
-            director,
-            nfvcb_rating,
-            liked_percent,
-            audience_rating,
-            audience_rating_count,
-            imdb_rating,
-            imdb_vote_count,
-            tmdb_rating,
-            synopsis,
-            release_type,
-            film_genres(genres(name)),
-            credits(
-              role,
-              character_name,
-              people(name, photo_url)
-            )
-          `)
-          .eq(col, slug)
-          .single();
+        // 1. Fetch film data: prefer API on production/staging, fall back to direct Supabase
+        let filmData = null;
 
-        if (filmErr || !filmData) {
+        if (!import.meta.env.DEV) {
+          try {
+            const res = await fetch(`/api/films?id=${encodeURIComponent(val)}`);
+            if (res.ok) {
+              const json = await res.json();
+              filmData = json?.film || null;
+            }
+          } catch (_) {}
+        }
+
+        if (!filmData) {
+          const { data, error } = await supabase
+            .from('films')
+            .select(`
+              id,
+              title,
+              slug,
+              poster_url,
+              backdrop_url,
+              year,
+              release_date,
+              runtime_minutes,
+              director,
+              nfvcb_rating,
+              liked_percent,
+              audience_rating,
+              audience_rating_count,
+              imdb_rating,
+              imdb_vote_count,
+              tmdb_rating,
+              synopsis,
+              release_type,
+              film_genres(genres(name))
+            `)
+            .eq(col, val)
+            .single();
+
+          if (!error && data) {
+            filmData = data;
+          }
+        }
+
+        if (!filmData) {
           throw new Error('Film not found');
         }
 
         const genres = (filmData.film_genres || [])
-          .map((fg) => fg.genres?.name)
+          .map((fg) => fg.genres?.name || fg.name || (typeof fg === 'string' ? fg : null))
           .filter(Boolean);
 
-        // Find director from credits if missing in film column
-        let directorName = filmData.director;
-        if (!directorName && filmData.credits) {
-          const dirCredit = filmData.credits.find((c) =>
-            (c.role || '').toLowerCase().includes('director')
-          );
-          if (dirCredit?.people?.name) {
-            directorName = dirCredit.people.name;
-          }
+        // Find director: check filmData first, else query credits safely
+        let directorName = filmData.director || null;
+        if (!directorName) {
+          try {
+            const { data: creditsData } = await supabase
+              .from('credits')
+              .select('role, people(name)')
+              .eq('film_id', filmData.id);
+            if (creditsData && creditsData.length > 0) {
+              const dirCredit = creditsData.find((c) =>
+                (c.role || '').toLowerCase().includes('director')
+              );
+              if (dirCredit?.people?.name) {
+                directorName = dirCredit.people.name;
+              }
+            }
+          } catch (_) {}
         }
 
         const fullFilm = {
@@ -157,27 +178,52 @@ export default function FilmReviews() {
 
         if (isMounted) setFilm(fullFilm);
 
-        // 2. Fetch Critic Reviews
-        const { data: criticData, error: criticErr } = await supabase
-          .from('critic_reviews')
-          .select('*, critic:critics(id, name, slug, avatar_url, publication, is_verified)')
-          .eq('film_id', filmData.id)
-          .order('is_featured', { ascending: false })
-          .order('created_at', { ascending: false });
+        // 2. Fetch Critic Reviews safely
+        try {
+          const { data: criticData } = await supabase
+            .from('critic_reviews')
+            .select('*, critic:critics(id, name, slug, avatar_url, publication, is_verified)')
+            .eq('film_id', filmData.id)
+            .order('is_featured', { ascending: false })
+            .order('created_at', { ascending: false });
 
-        if (!criticErr && criticData && isMounted) {
-          setCriticsList(criticData);
+          if (criticData && isMounted) {
+            setCriticsList(criticData);
+          }
+        } catch (cErr) {
+          console.warn('Critic reviews query notice:', cErr);
         }
 
         // 3. Fetch Audience Reviews (Community users + YouTube comments)
-        const { data: revData, error: revErr } = await supabase
-          .from('reviews')
-          .select('*, users:user_id(id, name, avatar_url)')
-          .eq('film_id', filmData.id)
-          .order('created_at', { ascending: false });
+        // Prefer /api/content?resource=film-reviews on production/staging, fallback to direct Supabase
+        let audienceRows = [];
+        try {
+          if (!import.meta.env.DEV) {
+            const res = await fetch(`/api/content?resource=film-reviews&filmId=${encodeURIComponent(filmData.id)}`);
+            if (res.ok) {
+              const json = await res.json();
+              if (Array.isArray(json?.reviews)) {
+                audienceRows = json.reviews;
+              }
+            }
+          }
+        } catch (_) {}
 
-        if (!revErr && revData && isMounted) {
-          setAudienceList(revData);
+        if (audienceRows.length === 0) {
+          try {
+            const { data: revData } = await supabase
+              .from('reviews')
+              .select('*, users:user_id(id, name, avatar_url)')
+              .eq('film_id', filmData.id)
+              .order('created_at', { ascending: false });
+            if (revData) audienceRows = revData;
+          } catch (rErr) {
+            console.warn('Audience reviews query notice:', rErr);
+          }
+        }
+
+        if (isMounted) {
+          setAudienceList(audienceRows);
         }
       } catch (err) {
         console.error('Error loading reviews page:', err);
