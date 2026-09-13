@@ -652,7 +652,7 @@ const ReviewsOverlayModal = ({
     );
 };
 
-const ReviewSection = ({ filmId, playId, currentUser, filmTitle = '' }) => {
+const ReviewSection = ({ filmId, playId, currentUser, filmTitle = '', filmSlug = '' }) => {
     const navigate = useNavigate()
     const {
         reviews,
@@ -890,7 +890,13 @@ const ReviewSection = ({ filmId, playId, currentUser, filmTitle = '' }) => {
                             <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
                                 <button
                                     type="button"
-                                    onClick={() => setShowAllOverlay(true)}
+                                    onClick={() => {
+                                        if (!isPlay && (filmSlug || filmId)) {
+                                            navigate(`/films/${filmSlug || filmId}/reviews?tab=all_audience`);
+                                        } else {
+                                            setShowAllOverlay(true);
+                                        }
+                                    }}
                                     className="px-6 py-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border hover:border-brand/40 text-text-primary text-xs sm:text-sm font-bold transition-all flex items-center gap-2.5 shadow-sm hover:shadow-md cursor-pointer group"
                                 >
                                     <Icon icon="solar:documents-minimalistic-bold" className="text-base text-brand group-hover:scale-110 transition-transform" />

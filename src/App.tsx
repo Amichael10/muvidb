@@ -40,6 +40,7 @@ function lazyWithRetry(factory: () => Promise<{ default: ComponentType<any> }>) 
 
 // Lazy public pages — code-split out of the initial bundle
 const FilmDetail = lazyWithRetry(() => import('./pages/FilmDetail'));
+const FilmReviews = lazyWithRetry(() => import('./pages/FilmReviews'));
 const Search = lazyWithRetry(() => import('./pages/Search'));
 const Browse = lazyWithRetry(() => import('./pages/Browse'));
 const TVShows = lazyWithRetry(() => import('./pages/TVShows'));
@@ -328,6 +329,8 @@ export default function App() {
               <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Home />} />
+                <Route path="/films/:slug/reviews" element={<FilmReviews />} />
+                <Route path="/film/:slug/reviews" element={<FilmReviews />} />
                 <Route path="/films/:slug" element={<FilmDetail />} />
                 <Route path="/film/:slug" element={<FilmDetail />} />
                 <Route path="/search" element={<Search />} />

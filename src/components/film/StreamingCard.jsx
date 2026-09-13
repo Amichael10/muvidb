@@ -16,13 +16,16 @@ const formatRuntime = (minutes) => {
 
 const getRating = (film) => {
   if (film.imdb_rating != null && film.imdb_rating > 0) {
-    return (film.imdb_rating / 2).toFixed(1);
+    return Number(film.imdb_rating).toFixed(1);
   }
   if (film.tmdb_rating != null && film.tmdb_rating > 0) {
-    return (film.tmdb_rating / 2).toFixed(1);
+    return Number(film.tmdb_rating).toFixed(1);
+  }
+  if (film.audience_rating != null && film.audience_rating > 0) {
+    return Number(film.audience_rating).toFixed(1);
   }
   if (film.liked_percent != null && film.liked_percent > 0) {
-    return (film.liked_percent / 20).toFixed(1);
+    return (film.liked_percent / 10).toFixed(1);
   }
   return null;
 };

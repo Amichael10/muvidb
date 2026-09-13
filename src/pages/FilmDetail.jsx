@@ -1221,7 +1221,7 @@ export default function FilmDetail() {
 
             {/* Critic Reviews & Quotes */}
             <div className="px-8 md:px-12 pt-4">
-              <CriticReviewsSection filmId={film.id} user={user} />
+              <CriticReviewsSection filmId={film.id} user={user} filmSlug={film.slug || slug} />
             </div>
 
             {/* Rotten Tomatoes "What did you think? / Rate it" interactive banner */}
@@ -1245,6 +1245,7 @@ export default function FilmDetail() {
                 filmId={film.id}
                 currentUser={user}
                 filmTitle={film.title}
+                filmSlug={film.slug || slug}
               />
             </section>
           </div>

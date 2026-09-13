@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import CriticReviewsEditor from '../admin/CriticReviewsEditor';
 
-export default function CriticReviewsSection({ filmId, playId, user }) {
+export default function CriticReviewsSection({ filmId, playId, user, filmSlug = '' }) {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -285,6 +285,20 @@ export default function CriticReviewsSection({ filmId, playId, user }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* View All Critic Reviews Button */}
+      {reviews.length > 0 && !playId && (
+        <div className="flex justify-center mt-6">
+          <Link
+            to={`/films/${filmSlug || filmId}/reviews?tab=all_critics`}
+            className="px-6 py-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border hover:border-brand/40 text-text-primary text-xs sm:text-sm font-bold transition-all flex items-center gap-2.5 shadow-sm hover:shadow-md cursor-pointer group"
+          >
+            <Icon icon="solar:medal-ribbon-star-bold" className="text-base text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span>View all critic reviews ({reviews.length})</span>
+            <Icon icon="solar:alt-arrow-right-linear" className="text-sm text-text-muted group-hover:text-text-primary group-hover:translate-x-0.5 transition-all" />
+          </Link>
         </div>
       )}
 

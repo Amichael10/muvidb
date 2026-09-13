@@ -14,6 +14,8 @@ export default [
   // server `loader` + `meta` to build the SEO head. That replaces the meta
   // injection api/seo.ts used to do via vercel.json rewrites — see
   // src/lib/seo.server.ts.
+  route('films/:slug/reviews', 'pages/FilmReviews.jsx'),
+  route('film/:slug/reviews', 'pages/FilmReviews.jsx', { id: 'film-reviews-legacy-alias' }),
   route('films/:slug', 'routes/film-detail.tsx'),
   // Legacy singular alias. Same module, so it needs an explicit unique route id.
   route('film/:slug', 'routes/film-detail.tsx', { id: 'film-detail-legacy-alias' }),

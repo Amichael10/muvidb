@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { formatRatingVotes } from '../../lib/rating';
 
@@ -34,75 +35,154 @@ export default function RottenTomatoesScorecard({
   const consensusText = featuredQuote?.quote || film?.editorial_consensus || null;
   const consensusSource = featuredQuote ? `${featuredQuote.critic_name || 'Critic'}${featuredQuote.publication ? ` (${featuredQuote.publication})` : ''}` : 'MuviDB Editorial Take';
 
+  const reviewsUrl = film?.slug || film?.id ? `/films/${film.slug || film.id}/reviews` : null;
+
   return (
     <div className={`w-full bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-5 sm:p-6 shadow-2xl transition-all duration-300 ${className}`}>
       {/* 1. TOP METERS ROW: Critics Score + Audience Score + Star & Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-white/10 pb-4">
         
         {/* CRITICS SCORE (TOMATOMETER STYLE) */}
-        <div className="flex items-center gap-3.5 pr-2">
-          <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10">
-            {cScorePct != null ? (
-              isCriticFresh ? (
-                <Icon icon="solar:medal-ribbon-star-bold" className="text-emerald-400 text-3xl drop-shadow-[0_0_12px_rgba(52,211,153,0.5)]" />
+        {reviewsUrl ? (
+          <Link
+            to={`${reviewsUrl}?tab=all_critics`}
+            className="flex items-center gap-3.5 pr-2 group/critic hover:opacity-95 cursor-pointer transition-opacity"
+            title="View all critic reviews"
+          >
+            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10 group-hover/critic:border-emerald-500/40 transition-colors">
+              {cScorePct != null ? (
+                isCriticFresh ? (
+                  <Icon icon="solar:medal-ribbon-star-bold" className="text-emerald-400 text-3xl drop-shadow-[0_0_12px_rgba(52,211,153,0.5)]" />
+                ) : (
+                  <Icon icon="solar:danger-triangle-bold" className="text-amber-500 text-3xl drop-shadow" />
+                )
               ) : (
-                <Icon icon="solar:danger-triangle-bold" className="text-amber-500 text-3xl drop-shadow" />
-              )
-            ) : (
-              <Icon icon="solar:pen-2-bold" className="text-white/30 text-2xl" />
-            )}
-          </div>
-          <div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none">
-                {cScorePct != null ? `${cScorePct}%` : (cScore ? `${cScore}/10` : '—')}
-              </span>
-              {cScorePct != null && isCriticFresh && (
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                  Fresh
-                </span>
+                <Icon icon="solar:pen-2-bold" className="text-white/30 text-2xl" />
               )}
             </div>
-            <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5">
-              Critics Score
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none group-hover/critic:text-emerald-400 transition-colors">
+                  {cScorePct != null ? `${cScorePct}%` : (cScore ? `${cScore}/10` : '—')}
+                </span>
+                {cScorePct != null && isCriticFresh && (
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                    Fresh
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5 flex items-center gap-1 group-hover/critic:text-white transition-colors">
+                <span>Critics Score</span>
+                <Icon icon="solar:alt-arrow-right-linear" className="text-[10px] opacity-0 group-hover/critic:opacity-100 transition-opacity" />
+              </div>
+              <div className="text-[10px] text-white/40 font-medium">
+                {criticCount > 0 ? `${criticCount} Reviews Counted` : 'Awaiting reviews'}
+              </div>
             </div>
-            <div className="text-[10px] text-white/40 font-medium">
-              {criticCount > 0 ? `${criticCount} Reviews Counted` : 'Awaiting reviews'}
+          </Link>
+        ) : (
+          <div className="flex items-center gap-3.5 pr-2">
+            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10">
+              {cScorePct != null ? (
+                isCriticFresh ? (
+                  <Icon icon="solar:medal-ribbon-star-bold" className="text-emerald-400 text-3xl drop-shadow-[0_0_12px_rgba(52,211,153,0.5)]" />
+                ) : (
+                  <Icon icon="solar:danger-triangle-bold" className="text-amber-500 text-3xl drop-shadow" />
+                )
+              ) : (
+                <Icon icon="solar:pen-2-bold" className="text-white/30 text-2xl" />
+              )}
+            </div>
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none">
+                  {cScorePct != null ? `${cScorePct}%` : (cScore ? `${cScore}/10` : '—')}
+                </span>
+                {cScorePct != null && isCriticFresh && (
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                    Fresh
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5">
+                Critics Score
+              </div>
+              <div className="text-[10px] text-white/40 font-medium">
+                {criticCount > 0 ? `${criticCount} Reviews Counted` : 'Awaiting reviews'}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* AUDIENCE SCORE (POPCORNMETER STYLE) */}
-        <div className="flex items-center gap-3.5 pt-3 sm:pt-0 sm:px-4">
-          <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10">
-            {pct != null ? (
-              <Icon
-                icon="mdi:popcorn"
-                className={`text-3xl ${isAudienceFresh ? 'text-[#FA320A] drop-shadow-[0_0_12px_rgba(250,50,10,0.5)]' : 'text-gray-400'}`}
-              />
-            ) : (
-              <Icon icon="mdi:popcorn" className="text-white/30 text-3xl" />
-            )}
-          </div>
-          <div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none">
-                {pct != null ? `${pct}%` : '—'}
-              </span>
-              {pct != null && isAudienceFresh && (
-                <span className="text-[10px] font-black uppercase tracking-wider text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
-                  Liked
-                </span>
+        {reviewsUrl ? (
+          <Link
+            to={`${reviewsUrl}?tab=all_audience`}
+            className="flex items-center gap-3.5 pt-3 sm:pt-0 sm:px-4 group/audience hover:opacity-95 cursor-pointer transition-opacity"
+            title="View all audience reviews"
+          >
+            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10 group-hover/audience:border-brand/40 transition-colors">
+              {pct != null ? (
+                <Icon
+                  icon="mdi:popcorn"
+                  className={`text-3xl ${isAudienceFresh ? 'text-[#FA320A] drop-shadow-[0_0_12px_rgba(250,50,10,0.5)]' : 'text-gray-400'}`}
+                />
+              ) : (
+                <Icon icon="mdi:popcorn" className="text-white/30 text-3xl" />
               )}
             </div>
-            <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5">
-              Audience Score
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none group-hover/audience:text-brand transition-colors">
+                  {pct != null ? `${pct}%` : '—'}
+                </span>
+                {pct != null && isAudienceFresh && (
+                  <span className="text-[10px] font-black uppercase tracking-wider text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                    Liked
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5 flex items-center gap-1 group-hover/audience:text-white transition-colors">
+                <span>Audience Score</span>
+                <Icon icon="solar:alt-arrow-right-linear" className="text-[10px] opacity-0 group-hover/audience:opacity-100 transition-opacity" />
+              </div>
+              <div className="text-[10px] text-white/40 font-medium">
+                {votesLabel ? `${votesLabel} Ratings Logged` : 'Audience Verified'}
+              </div>
             </div>
-            <div className="text-[10px] text-white/40 font-medium">
-              {votesLabel ? `${votesLabel} Ratings Logged` : 'Audience Verified'}
+          </Link>
+        ) : (
+          <div className="flex items-center gap-3.5 pt-3 sm:pt-0 sm:px-4">
+            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10">
+              {pct != null ? (
+                <Icon
+                  icon="mdi:popcorn"
+                  className={`text-3xl ${isAudienceFresh ? 'text-[#FA320A] drop-shadow-[0_0_12px_rgba(250,50,10,0.5)]' : 'text-gray-400'}`}
+                />
+              ) : (
+                <Icon icon="mdi:popcorn" className="text-white/30 text-3xl" />
+              )}
+            </div>
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none">
+                  {pct != null ? `${pct}%` : '—'}
+                </span>
+                {pct != null && isAudienceFresh && (
+                  <span className="text-[10px] font-black uppercase tracking-wider text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                    Liked
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5">
+                Audience Score
+              </div>
+              <div className="text-[10px] text-white/40 font-medium">
+                {votesLabel ? `${votesLabel} Ratings Logged` : 'Audience Verified'}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* MBD/STAR & QUICK ACTION DOCK */}
         <div className="flex items-center justify-between gap-3 pt-3 sm:pt-0 sm:pl-4">
