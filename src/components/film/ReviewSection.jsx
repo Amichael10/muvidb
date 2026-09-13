@@ -652,7 +652,7 @@ const ReviewsOverlayModal = ({
     );
 };
 
-const ReviewSection = ({ filmId, playId, currentUser, filmTitle = '', filmSlug = '' }) => {
+const ReviewSection = ({ filmId, playId, currentUser, filmTitle = '', filmSlug = '', openForm = false, onCloseForm }) => {
     const navigate = useNavigate()
     const {
         reviews,
@@ -668,6 +668,12 @@ const ReviewSection = ({ filmId, playId, currentUser, filmTitle = '', filmSlug =
     const [activeTab, setActiveTab] = useState('all') // 'all' | 'community' | 'audience'
     const [visibleLimit, setVisibleLimit] = useState(6)
     const [showAllOverlay, setShowAllOverlay] = useState(false)
+
+    useEffect(() => {
+        if (openForm) {
+            setShowForm(true);
+        }
+    }, [openForm]);
 
     const isPlay = Boolean(playId);
 
@@ -772,16 +778,6 @@ const ReviewSection = ({ filmId, playId, currentUser, filmTitle = '', filmSlug =
                         )}
                     </div>
                 </div>
-
-                {!userReview && !showForm && !editingReview && (
-                    <button
-                        onClick={() => currentUser ? setShowForm(true) : navigate('/login')}
-                        className="bg-brand text-white font-bold px-6 py-3 rounded-xl text-xs sm:text-sm btn-hover shadow-lg shadow-brand/20 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-                    >
-                        <Icon icon="solar:pen-new-square-linear" width="16" />
-                        <span>{currentUser ? `Review this ${isPlay ? 'Play' : 'Film'}` : 'Sign in to review'}</span>
-                    </button>
-                )}
             </div>
 
             {/* Posting Context */}
@@ -789,7 +785,11 @@ const ReviewSection = ({ filmId, playId, currentUser, filmTitle = '', filmSlug =
                 <div className="page-fade-in max-w-2xl">
                     <ReviewForm
                         onSubmit={handleSubmit}
-                        onCancel={() => { setShowForm(false); setEditingReview(null); }}
+                        onCancel={() => {
+                            setShowForm(false);
+                            setEditingReview(null);
+                            onCloseForm?.();
+                        }}
                         initialRating={editingReview?.rating}
                         initialBody={editingReview?.body}
                         isEditing={!!editingReview}

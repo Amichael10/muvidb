@@ -283,6 +283,7 @@ export default function FilmDetail() {
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
   const [awardsOpen, setAwardsOpen] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
 
   const fetchCriticSummary = async (uuid) => {
     try {
@@ -1233,6 +1234,7 @@ export default function FilmDetail() {
                 dislikesCount={dislikesCount}
                 onReaction={handleReaction}
                 onWriteReviewClick={() => {
+                  setShowReviewForm(true);
                   const el = document.getElementById('reviews-section');
                   if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }}
@@ -1246,6 +1248,8 @@ export default function FilmDetail() {
                 currentUser={user}
                 filmTitle={film.title}
                 filmSlug={film.slug || slug}
+                openForm={showReviewForm}
+                onCloseForm={() => setShowReviewForm(false)}
               />
             </section>
           </div>
