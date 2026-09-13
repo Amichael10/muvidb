@@ -201,7 +201,7 @@ export default function PlayDetail() {
         <CriticReviewsSection playId={play.id} user={user} />
 
         {/* Audience Reviews & Reactions */}
-        <ReviewSection playId={play.id} currentUser={user} />
+        <ReviewSection playId={play.id} currentUser={user} filmTitle={play.title} />
       </div>
     </div>
   );

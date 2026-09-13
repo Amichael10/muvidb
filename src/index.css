@@ -38,15 +38,15 @@
   --radius-button: var(--radius-xl);
 }
 
-/* Dark Theme (African Cinematic) */
+/* Dark Theme (African Cinematic - Bluish Black) */
 .dark, :root:not(.light) {
   color-scheme: dark;
-  --color-bg: #0B0B0B; /* Deep cinematic black */
-  --color-surface: #1A1A1A; /* Charcoal */
-  --color-surface-2: #242424;
-  --color-surface-3: #2E2E2E;
+  --color-bg: #080A0D; /* Footer cinematic bluish black */
+  --color-surface: #0E1217; /* Deep bluish dark surface */
+  --color-surface-2: #141A22; /* Elevated bluish surface */
+  --color-surface-3: #1C2430; /* Active bluish surface */
   /* Sharp dividers (0.24 so control/card boundaries meet WCAG 1.4.11 non-text 3:1) */
-  --color-border: rgba(255, 255, 255, 0.24);
+  --color-border: rgba(255, 255, 255, 0.20);
   /* Decorative-only divider — kept whisper-faint for a premium, borderless feel.
      Use border-hairline for section dividers/grids; border-border for controls. */
   --color-hairline: rgba(255, 255, 255, 0.05);
@@ -57,16 +57,16 @@
   --color-text-secondary: #B0B0B0;
   --color-text-muted: #707070;
   --color-brand-muted: rgba(255, 90, 31, 0.15);
-  --color-overlay: rgba(0, 0, 0, 0.85);
+  --color-overlay: rgba(8, 10, 13, 0.88);
   
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.8);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.9);
 
-  --color-sidebar: #1A1A1A;
+  --color-sidebar: #0E1217;
   --color-sidebar-text: #B0B0B0;
   --color-sidebar-hover: rgba(255, 255, 255, 0.05);
   --color-sidebar-active: rgba(255, 90, 31, 0.1);
-  --color-sidebar-border: rgba(255, 255, 255, 0.24);
+  --color-sidebar-border: rgba(255, 255, 255, 0.20);
   --color-on-brand: #000000;
 }
 

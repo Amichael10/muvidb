@@ -112,10 +112,10 @@ export default function CriticsList() {
 
 
       {/* ─── 1. EDITORIAL DIRECTORY HERO ─── */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-surface/80 to-bg px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-surface/80 to-bg">
         <div className="absolute inset-0 grid-bg opacity-15 pointer-events-none" />
         
-        <div className="max-w-7xl mx-auto pt-14 pb-16 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-16 relative z-10">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/30 text-brand text-[10px] font-black uppercase tracking-[0.2em] mb-5">
               <Icon icon="solar:pen-new-square-bold" className="w-4 h-4" />

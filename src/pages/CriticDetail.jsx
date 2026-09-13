@@ -70,6 +70,8 @@ export default function CriticDetail() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('newest');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   useEffect(() => {
     async function load() {
@@ -219,12 +221,29 @@ export default function CriticDetail() {
       });
   }, [reviews, reviewSearch, yearFilter, sentimentFilter, statusFilter, sortOrder, critic]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [reviewSearch, yearFilter, sentimentFilter, statusFilter, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredReviews.length / PAGE_SIZE));
+  const paginatedReviews = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredReviews.slice(start, start + PAGE_SIZE);
+  }, [filteredReviews, currentPage]);
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    document.getElementById('reviews-archive')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const clearFilters = () => {
     setReviewSearch('');
     setYearFilter('all');
     setSentimentFilter('all');
     setStatusFilter('all');
     setSortOrder('newest');
+    setCurrentPage(1);
   };
 
   const handleShare = () => {
@@ -696,7 +715,7 @@ export default function CriticDetail() {
       )}
 
       {/* ─── 4. REVIEWS ARCHIVE (METACRITIC EDITORIAL FEED) ─── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-14">
+      <section id="reviews-archive" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-14">
         
         {/* Section Header & Toolbar */}
         <div className="flex flex-col gap-5 mb-8">
@@ -878,7 +897,7 @@ export default function CriticDetail() {
         ) : viewMode === 'list' ? (
           /* METACRITIC EDITORIAL LIST VIEW */
           <div className="space-y-4">
-            {filteredReviews.map((rev) => {
+            {paginatedReviews.map((rev) => {
               const film = rev.film || rev.play || {};
               const normalized = normalizeRating(rev.rating);
               const filmUrl = rev.film?.slug
@@ -1007,7 +1026,7 @@ export default function CriticDetail() {
         ) : (
           /* CARD GRID VIEW */
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-            {filteredReviews.map((rev) => {
+            {paginatedReviews.map((rev) => {
               const film = rev.film || rev.play || {};
               const normalized = normalizeRating(rev.rating);
               const filmUrl = rev.film?.slug
@@ -1096,6 +1115,80 @@ export default function CriticDetail() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ─── PAGINATION CONTROLS ─── */}
+        {filteredReviews.length > PAGE_SIZE && (
+          <div className="mt-10 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-text-muted font-medium">
+              Showing <span className="font-bold text-text-primary">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredReviews.length)}</span> of <span className="font-bold text-text-primary">{filteredReviews.length}</span> reviews
+            </p>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => handlePageChange(currentPage - 1)}
+                className="px-3.5 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-primary hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                aria-label="Previous page"
+              >
+                <Icon icon="solar:alt-arrow-left-linear" className="text-sm" />
+                <span>Prev</span>
+              </button>
+
+              <div className="flex items-center gap-1 px-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    if (totalPages <= 7) return true;
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - currentPage) <= 1) return true;
+                    return false;
+                  })
+                  .reduce((acc, page, idx, arr) => {
+                    if (idx > 0 && page - arr[idx - 1] > 1) {
+                      acc.push(-idx); // placeholder for ellipsis
+                    }
+                    acc.push(page);
+                    return acc;
+                  }, [])
+                  .map((item) => {
+                    if (item < 0) {
+                      return (
+                        <span key={`ellipsis-${item}`} className="px-2 text-xs text-text-muted font-bold">
+                          …
+                        </span>
+                      );
+                    }
+                    const isCurrent = item === currentPage;
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => handlePageChange(item)}
+                        className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          isCurrent
+                            ? 'bg-brand text-black shadow-md shadow-brand/20 font-black'
+                            : 'bg-surface hover:bg-surface-2 border border-border text-text-secondary hover:text-text-primary'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => handlePageChange(currentPage + 1)}
+                className="px-3.5 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-primary hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                aria-label="Next page"
+              >
+                <span>Next</span>
+                <Icon icon="solar:alt-arrow-right-linear" className="text-sm" />
+              </button>
+            </div>
           </div>
         )}
 

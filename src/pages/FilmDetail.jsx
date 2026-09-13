@@ -1244,6 +1244,7 @@ export default function FilmDetail() {
               <ReviewSection
                 filmId={film.id}
                 currentUser={user}
+                filmTitle={film.title}
               />
             </section>
           </div>
