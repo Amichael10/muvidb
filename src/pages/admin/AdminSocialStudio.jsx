@@ -640,8 +640,9 @@ export default function AdminSocialStudio() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       toast.success('✨ Social Studio reset successfully! Clean slate ready.', { id: toastId });
+      setCalendarSlots([]);
+      setDrafts([]);
       await refreshAll();
-      setActiveTab('composer');
     } catch (err) {
       toast.error(err.message || 'Failed to reset studio data', { id: toastId });
     }
@@ -700,16 +701,12 @@ export default function AdminSocialStudio() {
   const seedCalendar = async () => {
     setSeedingCalendar(true);
     try {
-      const endpoint = postsPerDay === 3
-        ? '/api/social?task=seed_calendar_drafts'
-        : '/api/social?task=seed_calendar';
-
-      const res = await fetch(endpoint, {
+      // 1. Instant seed of 30 days of calendar slots (09:00, 12:00, 15:30 WAT)
+      const res = await fetch('/api/social?task=seed_calendar', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          daysAhead: 7,
-          days: 30,
+          daysAhead: 30,
           startDate: calendarStartDate,
           postsPerDay,
           clearExistingPlanned: true,
@@ -717,9 +714,23 @@ export default function AdminSocialStudio() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      const count = data.totalCreated ?? data.seeded ?? 21;
-      toast.success(`✨ Generated ${count} post drafts starting ${calendarStartDate} (09:00, 12:00, 15:30 WAT)!`);
+      const count = data.seeded ?? (postsPerDay * 30);
+      toast.success(`✨ Generated ${count} calendar slots starting ${calendarStartDate} (09:00, 12:00, 15:30 WAT)!`);
+
+      // 2. Pre-seed lightweight drafts for immediate upcoming days (09:00, 12:00, 15:30 WAT)
+      if (postsPerDay === 3) {
+        fetch('/api/social?task=seed_calendar_drafts', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            daysAhead: 3,
+            startDate: calendarStartDate,
+          }),
+        }).catch(err => console.warn('Background draft generation warning:', err));
+      }
+
       await fetchCalendar(shuffleOffset);
+      await fetchDrafts(true);
     } catch (err) {
       toast.error(err.message || 'Failed to seed calendar');
     } finally {

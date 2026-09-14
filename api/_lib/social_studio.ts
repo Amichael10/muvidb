@@ -333,6 +333,7 @@ export async function resetSocialStudioData(actor: SocialActor) {
   await supabase.from('social_platform_variants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('social_assets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('social_content_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('social_calendar').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   return { success: true, message: 'Social Studio data reset to clean slate' };
 }
 
@@ -1231,6 +1232,7 @@ export async function generateSocialDraft(
     platforms: SocialPlatform[];
     destinationId?: string | null;
     isAdHoc?: boolean;
+    skipAssets?: boolean;
   },
   actor: SocialActor,
 ) {
@@ -1321,13 +1323,15 @@ export async function generateSocialDraft(
   // because each variant needs to point at one. A render failure degrades to a
   // caption-only draft rather than failing generation — the item is still
   // reviewable and can be re-rendered later.
-  const assets = await renderAndStoreAssets({
-    contentItemId: contentItem.id,
-    snapshot,
-    templateSlug: effectiveTemplate.slug,
-    templateVersion: effectiveTemplate.version,
-    formats: templateFormats(effectiveTemplate.template_config, effectiveTemplate.slug),
-  });
+  const assets = input.skipAssets
+    ? { rows: [] as StoredAsset[] }
+    : await renderAndStoreAssets({
+        contentItemId: contentItem.id,
+        snapshot,
+        templateSlug: effectiveTemplate.slug,
+        templateVersion: effectiveTemplate.version,
+        formats: templateFormats(effectiveTemplate.template_config, effectiveTemplate.slug),
+      });
 
   if (assets.error) warnings.push(`Asset rendering failed: ${assets.error}`);
 
@@ -2518,7 +2522,7 @@ export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
         ? slot.social_content_series[0]
         : slot.social_content_series;
       const slug = series?.slug || 'unknown';
-      const key = `${slot.scheduled_date}:${slug}`;
+      const key = `${slot.scheduled_date}:${slot.scheduled_time || slug}`;
       const existing = dedupedByDateAndSeries.get(key);
       if (!existing || slotPriority(slot) > slotPriority(existing)) dedupedByDateAndSeries.set(key, slot);
     }

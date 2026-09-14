@@ -23,7 +23,7 @@ export async function sendMorningSocialBriefing(overrideChatId?: string | number
   const startIso = new Date(`${todayStr}T00:00:00+01:00`).toISOString();
   const endIso = new Date(`${todayStr}T23:59:59+01:00`).toISOString();
 
-  const { data: items, error } = await supabase
+  const { data: initialItems } = await supabase
     .from('social_content_items')
     .select(`
       id,
@@ -46,9 +46,40 @@ export async function sendMorningSocialBriefing(overrideChatId?: string | number
     .neq('status', 'rejected')
     .order('scheduled_for', { ascending: true });
 
-  if (error) {
-    console.error('[morning_social_briefing] Query error:', error);
-    return { ok: false, error: error.message };
+  let items = initialItems || [];
+
+  if (!items || items.length === 0) {
+    try {
+      const { generateDailyScheduleDrafts } = await import('./calendar_service.js');
+      await generateDailyScheduleDrafts({ daysAhead: 1, startDate: todayStr });
+      const { data: generatedItems } = await supabase
+        .from('social_content_items')
+        .select(`
+          id,
+          title,
+          status,
+          content_type,
+          scheduled_for,
+          metadata,
+          social_platform_variants (
+            id,
+            platform,
+            status,
+            caption,
+            title,
+            hashtags
+          )
+        `)
+        .gte('scheduled_for', startIso)
+        .lte('scheduled_for', endIso)
+        .neq('status', 'rejected')
+        .order('scheduled_for', { ascending: true });
+      if (generatedItems && generatedItems.length > 0) {
+        items = generatedItems;
+      }
+    } catch (genErr) {
+      console.warn('[morning_social_briefing] Auto-draft fallback failed:', genErr);
+    }
   }
 
   const siteUrl = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');

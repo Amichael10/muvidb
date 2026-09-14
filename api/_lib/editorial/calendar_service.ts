@@ -68,16 +68,53 @@ export const SINGLE_POST_SCHEDULE: Record<number, CalendarSlotConfig[]> = {
   0: [{ seriesSlug: 'film_conversation', time: '14:00:00', format: 'text', notes: 'Sunday Cinema: Community Debate & Conversation' }],
 };
 
-// Three-lane daily plan: the existing graphic lane plus two video preparation lanes.
-export const VIDEO_LANE_SCHEDULE: Record<number, CalendarSlotConfig[]> = {
-  0: [{ seriesSlug: 'film_conversation', time: '14:00:00', format: 'single_image', notes: 'Graphic lane' }, { seriesSlug: 'film_conversation', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'film_conversation', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
-  1: [{ seriesSlug: 'where_to_watch', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'where_to_watch', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'where_to_watch', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
-  2: [{ seriesSlug: 'critics_say', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'critics_say', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'critics_say', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
-  3: [{ seriesSlug: 'where_to_watch', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'where_to_watch', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'where_to_watch', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
-  4: [{ seriesSlug: 'behind_the_camera', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'behind_the_camera', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'behind_the_camera', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
-  5: [{ seriesSlug: 'weekend_watchlist', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'weekend_watchlist', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'weekend_watchlist', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
-  6: [{ seriesSlug: 'whats_on_stage', time: '14:00:00', format: 'carousel', notes: 'Graphic lane' }, { seriesSlug: 'whats_on_stage', time: '18:00:00', format: 'video', notes: '1:1 video lane — local clipper + Gemini' }, { seriesSlug: 'whats_on_stage', time: '20:00:00', format: 'video', notes: '9:16 video lane — local clipper + Gemini' }],
+// Three-post daily schedule aligned with publishing cron slots (09:00, 12:00, 15:30 WAT)
+export const THREE_POST_SCHEDULE: Record<number, CalendarSlotConfig[]> = {
+  // Sunday
+  0: [
+    { seriesSlug: 'filmography', time: '09:00:00', priority: 'high', format: 'carousel', notes: 'Morning Spotlight: Career Deep-Dive' },
+    { seriesSlug: 'critics_say', time: '12:00:00', priority: 'high', format: 'carousel', notes: 'Midday Review: Recent Critic Consensus' },
+    { seriesSlug: 'film_conversation', time: '15:30:00', format: 'text', notes: 'Afternoon Discussion: African Cinema Debate' },
+  ],
+  // Monday
+  1: [
+    { seriesSlug: 'you_know_the_face', time: '09:00:00', priority: 'high', format: 'carousel', notes: 'Morning Spotlight: Emerging Nollywood Stars' },
+    { seriesSlug: 'critics_say', time: '12:00:00', priority: 'high', format: 'carousel', notes: 'Midday Review: Recent Critic Consensus' },
+    { seriesSlug: 'new_and_upcoming', time: '15:30:00', format: 'single_image', notes: 'Afternoon Release Radar: Trailers & Announcements' },
+  ],
+  // Tuesday
+  2: [
+    { seriesSlug: 'where_to_watch', time: '09:00:00', priority: 'high', format: 'carousel', notes: 'Morning Streaming Alert: Nollistream, Docuth, etc.' },
+    { seriesSlug: 'critics_say', time: '12:00:00', priority: 'high', format: 'carousel', notes: 'Midday Review: Recent Critic Consensus' },
+    { seriesSlug: 'film_conversation', time: '15:30:00', format: 'text', notes: 'Afternoon Discussion: Film Industry Debate' },
+  ],
+  // Wednesday
+  3: [
+    { seriesSlug: 'behind_the_camera', time: '09:00:00', priority: 'high', format: 'carousel', notes: 'Morning Craft: Directors, Writers & Crew' },
+    { seriesSlug: 'critics_say', time: '12:00:00', priority: 'high', format: 'carousel', notes: 'Midday Review: Recent Critic Consensus' },
+    { seriesSlug: 'where_to_watch', time: '15:30:00', format: 'single_image', notes: 'Afternoon Streaming Discovery' },
+  ],
+  // Thursday
+  4: [
+    { seriesSlug: 'you_know_the_face', time: '09:00:00', priority: 'high', format: 'carousel', notes: 'Morning Spotlight: Emerging Nollywood Stars' },
+    { seriesSlug: 'critics_say', time: '12:00:00', priority: 'high', format: 'carousel', notes: 'Midday Review: Recent Critic Consensus' },
+    { seriesSlug: 'new_and_upcoming', time: '15:30:00', format: 'single_image', notes: 'Afternoon Release Radar' },
+  ],
+  // Friday
+  5: [
+    { seriesSlug: 'where_to_watch', time: '09:00:00', priority: 'high', format: 'carousel', notes: 'Morning Weekend Streaming Destination' },
+    { seriesSlug: 'weekend_watchlist', time: '12:00:00', priority: 'high', format: 'carousel', notes: 'Midday 5-Film Weekend Watchlist' },
+    { seriesSlug: 'new_and_upcoming', time: '15:30:00', format: 'single_image', notes: 'Afternoon Weekend Release Radar' },
+  ],
+  // Saturday
+  6: [
+    { seriesSlug: 'whats_on_stage', time: '09:00:00', priority: 'high', format: 'carousel', notes: 'Morning Stage: Theatre & Live African Productions' },
+    { seriesSlug: 'critics_say', time: '12:00:00', priority: 'high', format: 'carousel', notes: 'Midday Review: Recent Critic Consensus' },
+    { seriesSlug: 'film_conversation', time: '15:30:00', format: 'text', notes: 'Afternoon Discussion: Community Conversation' },
+  ],
 };
+
+export const VIDEO_LANE_SCHEDULE = THREE_POST_SCHEDULE;
 
 export interface SeedCalendarOptions {
   daysAhead?: number;
@@ -295,6 +332,7 @@ export async function generateDailyScheduleDrafts(options: GenerateScheduleDraft
             criticReviewId: candidate.data?.criticReview?.id || null,
             templateSlug,
             platforms: ['instagram', 'threads', 'facebook', 'tiktok'],
+            skipAssets: true,
           },
           systemActor,
         );
