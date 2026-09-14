@@ -1975,6 +1975,19 @@ export default function AdminSocialStudio() {
           <span>Intake Inbox</span>
         </button>
 
+        <button
+          type="button"
+          onClick={() => setActiveTab('video_plan')}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'video_plan'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+          }`}
+        >
+          <Icon icon="solar:clapperboard-edit-bold" width="16" />
+          <span>Video Clipper</span>
+        </button>
+
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
@@ -3223,6 +3236,471 @@ export default function AdminSocialStudio() {
       )}
 
       {/* ========================================================================= */}
+
+
+      {/* ========================================================================= */}
+      {/* 8. TAB 5: VIDEO AUTOPILOT PLANNER                                        */}
+      {/* ========================================================================= */}
+      {activeTab === 'video_plan' && (
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-surface to-surface p-6 shadow-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-white">Video Autopilot Planner</h3>
+                <p className="mt-1 max-w-2xl text-xs text-text-muted leading-relaxed">
+                  Automated video generation pipeline: Selects the latest verified Nollywood releases, extracts highlight moments with Gemini, and renders high-res 1:1 and 9:16 video clips locally.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all ${
+                    clipperStatus === 'running'
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 shadow-sm shadow-emerald-500/20'
+                      : 'border-rose-500/40 bg-rose-500/10 text-rose-300'
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${clipperStatus === 'running' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                  {clipperStatus === 'running' ? 'Local Clipper Ready' : 'Local Clipper Offline'}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Plan Duration
+                <select
+                  value={videoPlan.days}
+                  onChange={e => setVideoPlan(p => ({ ...p, days: Number(e.target.value) }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none"
+                >
+                  <option value="7">7 days (21 clips)</option>
+                  <option value="14">14 days (42 clips)</option>
+                  <option value="21">21 days (63 clips)</option>
+                  <option value="30">30 days (90 clips)</option>
+                </select>
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Start Date
+                <input
+                  type="date"
+                  value={videoPlan.startDate}
+                  onChange={e => setVideoPlan(p => ({ ...p, startDate: e.target.value }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
+                />
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Slot 1 Time (WAT)
+                <input
+                  type="time"
+                  value={videoPlan.slot1Time}
+                  onChange={e => setVideoPlan(p => ({ ...p, slot1Time: e.target.value }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
+                />
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Slot 2 Time (WAT)
+                <input
+                  type="time"
+                  value={videoPlan.slot2Time}
+                  onChange={e => setVideoPlan(p => ({ ...p, slot2Time: e.target.value }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
+                />
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Slot 3 Time (WAT)
+                <input
+                  type="time"
+                  value={videoPlan.slot3Time}
+                  onChange={e => setVideoPlan(p => ({ ...p, slot3Time: e.target.value }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
+                />
+              </label>
+
+              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                Clip Length
+                <select
+                  value={videoPlan.clipLength}
+                  onChange={e => setVideoPlan(p => ({ ...p, clipLength: Number(e.target.value) }))}
+                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none"
+                >
+                  <option value="15">15 seconds</option>
+                  <option value="30">30 seconds</option>
+                  <option value="45">45 seconds</option>
+                  <option value="60">60 seconds</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={buildVideoPlanRows}
+                disabled={videoAutopilot.running}
+                className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-500 shadow-md shadow-violet-600/20 disabled:opacity-50 transition-all"
+              >
+                Build {videoPlan.days}-Day Video Plan
+              </button>
+
+              <button
+                type="button"
+                onClick={generateAllRowCaptions}
+                disabled={videoAutopilot.running || videoRows.length === 0}
+                className="rounded-xl border border-violet-500/40 bg-violet-500/15 px-4 py-2.5 text-xs font-black text-violet-200 hover:bg-violet-500/25 disabled:opacity-50 transition-all flex items-center gap-1.5"
+              >
+                <span>✨ Auto-Generate All Captions & Scenes ({videoRows.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={runDailyVideoAutopilot}
+                disabled={videoAutopilot.running}
+                className="rounded-xl border border-white/10 bg-surface px-4 py-2.5 text-xs font-bold text-text-muted hover:text-white hover:border-white/20 disabled:opacity-50 transition-all"
+              >
+                {videoAutopilot.running ? 'Processing…' : '⚡ Auto-Generate Today’s Clips'}
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Video Plan Rows */}
+          <section className="rounded-2xl border border-white/10 bg-surface p-6 shadow-xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-white">Planned Video Clips ({videoRows.length})</h3>
+                <p className="mt-0.5 text-xs text-text-muted">Review clips, regenerate AI captions, or adjust crop timings before rendering.</p>
+              </div>
+              <button
+                type="button"
+                onClick={addVideoRow}
+                className="rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-xs font-black text-brand hover:bg-brand/20 transition-all"
+              >
+                ＋ Add Video Clip
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {videoRows.map((row, index) => (
+                <div key={row.id} className="rounded-xl border border-white/10 bg-surface-2 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-brand">Clip #{index + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeVideoRow(row.id)}
+                      className="text-xs font-bold text-red-400 hover:text-red-300"
+                      disabled={videoRows.length === 1}
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      Date
+                      <input
+                        type="date"
+                        value={row.date}
+                        onChange={e => updateVideoRow(row.id, { date: e.target.value })}
+                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
+                      />
+                    </label>
+
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      Time
+                      <input
+                        type="time"
+                        value={row.time}
+                        onChange={e => updateVideoRow(row.id, { time: e.target.value })}
+                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
+                      />
+                    </label>
+
+                    <div className="sm:col-span-2 lg:col-span-2">
+                      <label className="block text-[10px] font-black uppercase text-text-muted">
+                        Film Selection
+                      </label>
+                      <FilmSearchCombobox
+                        value={row.filmId}
+                        onChange={(filmId, film) => updateVideoRow(row.id, { filmId, film })}
+                        films={videoFilmOptions}
+                        placeholder="Search Nollywood films…"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 lg:col-span-2">
+                      <label className="text-[10px] font-black uppercase text-text-muted">
+                        Timing Mode
+                        <select
+                          value={row.mode}
+                          onChange={e => updateVideoRow(row.id, { mode: e.target.value })}
+                          className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
+                        >
+                          <option value="gemini">Gemini Auto (Finds Best Scene)</option>
+                          <option value="manual">Manual Exact Timing (MM:SS)</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="col-span-full">
+                      <label className="block text-[10px] font-black uppercase text-text-muted mb-1">
+                        Formats to Generate ({getRowAspectRatios(row).length} selected)
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {AVAILABLE_ASPECT_RATIOS.map(fmt => {
+                          const activeFormats = getRowAspectRatios(row);
+                          const isSelected = activeFormats.includes(fmt.id);
+                          return (
+                            <button
+                              key={fmt.id}
+                              type="button"
+                              onClick={() => {
+                                let next;
+                                if (isSelected) {
+                                  next = activeFormats.filter(f => f !== fmt.id);
+                                  if (next.length === 0) next = [fmt.id];
+                                } else {
+                                  next = [...activeFormats, fmt.id];
+                                }
+                                updateVideoRow(row.id, { aspectRatios: next });
+                              }}
+                              className={`h-8 px-3 rounded-lg border text-xs font-bold transition-all flex items-center gap-2 ${
+                                isSelected
+                                  ? 'border-brand bg-brand/20 text-brand-light shadow-sm shadow-brand/20'
+                                  : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-white'
+                              }`}
+                              title={`${fmt.label} (${fmt.subtitle})`}
+                            >
+                              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-brand' : 'bg-white/20'}`} />
+                              <span>{fmt.label}</span>
+                              <span className="text-[10px] opacity-70">({fmt.subtitle})</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-end gap-2.5">
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      Start Time (MM:SS)
+                      <input
+                        type="text"
+                        placeholder="e.g. 22:22"
+                        value={row.start}
+                        onChange={e => updateVideoRow(row.id, { start: e.target.value })}
+                        disabled={row.mode === 'gemini'}
+                        className="mt-1 h-9 w-28 rounded-lg border border-white/10 bg-surface px-2.5 text-xs text-white placeholder:text-white/30 disabled:opacity-50 focus:border-brand"
+                      />
+                    </label>
+
+                    <label className="text-[10px] font-black uppercase text-text-muted">
+                      End Time (MM:SS)
+                      <input
+                        type="text"
+                        placeholder="e.g. 24:30"
+                        value={row.end}
+                        onChange={e => updateVideoRow(row.id, { end: e.target.value })}
+                        disabled={row.mode === 'gemini'}
+                        className="mt-1 h-9 w-28 rounded-lg border border-white/10 bg-surface px-2.5 text-xs text-white placeholder:text-white/30 disabled:opacity-50 focus:border-brand"
+                      />
+                    </label>
+
+                    {(() => {
+                      const s = parseTimestampToSeconds(row.start);
+                      const e = parseTimestampToSeconds(row.end);
+                      const duration = Math.max(0, e - s);
+                      if (duration > 0) {
+                        return (
+                          <div className="flex h-9 items-center rounded-lg border border-brand/30 bg-brand/10 px-2.5 text-[11px] font-semibold text-brand-light">
+                            ⏱️ {duration}s ({Math.floor(duration / 60) > 0 ? `${Math.floor(duration / 60)}m ` : ''}${duration % 60}s)
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* AI Engine Switcher (Gemini / Cohere) */}
+                    <div className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-surface p-0.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => updateVideoRow(row.id, { engine: 'gemini' })}
+                        className={`h-full rounded px-2.5 transition-all flex items-center gap-1 ${
+                          (row.engine || 'gemini') === 'gemini'
+                            ? 'bg-violet-600 text-white shadow-xs'
+                            : 'text-text-muted hover:text-white'
+                        }`}
+                      >
+                        <span>⚡ Gemini</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateVideoRow(row.id, { engine: 'cohere' })}
+                        className={`h-full rounded px-2.5 transition-all flex items-center gap-1 ${
+                          row.engine === 'cohere'
+                            ? 'bg-brand text-white shadow-xs'
+                            : 'text-text-muted hover:text-white'
+                        }`}
+                      >
+                        <span>🪄 Cohere</span>
+                      </button>
+                    </div>
+
+                    {/* Tone / Editorial Angle Selector */}
+                    <select
+                      value={row.angle || 'editorial'}
+                      onChange={e => updateVideoRow(row.id, { angle: e.target.value })}
+                      className="h-9 rounded-lg border border-white/10 bg-surface px-2.5 text-xs font-bold text-white outline-none focus:border-brand"
+                    >
+                      {VIDEO_COPY_ANGLES.map(a => (
+                        <option key={a.value} value={a.value}>
+                          {a.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => generateRowCaption(row)}
+                      disabled={row.generatingCaption || !row.filmId}
+                      className="h-9 rounded-lg border border-violet-400/40 bg-violet-500/15 px-3 text-xs font-bold text-violet-200 hover:bg-violet-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {row.generatingCaption ? (
+                        <>
+                          <Icon icon="solar:spinner-linear" className="animate-spin" width="14" />
+                          <span>Generating…</span>
+                        </>
+                      ) : (
+                        <>
+                          <Icon icon="solar:magic-stick-3-bold" width="14" />
+                          <span>Generate 3 Variations ({(row.engine || 'gemini').toUpperCase()})</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* 3 Variations Pills (Option A / Option B / Option C) */}
+                  {Array.isArray(row.variations) && row.variations.length > 0 && (
+                    <div className="rounded-xl border border-white/10 bg-surface/60 p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-text-muted">
+                        <span>Select Copy Variation</span>
+                        <span className="text-violet-400 font-mono text-[9px]">Engine: {row.engine || 'gemini'} · Tone: {row.angle || 'editorial'}</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {row.variations.map(v => {
+                          const isSelected = (row.selectedVariationKey || 'B') === v.key || row.caption === v.text;
+                          return (
+                            <button
+                              key={v.key}
+                              type="button"
+                              onClick={() => {
+                                updateVideoRow(row.id, {
+                                  caption: v.text,
+                                  selectedVariationKey: v.key,
+                                });
+                                toast.success(`Switched to Option ${v.key} (${v.label})`);
+                              }}
+                              className={`rounded-lg border p-2 text-left transition-all ${
+                                isSelected
+                                  ? 'border-brand bg-brand/15 text-white ring-1 ring-brand shadow-xs'
+                                  : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-white'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-xs font-black">
+                                <span>Option {v.key}: {v.label}</span>
+                                {isSelected && <Icon icon="solar:check-circle-bold" className="text-brand" width="14" />}
+                              </div>
+                              <p className="mt-1 text-[10px] line-clamp-2 leading-relaxed opacity-90">{v.text}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <label className="block text-[10px] font-black uppercase text-text-muted">
+                    Caption
+                    <textarea
+                      value={row.caption}
+                      onChange={e => updateVideoRow(row.id, { caption: e.target.value })}
+                      rows={2}
+                      placeholder="Write social caption or generate one with AI…"
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-surface px-3 py-2 text-xs text-white outline-none focus:border-brand"
+                    />
+                  </label>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                    <div className="text-[11px] text-text-muted">
+                      {row.filmId ? (
+                        <span>Ready to clip {getRowAspectRatios(row).join(' & ')} formats ({row.start} – {row.end})</span>
+                      ) : (
+                        <span className="text-amber-300/80">Select a film to enable rendering</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => prepareCustomVideoPlan('draft', row)}
+                        disabled={videoAutopilot.running || clipperStatus !== 'running' || !row.filmId}
+                        className="flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3.5 text-xs font-bold text-white shadow-sm shadow-brand/20 transition-all hover:bg-brand-hover disabled:opacity-50"
+                      >
+                        <Icon icon="solar:clapperboard-play-bold" width="14" />
+                        <span>Render This Clip (Draft)</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              <button
+                type="button"
+                onClick={() => prepareCustomVideoPlan('draft')}
+                disabled={videoAutopilot.running || clipperStatus !== 'running'}
+                className="rounded-xl bg-brand px-5 py-2.5 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50 shadow-md shadow-brand/20 transition-all"
+              >
+                {videoAutopilot.running ? 'Processing…' : 'Render & Save to Drafts'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => prepareCustomVideoPlan('schedule')}
+                disabled={videoAutopilot.running || clipperStatus !== 'running'}
+                className="rounded-xl border border-amber-400/40 bg-amber-500/15 px-5 py-2.5 text-xs font-black text-amber-300 hover:bg-amber-500/25 disabled:opacity-50 transition-all"
+              >
+                Schedule All
+              </button>
+
+              <button
+                type="button"
+                onClick={() => prepareCustomVideoPlan('publish')}
+                disabled={videoAutopilot.running || clipperStatus !== 'running'}
+                className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-5 py-2.5 text-xs font-black text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 transition-all"
+              >
+                Post All Now
+              </button>
+            </div>
+            {clipperStatus !== 'running' && (
+              <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+                <Icon icon="solar:info-circle-bold" className="text-base text-amber-400 shrink-0" />
+                <div>
+                  <span className="font-bold">Local FFmpeg Clipper is offline.</span> Start the clipper service by running{' '}
+                  <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[11px] text-amber-300">
+                    powershell scripts\start-local-social-clipper.ps1
+                  </code>{' '}
+                  in your terminal to enable video rendering.
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 9. CHANNELS HUB MODAL (SchedulePress Inspired Reference Image 3)          */}
       {/* 10. AUTO-PILOT REVIEW & APPROVAL MODAL                                   */}
       {/* ========================================================================= */}
       <AutoPilotReviewModal
