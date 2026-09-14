@@ -279,3 +279,42 @@ export async function getTelegramFileUrl(fileId: string): Promise<string | null>
   }
 }
 
+export type TelegramEditMessageOpts = {
+  chatId: string | number;
+  messageId: number;
+  text: string;
+  replyMarkup?: { inline_keyboard: TelegramInlineButton[][] };
+  disablePreview?: boolean;
+};
+
+export async function editTelegramMessageText(
+  opts: TelegramEditMessageOpts,
+): Promise<{ ok: boolean; error?: string }> {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!token) return { ok: false, error: 'TELEGRAM_BOT_TOKEN not set' };
+
+  try {
+    const body: Record<string, unknown> = {
+      chat_id: opts.chatId,
+      message_id: opts.messageId,
+      text: opts.text.slice(0, 3900),
+      disable_web_page_preview: opts.disablePreview !== false,
+    };
+    if (opts.replyMarkup) body.reply_markup = opts.replyMarkup;
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      return { ok: false, error: json?.description || `HTTP ${res.status}` };
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
+

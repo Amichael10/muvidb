@@ -1,4 +1,4 @@
-export const SOCIAL_PLATFORMS = ['instagram', 'facebook', 'threads', 'tiktok'] as const;
+export const SOCIAL_PLATFORMS = ['instagram', 'facebook', 'threads', 'tiktok', 'x', 'youtube'] as const;
 
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
@@ -7,6 +7,8 @@ export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   facebook: 'Facebook',
   threads: 'Threads',
   tiktok: 'TikTok',
+  x: 'X (Twitter)',
+  youtube: 'YouTube',
 };
 
 export function isSocialPlatform(value: unknown): value is SocialPlatform {
@@ -15,16 +17,14 @@ export function isSocialPlatform(value: unknown): value is SocialPlatform {
 
 /**
  * Which rendered format each platform posts by default.
- *
- * TikTok is a full-screen vertical surface, so it takes 9:16. The rest are feed
- * placements where 4:5 occupies the most screen height Instagram allows. The
- * square render stays available for manual selection.
  */
-export const PLATFORM_PREFERRED_FORMAT: Record<SocialPlatform, 'portrait_4_5' | 'vertical_9_16'> = {
+export const PLATFORM_PREFERRED_FORMAT: Record<SocialPlatform, 'portrait_4_5' | 'vertical_9_16' | 'landscape_16_9' | 'square_1_1'> = {
   instagram: 'portrait_4_5',
   facebook: 'portrait_4_5',
   threads: 'portrait_4_5',
   tiktok: 'vertical_9_16',
+  x: 'square_1_1',
+  youtube: 'vertical_9_16',
 };
 
 /**

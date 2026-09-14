@@ -12,10 +12,12 @@ export type PlatformCaptionLimits = {
 };
 
 export const PLATFORM_CAPTION_LIMITS: Record<SocialPlatform, PlatformCaptionLimits> = {
-  instagram: { captionLimit: 2200, hashtagLimit: 3, usesTitle: false },
-  facebook: { captionLimit: 2000, hashtagLimit: 3, usesTitle: false },
+  instagram: { captionLimit: 2200, hashtagLimit: 12, usesTitle: false },
+  facebook: { captionLimit: 2000, hashtagLimit: 4, usesTitle: false },
   threads: { captionLimit: 500, hashtagLimit: 3, usesTitle: false },
-  tiktok: { captionLimit: 2200, hashtagLimit: 3, usesTitle: true },
+  tiktok: { captionLimit: 2200, hashtagLimit: 8, usesTitle: true },
+  x: { captionLimit: 280, hashtagLimit: 3, usesTitle: false },
+  youtube: { captionLimit: 5000, hashtagLimit: 15, usesTitle: true },
 };
 
 export type VariantContent = {

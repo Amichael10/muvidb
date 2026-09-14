@@ -270,7 +270,7 @@ export default function FigmaSocialCardPreview({
           {/* Bio Snippet */}
           {candidate?.subtext && (
             <div className="mt-3 rounded-lg bg-white/[0.06] border border-white/10 p-2.5 backdrop-blur-md">
-              <p className="text-[10.5px] text-white/85 line-clamp-2 leading-relaxed font-normal">
+              <p className="text-[10.5px] text-white/85 line-clamp-4 leading-relaxed font-normal">
                 {candidate.subtext}
               </p>
             </div>

@@ -183,7 +183,7 @@
     font-weight: 650;
     letter-spacing: -.028em;
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -451,7 +451,7 @@ function hexToContrast(hex) {
   return lum > 165 ? "#111315" : "#ffffff";
 }
 
-function clampSynopsis(text, max = 63) {
+function clampSynopsis(text, max = 150) {
   const clean = String(text || "").trim().replace(/\s+/g, " ");
   if (clean.length <= max) return clean;
   const limit = Math.max(1, max - 1);
@@ -540,7 +540,7 @@ function renderMuviDBCard(overrides = {}) {
 
   const synopsisEl = document.querySelector('[data-field="synopsis"]');
   if (synopsisEl) {
-    synopsisEl.textContent = clampSynopsis(data.synopsis || data.description, 63);
+    synopsisEl.textContent = clampSynopsis(data.synopsis || data.description, 150);
   }
 
   const logoEl = document.querySelector('[data-field="platform-logo"]');

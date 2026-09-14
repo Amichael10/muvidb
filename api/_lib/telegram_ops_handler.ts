@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   answerTelegramCallback,
+  editTelegramMessageText,
   getTelegramFileUrl,
   isAllowedOpsChat,
   sendTelegramMessage,
@@ -48,6 +49,8 @@ function helpText() {
     '/allowed — list whitelisted IPs',
     '/hits [ip] — recent scrape buckets (or top offenders)',
     '/blocked — list blocked IPs',
+    '/briefing — preview & approve today\'s 3 scheduled social posts',
+    '/outreach — review today\'s queued artist outreach candidates',
     '/help — this message',
     '',
     'YouTube: new film-length uploads alert here before auto-import.',
@@ -192,6 +195,20 @@ async function handleCommand(chatId: string | number, text: string) {
       (r: any) => `• ${r.ip} — ${r.hits} hits\n  ${(r.sample_paths || []).slice(0, 3).join(', ')}`,
     );
     await reply(chatId, `Top hitters (~15 min):\n${lines.join('\n')}`);
+    return;
+  }
+
+  if (cmd === '/briefing' || cmd === '/social') {
+    const { sendMorningSocialBriefing } = await import('./editorial/morning_social_briefing.js');
+    await reply(chatId, '⏳ Fetching today\'s social schedule…');
+    await sendMorningSocialBriefing(chatId);
+    return;
+  }
+
+  if (cmd === '/outreach') {
+    const { sendMorningOutreachBriefing } = await import('./outreach/morning_outreach_briefing.js');
+    await reply(chatId, '⏳ Checking today\'s outreach queue…');
+    await sendMorningOutreachBriefing(chatId);
     return;
   }
 
@@ -513,11 +530,12 @@ Respond ONLY with a valid JSON object matching this schema:
     return;
   }
 
-  if (data.startsWith('post_approve:')) {
-    const contentItemId = data.slice('post_approve:'.length).trim();
+  if (data.startsWith('appr:') || data.startsWith('post_approve:')) {
+    const prefix = data.startsWith('appr:') ? 'appr:' : 'post_approve:';
+    const contentItemId = data.slice(prefix.length).trim();
     const { data: item, error: itemErr } = await supabase
       .from('social_content_items')
-      .select('id, title, status, scheduled_for')
+      .select('id, title, status, scheduled_for, content_type')
       .eq('id', contentItemId)
       .maybeSingle();
 
@@ -526,28 +544,83 @@ Respond ONLY with a valid JSON object matching this schema:
       return;
     }
 
+    const nextStatus = item.scheduled_for ? 'scheduled' : 'approved';
     await supabase
       .from('social_content_items')
-      .update({
-        status: item.scheduled_for ? 'scheduled' : 'approved',
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: nextStatus, updated_at: new Date().toISOString() })
       .eq('id', contentItemId);
 
-    await answerTelegramCallback(callbackId, '🚀 Post Approved!');
-    if (chatId) {
-      await reply(
+    await supabase
+      .from('social_platform_variants')
+      .update({ status: nextStatus, updated_at: new Date().toISOString() })
+      .eq('content_item_id', contentItemId);
+
+    await answerTelegramCallback(callbackId, '✅ Post Approved!');
+
+    const messageId = query?.message?.message_id;
+    if (chatId && messageId) {
+      const scheduledTimeStr = item.scheduled_for
+        ? new Date(item.scheduled_for).toLocaleTimeString('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit' }) + ' WAT'
+        : 'Publishing Slot';
+      await editTelegramMessageText({
         chatId,
-        `✅ *Post Approved!*\n\n📌 *Title:* ${item.title || 'Untitled'}\n⏰ *Status:* ${item.scheduled_for ? `Scheduled for ${new Date(item.scheduled_for).toLocaleTimeString()}` : 'Ready to Publish'}\n\nOur automated publisher will post this directly to your connected social channels.`,
-      );
+        messageId,
+        text: `✅ *APPROVED & SCHEDULED*\n\n📌 *${item.title}*\n⏰ *Scheduled for:* ${scheduledTimeStr}\n\nThis post will be automatically published at its scheduled time.`,
+        replyMarkup: {
+          inline_keyboard: [
+            [{ text: '❌ Change to Skip', callback_data: `skip:${contentItemId}` }],
+          ],
+        },
+      });
     }
     return;
   }
 
-  if (data.startsWith('post_regen:')) {
-    const contentItemId = data.slice('post_regen:'.length).trim();
-    await answerTelegramCallback(callbackId, '🔄 Regenerating caption...');
-    if (chatId) await reply(chatId, '⏳ Rotating to a fresh conversational/editorial caption variation…');
+  if (data.startsWith('skip:') || data.startsWith('post_reject:')) {
+    const prefix = data.startsWith('skip:') ? 'skip:' : 'post_reject:';
+    const contentItemId = data.slice(prefix.length).trim();
+    await supabase
+      .from('social_content_items')
+      .update({ status: 'rejected', updated_at: new Date().toISOString() })
+      .eq('id', contentItemId);
+
+    await supabase
+      .from('social_platform_variants')
+      .update({ status: 'rejected', updated_at: new Date().toISOString() })
+      .eq('content_item_id', contentItemId);
+
+    await answerTelegramCallback(callbackId, '❌ Post Skipped');
+
+    const messageId = query?.message?.message_id;
+    if (chatId && messageId) {
+      await editTelegramMessageText({
+        chatId,
+        messageId,
+        text: `🗑 *Post Skipped / Rejected*\n\nThis slot has been removed from today's publishing schedule.`,
+        replyMarkup: {
+          inline_keyboard: [
+            [{ text: '↩️ Re-Approve Post', callback_data: `appr:${contentItemId}` }],
+          ],
+        },
+      });
+    }
+    return;
+  }
+
+  if (data.startsWith('tone:')) {
+    // Format: tone:<contentItemId>:<conv|edit|rel>
+    const parts = data.slice('tone:'.length).split(':');
+    const contentItemId = parts[0]?.trim();
+    const toneKey = parts[1]?.trim() || 'conv';
+
+    const toneLabels: Record<string, string> = {
+      conv: 'Conversational',
+      edit: 'Editorial',
+      rel: 'Relatable',
+    };
+    const targetAngle = toneKey === 'edit' ? 'critic_debate' : toneKey === 'rel' ? 'fun_relatable' : 'audience_debate';
+
+    await answerTelegramCallback(callbackId, `🔄 Generating ${toneLabels[toneKey] || 'new'} caption…`);
 
     try {
       const { data: item } = await supabase
@@ -556,9 +629,8 @@ Respond ONLY with a valid JSON object matching this schema:
         .eq('id', contentItemId)
         .maybeSingle();
 
-      if (!item) throw new Error('Content item not found');
+      if (!item) throw new Error('Post not found');
 
-      // Generate fresh captions with conversational / editorial priority
       const { generateAICaptions } = await import('./editorial/social_copy_ai.js');
       const aiRes = await generateAICaptions({
         candidate: {
@@ -568,12 +640,11 @@ Respond ONLY with a valid JSON object matching this schema:
           subtext: item.metadata?.synopsis || item.description || '',
           data: item.metadata || {},
         },
-        angle: 'fun_relatable',
+        angle: targetAngle as any,
       });
 
-      const newCaption = aiRes.instagram || aiRes.facebook || aiRes.threads || '';
+      const newCaption = aiRes.instagram || aiRes.threads || aiRes.facebook || '';
 
-      // Update primary copy variants
       if (item.social_copy_variants?.length) {
         for (const variant of item.social_copy_variants) {
           const platformText = aiRes[variant.platform as keyof typeof aiRes] || newCaption;
@@ -586,43 +657,91 @@ Respond ONLY with a valid JSON object matching this schema:
         }
       }
 
-      if (chatId) {
-        const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
-        await sendTelegramMessage({
-          text: `✨ *New Caption Generated (${aiRes.selectedVariation === 'C' ? 'Conversational' : 'Editorial'}):*\n\n${newCaption}\n\n👇 Approve or reject below:`,
-          chatId: String(chatId),
+      const messageId = query?.message?.message_id;
+      if (chatId && messageId) {
+        let timeLabel = '';
+        if (item.scheduled_for) {
+          timeLabel = new Date(item.scheduled_for).toLocaleTimeString('en-GB', {
+            timeZone: 'Africa/Lagos',
+            hour: '2-digit',
+            minute: '2-digit',
+          }) + ' WAT';
+        } else {
+          timeLabel = item.metadata?.scheduled_time || 'Planned';
+        }
+
+        const captionPreview = newCaption.length > 320 ? `${newCaption.slice(0, 310)}…` : newCaption;
+        const typeLabel = (item.content_type || 'spotlight').replace(/_/g, ' ').toUpperCase();
+
+        const updatedText = [
+          `📌 *${timeLabel} — ${typeLabel}*`,
+          `*${item.title}*`,
+          `Tone: *${toneLabels[toneKey]}* | Status: 📝 Draft`,
+          '',
+          '💬 *Caption Preview:*',
+          `_${captionPreview}_`,
+        ].join('\n');
+
+        await editTelegramMessageText({
+          chatId,
+          messageId,
+          text: updatedText,
           replyMarkup: {
             inline_keyboard: [
               [
-                { text: '🚀 Approve & Post', callback_data: `post_approve:${contentItemId}` },
-                { text: '🔄 Regen Again', callback_data: `post_regen:${contentItemId}` },
+                { text: '✅ Approve', callback_data: `appr:${contentItemId}` },
+                { text: '❌ Skip', callback_data: `skip:${contentItemId}` },
               ],
               [
-                { text: '❌ Reject Post', callback_data: `post_reject:${contentItemId}` },
-                { text: '🎨 Edit in Studio', url: `${site}/admin/social-studio` },
+                { text: '💬 Conversational', callback_data: `tone:${contentItemId}:conv` },
+                { text: '📰 Editorial', callback_data: `tone:${contentItemId}:edit` },
+                { text: '🔥 Relatable', callback_data: `tone:${contentItemId}:rel` },
               ],
             ],
           },
         });
       }
-    } catch (e: any) {
-      if (chatId) await reply(chatId, `⚠️ Caption regeneration failed: ${e.message}`);
+    } catch (toneErr: any) {
+      if (chatId) await reply(chatId, `⚠️ Caption regeneration failed: ${toneErr.message}`);
     }
     return;
   }
 
-  if (data.startsWith('post_reject:')) {
-    const contentItemId = data.slice('post_reject:'.length).trim();
-    await supabase
-      .from('social_content_items')
-      .update({
-        status: 'rejected',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', contentItemId);
+  if (data.startsWith('appr_all:')) {
+    const targetDate = data.slice('appr_all:'.length).trim();
+    const startIso = new Date(`${targetDate}T00:00:00+01:00`).toISOString();
+    const endIso = new Date(`${targetDate}T23:59:59+01:00`).toISOString();
 
-    await answerTelegramCallback(callbackId, '❌ Post Rejected');
-    if (chatId) await reply(chatId, '🗑 Post rejected and removed from publishing queue.');
+    const { data: drafts } = await supabase
+      .from('social_content_items')
+      .select('id')
+      .gte('scheduled_for', startIso)
+      .lte('scheduled_for', endIso)
+      .in('status', ['draft', 'ready_for_review']);
+
+    const ids = (drafts || []).map(d => d.id);
+    if (ids.length) {
+      await supabase
+        .from('social_content_items')
+        .update({ status: 'scheduled', updated_at: new Date().toISOString() })
+        .in('id', ids);
+
+      await supabase
+        .from('social_platform_variants')
+        .update({ status: 'scheduled', updated_at: new Date().toISOString() })
+        .in('content_item_id', ids);
+    }
+
+    await answerTelegramCallback(callbackId, `🚀 Approved all ${ids.length} posts!`);
+
+    const messageId = query?.message?.message_id;
+    if (chatId && messageId) {
+      await editTelegramMessageText({
+        chatId,
+        messageId,
+        text: `🚀 *ALL ${ids.length} POSTS APPROVED FOR TODAY*\n\nAll scheduled posts for ${targetDate} are locked in and will publish automatically at their scheduled cron times.`,
+      });
+    }
     return;
   }
 

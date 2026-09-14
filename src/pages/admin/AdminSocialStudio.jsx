@@ -6,6 +6,7 @@ import { authHeaders } from '../../lib/apiAuth';
 import { supabase } from '../../lib/supabase';
 import { uploadAdminSocialMedia } from '../../lib/imageUpload';
 import SocialDraftComposer, { EDITORIAL_THEMES } from '../../components/admin/SocialDraftComposer';
+import UniversalSocialComposer from '../../components/admin/UniversalSocialComposer';
 import AutoPilotReviewModal from '../../components/admin/AutoPilotReviewModal';
 import SocialIntakeInbox from '../../components/admin/SocialIntakeInbox';
 import FilmSearchCombobox from '../../components/admin/FilmSearchCombobox';
@@ -409,7 +410,7 @@ const VIDEO_COPY_ANGLES = [
 
 export default function AdminSocialStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'intake' ? 'intake' : 'calendar'); // 'calendar' | 'drafts' | 'composer' | 'intake' | 'channels' | 'video_plan'
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'composer'); // 'composer' | 'drafts' | 'calendar' | 'intake'
   const [calendarViewMode, setCalendarViewMode] = useState('month'); // 'month' | 'cards'
   const [selectedSlotForReview, setSelectedSlotForReview] = useState(null);
   const [summary, setSummary] = useState(emptySummary);
@@ -436,6 +437,8 @@ export default function AdminSocialStudio() {
       instagram: null,
       facebook: null,
       tiktok: null,
+      x: null,
+      youtube: null,
     },
   });
   const [channelsModalOpen, setChannelsModalOpen] = useState(false);
@@ -622,6 +625,28 @@ export default function AdminSocialStudio() {
     }
   };
 
+  const handleResetStudioData = async () => {
+    const confirmed = window.confirm(
+      '⚠️ RESET SOCIAL STUDIO DATA?\n\nThis will permanently delete all drafts, scheduled posts, and publish jobs so you can start completely fresh.\n\nYour account connections (Instagram, Threads, etc.) will be preserved.\n\nAre you sure you want to proceed?'
+    );
+    if (!confirmed) return;
+
+    const toastId = toast.loading('Resetting Social Studio data...');
+    try {
+      const res = await fetch('/api/social?task=reset_studio_data', {
+        method: 'POST',
+        headers: await authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success('✨ Social Studio reset successfully! Clean slate ready.', { id: toastId });
+      await refreshAll();
+      setActiveTab('composer');
+    } catch (err) {
+      toast.error(err.message || 'Failed to reset studio data', { id: toastId });
+    }
+  };
+
   const fetchDrafts = async (silent = false) => {
     if (!silent) setDraftsLoading(true);
     setDraftsError('');
@@ -675,10 +700,15 @@ export default function AdminSocialStudio() {
   const seedCalendar = async () => {
     setSeedingCalendar(true);
     try {
-      const res = await fetch('/api/social?task=seed_calendar', {
+      const endpoint = postsPerDay === 3
+        ? '/api/social?task=seed_calendar_drafts'
+        : '/api/social?task=seed_calendar';
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          daysAhead: 7,
           days: 30,
           startDate: calendarStartDate,
           postsPerDay,
@@ -687,10 +717,11 @@ export default function AdminSocialStudio() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success(`✨ Generated ${data.seeded || 30} slots starting ${calendarStartDate} (${postsPerDay} post${postsPerDay > 1 ? 's' : ''}/day)!`);
+      const count = data.totalCreated ?? data.seeded ?? 21;
+      toast.success(`✨ Generated ${count} post drafts starting ${calendarStartDate} (09:00, 12:00, 15:30 WAT)!`);
       await fetchCalendar(shuffleOffset);
     } catch (err) {
-      toast.error(err.message || 'Failed to seed 30-day calendar');
+      toast.error(err.message || 'Failed to seed calendar');
     } finally {
       setSeedingCalendar(false);
     }
@@ -1768,16 +1799,22 @@ export default function AdminSocialStudio() {
                   <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${connections.platforms.tiktok ? 'bg-[#25F4EE] text-black' : 'bg-surface-3 text-text-muted'}`}>
                     <Icon icon="simple-icons:tiktok" width="9" />
                   </span>
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${connections.platforms.x ? 'bg-black text-white border border-white/20' : 'bg-surface-3 text-text-muted'}`}>
+                    <Icon icon="ri:twitter-x-fill" width="8" />
+                  </span>
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[9px] ${connections.platforms.youtube ? 'bg-[#FF0000] text-white' : 'bg-surface-3 text-text-muted'}`}>
+                    <Icon icon="mdi:youtube" width="9" />
+                  </span>
                 </div>
                 <span className="text-[11px] font-bold">
-                  {connectedCount}/4 Connected
+                  {connectedCount}/6 Connected
                 </span>
                 <Icon icon="solar:alt-arrow-right-linear" className="text-text-muted group-hover:text-brand group-hover:translate-x-0.5 transition-all" width="12" />
               </button>
             </div>
 
             <p className="text-xs text-text-muted max-w-2xl leading-relaxed">
-              Multi-channel Nollywood publishing studio: 30-day automated editorial planner, Figma/HTML canvas generator, AI copywriter, and one-click instant distribution to Instagram, Threads, Facebook & TikTok.
+              Unified multi-channel publishing studio: Universal post composer, editorial calendar, AI adaptation, and one-click distribution across Instagram, Threads, Facebook, TikTok, X & YouTube.
             </p>
           </div>
 
@@ -1866,23 +1903,20 @@ export default function AdminSocialStudio() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. SEGMENTED TAB NAVIGATOR (Pastis / SchedulePress Style)                */}
+      {/* 3. SEGMENTED TAB NAVIGATOR                                               */}
       {/* ========================================================================= */}
-      <div className="flex overflow-x-auto rounded-2xl border border-white/10 bg-surface p-1.5 shadow-sm">
+      <div className="flex overflow-x-auto rounded-2xl border border-white/10 bg-surface p-1.5 shadow-sm items-center gap-1">
         <button
           type="button"
-          onClick={() => setActiveTab('calendar')}
+          onClick={() => setActiveTab('composer')}
           className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
-            activeTab === 'calendar'
+            activeTab === 'composer'
               ? 'bg-brand text-white shadow-md shadow-brand/20'
               : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
           }`}
         >
-          <Icon icon="solar:calendar-mark-bold" width="16" />
-          <span>30-Day Auto-Pilot Plan</span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] ${activeTab === 'calendar' ? 'bg-black/30 text-white' : 'bg-surface-3 text-text-muted'}`}>
-            {calendarSlots.length}
-          </span>
+          <Icon icon="solar:magic-stick-3-bold" width="16" />
+          <span>Universal Publisher</span>
         </button>
 
         <button
@@ -1903,15 +1937,18 @@ export default function AdminSocialStudio() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('composer')}
+          onClick={() => setActiveTab('calendar')}
           className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
-            activeTab === 'composer'
+            activeTab === 'calendar'
               ? 'bg-brand text-white shadow-md shadow-brand/20'
               : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
           }`}
         >
-          <Icon icon="solar:magic-stick-3-bold" width="16" />
-          <span>Ad-Hoc Composer</span>
+          <Icon icon="solar:calendar-mark-bold" width="16" />
+          <span>Calendar</span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] ${activeTab === 'calendar' ? 'bg-black/30 text-white' : 'bg-surface-3 text-text-muted'}`}>
+            {calendarSlots.length}
+          </span>
         </button>
 
         <button
@@ -1924,30 +1961,29 @@ export default function AdminSocialStudio() {
           }`}
         >
           <Icon icon="solar:inbox-in-bold" width="16" />
-          <span>Telegram Intake Inbox</span>
+          <span>Intake Inbox</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('video_plan')}
-          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
-            activeTab === 'video_plan'
-              ? 'bg-brand text-white shadow-md shadow-brand/20'
-              : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
-          }`}
-        >
-          <Icon icon="solar:clapperboard-edit-bold" width="16" />
-          <span>Video Autopilot</span>
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleResetStudioData}
+            title="Reset Studio data to clean slate"
+            className="flex items-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
+          >
+            <Icon icon="solar:trash-bin-trash-bold" width="15" />
+            <span>Reset Studio</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setChannelsModalOpen(true)}
-          className="ml-auto flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-text-muted hover:text-text-primary hover:bg-surface-2 transition-all"
-        >
-          <Icon icon="solar:settings-bold" width="16" />
-          <span>Channels Hub</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setChannelsModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-text-muted hover:text-text-primary hover:bg-surface-2 transition-all"
+          >
+            <Icon icon="solar:settings-bold" width="16" />
+            <span>Channels Hub</span>
+          </button>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -2057,7 +2093,7 @@ export default function AdminSocialStudio() {
                           : 'text-text-muted hover:text-text-primary'
                       }`}
                     >
-                      {num} {num === 1 ? 'Post' : num === 3 ? 'Lanes' : 'Posts'}/Day
+                      {num} {num === 1 ? 'Post' : 'Posts'}/Day
                     </button>
                   ))}
                 </div>
@@ -2545,6 +2581,7 @@ export default function AdminSocialStudio() {
                                 threads: 'simple-icons:threads',
                                 facebook: 'mdi:facebook',
                                 tiktok: 'simple-icons:tiktok',
+                                x: 'ri:twitter-x-fill',
                                 youtube: 'mdi:youtube',
                               }[variant.platform] || 'solar:share-linear';
 
@@ -2649,28 +2686,23 @@ export default function AdminSocialStudio() {
       )}
 
       {/* ========================================================================= */}
-      {/* 6. TAB 3: AD-HOC CUSTOM COMPOSER                                         */}
+      {/* 6. TAB: UNIVERSAL MULTI-PLATFORM PUBLISHER                               */}
       {/* ========================================================================= */}
       {activeTab === 'composer' && (
-        <SocialDraftComposer
-          disabled={!summary.enabled}
-          initialDraft={editingDraft}
-          onClearDraft={() => setEditingDraft(null)}
-          selectedThemeId={selectedThemeId}
-          slotContext={slotContext}
-          onClearSlot={() => setSlotContext(null)}
-          onGenerated={async (res, meta) => {
+        <UniversalSocialComposer
+          connections={connections}
+          initialData={editingDraft}
+          onPostCreated={async () => {
             await refreshAll();
-            if (meta?.action === 'scheduled' || meta?.action === 'published') {
-              setActiveTab('drafts');
-              setEditingDraft(null);
-            }
+            setActiveTab('drafts');
+            setEditingDraft(null);
           }}
+          onCancel={editingDraft ? () => setEditingDraft(null) : null}
         />
       )}
 
       {/* ========================================================================= */}
-      {/* 7. TAB 4: TELEGRAM INTAKE INBOX                                          */}
+      {/* 7. TAB: INTAKE INBOX                                                     */}
       {/* ========================================================================= */}
       {activeTab === 'intake' && (
         <SocialIntakeInbox
@@ -2679,467 +2711,6 @@ export default function AdminSocialStudio() {
             setActiveTab('drafts');
           }}
         />
-      )}
-
-      {/* ========================================================================= */}
-      {/* 8. TAB 5: VIDEO AUTOPILOT PLANNER                                        */}
-      {/* ========================================================================= */}
-      {activeTab === 'video_plan' && (
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 via-surface to-surface p-6 shadow-xl">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-black text-white">Video Autopilot Planner</h3>
-                <p className="mt-1 max-w-2xl text-xs text-text-muted leading-relaxed">
-                  Automated video generation pipeline: Selects the latest verified Nollywood releases, extracts highlight moments with Gemini, and renders high-res 1:1 and 9:16 video clips locally.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all ${
-                    clipperStatus === 'running'
-                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 shadow-sm shadow-emerald-500/20'
-                      : 'border-rose-500/40 bg-rose-500/10 text-rose-300'
-                  }`}
-                >
-                  <span className={`h-2 w-2 rounded-full ${clipperStatus === 'running' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
-                  {clipperStatus === 'running' ? 'Local Clipper Ready' : 'Local Clipper Offline'}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Plan Duration
-                <select
-                  value={videoPlan.days}
-                  onChange={e => setVideoPlan(p => ({ ...p, days: Number(e.target.value) }))}
-                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none"
-                >
-                  <option value="7">7 days (21 clips)</option>
-                  <option value="14">14 days (42 clips)</option>
-                  <option value="21">21 days (63 clips)</option>
-                  <option value="30">30 days (90 clips)</option>
-                </select>
-              </label>
-
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Start Date
-                <input
-                  type="date"
-                  value={videoPlan.startDate}
-                  onChange={e => setVideoPlan(p => ({ ...p, startDate: e.target.value }))}
-                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
-                />
-              </label>
-
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Slot 1 Time (WAT)
-                <input
-                  type="time"
-                  value={videoPlan.slot1Time}
-                  onChange={e => setVideoPlan(p => ({ ...p, slot1Time: e.target.value }))}
-                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
-                />
-              </label>
-
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Slot 2 Time (WAT)
-                <input
-                  type="time"
-                  value={videoPlan.slot2Time}
-                  onChange={e => setVideoPlan(p => ({ ...p, slot2Time: e.target.value }))}
-                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
-                />
-              </label>
-
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Slot 3 Time (WAT)
-                <input
-                  type="time"
-                  value={videoPlan.slot3Time}
-                  onChange={e => setVideoPlan(p => ({ ...p, slot3Time: e.target.value }))}
-                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none cursor-pointer"
-                />
-              </label>
-
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Clip Length
-                <select
-                  value={videoPlan.clipLength}
-                  onChange={e => setVideoPlan(p => ({ ...p, clipLength: Number(e.target.value) }))}
-                  className="mt-1 h-10 w-full rounded-xl border border-white/10 bg-surface px-3 text-xs font-bold text-white outline-none"
-                >
-                  <option value="15">15 seconds</option>
-                  <option value="30">30 seconds</option>
-                  <option value="45">45 seconds</option>
-                  <option value="60">60 seconds</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={buildVideoPlanRows}
-                disabled={videoAutopilot.running}
-                className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-500 shadow-md shadow-violet-600/20 disabled:opacity-50 transition-all"
-              >
-                Build {videoPlan.days}-Day Video Plan
-              </button>
-
-              <button
-                type="button"
-                onClick={generateAllRowCaptions}
-                disabled={videoAutopilot.running || videoRows.length === 0}
-                className="rounded-xl border border-violet-500/40 bg-violet-500/15 px-4 py-2.5 text-xs font-black text-violet-200 hover:bg-violet-500/25 disabled:opacity-50 transition-all flex items-center gap-1.5"
-              >
-                <span>✨ Auto-Generate All Captions & Scenes ({videoRows.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={runDailyVideoAutopilot}
-                disabled={videoAutopilot.running}
-                className="rounded-xl border border-white/10 bg-surface px-4 py-2.5 text-xs font-bold text-text-muted hover:text-white hover:border-white/20 disabled:opacity-50 transition-all"
-              >
-                {videoAutopilot.running ? 'Processing…' : '⚡ Auto-Generate Today’s Clips'}
-              </button>
-            </div>
-          </div>
-
-          {/* Custom Video Plan Rows */}
-          <section className="rounded-2xl border border-white/10 bg-surface p-6 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-wider text-white">Planned Video Clips ({videoRows.length})</h3>
-                <p className="mt-0.5 text-xs text-text-muted">Review clips, regenerate AI captions, or adjust crop timings before rendering.</p>
-              </div>
-              <button
-                type="button"
-                onClick={addVideoRow}
-                className="rounded-xl border border-brand/40 bg-brand/10 px-3.5 py-2 text-xs font-black text-brand hover:bg-brand/20 transition-all"
-              >
-                ＋ Add Video Clip
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {videoRows.map((row, index) => (
-                <div key={row.id} className="rounded-xl border border-white/10 bg-surface-2 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black uppercase tracking-wider text-brand">Clip #{index + 1}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeVideoRow(row.id)}
-                      className="text-xs font-bold text-red-400 hover:text-red-300"
-                      disabled={videoRows.length === 1}
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                    <label className="text-[10px] font-black uppercase text-text-muted">
-                      Date
-                      <input
-                        type="date"
-                        value={row.date}
-                        onChange={e => updateVideoRow(row.id, { date: e.target.value })}
-                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
-                      />
-                    </label>
-
-                    <label className="text-[10px] font-black uppercase text-text-muted">
-                      Time
-                      <input
-                        type="time"
-                        value={row.time}
-                        onChange={e => updateVideoRow(row.id, { time: e.target.value })}
-                        className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
-                      />
-                    </label>
-
-                    <div className="sm:col-span-2 lg:col-span-2">
-                      <label className="block text-[10px] font-black uppercase text-text-muted">
-                        Film Selection
-                      </label>
-                      <FilmSearchCombobox
-                        value={row.filmId}
-                        onChange={(filmId, film) => updateVideoRow(row.id, { filmId, film })}
-                        films={videoFilmOptions}
-                        placeholder="Search Nollywood films…"
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2 lg:col-span-2">
-                      <label className="text-[10px] font-black uppercase text-text-muted">
-                        Timing Mode
-                        <select
-                          value={row.mode}
-                          onChange={e => updateVideoRow(row.id, { mode: e.target.value })}
-                          className="mt-1 h-9 w-full rounded-lg border border-white/10 bg-surface px-2 text-xs text-white"
-                        >
-                          <option value="gemini">Gemini Auto (Finds Best Scene)</option>
-                          <option value="manual">Manual Exact Timing (MM:SS)</option>
-                        </select>
-                      </label>
-                    </div>
-
-                    <div className="col-span-full">
-                      <label className="block text-[10px] font-black uppercase text-text-muted mb-1">
-                        Formats to Generate ({getRowAspectRatios(row).length} selected)
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {AVAILABLE_ASPECT_RATIOS.map(fmt => {
-                          const activeFormats = getRowAspectRatios(row);
-                          const isSelected = activeFormats.includes(fmt.id);
-                          return (
-                            <button
-                              key={fmt.id}
-                              type="button"
-                              onClick={() => {
-                                let next;
-                                if (isSelected) {
-                                  next = activeFormats.filter(f => f !== fmt.id);
-                                  if (next.length === 0) next = [fmt.id];
-                                } else {
-                                  next = [...activeFormats, fmt.id];
-                                }
-                                updateVideoRow(row.id, { aspectRatios: next });
-                              }}
-                              className={`h-8 px-3 rounded-lg border text-xs font-bold transition-all flex items-center gap-2 ${
-                                isSelected
-                                  ? 'border-brand bg-brand/20 text-brand-light shadow-sm shadow-brand/20'
-                                  : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-white'
-                              }`}
-                              title={`${fmt.label} (${fmt.subtitle})`}
-                            >
-                              <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-brand' : 'bg-white/20'}`} />
-                              <span>{fmt.label}</span>
-                              <span className="text-[10px] opacity-70">({fmt.subtitle})</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-end gap-2.5">
-                    <label className="text-[10px] font-black uppercase text-text-muted">
-                      Start Time (MM:SS)
-                      <input
-                        type="text"
-                        placeholder="e.g. 22:22"
-                        value={row.start}
-                        onChange={e => updateVideoRow(row.id, { start: e.target.value })}
-                        disabled={row.mode === 'gemini'}
-                        className="mt-1 h-9 w-28 rounded-lg border border-white/10 bg-surface px-2.5 text-xs text-white placeholder:text-white/30 disabled:opacity-50 focus:border-brand"
-                      />
-                    </label>
-
-                    <label className="text-[10px] font-black uppercase text-text-muted">
-                      End Time (MM:SS)
-                      <input
-                        type="text"
-                        placeholder="e.g. 24:30"
-                        value={row.end}
-                        onChange={e => updateVideoRow(row.id, { end: e.target.value })}
-                        disabled={row.mode === 'gemini'}
-                        className="mt-1 h-9 w-28 rounded-lg border border-white/10 bg-surface px-2.5 text-xs text-white placeholder:text-white/30 disabled:opacity-50 focus:border-brand"
-                      />
-                    </label>
-
-                    {(() => {
-                      const s = parseTimestampToSeconds(row.start);
-                      const e = parseTimestampToSeconds(row.end);
-                      const duration = Math.max(0, e - s);
-                      if (duration > 0) {
-                        return (
-                          <div className="flex h-9 items-center rounded-lg border border-brand/30 bg-brand/10 px-2.5 text-[11px] font-semibold text-brand-light">
-                            ⏱️ {duration}s ({Math.floor(duration / 60) > 0 ? `${Math.floor(duration / 60)}m ` : ''}${duration % 60}s)
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-
-                    {/* AI Engine Switcher (Gemini / Cohere) */}
-                    <div className="inline-flex h-9 items-center rounded-lg border border-white/10 bg-surface p-0.5 text-[10px] font-bold">
-                      <button
-                        type="button"
-                        onClick={() => updateVideoRow(row.id, { engine: 'gemini' })}
-                        className={`h-full rounded px-2.5 transition-all flex items-center gap-1 ${
-                          (row.engine || 'gemini') === 'gemini'
-                            ? 'bg-violet-600 text-white shadow-xs'
-                            : 'text-text-muted hover:text-white'
-                        }`}
-                      >
-                        <span>⚡ Gemini</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateVideoRow(row.id, { engine: 'cohere' })}
-                        className={`h-full rounded px-2.5 transition-all flex items-center gap-1 ${
-                          row.engine === 'cohere'
-                            ? 'bg-brand text-white shadow-xs'
-                            : 'text-text-muted hover:text-white'
-                        }`}
-                      >
-                        <span>🪄 Cohere</span>
-                      </button>
-                    </div>
-
-                    {/* Tone / Editorial Angle Selector */}
-                    <select
-                      value={row.angle || 'editorial'}
-                      onChange={e => updateVideoRow(row.id, { angle: e.target.value })}
-                      className="h-9 rounded-lg border border-white/10 bg-surface px-2.5 text-xs font-bold text-white outline-none focus:border-brand"
-                    >
-                      {VIDEO_COPY_ANGLES.map(a => (
-                        <option key={a.value} value={a.value}>
-                          {a.label}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() => generateRowCaption(row)}
-                      disabled={row.generatingCaption || !row.filmId}
-                      className="h-9 rounded-lg border border-violet-400/40 bg-violet-500/15 px-3 text-xs font-bold text-violet-200 hover:bg-violet-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      {row.generatingCaption ? (
-                        <>
-                          <Icon icon="solar:spinner-linear" className="animate-spin" width="14" />
-                          <span>Generating…</span>
-                        </>
-                      ) : (
-                        <>
-                          <Icon icon="solar:magic-stick-3-bold" width="14" />
-                          <span>Generate 3 Variations ({(row.engine || 'gemini').toUpperCase()})</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* 3 Variations Pills (Option A / Option B / Option C) */}
-                  {Array.isArray(row.variations) && row.variations.length > 0 && (
-                    <div className="rounded-xl border border-white/10 bg-surface/60 p-2.5 space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-text-muted">
-                        <span>Select Copy Variation</span>
-                        <span className="text-violet-400 font-mono text-[9px]">Engine: {row.engine || 'gemini'} · Tone: {row.angle || 'editorial'}</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {row.variations.map(v => {
-                          const isSelected = (row.selectedVariationKey || 'B') === v.key || row.caption === v.text;
-                          return (
-                            <button
-                              key={v.key}
-                              type="button"
-                              onClick={() => {
-                                updateVideoRow(row.id, {
-                                  caption: v.text,
-                                  selectedVariationKey: v.key,
-                                });
-                                toast.success(`Switched to Option ${v.key} (${v.label})`);
-                              }}
-                              className={`rounded-lg border p-2 text-left transition-all ${
-                                isSelected
-                                  ? 'border-brand bg-brand/15 text-white ring-1 ring-brand shadow-xs'
-                                  : 'border-white/10 bg-surface text-text-muted hover:border-white/20 hover:text-white'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between text-xs font-black">
-                                <span>Option {v.key}: {v.label}</span>
-                                {isSelected && <Icon icon="solar:check-circle-bold" className="text-brand" width="14" />}
-                              </div>
-                              <p className="mt-1 text-[10px] line-clamp-2 leading-relaxed opacity-90">{v.text}</p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <label className="block text-[10px] font-black uppercase text-text-muted">
-                    Caption
-                    <textarea
-                      value={row.caption}
-                      onChange={e => updateVideoRow(row.id, { caption: e.target.value })}
-                      rows={2}
-                      placeholder="Write social caption or generate one with AI…"
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-surface px-3 py-2 text-xs text-white outline-none focus:border-brand"
-                    />
-                  </label>
-
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
-                    <div className="text-[11px] text-text-muted">
-                      {row.filmId ? (
-                        <span>Ready to clip {getRowAspectRatios(row).join(' & ')} formats ({row.start} – {row.end})</span>
-                      ) : (
-                        <span className="text-amber-300/80">Select a film to enable rendering</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => prepareCustomVideoPlan('draft', row)}
-                        disabled={videoAutopilot.running || clipperStatus !== 'running' || !row.filmId}
-                        className="flex h-8 items-center gap-1.5 rounded-lg bg-brand px-3.5 text-xs font-bold text-white shadow-sm shadow-brand/20 transition-all hover:bg-brand-hover disabled:opacity-50"
-                      >
-                        <Icon icon="solar:clapperboard-play-bold" width="14" />
-                        <span>Render This Clip (Draft)</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 flex flex-wrap gap-2.5">
-              <button
-                type="button"
-                onClick={() => prepareCustomVideoPlan('draft')}
-                disabled={videoAutopilot.running || clipperStatus !== 'running'}
-                className="rounded-xl bg-brand px-5 py-2.5 text-xs font-black text-white hover:bg-brand-hover disabled:opacity-50 shadow-md shadow-brand/20 transition-all"
-              >
-                {videoAutopilot.running ? 'Processing…' : 'Render & Save to Drafts'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => prepareCustomVideoPlan('schedule')}
-                disabled={videoAutopilot.running || clipperStatus !== 'running'}
-                className="rounded-xl border border-amber-400/40 bg-amber-500/15 px-5 py-2.5 text-xs font-black text-amber-300 hover:bg-amber-500/25 disabled:opacity-50 transition-all"
-              >
-                Schedule All
-              </button>
-
-              <button
-                type="button"
-                onClick={() => prepareCustomVideoPlan('publish')}
-                disabled={videoAutopilot.running || clipperStatus !== 'running'}
-                className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-5 py-2.5 text-xs font-black text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 transition-all"
-              >
-                Post All Now
-              </button>
-            </div>
-            {clipperStatus !== 'running' && (
-              <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
-                <Icon icon="solar:info-circle-bold" className="text-base text-amber-400 shrink-0" />
-                <div>
-                  <span className="font-bold">Local FFmpeg Clipper is offline.</span> Start the clipper service by running{' '}
-                  <code className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[11px] text-amber-300">
-                    powershell scripts\start-local-social-clipper.ps1
-                  </code>{' '}
-                  in your terminal to enable video rendering.
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
       )}
 
       {/* ========================================================================= */}
@@ -3431,6 +3002,132 @@ export default function AdminSocialStudio() {
                     className="rounded-xl border border-white/10 bg-surface px-3 py-1.5 text-xs font-bold text-text-muted hover:text-white"
                   >
                     Token
+                  </button>
+                </div>
+              </div>
+
+              {/* X (Twitter) Card */}
+              <div className="flex flex-col justify-between rounded-xl border border-white/10 bg-surface-2 p-5 shadow-sm">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-black text-white border border-white/20 shadow-md">
+                        <Icon icon="ri:twitter-x-fill" width="20" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-white">X (Twitter)</h4>
+                        <p className="text-[11px] text-text-muted">Posts, Threads & Media</p>
+                      </div>
+                    </div>
+                    <Pill tone={connections.platforms?.x ? 'green' : 'amber'}>
+                      {connections.platforms?.x ? 'Active' : 'Offline'}
+                    </Pill>
+                  </div>
+
+                  <div className="mt-4 space-y-1.5 text-xs">
+                    <div className="flex justify-between text-text-muted">
+                      <span>Connected Profile:</span>
+                      <span className="font-mono font-bold text-white">
+                        {connections.platforms?.x ? `@${connections.platforms.x.username}` : 'Not connected'}
+                      </span>
+                    </div>
+                    {connections.platforms?.x?.displayName && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Account Name:</span>
+                        <span className="font-bold text-text-secondary">{connections.platforms.x.displayName}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+                  {connections.platforms?.x && (
+                    <button
+                      type="button"
+                      onClick={() => disconnectAccount('x')}
+                      disabled={connections.connecting}
+                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      Disconnect
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualConnectPlatform('x');
+                      setManualFormData({
+                        username: connections.platforms?.x?.username || 'muvidb',
+                        displayName: connections.platforms?.x?.displayName || 'MuviDB on X',
+                        externalAccountId: connections.platforms?.x?.externalAccountId || 'muvidb_x_id',
+                        accessToken: '',
+                      });
+                    }}
+                    className="rounded-xl border border-white/10 bg-white/10 px-4 py-1.5 text-xs font-black text-white hover:bg-white/20 transition-colors"
+                  >
+                    ⚡ Connect / Set Token
+                  </button>
+                </div>
+              </div>
+
+              {/* YouTube Card */}
+              <div className="flex flex-col justify-between rounded-xl border border-white/10 bg-surface-2 p-5 shadow-sm">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FF0000]/15 text-[#FF0000] border border-[#FF0000]/30 shadow-md">
+                        <Icon icon="mdi:youtube" width="22" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-white">YouTube</h4>
+                        <p className="text-[11px] text-text-muted">Shorts & Community Posts</p>
+                      </div>
+                    </div>
+                    <Pill tone={connections.platforms?.youtube ? 'green' : 'amber'}>
+                      {connections.platforms?.youtube ? 'Active' : 'Offline'}
+                    </Pill>
+                  </div>
+
+                  <div className="mt-4 space-y-1.5 text-xs">
+                    <div className="flex justify-between text-text-muted">
+                      <span>Connected Channel:</span>
+                      <span className="font-mono font-bold text-white">
+                        {connections.platforms?.youtube ? `@${connections.platforms.youtube.username}` : 'Not connected'}
+                      </span>
+                    </div>
+                    {connections.platforms?.youtube?.displayName && (
+                      <div className="flex justify-between text-text-muted">
+                        <span>Channel Name:</span>
+                        <span className="font-bold text-text-secondary">{connections.platforms.youtube.displayName}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
+                  {connections.platforms?.youtube && (
+                    <button
+                      type="button"
+                      onClick={() => disconnectAccount('youtube')}
+                      disabled={connections.connecting}
+                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      Disconnect
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualConnectPlatform('youtube');
+                      setManualFormData({
+                        username: connections.platforms?.youtube?.username || 'muvidb',
+                        displayName: connections.platforms?.youtube?.displayName || 'MuviDB YouTube',
+                        externalAccountId: connections.platforms?.youtube?.externalAccountId || 'muvidb_yt_id',
+                        accessToken: '',
+                      });
+                    }}
+                    className="rounded-xl border border-white/10 bg-[#FF0000]/20 px-4 py-1.5 text-xs font-black text-red-300 hover:bg-[#FF0000]/30 transition-colors"
+                  >
+                    ⚡ Connect / Set Token
                   </button>
                 </div>
               </div>

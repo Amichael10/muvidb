@@ -327,6 +327,145 @@ export async function createEditorVideoDraft(input: {
   return { id: contentItem.id, title, status: 'draft', platforms, assetCount: insertedAssets.length };
 }
 
+export async function resetSocialStudioData(actor: SocialActor) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  await supabase.from('social_publish_jobs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('social_platform_variants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('social_assets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('social_content_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  return { success: true, message: 'Social Studio data reset to clean slate' };
+}
+
+export async function createUniversalSocialPost(input: {
+  title?: string;
+  format?: 'post' | 'image' | 'carousel' | 'video';
+  platforms: string[];
+  universalCaption: string;
+  platformCaptions?: Record<string, string>;
+  mediaAssets?: Array<{
+    publicUrl: string;
+    storagePath?: string;
+    mimeType?: string;
+    format?: string;
+    fileSizeBytes?: number;
+    width?: number;
+    height?: number;
+  }>;
+  scheduledFor?: string | null;
+  status?: 'draft' | 'scheduled';
+}, actor: SocialActor) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+
+  const platforms = [...new Set(input.platforms || [])].filter((p): p is SocialPlatform =>
+    ['instagram', 'facebook', 'threads', 'tiktok', 'x', 'youtube'].includes(p as any)
+  );
+  if (!platforms.length) throw httpError(400, 'Choose at least one social platform');
+
+  const universalCaption = String(input.universalCaption || '').trim();
+  const format = input.format || (input.mediaAssets?.length ? (input.mediaAssets.length > 1 ? 'carousel' : (input.mediaAssets[0].mimeType?.startsWith('video/') ? 'video' : 'image')) : 'post');
+  const title = String(input.title || '').trim().slice(0, 180) || universalCaption.slice(0, 50) || 'Social Post';
+  const bucket = getAssetBucket();
+
+  const sourceId = crypto.randomUUID();
+  const snapshot = {
+    kind: 'universal_post',
+    capturedAt: new Date().toISOString(),
+    title,
+    format,
+    caption: universalCaption,
+    mediaCount: input.mediaAssets?.length || 0,
+  };
+
+  const { data: contentItem, error: itemError } = await supabase.from('social_content_items').insert({
+    content_type: 'general_post',
+    title,
+    source_entity_type: 'universal_post',
+    source_entity_id: sourceId,
+    source_snapshot: snapshot,
+    status: 'draft',
+    generation_method: 'universal_composer',
+    created_by: actor.id,
+  }).select('id').single();
+  if (itemError) throw itemError;
+
+  const insertedAssets: Array<{ id: string; format: string; public_url: string }> = [];
+  if (Array.isArray(input.mediaAssets) && input.mediaAssets.length > 0) {
+    for (const media of input.mediaAssets) {
+      if (!media.publicUrl) continue;
+      const isR2Asset = /^https:\/\//i.test(media.publicUrl) && Boolean(media.storagePath);
+      const isVideo = media.mimeType?.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(media.publicUrl);
+      const assetFormat = media.format || (isVideo ? 'video_vertical_9_16' : 'portrait_4_5');
+
+      const { data: asset, error: assetError } = await supabase.from('social_assets').insert({
+        content_item_id: contentItem.id,
+        format: assetFormat,
+        storage_bucket: isR2Asset ? 'external' : bucket,
+        storage_path: media.storagePath || '',
+        public_url: media.publicUrl,
+        mime_type: media.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg'),
+        width: Math.max(1, Math.round(media.width || 1080)),
+        height: Math.max(1, Math.round(media.height || 1080)),
+        file_size_bytes: Math.max(0, Math.round(media.fileSizeBytes || 0)),
+        render_metadata: { source: 'universal_composer', format: assetFormat },
+      }).select('id,format,public_url').single();
+
+      if (!assetError && asset) {
+        insertedAssets.push(asset);
+      }
+    }
+  }
+
+  const primaryAsset = insertedAssets[0] || null;
+  const carouselUrls = insertedAssets.map(a => a.public_url);
+
+  const variants = platforms.map(platform => {
+    const platformSpecificCaption = input.platformCaptions?.[platform];
+    const caption = String(platformSpecificCaption !== undefined && platformSpecificCaption !== null && platformSpecificCaption !== '' ? platformSpecificCaption : universalCaption).trim();
+
+    return {
+      content_item_id: contentItem.id,
+      platform,
+      status: 'draft',
+      title,
+      caption,
+      hashtags: [],
+      mentions: [],
+      selected_asset_id: primaryAsset?.id || null,
+      platform_options: {
+        media_kind: format,
+        post_format: format === 'carousel' ? 'carousel' : 'single',
+        carousel_assets: carouselUrls.map((url, i) => ({ id: `asset_${i}`, url })),
+        carousel_asset_urls: carouselUrls,
+      },
+    };
+  });
+
+  const { error: variantsError } = await supabase.from('social_platform_variants').insert(variants);
+  if (variantsError) throw variantsError;
+
+  if (input.status === 'scheduled' && input.scheduledFor) {
+    try {
+      await scheduleContentItem({ contentItemId: contentItem.id, scheduledFor: input.scheduledFor }, actor);
+    } catch (schedErr: any) {
+      console.warn('Post created as draft but scheduling failed:', schedErr?.message);
+    }
+  }
+
+  await insertSocialEvent({
+    contentItemId: contentItem.id,
+    eventType: 'universal_post_created',
+    eventData: { actor_id: actor.id, platforms, format, scheduled_for: input.scheduledFor || null },
+  });
+
+  return {
+    id: contentItem.id,
+    title,
+    status: input.status === 'scheduled' && input.scheduledFor ? 'scheduled' : 'draft',
+    platforms,
+    assetCount: insertedAssets.length,
+  };
+}
+
 async function recalculateContentStatus(contentItemId: string) {
   const { data: variants, error } = await supabase
     .from('social_platform_variants')

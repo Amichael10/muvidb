@@ -330,6 +330,11 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     });
   }
 
+  // Ignore birthday series until dedicated designs exist
+  if (norm.includes('birthday')) {
+    return [];
+  }
+
   // ── 3. FILMOGRAPHY / CAREER DEEP DIVES / ACTOR SPOTLIGHT ───────────────────
   if (
     norm.includes('filmography') ||
@@ -337,7 +342,6 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     norm.includes('star') ||
     norm.includes('spotlight') ||
     norm.includes('stage_to_screen') ||
-    norm.includes('birthday') ||
     norm.includes('talent') ||
     norm.includes('people')
   ) {
@@ -407,17 +411,23 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     }));
   }
 
-  // ── 5. CRITICS ROUNDUP & VERDICTS (Real movies with critic reviews) ────────
+  // ── 5. CRITICS ROUNDUP & VERDICTS (Recent movies only with critic reviews) ────────
   if (norm.includes('critic') || norm.includes('review') || norm.includes('take')) {
+    const currentYear = new Date().getFullYear();
+    const minRecentYear = currentYear - 2; // e.g. 2024+ for relevant current Nollywood/African films
+
     const { data: reviews } = await supabase
       .from('critic_reviews')
       .select('id, film_id, critic_name, publication, quote, rating, films!inner(id, title, slug, poster_url, backdrop_url, release_date, year, synopsis, tagline, liked_percent, imdb_rating, view_count, genres)')
       .not('quote', 'is', null)
+      .gte('films.year', minRecentYear)
       .order('created_at', { ascending: false })
-      .limit(limit);
+      .limit(limit * 3);
 
     if (reviews && reviews.length > 0) {
-      const rawFilms = reviews.map((r: any) => ({
+      // Filter out rows where film poster is missing or quote is empty
+      const validReviews = reviews.filter((r: any) => r.films?.poster_url && r.quote && r.quote.trim().length > 15);
+      const rawFilms = validReviews.slice(0, limit).map((r: any) => ({
         ...r.films,
         criticReview: {
           id: r.id,

@@ -259,6 +259,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updateSocialContentItemDraft,
       deleteSocialContentItem,
       createEditorVideoDraft,
+      createUniversalSocialPost,
+      resetSocialStudioData,
       getEditorialCalendar,
       seedEditorialCalendarSlots,
     } = await import('./_lib/social_studio.js');
@@ -451,6 +453,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      if (task === 'create_post' || task === 'create_universal_post') {
+        const actor = await requireSocialStudioAdmin(req);
+        return res.status(201).json(await createUniversalSocialPost(parseBody(req) as any, actor));
+      }
+
+      if (task === 'reset_studio_data') {
+        const actor = await requireSocialStudioAdmin(req);
+        return res.status(200).json(await resetSocialStudioData(actor));
+      }
+
       if (task === 'intake_update') {
         await requireSocialStudioAdmin(req);
         const { updateSocialIntake } = await import('./_lib/social_intake.js');
@@ -529,6 +541,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (task === 'seed_calendar') {
         await requireSocialStudioAdmin(req);
         return res.status(200).json(await seedEditorialCalendarSlots(req.body || { days: 30 }));
+      }
+
+      if (task === 'seed_calendar_drafts') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { generateDailyScheduleDrafts } = await import('./_lib/editorial/calendar_service.js');
+        const body = parseBody(req);
+        return res.status(200).json(await generateDailyScheduleDrafts({ ...body, actor }));
       }
 
       if (task === 'disconnect_platform') {

@@ -163,3 +163,187 @@ export async function seedRollingCalendar(options: SeedCalendarOptions | number 
   return createdCount;
 }
 
+export interface GenerateScheduleDraftsOptions {
+  daysAhead?: number;
+  startDate?: string;
+  actor?: any;
+}
+
+/**
+ * Generates 3 rich post drafts for each day across a specified date range.
+ * Each post is assigned to the exact cron publishing times:
+ * - Slot 1: 09:00 WAT (Spotlight or Streaming Guide)
+ * - Slot 2: 12:00 WAT (Recent Critic Review Consensus or Weekend Watchlist)
+ * - Slot 3: 15:30 WAT (Upcoming Release Radar or Cinema Conversation)
+ */
+export async function generateDailyScheduleDrafts(options: GenerateScheduleDraftsOptions = {}) {
+  const daysAhead = Math.min(Math.max(options.daysAhead || 7, 1), 30);
+  const systemActor = options.actor || {
+    id: '00000000-0000-0000-0000-000000000000',
+    email: 'admin@muvidb.com',
+    role: 'admin' as const,
+  };
+
+  const { generateSocialDraft } = await import('../social_studio.js');
+  const { fetchSeriesCandidates } = await import('./candidate_service.js');
+
+  let startBaseDate = new Date();
+  if (options.startDate) {
+    const parsed = new Date(options.startDate);
+    if (!isNaN(parsed.getTime())) {
+      startBaseDate = parsed;
+    }
+  }
+
+  // Pre-seed used entities to avoid duplicates from recent 14-day history
+  const usedEntityIds = new Set<string>();
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recentItems } = await supabase
+    .from('social_content_items')
+    .select('source_entity_id')
+    .gte('created_at', fourteenDaysAgo);
+  for (const item of recentItems || []) {
+    if (item.source_entity_id) usedEntityIds.add(item.source_entity_id);
+  }
+
+  const results: any[] = [];
+  let totalCreated = 0;
+
+  // 3 daily slots aligned with GitHub Actions publisher crons (Africa/Lagos is UTC+1)
+  const DAILY_SLOTS = [
+    {
+      slotIndex: 1,
+      time: '09:00:00',
+      rotation: ['where_to_watch', 'actor_spotlight'],
+      label: 'Morning Spotlight & Streaming Guide',
+    },
+    {
+      slotIndex: 2,
+      time: '12:00:00',
+      rotation: ['critics_say'],
+      label: 'Midday Critic Consensus & Reviews',
+    },
+    {
+      slotIndex: 3,
+      time: '15:30:00',
+      rotation: ['upcoming_movie', 'whats_on_stage', 'film_conversation'],
+      label: 'Afternoon Release Radar & Culture',
+    },
+  ];
+
+  for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
+    const d = new Date(startBaseDate);
+    d.setDate(startBaseDate.getDate() + dayOffset);
+    const dateStr = d.toISOString().split('T')[0];
+    const isFriday = d.getDay() === 5;
+
+    const dayItems: any[] = [];
+
+    for (const slot of DAILY_SLOTS) {
+      let contentType = slot.rotation[dayOffset % slot.rotation.length];
+      if (slot.slotIndex === 2 && isFriday) {
+        contentType = 'weekend_watchlist';
+      }
+
+      // 09:00 WAT = 08:00 UTC, 12:00 WAT = 11:00 UTC, 15:30 WAT = 14:30 UTC
+      const scheduledFor = new Date(`${dateStr}T${slot.time}+01:00`).toISOString();
+      const { data: existingPost } = await supabase
+        .from('social_content_items')
+        .select('id, title, status, scheduled_for')
+        .eq('scheduled_for', scheduledFor)
+        .neq('status', 'rejected')
+        .maybeSingle();
+
+      if (existingPost) {
+        dayItems.push({
+          slotIndex: slot.slotIndex,
+          time: slot.time,
+          status: existingPost.status,
+          title: existingPost.title,
+          alreadyExisted: true,
+        });
+        continue;
+      }
+
+      try {
+        const candidates = await fetchSeriesCandidates(contentType, 20);
+        const candidate = candidates.find(c => !usedEntityIds.has(c.id)) || candidates[0];
+
+        if (!candidate) {
+          console.warn(`[calendar_service] No candidates found for ${contentType} on ${dateStr}`);
+          continue;
+        }
+
+        usedEntityIds.add(candidate.id);
+
+        const templateMap: Record<string, string> = {
+          actor_spotlight: 'actor-spotlight-v1',
+          upcoming_movie: 'upcoming-movie-v1',
+          critics_say: 'critics-say-v1',
+          where_to_watch: 'where-to-watch-v1',
+          weekend_watchlist: 'weekend-watchlist-v1',
+          whats_on_stage: 'whats-on-stage-v1',
+          film_conversation: 'nollywood-debate-v1',
+        };
+
+        const templateSlug = templateMap[contentType] || 'where-to-watch-v1';
+
+        const draft = await generateSocialDraft(
+          {
+            contentType: contentType as any,
+            sourceEntityId: candidate.id,
+            criticReviewId: candidate.data?.criticReview?.id || null,
+            templateSlug,
+            platforms: ['instagram', 'threads', 'facebook', 'tiktok'],
+          },
+          systemActor,
+        );
+
+        if (draft?.contentItem?.id) {
+          await supabase
+            .from('social_content_items')
+            .update({
+              scheduled_for: scheduledFor,
+              status: 'draft',
+              metadata: {
+                scheduled_date: dateStr,
+                scheduled_time: slot.time,
+                slot_index: slot.slotIndex,
+                auto_scheduled: true,
+                candidate_name: candidate.name,
+              },
+            })
+            .eq('id', draft.contentItem.id);
+
+          await supabase
+            .from('social_platform_variants')
+            .update({ scheduled_for: scheduledFor })
+            .eq('content_item_id', draft.contentItem.id);
+
+          totalCreated++;
+          dayItems.push({
+            id: draft.contentItem.id,
+            slotIndex: slot.slotIndex,
+            time: slot.time,
+            title: draft.contentItem.title,
+            contentType,
+            status: 'draft',
+          });
+        }
+      } catch (slotErr: any) {
+        console.error(`[calendar_service] Failed to generate slot ${slot.slotIndex} (${contentType}) for ${dateStr}:`, slotErr);
+      }
+    }
+
+    results.push({ date: dateStr, items: dayItems });
+  }
+
+  return {
+    success: true,
+    totalCreated,
+    daysAhead,
+    startDate: options.startDate || startBaseDate.toISOString().split('T')[0],
+    days: results,
+  };
+}
+

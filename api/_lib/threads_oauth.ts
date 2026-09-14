@@ -417,7 +417,7 @@ export async function getAllPlatformConnections() {
 
   if (error) throw error;
 
-  const platforms = ['instagram', 'facebook', 'threads', 'tiktok'] as const;
+  const platforms = ['instagram', 'facebook', 'threads', 'tiktok', 'x', 'youtube'] as const;
   const result: Record<string, any> = {};
 
   for (const p of platforms) {

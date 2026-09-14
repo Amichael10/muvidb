@@ -1,12 +1,31 @@
-name: Social Studio Publisher
+name: Social Studio Publisher & Morning Briefings
 
 on:
   schedule:
-    # MuviDB publishes 3 times daily: 09:00, 12:00, and 15:30 WAT (Africa/Lagos is UTC+1)
-    - cron: "0 8 * * *"   # 09:00 WAT (08:00 UTC)
-    - cron: "0 11 * * *"  # 12:00 WAT (11:00 UTC)
-    - cron: "30 14 * * *" # 15:30 WAT (14:30 UTC)
+    # 08:00 WAT (07:00 UTC) — Morning Telegram Briefing (Social 3-Post Review & Outreach Digest)
+    - cron: "0 7 * * *"
+    # 09:00 WAT (08:00 UTC) — Slot 1 (Graphic: Spotlight / Streaming Guide)
+    - cron: "0 8 * * *"
+    # 12:00 WAT (11:00 UTC) — Slot 2 (Graphic: Recent Movie Critic Review)
+    - cron: "0 11 * * *"
+    # 13:00 WAT (12:00 UTC) — Slot 3 (Video Clip 1)
+    - cron: "0 12 * * *"
+    # 15:30 WAT (14:30 UTC) — Slot 4 (Graphic: Release Radar / Discussion)
+    - cron: "30 14 * * *"
+    # 18:00 WAT (17:00 UTC) — Slot 5 (Video Clip 2)
+    - cron: "0 17 * * *"
   workflow_dispatch:
+    inputs:
+      task:
+        description: "Task to execute: social_publish or morning_briefing"
+        required: true
+        default: "social_publish"
+        type: choice
+        options:
+          - social_publish
+          - morning_briefing
+          - morning_social
+          - morning_outreach
 
 # Never let two queue drainers publish the same batch concurrently. The
 # database publisher also claims each job atomically and uses idempotency keys.
@@ -18,11 +37,10 @@ permissions:
   contents: read
 
 jobs:
-  publish-due-content:
+  dispatch-social-ops:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      PUBLISH_URL: https://muvidb.com/api/cron/sync?task=social_publish
       CRON_SECRET: ${{ secrets.CRON_SECRET || secrets.VITE_CRON_SECRET }}
 
     steps:
@@ -34,24 +52,48 @@ jobs:
             exit 1
           fi
 
-      - name: Publish due Social Studio posts
+      - name: Determine task to run
+        id: task_select
         shell: bash
         run: |
+          # If manual dispatch was used, honor input.
+          if [ -n "${{ inputs.task }}" ]; then
+            echo "task=${{ inputs.task }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Current UTC hour
+          current_hour="$(date -u +%H)"
+          current_minute="$(date -u +%M)"
+
+          # At 07:00 UTC (08:00 WAT), run morning briefing
+          if [ "$current_hour" = "07" ]; then
+            echo "task=morning_briefing" >> "$GITHUB_OUTPUT"
+          else
+            echo "task=social_publish" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Execute Social Task
+        shell: bash
+        run: |
+          TASK="${{ steps.task_select.outputs.task }}"
+          ENDPOINT="https://muvidb.com/api/cron/sync?task=$TASK"
+          echo "Executing task: $TASK ($ENDPOINT)"
+
           response="$(curl --silent --show-error --fail-with-body \
             --retry 2 \
             --retry-delay 2 \
             --retry-all-errors \
             --max-time 240 \
             -H "x-cron-secret: $CRON_SECRET" \
-            "$PUBLISH_URL")"
+            "$ENDPOINT")"
 
           echo "$response" | jq .
 
           if [ "$(echo "$response" | jq -r '.skipped // false')" = "true" ]; then
             reason="$(echo "$response" | jq -r '.reason // "unknown reason"')"
-            echo "::error::Social publisher was skipped: $reason"
+            echo "::error::Social operation was skipped: $reason"
             exit 1
           fi
 
-          processed="$(echo "$response" | jq -r '.processed // 0')"
-          echo "Social Studio publisher completed. Jobs processed: $processed"
+          echo "Task $TASK executed successfully."

@@ -145,6 +145,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = await runCommentMining({ scan: 50, aiCap: 10 });
         break;
       }
+      case 'morning_briefing': {
+        const { sendMorningSocialBriefing } = await import('../_lib/editorial/morning_social_briefing.js');
+        const { sendMorningOutreachBriefing } = await import('../_lib/outreach/morning_outreach_briefing.js');
+        const [socialRes, outreachRes] = await Promise.all([
+          sendMorningSocialBriefing(),
+          sendMorningOutreachBriefing(),
+        ]);
+        result = { task: 'morning_briefing', social: socialRes, outreach: outreachRes };
+        break;
+      }
+      case 'morning_social': {
+        const { sendMorningSocialBriefing } = await import('../_lib/editorial/morning_social_briefing.js');
+        result = await sendMorningSocialBriefing();
+        break;
+      }
+      case 'morning_outreach': {
+        const { sendMorningOutreachBriefing } = await import('../_lib/outreach/morning_outreach_briefing.js');
+        result = await sendMorningOutreachBriefing();
+        break;
+      }
       case 'critics':              result = await runCriticsSync(); break;
       case 'kava':      
         return res.status(200).json({ 
