@@ -21,6 +21,8 @@ import { nationalityToCountryName } from '../utils/africanCountries'
 import { fetchPersonStageCredits, getPlayDateLabel } from '../lib/plays'
 import PersonHeroMediaShowcase from '../components/person/PersonHeroMediaShowcase'
 import CareerPassportModal from '../components/professional/CareerPassportModal'
+import PersonMediaSection from '../components/person/PersonMediaSection'
+import AddPersonMediaModal from '../components/person/AddPersonMediaModal'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -164,6 +166,8 @@ const PersonDetail = () => {
     : null
 
   const [person, setPerson] = useState(seededPerson)
+  const [media, setMedia] = useState(seededPerson?.person_media || [])
+  const [showAddMedia, setShowAddMedia] = useState(false)
   const [stageCredits, setStageCredits] = useState([])
   const [awardFilms, setAwardFilms] = useState({}) // film_id -> { slug, title, poster_url }
   const [personId, setPersonId] = useState(seededPerson?.id ?? null) // actual UUID
@@ -181,6 +185,16 @@ const PersonDetail = () => {
   const [filmographyView, setFilmographyView] = useState('grid')
   const [awardsOpen, setAwardsOpen] = useState(false)
   const [passportOpen, setPassportOpen] = useState(false)
+
+  const canManage = Boolean(
+    user && (
+      user.id === person?.claimed_by ||
+      user.role === 'admin' ||
+      user.is_admin ||
+      user.app_metadata?.role === 'admin' ||
+      user.user_metadata?.role === 'admin'
+    )
+  )
 
   const {
     isFollowing,
@@ -236,6 +250,16 @@ const PersonDetail = () => {
             box_office_domestic, box_office_currency, box_office_source,
             film_genres(genres(name))
           )
+        ),
+        person_media(
+          id, media_type, category, title, description,
+          url, thumbnail_url, r2_key, embed_provider, embed_id,
+          duration_seconds, width, height, aspect_ratio,
+          film_id, character_name, photographer_credit, year,
+          is_primary, sort_order, status,
+          films(
+            id, title, year, poster_url, slug
+          )
         )
       `)
       .eq(col, val)
@@ -261,8 +285,32 @@ const PersonDetail = () => {
     setPerson(basePerson)
     setPersonId(data.id)
 
+    if (data.person_media) {
+      setMedia(data.person_media);
+    } else {
+      supabase
+        .from('person_media')
+        .select(`
+          id, media_type, category, title, description,
+          url, thumbnail_url, r2_key, embed_provider, embed_id,
+          duration_seconds, width, height, aspect_ratio,
+          film_id, character_name, photographer_credit, year,
+          is_primary, sort_order, status,
+          films(
+            id, title, year, poster_url, slug
+          )
+        `)
+        .eq('person_id', data.id)
+        .eq('status', 'approved')
+        .order('sort_order', { ascending: true })
+        .then(({ data: mediaData }) => {
+          if (mediaData) setMedia(mediaData);
+        });
+    }
+
     // Fetch Stage & Theatre Credits
     fetchPersonStageCredits(data.id).then(sc => setStageCredits(sc || []));
+
     // Title comes from the route's `meta` export now — setting it here would
     // overwrite the server-rendered one after hydration.
 
@@ -888,6 +936,15 @@ const PersonDetail = () => {
                   </a>
                 )}
                 
+                {canManage && (
+                  <button
+                    onClick={() => setShowAddMedia(true)}
+                    className="inline-flex min-h-[44px] flex-shrink-0 items-center gap-1.5 rounded-lg border border-brand bg-brand/10 px-5 py-3 text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white"
+                  >
+                    <Icon icon="solar:clapperboard-play-linear" width="16" /> Add Media
+                  </button>
+                )}
+
                 {person.claimed_by ? (
                   <button onClick={() => setPassportOpen(true)} className="inline-flex min-h-[44px] flex-shrink-0 items-center gap-2 rounded-lg border border-brand/40 bg-brand/5 px-5 py-3 text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white">
                     <Icon icon="solar:passport-linear" width="17" /> Share Career Passport
@@ -1048,6 +1105,17 @@ const PersonDetail = () => {
             </div>
           </section>
         )}
+
+        {/* IMDb-Style Dynamic Actor Media Hub */}
+        <PersonMediaSection
+          person={person}
+          media={media}
+          canManage={canManage}
+          onMediaAdded={(newMedia) => {
+            setMedia((prev) => [newMedia, ...prev]);
+          }}
+        />
+
         <div className="p-4 md:p-8 lg:p-12">
           <div className="mb-8 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
             <div>
@@ -1486,9 +1554,19 @@ const PersonDetail = () => {
           </div>
         )}
         {passportOpen && <CareerPassportModal person={person} credits={person.credits || []} stageCredits={stageCredits} onClose={() => setPassportOpen(false)} />}
+        {showAddMedia && (
+          <AddPersonMediaModal
+            person={person}
+            onClose={() => setShowAddMedia(false)}
+            onMediaAdded={(newMedia) => {
+              setMedia((prev) => [newMedia, ...prev]);
+            }}
+          />
+        )}
       </div>
     </div>
   )
 }
 
 export default PersonDetail
+

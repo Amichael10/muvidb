@@ -7,7 +7,10 @@ import {
   type CreditObservation,
 } from './credit_roll_parser';
 
-if (process.platform === 'win32') {
+const localTessdata = join(process.cwd(), 'tessdata');
+if (existsSync(join(localTessdata, 'eng.traineddata'))) {
+  process.env.TESSDATA_PREFIX = localTessdata;
+} else if (process.platform === 'win32') {
   const tesseractDir = existsSync('C:\\Program Files\\Tesseract-OCR')
     ? 'C:\\Program Files\\Tesseract-OCR'
     : existsSync(join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR'))
@@ -33,6 +36,29 @@ if (process.platform === 'win32') {
   if (extraPaths.length > 0) {
     process.env.PATH = `${extraPaths.join(';')};${process.env.PATH || ''}`;
   }
+}
+
+function getTesseractFlags(): { langs: string; extraArgs: string[] } {
+  const activeTessdata = process.env.TESSDATA_PREFIX || join(process.cwd(), 'tessdata');
+  const langs = ['eng'];
+  if (existsSync(join(activeTessdata, 'yor.traineddata'))) langs.push('yor');
+  if (existsSync(join(activeTessdata, 'ibo.traineddata'))) langs.push('ibo');
+
+  const extraArgs: string[] = [];
+  const userWords = [
+    join(activeTessdata, 'eng.user-words'),
+    join(activeTessdata, 'nollywood.user-words'),
+  ].find((p) => existsSync(p));
+  if (userWords) {
+    extraArgs.push('--user-words', userWords);
+  }
+
+  const userPatterns = join(activeTessdata, 'user-patterns');
+  if (existsSync(userPatterns)) {
+    extraArgs.push('--user-patterns', userPatterns);
+  }
+
+  return { langs: langs.join('+'), extraArgs };
 }
 
 function run(command: string, args: string[], input?: Buffer): Promise<Buffer> {
@@ -130,8 +156,9 @@ export async function parseCreditFrameWithOcr(
   videoSec: number,
 ): Promise<CreditObservation[]> {
   const image = await prepareCreditFrame(frame);
+  const { langs, extraArgs } = getTesseractFlags();
   const read = async (mode: string) => {
-    const tsv = await run('tesseract', ['stdin', 'stdout', '-l', 'eng', '--psm', mode, 'tsv'], image);
+    const tsv = await run('tesseract', ['stdin', 'stdout', '-l', langs, ...extraArgs, '--psm', mode, 'tsv'], image);
     return parseCreditFrame(parseTesseractTsv(tsv.toString()), frameIndex, frameSec, videoSec);
   };
   const block = await read('6');

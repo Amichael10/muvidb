@@ -20,7 +20,7 @@ function collectKeys(base: string): string[] {
 
 // Gemini: rotate on 429/RESOURCE_EXHAUSTED before falling back to OpenAI/Groq.
 const GEMINI_KEYS = collectKeys('GEMINI_API_KEY');
-const GEMINI_TEXT_MODELS = (process.env.GEMINI_TEXT_MODELS || process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite')
+const GEMINI_TEXT_MODELS = (process.env.GEMINI_TEXT_MODELS || process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash,gemini-2.5-flash,gemini-2.5-flash-lite')
   .split(',')
   .map((model) => model.trim())
   .filter(Boolean);
@@ -75,9 +75,8 @@ async function withGeminiRotation(model: string, fn: (m: any) => Promise<any>): 
   throw lastErr;
 }
 
-// Groq: same multi-key rotation as Gemini.
-const GROQ_KEYS = collectKeys('GROQ_API_KEY');
-const GROQ_TEXT_MODELS = (process.env.GROQ_TEXT_MODELS || 'qwen/qwen3.8-27b,qwen/qwen3.6-27b,openai/gpt-oss-20b,openai/gpt-oss-120b')
+const GROQ_KEYS = collectKeys('GROQ_API_KEY').filter((k) => k.startsWith('gsk_'));
+const GROQ_TEXT_MODELS = (process.env.GROQ_TEXT_MODELS || 'openai/gpt-oss-120b,qwen/qwen3.6-27b,openai/gpt-oss-20b')
   .split(',')
   .map((model) => model.trim())
   .filter(Boolean);
@@ -196,57 +195,48 @@ async function withCohereRotation(fn: (client: any) => Promise<any>): Promise<an
 }
 
 function extractCohereText(response: any): string {
-  if (typeof response?.text === 'string' && response.text) return response.text;
   const content = response?.message?.content;
   if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    const parts: string[] = [];
-    for (const part of content) {
-      if (typeof part === 'string') parts.push(part);
-      else if (part?.type === 'text' && typeof part.text === 'string') parts.push(part.text);
-    }
-    if (parts.length) return parts.join('');
+  if (!Array.isArray(content)) return '';
+  const parts: string[] = [];
+  for (const part of content) {
+    if (typeof part === 'string') parts.push(part);
+    else if (part?.type === 'text' && typeof part.text === 'string') parts.push(part.text);
   }
-  return '';
+  return parts.join('');
 }
 
 /**
  * Clean and parse JSON from AI response
  */
 export function parseJSON(text: string) {
+  if (!text) return null;
+  // Strip reasoning model thought blocks
+  const normalized = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
   try {
-    const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const cleaned = normalized.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
     return JSON.parse(cleaned);
   } catch (err) {
-    // Try to extract JSON array from within surrounding text
+    // Try to extract JSON object { ... }
     try {
-      const bracketStart = text.indexOf('[');
-      const bracketEnd = text.lastIndexOf(']');
-      if (bracketStart !== -1 && bracketEnd > bracketStart) {
-        const extracted = text.substring(bracketStart, bracketEnd + 1);
+      const objStart = normalized.indexOf('{');
+      const objEnd = normalized.lastIndexOf('}');
+      if (objStart !== -1 && objEnd > objStart) {
+        const extracted = normalized.substring(objStart, objEnd + 1);
         return JSON.parse(extracted);
       }
-      // Truncated array: closing bracket was cut off by token limit
-      if (bracketStart !== -1) {
-        const lastCurly = text.lastIndexOf('}');
-        if (lastCurly > bracketStart) {
-          const recovered = text.substring(bracketStart, lastCurly + 1) + ']';
-          return JSON.parse(recovered);
-        }
+    } catch (err2) {}
+
+    // Try to extract JSON array [ ... ]
+    try {
+      const bracketStart = normalized.indexOf('[');
+      const bracketEnd = normalized.lastIndexOf(']');
+      if (bracketStart !== -1 && bracketEnd > bracketStart) {
+        const extracted = normalized.substring(bracketStart, bracketEnd + 1);
+        return JSON.parse(extracted);
       }
-    } catch (err2) {
-      // Regex extraction of all individual { ... } objects
-      try {
-        const matches = text.match(/\{[^{}]*\}/g);
-        if (matches && matches.length > 0) {
-          const parsedArr = [];
-          for (const m of matches) {
-            try { parsedArr.push(JSON.parse(m)); } catch {}
-          }
-          if (parsedArr.length > 0) return parsedArr;
-        }
-      } catch {}
-    }
+    } catch (err3) {}
+
     console.error('Failed to parse AI JSON. Raw text was:', text.substring(0, 500) + '...');
     return [];
   }
@@ -283,21 +273,6 @@ export async function generateAIContent(
     });
   }
 
-  if (openai) {
-    providers.push({
-      name: 'openai',
-      execute: async () => {
-        const response = await openai.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
-          model: 'gpt-4o-mini',
-          temperature: 0.3,
-        });
-        const text = response.choices[0]?.message?.content || '';
-        return { text, engine: 'openai', headers: null };
-      }
-    });
-  }
-
   if (GROQ_KEYS.length) {
     providers.push({
       name: 'groq',
@@ -308,7 +283,7 @@ export async function generateAIContent(
             const response = await client.chat.completions.create({
               messages: [{ role: 'user', content: prompt }],
               model,
-              max_completion_tokens: 4096,
+              max_tokens: 4096,
             }).asResponse();
             const data = await response.json();
             if (data.error) throw new Error(data.error.message);
@@ -326,6 +301,21 @@ export async function generateAIContent(
     });
   }
 
+  if (openai) {
+    providers.push({
+      name: 'openai',
+      execute: async () => {
+        const response = await openai.chat.completions.create({
+          messages: [{ role: 'user', content: prompt }],
+          model: 'gpt-4o-mini',
+          temperature: 0.3,
+        });
+        const text = response.choices[0]?.message?.content || '';
+        return { text, engine: 'openai', headers: null };
+      }
+    });
+  }
+
   if (COHERE_KEYS.length) {
     providers.push({
       name: 'cohere',
@@ -334,15 +324,12 @@ export async function generateAIContent(
         let lastErr: any;
         for (const model of models) {
           try {
-            let response: any;
-            const chatPromise = (client.v2?.chat)
-              ? client.v2.chat({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.4 })
-              : client.chat({ model, message: prompt, temperature: 0.4 });
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Cohere timeout (10s)')), 10000));
-            response = await Promise.race([chatPromise, timeoutPromise]);
-            const text = extractCohereText(response);
-            if (!text.trim()) throw new Error(`Cohere model ${model} returned an empty response`);
-            return { text, engine: `cohere (${model})`, headers: null };
+            const response = await client.chat({
+              model,
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.4,
+            });
+            return { text: extractCohereText(response), engine: `cohere (${model})`, headers: null };
           } catch (err: any) {
             lastErr = err;
             if (isCohereQuotaError(err) || isCohereDeadKeyError(err)) throw err;
@@ -357,20 +344,19 @@ export async function generateAIContent(
     throw new Error('No AI providers configured. Please check GEMINI_API_KEY, OPENAI_API_KEY, GROQ_API_KEY, or COHERE_API_KEY.');
   }
 
-  // Order providers: if preferredProvider is specified, put it first.
-  // Otherwise, prioritize fastest and most reliable providers (Groq > Gemini > OpenAI > Cohere).
+  // Order providers: if preferredProvider is specified, put it first, then shuffle the rest
   let orderedProviders = [];
   if (options?.preferredProvider) {
     const prefIndex = providers.findIndex(p => p.name === options.preferredProvider);
     if (prefIndex !== -1) {
       const preferred = providers.splice(prefIndex, 1)[0];
-      orderedProviders = [preferred, ...providers];
+      const rest = providers.sort(() => Math.random() - 0.5);
+      orderedProviders = [preferred, ...rest];
     } else {
-      orderedProviders = providers;
+      orderedProviders = providers.sort(() => Math.random() - 0.5);
     }
   } else {
-    const rank: Record<string, number> = { groq: 1, gemini: 2, openai: 3, cohere: 4 };
-    orderedProviders = providers.sort((a, b) => (rank[a.name] || 99) - (rank[b.name] || 99));
+    orderedProviders = providers.sort(() => Math.random() - 0.5);
   }
 
   let lastError = null;

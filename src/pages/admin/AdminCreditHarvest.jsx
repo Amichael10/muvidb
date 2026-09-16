@@ -1362,17 +1362,21 @@ export default function AdminCreditHarvest() {
   const handleResetQueueAndLogs = async () => {
     setIsResettingQueue(true);
     try {
-      const { error: cError } = await supabase.from('credit_candidates').delete().eq('status', 'pending');
-      if (cError) throw cError;
+      const { error: rpcErr } = await supabase.rpc('reset_credit_harvest_queue_and_logs');
+      if (rpcErr) {
+        // Fallback to table deletes if RPC isn't deployed yet
+        const { error: cError } = await supabase.from('credit_candidates').delete().eq('status', 'pending');
+        if (cError) throw cError;
 
-      const { error: mError } = await supabase.from('credit_metadata_candidates').delete().eq('status', 'pending');
-      if (mError) throw mError;
+        const { error: mError } = await supabase.from('credit_metadata_candidates').delete().eq('status', 'pending');
+        if (mError) throw mError;
 
-      const { error: lError } = await supabase.from('credit_harvest_logs').delete().gt('id', 0);
-      if (lError) throw lError;
+        const { error: lError } = await supabase.from('credit_harvest_logs').delete().gt('id', 0);
+        if (lError) throw lError;
 
-      const { error: jError } = await supabase.from('credit_harvest_jobs').delete().neq('status', 'impossible_status');
-      if (jError) throw jError;
+        const { error: jError } = await supabase.from('credit_harvest_jobs').delete().neq('status', 'impossible_status');
+        if (jError) throw jError;
+      }
 
       setResetModalOpen(false);
       toast.success('Queue & logs reset successfully! Ready to start afresh.');
@@ -2009,7 +2013,7 @@ export default function AdminCreditHarvest() {
             Run the harvester on the worker machine to populate this queue.
           </p>
           <code className="inline-block mt-3 text-[10px] bg-surface-2 border border-border rounded px-2 py-1">
-            npx tsx scripts/harvest_credits.ts
+            npx tsx scripts/run_automated_credit_harvester.ts
           </code>
         </div>
       ) : (

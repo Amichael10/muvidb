@@ -1,14 +1,5 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-dotenv.config();
-
-const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://pkenrmorywmuvnzfoylp.supabase.co';
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY!;
-
-export const serviceSupabase: SupabaseClient = createClient(url, serviceKey, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+import { supabase as serviceSupabase } from './db';
+export { serviceSupabase };
 
 export type RawCandidate = {
   name: string;
@@ -40,12 +31,13 @@ const HONORIFICS = /^(?:Chief|Alhaja|Alhaji|Dr\.?|Doctor|Prof\.?|Professor|Pasto
 const POST_NOMINALS = /\s*\((?:MON|OON|MFR|CFR|GCFR|CON|JP|SAN|OFR|FNA)\)/gi;
 
 // Noise filtering for non-person strings
-const NOISE_WORDS = [
+export const NOISE_WORDS = [
   'COMING SOON', 'NEXT WEEK', 'NOW SHOWING', 'SUBSCRIBE', 'LIKE AND SHARE',
   'COPYRIGHT', 'PRODUCTIONS', 'ENTERTAINMENT', 'PICTURES', 'STUDIOS', 'LIMITED',
   'SPECIAL THANKS', 'LOCATION', 'LOGISTICS', 'CAMERA ASSISTANT', 'LIGHTS',
   'CATERING', 'SECURITY', 'TRANSPORT', 'GENERATOR', 'WELFARE', 'MEDIA', 'GRAPHICS',
-  'CLICK HERE', 'ALL RIGHTS RESERVED', 'THE END', 'CAST', 'CREW'
+  'CLICK HERE', 'ALL RIGHTS RESERVED', 'THE END', 'CAST', 'CREW', 'FULL MOVIE',
+  'SOUND MAN', 'PROP SER', 'ASS RF GAFFER', 'CAMERA ASST', 'FOCUS PULLER', 'SET PROPS'
 ];
 
 export function normalizePersonName(raw: string): string {
@@ -146,6 +138,64 @@ export function normalizeRole(rawRole: string | null | undefined, creditType: 'a
   return 'crew';
 }
 
+import { validateCreditsWithAi } from './ai_credit_validator';
+
+/**
+ * Fuzzy search for an existing person in Lumi's people database.
+ * 1. Exact case-insensitive match
+ * 2. Multi-token overlap (First + Last)
+ * 3. Surname search with Levenshtein similarity >= 85%
+ */
+export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: string; name: string } | null> {
+  if (!name || name.trim().length < 2) return null;
+  const clean = normalizePersonName(name);
+
+  // 1. Direct ILIKE
+  const { data: directFind } = await serviceSupabase
+    .from('people')
+    .select('id, name')
+    .ilike('name', clean)
+    .limit(1);
+
+  if (directFind && directFind.length > 0) return directFind[0];
+
+  // 2. Token search: First word + Last word
+  const parts = clean.split(/\s+/).filter(w => w.length > 2);
+  if (parts.length >= 2) {
+    const { data: tokenHits } = await serviceSupabase
+      .from('people')
+      .select('id, name')
+      .ilike('name', `%${parts[0]}%${parts[parts.length - 1]}%`)
+      .limit(5);
+
+    if (tokenHits && tokenHits.length > 0) {
+      for (const hit of tokenHits) {
+        if (nameSimilarity(hit.name, clean) >= 0.85) {
+          return hit;
+        }
+      }
+    }
+
+    // 3. Surname fallback search
+    const surname = parts[parts.length - 1];
+    const { data: surnameHits } = await serviceSupabase
+      .from('people')
+      .select('id, name')
+      .ilike('name', `%${surname}%`)
+      .limit(10);
+
+    if (surnameHits && surnameHits.length > 0) {
+      for (const hit of surnameHits) {
+        if (nameSimilarity(hit.name, clean) >= 0.85) {
+          return hit;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 /**
  * Worker 3: The Consensus & Reconciliation Engine
  */
@@ -153,7 +203,8 @@ export async function reconcileAndVerifyCredits(
   filmId: string,
   worker1Candidates: RawCandidate[],
   worker2Candidates: RawCandidate[],
-  metadataCandidates: RawCandidate[] = []
+  metadataCandidates: RawCandidate[] = [],
+  filmTitle: string = 'Film'
 ): Promise<VerifiedCredit[]> {
   const allRaw = [...worker1Candidates, ...worker2Candidates, ...metadataCandidates];
 
@@ -215,70 +266,98 @@ export async function reconcileAndVerifyCredits(
     }
   }
 
-  // Fetch known people from Supabase directory
-  const { data: knownPeople } = await serviceSupabase
-    .from('people')
-    .select('id, name')
-    .limit(1000);
+  if (!clusters.length) return [];
 
   const verifiedCredits: VerifiedCredit[] = [];
-  const processedActorIds = new Set<string>(); // GUARANTEE 0 DUPLICATE ACTORS
+  const processedActorIds = new Set<string>(); // GUARANTEE 0 DUPLICATE ACTORS IN BATCH
+  const processedPairs = new Set<string>();
+
+  // 1. First Pass: Check which candidates are ALREADY verified in Lumi's people directory
+  const unresolvedClusters: typeof clusters = [];
+  const resolvedDbPeople = new Map<string, { id: string; name: string }>();
+
+  for (const cluster of clusters) {
+    const dbPerson = await findPersonWithFuzzyMatch(cluster.canonicalName);
+    if (dbPerson) {
+      resolvedDbPeople.set(cluster.canonicalName.toLowerCase(), dbPerson);
+    } else {
+      unresolvedClusters.push(cluster);
+    }
+  }
+
+  if (resolvedDbPeople.size > 0) {
+    console.log(`   📚 DB Directory: Auto-approved ${resolvedDbPeople.size} known persons from database`);
+  }
+
+  // 2. Second Pass: Consult AI Validation Gate ONLY for candidates NOT in the database
+  const aiResultLookup = new Map<string, any>();
+  if (unresolvedClusters.length > 0) {
+    console.log(`   🤖 AI Validation Gate: Checking ${unresolvedClusters.length} unverified candidates...`);
+    const candidatesForAi = unresolvedClusters.map(c => ({
+      raw: c.canonicalName,
+      role: Array.from(c.roles)[0] || (c.creditType === 'actor' ? 'actor' : 'crew'),
+      creditType: c.creditType,
+    }));
+
+    const aiValidations = await validateCreditsWithAi(filmTitle, candidatesForAi);
+    for (const res of aiValidations) {
+      aiResultLookup.set(res.raw.toLowerCase(), res);
+    }
+  } else {
+    console.log(`   ✨ All candidates already matched verified database people (AI gate call not needed).`);
+  }
 
   let billingOrder = 1;
 
   for (const cluster of clusters) {
-    let dbPerson: { id: string; name: string } | null = null;
-    if (knownPeople && knownPeople.length > 0) {
-      const match = knownPeople.find(p => nameSimilarity(p.name, cluster.canonicalName) >= 0.90);
-      if (match) dbPerson = match;
+    let dbPerson = resolvedDbPeople.get(cluster.canonicalName.toLowerCase()) || null;
+    let aiCheck = aiResultLookup.get(cluster.canonicalName.toLowerCase());
+
+    // If not directly found in DB, check AI validation
+    if (!dbPerson) {
+      if (aiCheck && (!aiCheck.isValidHumanName || aiCheck.confidence < 85)) {
+        console.log(`      🗑️  AI Rejected: "${cluster.canonicalName}" (${aiCheck.rejectionReason || 'Invalid name/role'})`);
+        continue;
+      }
+
+      // If AI suggested a corrected name (e.g. fixed OCR typo), check DB again
+      if (aiCheck?.cleanName && aiCheck.cleanName !== cluster.canonicalName) {
+        dbPerson = await findPersonWithFuzzyMatch(aiCheck.cleanName);
+      }
     }
 
-    const hasDualWorkerConsensus = cluster.sources.has('worker1') && cluster.sources.has('worker2');
-    const hasMetadataSupport = cluster.sources.has('metadata');
-    const hasMultiFrameSupport = cluster.frameSupport >= 2;
     const isKnownStar = dbPerson !== null;
-
-    let consensusScore = 0.50;
-    if (hasDualWorkerConsensus) consensusScore += 0.30;
-    if (hasMetadataSupport) consensusScore += 0.20;
-    if (hasMultiFrameSupport) consensusScore += 0.15;
-    if (isKnownStar) consensusScore += 0.20;
-    consensusScore = Math.min(1.0, consensusScore);
-
-    const isAccepted = consensusScore >= 0.70 || hasDualWorkerConsensus || isKnownStar;
-    if (!isAccepted) continue;
-
     let personId = dbPerson?.id;
-    let finalPersonName = dbPerson?.name || cluster.canonicalName;
+    let finalPersonName = dbPerson?.name || aiCheck?.cleanName || cluster.canonicalName;
 
+    // Only create a person if:
+    // 1. Not found via fuzzy match in entire Lumi directory
+    // 2. AND AI confirmed with >= 80% confidence or multi-source/frame support
     if (!personId) {
-      const { data: directFind } = await serviceSupabase
-        .from('people')
-        .select('id, name')
-        .ilike('name', cluster.canonicalName)
-        .limit(1);
-
-      if (directFind && directFind.length > 0) {
-        personId = directFind[0].id;
-        finalPersonName = directFind[0].name;
-      } else {
-        const slug = cluster.canonicalName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const isHighConfidence = aiCheck && aiCheck.isValidHumanName && aiCheck.confidence >= 80;
+      const isMultiSource = cluster.sources.size >= 2 || cluster.frameSupport >= 2;
+      if (isHighConfidence || (aiCheck?.isValidHumanName && isMultiSource)) {
+        const baseSlug = finalPersonName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         const { data: created, error: pErr } = await serviceSupabase
           .from('people')
           .insert({
-            name: cluster.canonicalName,
-            slug: `${slug}-${Math.floor(1000 + Math.random() * 9000)}`,
+            name: finalPersonName,
+            slug: `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`,
             known_for_department: cluster.creditType === 'actor' ? 'Acting' : 'Directing',
           })
           .select('id, name')
           .single();
 
         if (pErr) {
-          console.error(`Error auto-creating person ${cluster.canonicalName}:`, pErr.message);
+          console.error(`Error auto-creating verified person ${finalPersonName}:`, pErr.message);
           continue;
         }
         personId = created.id;
         finalPersonName = created.name;
+        console.log(`      ✨ Verified New Person Added to Directory: "${finalPersonName}"`);
+      } else {
+        console.log(`      ⏭️  Skipped (Uncertain / Not in DB): "${cluster.canonicalName}"`);
+        continue;
       }
     }
 
@@ -292,8 +371,16 @@ export async function reconcileAndVerifyCredits(
       processedActorIds.add(personId);
     }
 
-    const roleString = Array.from(cluster.roles)[0] || (cluster.creditType === 'actor' ? 'actor' : 'crew');
+    const roleString = aiCheck?.normalizedRole || Array.from(cluster.roles)[0] || (cluster.creditType === 'actor' ? 'actor' : 'crew');
     const normalizedRole = normalizeRole(roleString, cluster.creditType);
+
+    const pairKey = `${personId}:${normalizedRole}`;
+    if (processedPairs.has(pairKey)) {
+      continue;
+    }
+    processedPairs.add(pairKey);
+
+    let consensusScore = isKnownStar ? 0.95 : (aiCheck?.confidence ? aiCheck.confidence / 100 : 0.85);
 
     verifiedCredits.push({
       personId,
@@ -311,36 +398,62 @@ export async function reconcileAndVerifyCredits(
 
 /**
  * Commits verified credits directly into Supabase `credits` table.
+ * Strictly guarantees ZERO duplicate actor credits and zero duplicate (person, role) pairs.
  */
 export async function commitVerifiedCredits(filmId: string, credits: VerifiedCredit[]): Promise<number> {
   if (!credits.length) return 0;
 
+  // Fetch all existing credits for this film to prevent duplicates
+  const { data: existingCredits } = await serviceSupabase
+    .from('credits')
+    .select('person_id, role')
+    .eq('film_id', filmId);
+
+  const existingPairSet = new Set<string>();
+  const existingActors = new Set<string>();
+  for (const ex of (existingCredits || []) as any[]) {
+    existingPairSet.add(`${ex.person_id}:${ex.role}`);
+    if (ex.role === 'actor') {
+      existingActors.add(ex.person_id);
+    }
+  }
+
   let inserted = 0;
+  const batchInsertedPairs = new Set<string>();
+  const batchInsertedActors = new Set<string>();
 
   for (const c of credits) {
-    const { data: existing } = await serviceSupabase
-      .from('credits')
-      .select('id')
-      .eq('film_id', filmId)
-      .eq('person_id', c.personId)
-      .eq('role', c.role)
-      .limit(1);
+    const pairKey = `${c.personId}:${c.role}`;
 
-    if (!existing || existing.length === 0) {
-      const { error } = await serviceSupabase.from('credits').insert({
-        film_id: filmId,
-        person_id: c.personId,
-        role: c.role,
-        character_name: c.characterName,
-        billing_order: c.billingOrder,
-        source: 'harvest_consensus',
-      });
+    // 1. Never add the same person twice for the same role under the same movie
+    if (existingPairSet.has(pairKey) || batchInsertedPairs.has(pairKey)) {
+      continue;
+    }
 
-      if (!error) {
-        inserted++;
-      } else {
-        console.error(`  -> Failed to insert credit for ${c.personName}:`, error.message);
+    // 2. Never add multiple actor credits for the same person under the same movie
+    if (c.role === 'actor' && (existingActors.has(c.personId) || batchInsertedActors.has(c.personId))) {
+      continue;
+    }
+
+    const { error } = await serviceSupabase.from('credits').insert({
+      film_id: filmId,
+      person_id: c.personId,
+      role: c.role,
+      character_name: c.characterName,
+      billing_order: c.billingOrder,
+      source: 'harvest_consensus',
+    });
+
+    if (!error) {
+      inserted++;
+      existingPairSet.add(pairKey);
+      batchInsertedPairs.add(pairKey);
+      if (c.role === 'actor') {
+        existingActors.add(c.personId);
+        batchInsertedActors.add(c.personId);
       }
+    } else {
+      console.error(`  -> Failed to insert credit for ${c.personName}:`, error.message);
     }
   }
 
