@@ -118,6 +118,19 @@ function cleanTitle(raw: string): string {
     .trim();
 }
 
+async function safeRm(targetPath: string) {
+  for (let i = 0; i < 5; i++) {
+    try {
+      if (existsSync(targetPath)) {
+        await rm(targetPath, { recursive: true, force: true });
+      }
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+    }
+  }
+}
+
 /** Extracts tail frames using yt-dlp + ffmpeg at 720p resolution */
 async function extractTailFrames(url: string, dir: string): Promise<{
   frames: string[];
@@ -126,19 +139,23 @@ async function extractTailFrames(url: string, dir: string): Promise<{
   youtubeTitle?: string;
   youtubeDescription?: string;
 }> {
-  const probeArgs = [
-    '--dump-json', '--no-warnings', '--no-playlist', '--skip-download',
-    ...clientArgs,
-    ...(COOKIES_PATH ? ['--cookies', COOKIES_PATH] : []),
-    url,
-  ];
+  let probe: any = {};
+  try {
+    const probeArgs = [
+      '--dump-json', '--no-warnings', '--no-playlist', '--skip-download',
+      ...clientArgs,
+      ...(COOKIES_PATH ? ['--cookies', COOKIES_PATH] : []),
+      url,
+    ];
+    const probeProc = await runWithRetry('yt-dlp', probeArgs, { timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
+    const rawOutput = (probeProc.stdout || '').trim();
+    const lastLine = rawOutput.split('\n').filter(Boolean).at(-1) || rawOutput;
+    probe = JSON.parse(lastLine);
+  } catch (err: any) {
+    console.warn(`   ⚠️ Metadata probe warning: ${err.message?.slice(0, 120) || 'Unknown'}`);
+  }
 
-  const probeProc = await runWithRetry('yt-dlp', probeArgs, { timeout: 180_000, maxBuffer: 64 * 1024 * 1024 });
-  const rawOutput = (probeProc.stdout || '').trim();
-  const lastLine = rawOutput.split('\n').filter(Boolean).at(-1) || rawOutput;
-  const probe = JSON.parse(lastLine);
   const durationSec = Number(probe.duration || 0);
-
   if (!durationSec || durationSec < 60) {
     return { frames: [], durationSec: 0, startSec: 0, youtubeTitle: probe.title, youtubeDescription: probe.description };
   }
@@ -150,7 +167,7 @@ async function extractTailFrames(url: string, dir: string): Promise<{
   const downloadArgs = [
     '-f', 'bestvideo[height<=720][vcodec^=avc1]/bestvideo[height<=720]/22/best[height<=720]/18/best',
     '--download-sections', `*${startSec}-${durationSec}`,
-    '--retries', '3', '--fragment-retries', '3', '--socket-timeout', '30',
+    '--retries', '2', '--fragment-retries', '2', '--socket-timeout', '20',
     ...clientArgs,
     ...(COOKIES_PATH ? ['--cookies', COOKIES_PATH] : []),
     '-o', tailFile,
@@ -158,10 +175,17 @@ async function extractTailFrames(url: string, dir: string): Promise<{
     url,
   ];
 
-  await runWithRetry('yt-dlp', downloadArgs, { timeout: 480_000 });
+  try {
+    await runWithRetry('yt-dlp', downloadArgs, { timeout: 240_000 });
+  } catch (dlErr: any) {
+    console.warn(`   ⚠️ Tail download failed or timed out: ${dlErr.message?.slice(0, 120) || 'Unknown'}. Skipping tail OCR.`);
+    await safeRm(tailFile);
+    return { frames: [], durationSec, startSec, youtubeTitle: probe.title, youtubeDescription: probe.description };
+  }
 
   if (!existsSync(tailFile) || statSync(tailFile).size < 100_000) {
     console.warn(`   ⚠️ Downloaded tail video is empty or corrupt (${existsSync(tailFile) ? statSync(tailFile).size : 0} bytes). Skipping tail OCR.`);
+    await safeRm(tailFile);
     return { frames: [], durationSec, startSec, youtubeTitle: probe.title, youtubeDescription: probe.description };
   }
 
@@ -178,7 +202,7 @@ async function extractTailFrames(url: string, dir: string): Promise<{
     console.warn(`   ⚠️ FFmpeg frame extraction warning: ${ffErr.message.slice(0, 150)}`);
   }
 
-  await rm(tailFile, { force: true }).catch(() => {});
+  await safeRm(tailFile);
 
   const frames = (await readdir(dir))
     .filter((f) => f.startsWith('f_') && f.endsWith('.jpg'))
@@ -196,7 +220,7 @@ async function extractHeadFrames(url: string, dir: string): Promise<{ frames: st
   const downloadArgs = [
     '-f', 'bestvideo[height<=720][vcodec^=avc1]/bestvideo[height<=720]/22/best[height<=720]/18/best',
     '--download-sections', `*15-${headEndSec}`,
-    '--retries', '2', '--socket-timeout', '30',
+    '--retries', '2', '--socket-timeout', '20',
     ...clientArgs,
     ...(COOKIES_PATH ? ['--cookies', COOKIES_PATH] : []),
     '-o', headFile,
@@ -205,8 +229,11 @@ async function extractHeadFrames(url: string, dir: string): Promise<{ frames: st
   ];
 
   try {
-    await runWithRetry('yt-dlp', downloadArgs, { timeout: 180_000 });
-    if (!existsSync(headFile) || statSync(headFile).size < 100_000) return { frames: [], startSec: 15 };
+    await runWithRetry('yt-dlp', downloadArgs, { timeout: 120_000 });
+    if (!existsSync(headFile) || statSync(headFile).size < 100_000) {
+      await safeRm(headFile);
+      return { frames: [], startSec: 15 };
+    }
 
     await run('ffmpeg', [
       '-i', headFile,
@@ -216,7 +243,7 @@ async function extractHeadFrames(url: string, dir: string): Promise<{ frames: st
       '-hide_banner', '-loglevel', 'error', '-y',
     ], { timeout: 60_000 });
 
-    await rm(headFile, { force: true }).catch(() => {});
+    await safeRm(headFile);
 
     const frames = (await readdir(dir))
       .filter((f) => f.startsWith('h_') && f.endsWith('.jpg'))
@@ -225,6 +252,7 @@ async function extractHeadFrames(url: string, dir: string): Promise<{ frames: st
 
     return { frames, startSec: 15 };
   } catch {
+    await safeRm(headFile);
     return { frames: [], startSec: 15 };
   }
 }
@@ -472,7 +500,7 @@ async function processFilm(film: any): Promise<boolean> {
     console.error(`   ❌ Error processing film ${filmTitle}:`, err.message);
     return false;
   } finally {
-    await rm(tempDir, { recursive: true, force: true });
+    await safeRm(tempDir);
   }
 }
 
