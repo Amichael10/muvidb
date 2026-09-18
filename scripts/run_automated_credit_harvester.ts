@@ -88,7 +88,7 @@ const arg = (n: string) => {
 };
 
 const TAIL_SECONDS = Number(arg('tail')) || 240; // Default: last 4 minutes
-const FRAME_EVERY_SEC = Number(arg('frame-every')) || 1; // Default: 1 frame per second (240 frames for full coverage)
+const FRAME_EVERY_SEC = Number(arg('frame-every')) || 3; // Default: 1 frame every 3 seconds (~80 frames for 240s tail)
 const ONCE = arg('once') !== undefined;
 const SINGLE_FILM = arg('film');
 const COOKIES_PATH = [
@@ -376,17 +376,24 @@ async function processFilm(film: any): Promise<boolean> {
     console.log(`   🖼️  Extracted ${frames.length} frames.`);
 
     // 2. Worker 1 (Pass A): Standard Layout OCR
-    console.log(`   🔍 Worker 1: Running layout-aware OCR across ${frames.length} frames (720p)...`);
+    console.log(`   🔍 Worker 1: Running parallel layout-aware OCR across ${frames.length} frames...`);
     const observations: CreditObservation[] = [];
-    for (let i = frames.length - 1; i >= 0; i--) {
-      const frameSec = i * FRAME_EVERY_SEC;
-      const doneCount = frames.length - i;
-      if (doneCount % 20 === 0 || doneCount === 1 || doneCount === frames.length) {
-        console.log(`      ... scanning frame ${doneCount}/${frames.length}`);
+    const BATCH_SIZE = 5;
+    let doneCount = 0;
+    for (let i = frames.length - 1; i >= 0; i -= BATCH_SIZE) {
+      const batchPromises = [];
+      for (let j = 0; j < BATCH_SIZE && (i - j) >= 0; j++) {
+        const idx = i - j;
+        const frameSec = idx * FRAME_EVERY_SEC;
+        batchPromises.push(parseCreditFrameWithOcr(frames[idx], idx, frameSec, startSec + frameSec));
       }
-      const obs = await parseCreditFrameWithOcr(frames[i], i, frameSec, startSec + frameSec);
-      if (obs && obs.length > 0) {
-        observations.push(...obs);
+      const results = await Promise.all(batchPromises);
+      doneCount += results.length;
+      if (doneCount % 20 === 0 || doneCount <= BATCH_SIZE || doneCount >= frames.length) {
+        console.log(`      ... scanned frame ${doneCount}/${frames.length}`);
+      }
+      for (const obs of results) {
+        if (obs && obs.length > 0) observations.push(...obs);
       }
     }
 
@@ -399,11 +406,16 @@ async function processFilm(film: any): Promise<boolean> {
       if (headFrames.length > 0) {
         console.log(`   🎬 Scanning ${headFrames.length} opening title frames...`);
         const headObs: CreditObservation[] = [];
-        for (let i = 0; i < headFrames.length; i++) {
-          const frameSec = i * 2;
-          const obs = await parseCreditFrameWithOcr(headFrames[i], i, frameSec, headStartSec + frameSec);
-          if (obs && obs.length > 0) {
-            headObs.push(...obs);
+        for (let i = 0; i < headFrames.length; i += BATCH_SIZE) {
+          const batchPromises = [];
+          for (let j = 0; j < BATCH_SIZE && (i + j) < headFrames.length; j++) {
+            const idx = i + j;
+            const frameSec = idx * 2;
+            batchPromises.push(parseCreditFrameWithOcr(headFrames[idx], idx, frameSec, headStartSec + frameSec));
+          }
+          const results = await Promise.all(batchPromises);
+          for (const obs of results) {
+            if (obs && obs.length > 0) headObs.push(...obs);
           }
         }
         if (headObs.length > 0) {
