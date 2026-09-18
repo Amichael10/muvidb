@@ -42,8 +42,33 @@ Return a JSON object with a "results" array matching this exact schema:
   ]
 }`;
 
+import { NOISE_WORDS, normalizePersonName } from './credit_consensus_verifier';
+
+export function isCleanHumanNameHeuristic(raw: string): { isValid: boolean; cleanName: string | null } {
+  if (!raw) return { isValid: false, cleanName: null };
+  const clean = normalizePersonName(raw);
+  if (!clean || clean.length < 3 || clean.length > 50) return { isValid: false, cleanName: null };
+
+  const words = clean.split(' ');
+  if (words.length < 2 || words.length > 4) return { isValid: false, cleanName: null };
+
+  // Reject if any word contains noise words or role keywords
+  const containsNoise = NOISE_WORDS.some(nw => clean.toUpperCase().includes(nw));
+  if (containsNoise) return { isValid: false, cleanName: null };
+
+  if (/\b(sound\s+man|prop\s+ser|gaffer|camera|movie|production|studio|pictures|director|producer|writer|editor|special\s+thanks)\b/i.test(clean)) {
+    return { isValid: false, cleanName: null };
+  }
+
+  // Check that each word starts with a capital letter and consists of valid letters
+  const isAllValidWords = words.every(w => /^[A-Z][a-zA-Z'’-]{1,25}$/.test(w));
+  if (!isAllValidWords) return { isValid: false, cleanName: null };
+
+  return { isValid: true, cleanName: clean };
+}
+
 /**
- * Validates candidate credits using the AI Validation Gate (Groq / Gemini / Cohere).
+ * Validates candidate credits using Fast Local Heuristics + AI Validation Gate fallback.
  */
 export async function validateCreditsWithAi(
   filmTitle: string,
@@ -51,53 +76,60 @@ export async function validateCreditsWithAi(
 ): Promise<AiValidationResult[]> {
   if (!candidates.length) return [];
 
-  // 1. Instant regex pre-filter to reject obvious junk without burning AI calls
-  const prefiltered: Array<{ item: { raw: string; role: string; creditType: 'actor' | 'crew' }; autoRejectReason?: string }> = [];
+  const results: AiValidationResult[] = [];
+  const toAskAi: Array<{ raw: string; role: string; creditType: 'actor' | 'crew' }> = [];
 
   for (const c of candidates) {
     const raw = (c.raw || '').trim();
-    if (raw.length < 3) {
-      prefiltered.push({ item: c, autoRejectReason: 'Too short' });
-      continue;
-    }
+    const heuristic = isCleanHumanNameHeuristic(raw);
 
-    const words = raw.split(/\s+/);
-    if (words.length > 4) {
-      prefiltered.push({ item: c, autoRejectReason: 'Too many words (mashed multiple people or title)' });
-      continue;
+    if (heuristic.isValid && heuristic.cleanName) {
+      // ⚡ FAST PASS: Clean 2-4 word human name validated locally without burning API calls
+      results.push({
+        raw,
+        isValidHumanName: true,
+        cleanName: heuristic.cleanName,
+        normalizedRole: c.role || (c.creditType === 'actor' ? 'actor' : 'crew'),
+        confidence: 92,
+      });
+    } else {
+      // Obvious junk or ambiguous candidate
+      if (raw.length < 3 || raw.split(/\s+/).length > 4 || /\b(sound\s+man|prop\s+ser|gaffer|movie|part\s+\d+|the\s+end)\b/i.test(raw)) {
+        results.push({
+          raw,
+          isValidHumanName: false,
+          cleanName: null,
+          normalizedRole: null,
+          rejectionReason: 'Known role/noise or invalid format',
+          confidence: 0,
+        });
+      } else {
+        toAskAi.push(c);
+      }
     }
-
-    if (/^(sound\s+man|prop\s+ser|ass\s+rf\s+gaffer|camera\s+asst|full\s+movie|part\s+\d+|the\s+end)$/i.test(raw)) {
-      prefiltered.push({ item: c, autoRejectReason: 'Known role/title phrase' });
-      continue;
-    }
-
-    if (/\b(produc|scripty|wardrop|gaffer|sound\s+design|camera\s+operator|focus\s+puller)\b/i.test(raw)) {
-      prefiltered.push({ item: c, autoRejectReason: 'Role keyword embedded in name' });
-      continue;
-    }
-
-    prefiltered.push({ item: c });
   }
 
-  const toAskAi = prefiltered.filter(p => !p.autoRejectReason).map(p => p.item);
-  const aiResultsMap = new Map<string, AiValidationResult>();
+  if (!toAskAi.length) {
+    return results;
+  }
 
-  // Chunk AI validation into batches of 15 to avoid token limits or dropped candidates
+  // Optional AI Gate for remaining ambiguous candidates (with strict 5-second timeout)
   const BATCH_SIZE = 15;
   for (let i = 0; i < toAskAi.length; i += BATCH_SIZE) {
     const batch = toAskAi.slice(i, i + BATCH_SIZE);
     const prompt = `${SYSTEM_PROMPT}\n\nFilm Title: "${filmTitle}"\nCandidates to validate:\n${JSON.stringify(batch.map(c => ({ raw: c.raw, role: c.role })), null, 2)}`;
     try {
-      console.log(`      ⚡ Consulting AI (${batch.length} candidates, batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(toAskAi.length / BATCH_SIZE)})...`);
-      const aiResponse = await generateAIContent(prompt, { preferredProvider: 'cohere' });
+      console.log(`      ⚡ Consulting AI Gate for ${batch.length} ambiguous candidates...`);
+      const aiPromise = generateAIContent(prompt, { preferredProvider: 'cohere' });
+      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('AI Gate timeout (5s)')), 5000));
+      
+      const aiResponse: any = await Promise.race([aiPromise, timeoutPromise]);
       const parsed = parseJSON(aiResponse.text);
       const list: any[] = Array.isArray(parsed) ? parsed : (parsed?.results || parsed?.candidates || parsed?.credits || []);
-      console.log(`      🤖 AI Gate [${aiResponse.telemetry?.engine || 'Active Model'}] responded: processed ${list.length} validations`);
 
       for (const item of list) {
         if (item && item.raw) {
-          aiResultsMap.set(item.raw.toLowerCase(), {
+          results.push({
             raw: item.raw,
             isValidHumanName: Boolean(item.isValidHumanName),
             cleanName: item.cleanName || null,
@@ -108,41 +140,20 @@ export async function validateCreditsWithAi(
         }
       }
     } catch (err: any) {
-      console.warn(`      ⚠️ [AI Gate] Batch validation call failed: ${err.message}.`);
+      console.warn(`      ⚠️ AI Gate skipped/timed out (${err.message}). Using local name heuristics.`);
+      for (const c of batch) {
+        const norm = normalizePersonName(c.raw);
+        const valid = norm.length > 3 && norm.split(' ').length >= 2 && !NOISE_WORDS.some(nw => norm.toUpperCase().includes(nw));
+        results.push({
+          raw: c.raw,
+          isValidHumanName: valid,
+          cleanName: valid ? norm : null,
+          normalizedRole: c.role,
+          confidence: valid ? 85 : 0,
+        });
+      }
     }
   }
 
-  // Combine pre-filtered rejections and AI results
-  const finalResults: AiValidationResult[] = [];
-
-  for (const entry of prefiltered) {
-    if (entry.autoRejectReason) {
-      finalResults.push({
-        raw: entry.item.raw,
-        isValidHumanName: false,
-        cleanName: null,
-        normalizedRole: null,
-        rejectionReason: entry.autoRejectReason,
-        confidence: 0,
-      });
-      continue;
-    }
-
-    const aiRes = aiResultsMap.get(entry.item.raw.toLowerCase());
-    if (aiRes) {
-      finalResults.push(aiRes);
-    } else {
-      // If AI didn't return an entry for this item, fail safe (skip)
-      finalResults.push({
-        raw: entry.item.raw,
-        isValidHumanName: false,
-        cleanName: null,
-        normalizedRole: null,
-        rejectionReason: 'Not confirmed by AI gate',
-        confidence: 0,
-      });
-    }
-  }
-
-  return finalResults;
+  return results;
 }
