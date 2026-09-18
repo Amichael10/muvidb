@@ -165,7 +165,7 @@ async function extractTailFrames(url: string, dir: string): Promise<{
 
   // Request 720p HD stream with fallback
   const downloadArgs = [
-    '-f', 'bestvideo[height<=720][vcodec^=avc1]/bestvideo[height<=720]/22/best[height<=720]/18/best',
+    '-f', '18/22/best[height<=720]/best',
     '--download-sections', `*${startSec}-${durationSec}`,
     '--retries', '2', '--fragment-retries', '2', '--socket-timeout', '20',
     ...clientArgs,
@@ -218,7 +218,7 @@ async function extractHeadFrames(url: string, dir: string): Promise<{ frames: st
   const headEndSec = 150; // first 2.5 minutes
 
   const downloadArgs = [
-    '-f', 'bestvideo[height<=720][vcodec^=avc1]/bestvideo[height<=720]/22/best[height<=720]/18/best',
+    '-f', '18/22/best[height<=720]/best',
     '--download-sections', `*15-${headEndSec}`,
     '--retries', '2', '--socket-timeout', '20',
     ...clientArgs,
@@ -397,76 +397,84 @@ async function processFilm(film: any): Promise<boolean> {
     console.log(`   ⬇️  Worker 1: Downloading tail & extracting frames...`);
     const { frames, durationSec, startSec, youtubeTitle, youtubeDescription } = await extractTailFrames(url, tempDir);
 
-    if (!frames.length) {
-      console.log(`   ⚠️  No frames extracted (video unavailable or too short).`);
-      return false;
-    }
-    console.log(`   🖼️  Extracted ${frames.length} frames.`);
-
-    // 2. Worker 1 (Pass A): Standard Layout OCR
-    console.log(`   🔍 Worker 1: Running parallel layout-aware OCR across ${frames.length} frames...`);
-    const observations: CreditObservation[] = [];
-    const BATCH_SIZE = 5;
-    let doneCount = 0;
-    for (let i = frames.length - 1; i >= 0; i -= BATCH_SIZE) {
-      const batchPromises = [];
-      for (let j = 0; j < BATCH_SIZE && (i - j) >= 0; j++) {
-        const idx = i - j;
-        const frameSec = idx * FRAME_EVERY_SEC;
-        batchPromises.push(parseCreditFrameWithOcr(frames[idx], idx, frameSec, startSec + frameSec));
-      }
-      const results = await Promise.all(batchPromises);
-      doneCount += results.length;
-      if (doneCount % 20 === 0 || doneCount <= BATCH_SIZE || doneCount >= frames.length) {
-        console.log(`      ... scanned frame ${doneCount}/${frames.length}`);
-      }
-      for (const obs of results) {
-        if (obs && obs.length > 0) observations.push(...obs);
-      }
-    }
-
-    let consolidated = consolidateCreditObservations(observations);
-
-    // If tail credits yielded very few candidates, check opening sequence (first 150s)
-    if (consolidated.length < 3) {
-      console.log(`   ℹ️  Tail credits sparse (${consolidated.length} found). Checking head / opening sequence...`);
-      const { frames: headFrames, startSec: headStartSec } = await extractHeadFrames(url, tempDir);
-      if (headFrames.length > 0) {
-        console.log(`   🎬 Scanning ${headFrames.length} opening title frames...`);
-        const headObs: CreditObservation[] = [];
-        for (let i = 0; i < headFrames.length; i += BATCH_SIZE) {
-          const batchPromises = [];
-          for (let j = 0; j < BATCH_SIZE && (i + j) < headFrames.length; j++) {
-            const idx = i + j;
-            const frameSec = idx * 2;
-            batchPromises.push(parseCreditFrameWithOcr(headFrames[idx], idx, frameSec, headStartSec + frameSec));
-          }
-          const results = await Promise.all(batchPromises);
-          for (const obs of results) {
-            if (obs && obs.length > 0) headObs.push(...obs);
-          }
-        }
-        if (headObs.length > 0) {
-          const headConsolidated = consolidateCreditObservations(headObs);
-          consolidated = [...consolidated, ...headConsolidated];
-        }
-      }
-    }
-
     const worker1Raw: RawCandidate[] = [];
-    for (const p of consolidated) {
-      worker1Raw.push({
-        name: p.name,
-        role: p.roleOrCharacter,
-        creditType: p.creditType,
-        confidence: p.ocrConfidence,
-        frameIndex: p.frameIndex,
-        frameSec: p.frameSec,
-        videoSec: p.videoSec,
-        frameSupport: p.frameSupport,
-        evidenceText: p.evidenceText,
-        sourceWorker: 'worker1',
-      });
+
+    if (frames.length > 0) {
+      console.log(`   🖼️  Extracted ${frames.length} frames.`);
+      console.log(`   🔍 Worker 1: Running parallel layout-aware OCR across ${frames.length} frames...`);
+      const observations: CreditObservation[] = [];
+      const BATCH_SIZE = 5;
+      let doneCount = 0;
+      for (let i = frames.length - 1; i >= 0; i -= BATCH_SIZE) {
+        const batchPromises = [];
+        for (let j = 0; j < BATCH_SIZE && (i - j) >= 0; j++) {
+          const idx = i - j;
+          const frameSec = idx * FRAME_EVERY_SEC;
+          batchPromises.push(parseCreditFrameWithOcr(frames[idx], idx, frameSec, startSec + frameSec));
+        }
+        const results = await Promise.all(batchPromises);
+        doneCount += results.length;
+        if (doneCount % 20 === 0 || doneCount <= BATCH_SIZE || doneCount >= frames.length) {
+          console.log(`      ... scanned frame ${doneCount}/${frames.length}`);
+        }
+        for (const obs of results) {
+          if (obs && obs.length > 0) observations.push(...obs);
+        }
+      }
+
+      let consolidated = consolidateCreditObservations(observations);
+
+      // If tail credits yielded very few candidates, check opening sequence (first 150s)
+      if (consolidated.length < 3) {
+        console.log(`   ℹ️  Tail credits sparse (${consolidated.length} found). Checking head / opening sequence...`);
+        const { frames: headFrames, startSec: headStartSec } = await extractHeadFrames(url, tempDir);
+        if (headFrames.length > 0) {
+          console.log(`   🎬 Scanning ${headFrames.length} opening title frames...`);
+          const headObs: CreditObservation[] = [];
+          for (let i = 0; i < headFrames.length; i += BATCH_SIZE) {
+            const batchPromises = [];
+            for (let j = 0; j < BATCH_SIZE && (i + j) < headFrames.length; j++) {
+              const idx = i + j;
+              const frameSec = idx * 2;
+              batchPromises.push(parseCreditFrameWithOcr(headFrames[idx], idx, frameSec, headStartSec + frameSec));
+            }
+            const results = await Promise.all(batchPromises);
+            for (const obs of results) {
+              if (obs && obs.length > 0) headObs.push(...obs);
+            }
+          }
+          if (headObs.length > 0) {
+            const headConsolidated = consolidateCreditObservations(headObs);
+            consolidated = [...consolidated, ...headConsolidated];
+          }
+        }
+      }
+
+      for (const p of consolidated) {
+        worker1Raw.push({
+          name: p.name,
+          role: p.roleOrCharacter,
+          creditType: p.creditType,
+          confidence: p.ocrConfidence,
+          frameIndex: p.frameIndex,
+          frameSec: p.frameSec,
+          videoSec: p.videoSec,
+          frameSupport: p.frameSupport,
+          evidenceText: p.evidenceText,
+          sourceWorker: 'worker1',
+        });
+      }
+
+      if (worker1Raw.length > 0) {
+        console.log(`   👁️  Worker 1 extracted ${worker1Raw.length} raw candidate(s) from OCR:`);
+        for (const c of worker1Raw) {
+          console.log(`      • ${c.creditType.toUpperCase()}: ${c.name} (Role: ${c.role}, Frames: ${c.frameSupport})`);
+        }
+      } else {
+        console.log(`   👁️  Worker 1 extracted 0 raw candidates from OCR.`);
+      }
+    } else {
+      console.log(`   ℹ️  Skipping Worker 1 OCR (video frames unavailable). Proceeding to Worker 2 metadata parsing...`);
     }
 
     // 3. Worker 2: YouTube Description and Title metadata parser
@@ -523,7 +531,7 @@ async function main() {
   const pageVal = arg('page') ? parseInt(arg('page')!, 10) : undefined;
   const offsetVal = arg('offset') ? parseInt(arg('offset')!, 10) : undefined;
   const forceReharvest = arg('force') !== undefined;
-  const minCreditsThreshold = arg('min-credits') !== undefined ? parseInt(arg('min-credits')!, 10) : 4;
+  const minCreditsThreshold = arg('min-credits') !== undefined ? parseInt(arg('min-credits')!, 10) : 7;
 
   let offset = offsetVal !== undefined ? offsetVal : (pageVal ? (pageVal - 1) * 20 : 0);
   const limit = 40;
