@@ -50,14 +50,56 @@ function cleanPersonName(raw) {
   return name;
 }
 
+async function getTesseract() {
+  // 1. If already loaded globally in browser
+  if (typeof window !== 'undefined' && window.Tesseract) {
+    return window.Tesseract;
+  }
+
+  // 2. In browser environments (document available), load via CDN script tag to avoid bare specifier bundling issues
+  if (typeof document !== 'undefined') {
+    if (!window._tesseractPromise) {
+      window._tesseractPromise = new Promise((resolve, reject) => {
+        if (window.Tesseract) return resolve(window.Tesseract);
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.onload = () => {
+          if (window.Tesseract) {
+            resolve(window.Tesseract);
+          } else {
+            reject(new Error('Tesseract script loaded from CDN but window.Tesseract is not defined'));
+          }
+        };
+        script.onerror = () => reject(new Error('Failed to load Tesseract.js from CDN'));
+        document.head.appendChild(script);
+      });
+    }
+    return await window._tesseractPromise;
+  }
+
+  // 3. In Node / Vitest test environments
+  try {
+    const mod = await import(/* @vite-ignore */ 'tesseract.js');
+    if (mod?.createWorker || mod?.default?.createWorker) {
+      return mod.createWorker ? mod : mod.default;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  throw new Error('Tesseract.js could not be loaded in this environment');
+}
+
 /**
  * Perform local OCR using Tesseract.js on an image (Base64 string or File).
  * Returns array of extracted items: [{ name: string, role_or_character: string }]
  */
 export async function extractCreditsWithLocalOCR(imageBase64, creditType = 'cast') {
-  const { createWorker } = await import('tesseract.js');
+  const tesseract = await getTesseract();
   creditType = creditType === 'actor' ? 'cast' : creditType;
-  const worker = await createWorker('eng');
+  const worker = await tesseract.createWorker('eng');
   
   try {
     const ret = await worker.recognize(imageBase64);

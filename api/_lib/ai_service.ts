@@ -20,11 +20,11 @@ function collectKeys(base: string): string[] {
 
 // Gemini: rotate on 429/RESOURCE_EXHAUSTED before falling back to OpenAI/Groq.
 const GEMINI_KEYS = collectKeys('GEMINI_API_KEY');
-const GEMINI_TEXT_MODELS = (process.env.GEMINI_TEXT_MODELS || process.env.GEMINI_TEXT_MODEL || 'gemini-3.6-flash,gemini-2.5-flash,gemini-2.5-flash-lite')
+const GEMINI_TEXT_MODELS = (process.env.GEMINI_TEXT_MODELS || process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash,gemini-3.6-flash,gemini-3.5-flash-lite')
   .split(',')
   .map((model) => model.trim())
   .filter(Boolean);
-const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite')
+const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-2.5-flash,gemini-3.6-flash,gemini-3.5-flash-lite')
   .split(',')
   .map((model) => model.trim())
   .filter(Boolean);
@@ -36,7 +36,11 @@ function geminiModelFor(model: string) {
 
 function isGeminiQuotaError(err: any): boolean {
   const msg = (err?.message || '').toLowerCase();
-  return err?.status === 429 || /quota|resource_exhausted|rate limit|too many requests|\b429\b/.test(msg);
+  return (
+    err?.status === 429 ||
+    err?.status === 402 ||
+    /quota|resource_exhausted|rate limit|too many requests|\b429\b|\b402\b|prepayment|payment required|depleted|fetch failed|socket|network|econnreset|etimedout/.test(msg)
+  );
 }
 
 /** A revoked/typo'd Gemini key (401). Drop it for the life of this process. */

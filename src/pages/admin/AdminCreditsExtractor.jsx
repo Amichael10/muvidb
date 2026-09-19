@@ -533,22 +533,31 @@ export default function AdminCreditsExtractor() {
             extracted = await extractCreditsWithLocalOCR(shot.base64, activeTab);
           } else {
             setOcrLogs((prev) => [...prev, `🔍 ${label} (${shot.name}): running AI Vision OCR...`]);
-            const response = await fetch('/api/ai', {
-              method: 'POST',
-              headers: await authHeaders(),
-              body: JSON.stringify({
-                task: 'extract_credits_from_image',
-                data: { image: shot.base64, creditType: activeTab },
-              }),
-            });
+            try {
+              const response = await fetch('/api/ai', {
+                method: 'POST',
+                headers: await authHeaders(),
+                body: JSON.stringify({
+                  task: 'extract_credits_from_image',
+                  data: { image: shot.base64, creditType: activeTab },
+                }),
+              });
 
-            if (!response.ok) {
-              const errJson = await response.json().catch(() => ({}));
-              throw new Error(errJson.error || 'Server returned an error');
+              if (!response.ok) {
+                const errJson = await response.json().catch(() => ({}));
+                throw new Error(errJson.error || 'Server returned an error');
+              }
+
+              const resData = await response.json();
+              extracted = resData.results || [];
+            } catch (aiErr) {
+              console.warn('[CreditsExtractor] AI Vision failed, falling back to Local OCR:', aiErr);
+              setOcrLogs((prev) => [
+                ...prev,
+                `⚠️ ${label}: AI Vision unavailable. Falling back to Free Local Tesseract OCR...`
+              ]);
+              extracted = await extractCreditsWithLocalOCR(shot.base64, activeTab);
             }
-
-            const resData = await response.json();
-            extracted = resData.results || [];
           }
 
           if (!extracted.length) {
