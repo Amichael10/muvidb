@@ -13,12 +13,12 @@ const ENDPOINTS = [
     path: '/api/v1/films',
     tier: 'Free',
     tierBadgeColor: 'bg-green-500/10 text-green-400 border-green-500/20',
-    description: 'Query African and Nollywood cinema catalog with multi-field search, genre filters, streaming platforms, and year sorting.',
+    description: 'Query African and Nollywood cinema catalog. Free tier is limited to previewing the first 500 films; Pro tier provides unrestricted access to all 12,000+ films.',
     params: [
       { name: 'query', type: 'string', desc: 'Search by title, alternative titles, or keywords' },
       { name: 'genre', type: 'string', desc: 'Filter by genre (e.g. Drama, Comedy, Thriller)' },
       { name: 'year', type: 'number', desc: 'Filter by release year (e.g. 2024)' },
-      { name: 'page', type: 'number', desc: 'Page number (default: 1)' },
+      { name: 'page', type: 'number', desc: 'Page number (default: 1; Free tier max offset 500)' },
       { name: 'limit', type: 'number', desc: 'Items per page (Free max 20, Pro max 100)' },
     ],
     curl: `curl -X GET "https://muvidb.com/api/v1/films?query=wedding&genre=Romance" \\
@@ -60,8 +60,9 @@ print(films["data"])`,
   "pagination": {
     "page": 1,
     "limit": 20,
-    "total": 142,
-    "has_more": true
+    "total": 500,
+    "has_more": true,
+    "catalog_tier": "Free (Limited to first 500 films)"
   }
 }`
   },
@@ -70,9 +71,9 @@ print(films["data"])`,
     name: 'Film Cast & Crew',
     method: 'GET',
     path: '/api/v1/films/:id/credits',
-    tier: 'Free',
+    tier: 'Free Preview',
     tierBadgeColor: 'bg-green-500/10 text-green-400 border-green-500/20',
-    description: 'Retrieve verified, billing-ordered cast and crew ensemble for a specific film, including department designations and character roles.',
+    description: 'Retrieve cast and crew ensemble for a specific film. Free tier returns preview credits (top 10 cast & crew); Pro tier delivers the complete ensemble.',
     params: [
       { name: 'id', type: 'UUID or Slug', required: true, desc: 'Film UUID or slug' }
     ],
@@ -128,13 +129,13 @@ print(response.json()["data"])`,
     name: 'People & Filmographies',
     method: 'GET',
     path: '/api/v1/people',
-    tier: 'Free',
+    tier: 'Free Preview',
     tierBadgeColor: 'bg-green-500/10 text-green-400 border-green-500/20',
-    description: 'Explore the definitive biographical index of African filmmakers, actors, directors, screenwriters, producers, and talent agencies.',
+    description: 'Explore the biographical index of African filmmakers, actors, and crew. Free tier is capped to the first 500 people; Pro tier grants access to all 15,000+ profiles.',
     params: [
       { name: 'query', type: 'string', desc: 'Search by full or professional name' },
       { name: 'role', type: 'string', desc: 'Filter by primary profession (Actor, Director, Producer)' },
-      { name: 'page', type: 'number', desc: 'Page number' },
+      { name: 'page', type: 'number', desc: 'Page number (Free tier max offset 500)' },
       { name: 'limit', type: 'number', desc: 'Records per page (Free max 20, Pro max 100)' }
     ],
     curl: `curl -X GET "https://muvidb.com/api/v1/people?query=Genevieve&role=Actor" \\
@@ -162,7 +163,7 @@ print(response.json()["data"])`,
       "name": "Genevieve Nnaji",
       "slug": "genevieve-nnaji",
       "primary_role": "Actor / Director",
-      "bio": "Genevieve Nnaji is a Nigerian actress, producer, and director who won the Africa Movie Academy Award...",
+      "bio": "Genevieve Nnaji is a Nigerian actress, producer, and director...",
       "profile_image": "https://images.muvidb.com/people/genevieve.jpg",
       "credits_count": 84,
       "awards_count": 14,
@@ -172,8 +173,63 @@ print(response.json()["data"])`,
   "pagination": {
     "page": 1,
     "limit": 20,
-    "total": 1,
-    "has_more": false
+    "total": 500,
+    "has_more": true,
+    "catalog_tier": "Free (Limited to first 500 people)"
+  }
+}`
+  },
+  {
+    id: 'credits-list',
+    name: 'Search Cast & Crew Credits',
+    method: 'GET',
+    path: '/api/v1/credits',
+    tier: 'Free Preview',
+    tierBadgeColor: 'bg-green-500/10 text-green-400 border-green-500/20',
+    description: 'Query credits across the database by film, actor, role, or department. Free tier is capped to the first 500 credits; Pro tier has unlimited access.',
+    params: [
+      { name: 'film_id', type: 'UUID', desc: 'Filter by film UUID' },
+      { name: 'person_id', type: 'UUID', desc: 'Filter by person UUID' },
+      { name: 'role', type: 'string', desc: 'Filter by role or character name' },
+      { name: 'department', type: 'string', desc: 'Filter by department (Directing, Production, Cast)' },
+      { name: 'limit', type: 'number', desc: 'Records per page (Free max 20, Pro max 100)' }
+    ],
+    curl: `curl -X GET "https://muvidb.com/api/v1/credits?role=Actor&limit=20" \\
+  -H "x-api-key: mvd_live_your_api_key_here"`,
+    javascript: `const res = await fetch('https://muvidb.com/api/v1/credits?role=Actor&limit=20', {
+  headers: {
+    'x-api-key': 'mvd_live_your_api_key_here'
+  }
+});
+const credits = await res.json();
+console.log(credits.data);`,
+    python: `import requests
+
+url = "https://muvidb.com/api/v1/credits"
+headers = {"x-api-key": "mvd_live_your_api_key_here"}
+params = {"role": "Actor", "limit": 20}
+
+response = requests.get(url, headers=headers, params=params)
+print(response.json()["data"])`,
+    responseSample: `{
+  "success": true,
+  "data": [
+    {
+      "id": "c1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c",
+      "film_id": "f48c149d-37cb-4ad8-ba96-f94a86fbe07a",
+      "role": "Dunni Coker",
+      "department": "Cast",
+      "credit_order": 1,
+      "films": { "title": "The Wedding Party", "year": 2016 },
+      "people": { "name": "Adesua Etomi-Wellington" }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 500,
+    "has_more": true,
+    "catalog_tier": "Free (Limited to first 500 credits)"
   }
 }`
   },
@@ -655,23 +711,23 @@ export default function DeveloperApi() {
                 <div className="space-y-3 text-xs text-slate-300">
                   <div className="flex items-center gap-2.5">
                     <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
+                    <span><strong>Catalog Limit:</strong> First 500 Films &amp; 500 People</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
+                    <span><strong>Credits Limit:</strong> Up to 500 credits (Top 10 cast/crew preview)</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
                     <span><strong>60 requests / min</strong> (1 req/sec)</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
                     <span>Max 20 items per page</span>
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
-                    <span>Access to Films & People catalog</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
-                    <span>Full cast & crew ensemble credits</span>
-                  </div>
                   <div className="flex items-center gap-2.5 text-slate-500">
                     <Icon icon="solar:close-circle-linear" className="text-slate-600 text-base shrink-0" />
-                    <span>No Box Office / Gross analytics</span>
+                    <span>No Box Office / Gross revenue data</span>
                   </div>
                   <div className="flex items-center gap-2.5 text-slate-500">
                     <Icon icon="solar:close-circle-linear" className="text-slate-600 text-base shrink-0" />
@@ -714,6 +770,18 @@ export default function DeveloperApi() {
                 <div className="space-y-3 text-xs text-slate-200">
                   <div className="flex items-center gap-2.5">
                     <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
+                    <span><strong>Full Database Access</strong> (All 12,400+ Films &amp; 15,000+ People)</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
+                    <span><strong>Complete Credits History</strong> (Unrestricted cast &amp; crew)</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
+                    <span className="font-bold text-white">Box Office Grosses &amp; Rankings</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
                     <span><strong>600 requests / min</strong> (10 req/sec)</span>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -722,19 +790,7 @@ export default function DeveloperApi() {
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span className="font-bold text-white">Box Office Grosses & Rankings</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span>Verified streaming platform deep links</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
                     <span>Commercial licensing (no attribution required)</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span>Priority developer email & Discord support</span>
                   </div>
                 </div>
               </div>
@@ -842,16 +898,22 @@ export default function DeveloperApi() {
                   <td className="p-4 text-center">500</td>
                 </tr>
                 <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">African Cinema & People Catalog</td>
-                  <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
-                  <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
-                  <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
+                  <td className="p-4 font-semibold text-white">Films Catalog Coverage</td>
+                  <td className="p-4 text-center text-amber-400 font-semibold">First 500 Films (Preview)</td>
+                  <td className="p-4 text-center font-bold text-white">Full 12,400+ Films</td>
+                  <td className="p-4 text-center font-bold text-white">Full 12,400+ Films</td>
                 </tr>
                 <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">Ensemble Cast & Crew Credits</td>
-                  <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
-                  <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
-                  <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
+                  <td className="p-4 font-semibold text-white">People &amp; Talent Directory</td>
+                  <td className="p-4 text-center text-amber-400 font-semibold">First 500 People (Preview)</td>
+                  <td className="p-4 text-center font-bold text-white">Full 15,000+ People</td>
+                  <td className="p-4 text-center font-bold text-white">Full 15,000+ People</td>
+                </tr>
+                <tr className="hover:bg-white/[0.02]">
+                  <td className="p-4 font-semibold text-white">Credits &amp; Ensemble Filmographies</td>
+                  <td className="p-4 text-center text-amber-400 font-semibold">Limited: 500 Credits (Top 10 / film)</td>
+                  <td className="p-4 text-center font-bold text-brand">Complete &amp; Unrestricted</td>
+                  <td className="p-4 text-center font-bold text-blue-400">Complete &amp; Unrestricted</td>
                 </tr>
                 <tr className="hover:bg-white/[0.02]">
                   <td className="p-4 font-semibold text-white">Box Office & Gross Revenue Data</td>

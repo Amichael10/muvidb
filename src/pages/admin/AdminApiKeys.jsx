@@ -534,11 +534,11 @@ export default function AdminApiKeys() {
             <ul className="space-y-1.5 text-text-muted pt-1">
               <li className="flex items-center gap-2 text-white/90">
                 <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Films &amp; People Search</span>
+                <span>Limited Catalog: <strong>Max 500 Films &amp; 500 People</strong></span>
               </li>
               <li className="flex items-center gap-2 text-white/90">
                 <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Full Credits &amp; Filmography</span>
+                <span>Limited Credits: <strong>Top 10 cast/crew per film, max 500 credits</strong></span>
               </li>
               <li className="flex items-center gap-2 text-white/90">
                 <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -574,7 +574,7 @@ export default function AdminApiKeys() {
             <ul className="space-y-1.5 text-text-muted pt-1">
               <li className="flex items-center gap-2 text-white">
                 <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>Everything in Free</span>
+                <span><strong>Full Unrestricted Database</strong> (All 12,000+ Films, 15,000+ People &amp; Complete Credits)</span>
               </li>
               <li className="flex items-center gap-2 text-white">
                 <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-blue-400 shrink-0" />

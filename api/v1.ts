@@ -3,6 +3,8 @@ import { handleCors } from './_lib/cors.js';
 import { requireApiKey } from './_lib/api_key_guard.js';
 import { supabase } from './_lib/supabase.js';
 
+const MAX_FREE_CATALOG_LIMIT = 500;
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
@@ -42,6 +44,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tier_entitlements: {
         tier: key.tier,
         max_page_limit: key.tier === 'free' ? 20 : 100,
+        catalog_access_limit: key.tier === 'free' ? MAX_FREE_CATALOG_LIMIT : 'unlimited',
+        full_catalog_access: key.tier !== 'free',
         box_office_access: key.tier !== 'free',
         commercial_license: key.tier !== 'free',
         priority_support: key.tier !== 'free',
@@ -52,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'GET /api/v1/films/:id/credits',
         'GET /api/v1/people',
         'GET /api/v1/people/:id',
+        'GET /api/v1/credits',
         'GET /api/v1/boxoffice (Pro & Enterprise)',
       ],
       documentation: 'https://muvidb.com/developers'
@@ -90,15 +95,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (error) return res.status(500).json({ error: 'Failed to fetch film credits' });
 
-      const cast = (credits || []).filter(c => c.role === 'Actor' || c.department === 'Cast');
-      const crew = (credits || []).filter(c => c.role !== 'Actor' && c.department !== 'Cast');
+      const rawCast = (credits || []).filter(c => c.role === 'Actor' || c.department === 'Cast');
+      const rawCrew = (credits || []).filter(c => c.role !== 'Actor' && c.department !== 'Cast');
+
+      const isFree = key.tier === 'free';
+      const cast = isFree ? rawCast.slice(0, 10) : rawCast;
+      const crew = isFree ? rawCrew.slice(0, 10) : rawCrew;
 
       return res.status(200).json({
         film_id: filmId,
         cast_count: cast.length,
         crew_count: crew.length,
+        total_cast_in_db: rawCast.length,
+        total_crew_in_db: rawCrew.length,
         cast,
         crew,
+        tier: key.tier,
+        is_limited_preview: isFree && (rawCast.length > 10 || rawCrew.length > 10),
+        upgrade_url: isFree ? 'https://muvidb.com/developers#pricing' : undefined,
       });
     }
 
@@ -156,10 +170,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const key = await requireApiKey(req, res, 'films:read');
     if (!key) return;
 
+    const isFree = key.tier === 'free';
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const maxLimitAllowed = key.tier === 'free' ? 20 : 100;
+    const maxLimitAllowed = isFree ? 20 : 100;
     const limit = Math.min(maxLimitAllowed, Math.max(1, parseInt(req.query.limit as string) || 20));
     const offset = (page - 1) * limit;
+
+    // Gate Free tier catalog to first 500 records
+    if (isFree && offset >= MAX_FREE_CATALOG_LIMIT) {
+      return res.status(403).json({
+        error: 'Free Tier Catalog Limit Reached',
+        message: `Free tier API keys are limited to previewing the first ${MAX_FREE_CATALOG_LIMIT} films. Upgrade to Pro for unrestricted access to all 12,000+ films in the catalog.`,
+        catalog_limit: MAX_FREE_CATALOG_LIMIT,
+        upgrade_url: 'https://muvidb.com/developers#pricing',
+        tier: key.tier
+      });
+    }
 
     const { search, year, language, sort = 'popular' } = req.query;
 
@@ -193,13 +219,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (error) return res.status(500).json({ error: 'Failed to retrieve films' });
 
+    const effectiveTotal = isFree ? Math.min(MAX_FREE_CATALOG_LIMIT, count || 0) : (count || 0);
+    const hasMore = isFree 
+      ? (offset + limit < MAX_FREE_CATALOG_LIMIT && (count || 0) > offset + limit)
+      : (count || 0) > offset + limit;
+
     return res.status(200).json({
       data: films || [],
       pagination: {
         page,
         limit,
-        total: count || 0,
-        has_more: (count || 0) > offset + limit,
+        total: effectiveTotal,
+        has_more: hasMore,
+        catalog_tier: isFree ? `Free (Limited to first ${MAX_FREE_CATALOG_LIMIT} films)` : 'Pro / Enterprise (Unlimited Catalog)'
       }
     });
   }
@@ -266,10 +298,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const key = await requireApiKey(req, res, 'people:read');
     if (!key) return;
 
+    const isFree = key.tier === 'free';
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const maxLimitAllowed = key.tier === 'free' ? 20 : 100;
+    const maxLimitAllowed = isFree ? 20 : 100;
     const limit = Math.min(maxLimitAllowed, Math.max(1, parseInt(req.query.limit as string) || 20));
     const offset = (page - 1) * limit;
+
+    // Gate Free tier catalog to first 500 records
+    if (isFree && offset >= MAX_FREE_CATALOG_LIMIT) {
+      return res.status(403).json({
+        error: 'Free Tier Catalog Limit Reached',
+        message: `Free tier API keys are limited to previewing the first ${MAX_FREE_CATALOG_LIMIT} people. Upgrade to Pro for unrestricted access to all 15,000+ talent and crew members.`,
+        catalog_limit: MAX_FREE_CATALOG_LIMIT,
+        upgrade_url: 'https://muvidb.com/developers#pricing',
+        tier: key.tier
+      });
+    }
 
     const { search, department } = req.query;
 
@@ -290,13 +334,83 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (error) return res.status(500).json({ error: 'Failed to retrieve people' });
 
+    const effectiveTotal = isFree ? Math.min(MAX_FREE_CATALOG_LIMIT, count || 0) : (count || 0);
+    const hasMore = isFree 
+      ? (offset + limit < MAX_FREE_CATALOG_LIMIT && (count || 0) > offset + limit)
+      : (count || 0) > offset + limit;
+
     return res.status(200).json({
       data: people || [],
       pagination: {
         page,
         limit,
-        total: count || 0,
-        has_more: (count || 0) > offset + limit,
+        total: effectiveTotal,
+        has_more: hasMore,
+        catalog_tier: isFree ? `Free (Limited to first ${MAX_FREE_CATALOG_LIMIT} people)` : 'Pro / Enterprise (Unlimited Directory)'
+      }
+    });
+  }
+
+  // 3. CREDITS RESOURCE: GET /api/v1/credits
+  if (resource === 'credits') {
+    const key = await requireApiKey(req, res, 'credits:read');
+    if (!key) return;
+
+    const isFree = key.tier === 'free';
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const maxLimitAllowed = isFree ? 20 : 100;
+    const limit = Math.min(maxLimitAllowed, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const offset = (page - 1) * limit;
+
+    if (isFree && offset >= MAX_FREE_CATALOG_LIMIT) {
+      return res.status(403).json({
+        error: 'Free Tier Catalog Limit Reached',
+        message: `Free tier API keys are limited to previewing the first ${MAX_FREE_CATALOG_LIMIT} credits. Upgrade to Pro for unrestricted full database credits access.`,
+        catalog_limit: MAX_FREE_CATALOG_LIMIT,
+        upgrade_url: 'https://muvidb.com/developers#pricing',
+        tier: key.tier
+      });
+    }
+
+    const { film_id, person_id, role, department } = req.query;
+
+    let query = supabase
+      .from('credits')
+      .select(`
+        id,
+        film_id,
+        person_id,
+        role,
+        department,
+        credit_order,
+        is_lead,
+        films(id, slug, title, year, poster_url),
+        people(id, slug, name, avatar_url)
+      `, { count: 'exact' });
+
+    if (film_id && typeof film_id === 'string') query = query.eq('film_id', film_id);
+    if (person_id && typeof person_id === 'string') query = query.eq('person_id', person_id);
+    if (role && typeof role === 'string') query = query.ilike('role', `%${role.trim()}%`);
+    if (department && typeof department === 'string') query = query.ilike('department', `%${department.trim()}%`);
+
+    query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+
+    const { data: credits, error, count } = await query;
+    if (error) return res.status(500).json({ error: 'Failed to retrieve credits' });
+
+    const effectiveTotal = isFree ? Math.min(MAX_FREE_CATALOG_LIMIT, count || 0) : (count || 0);
+    const hasMore = isFree 
+      ? (offset + limit < MAX_FREE_CATALOG_LIMIT && (count || 0) > offset + limit)
+      : (count || 0) > offset + limit;
+
+    return res.status(200).json({
+      data: credits || [],
+      pagination: {
+        page,
+        limit,
+        total: effectiveTotal,
+        has_more: hasMore,
+        catalog_tier: isFree ? `Free (Limited to first ${MAX_FREE_CATALOG_LIMIT} credits)` : 'Pro / Enterprise (Unlimited Credits)'
       }
     });
   }
