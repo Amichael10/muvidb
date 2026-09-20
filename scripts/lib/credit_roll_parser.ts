@@ -287,9 +287,24 @@ function personCandidateText(value: string): string {
   return words.join(' ');
 }
 
+const CHARACTER_ROLE_PREFIXES = /^(?:BROTHER|BRO|SISTER|SIS|UNCLE|AUNTY|AUNT|MAMA|BABA|PAPA|PAPPY|PASTOR|ALFA|IMAM|ALHAJI|ALHAJA|DOCTOR|DOC|NURSE|LAWYER|BARRISTER|OFFICER|POLICE|INSPECTOR|SERGEANT|DPO|GATEMAN|GATE\s+MAN|DRIVER|LANDLORD|LANDLADY|MAID|CHAIRMAN|MADAM|ELDER|OMO|ELEGBON|OLORI)\b/i;
+
+const KNOWN_STAGE_NAMES = new Set([
+  'officer woos', 'mr macaroni', 'baba suwe', 'madam saje', 'mr latin', 'pastor peller', 'broda shaggi'
+]);
+
 function personTextLooksValid(text: string, allowSingleWord = false): boolean {
   if (text.length < (allowSingleWord ? 3 : 5) || text.length > 60) return false;
   if (/\d/.test(text) || canonicalRole(text) || isNoiseLine(text)) return false;
+
+  const norm = normalizeKey(text).toLowerCase();
+  if (CHARACTER_ROLE_PREFIXES.test(norm) && !KNOWN_STAGE_NAMES.has(norm)) {
+    return false;
+  }
+  if (/\b(?:agency|ventures|enterprises|properties|limited|ltd|holdings|services|company|consult|logistics|foundation|studio|studios|production|productions|entertainment|props|costumes|glamour)\b/i.test(norm)) {
+    return false;
+  }
+
   const shape = allowSingleWord
     ? /^[\p{L}][\p{L}.'’/-]*(?: [\p{L}][\p{L}.'’/-]*)*$/u
     : /^[\p{L}][\p{L}.'’/-]*(?: [\p{L}][\p{L}.'’/-]*)+$/u;
@@ -524,7 +539,7 @@ function splitAtSeparator(line: OcrLine, separatorX: number): [OcrWord[], OcrWor
   return null;
 }
 
-const CHARACTER_HINT = /\b(?:MR|MRS|MISS|MS|DR|DOCTOR|PROF|PROFESSOR|PRINCIPAL|TEACHER|KING|QUEEN|CHIEF|PRINCE|PRINCESS|PASTOR|IMAM|ALFA|BABA|MAMA|MOTHER|FATHER|OFFICER|POLICE|INSPECTOR|LAWYER|BARRISTER|NURSE|JUDGE|ELDER|LANDLORD|LANDLADY|CHAIRMAN|MADAM|SIR|MAID|GUARD|GATEMAN|GATE MAN|BOSS|DRIVER|WIFE|HUSBAND|SON|DAUGHTER|FRIEND|NEIGHBOUR|NEIGHBOR|CUSTOMER|VENDOR|VILLAGER|CHILD)\b/;
+const CHARACTER_HINT = /\b(?:BROTHER|BRO|SISTER|SIS|UNCLE|AUNTY|AUNT|MAMA|BABA|PAPA|PAPPY|PASTOR|ALFA|IMAM|ALHAJI|ALHAJA|MR|MRS|MISS|MS|DR|DOCTOR|PROF|PROFESSOR|PRINCIPAL|TEACHER|KING|QUEEN|CHIEF|PRINCE|PRINCESS|OFFICER|POLICE|INSPECTOR|LAWYER|BARRISTER|NURSE|JUDGE|ELDER|LANDLORD|LANDLADY|CHAIRMAN|MADAM|SIR|MAID|GUARD|GATEMAN|GATE\s+MAN|BOSS|DRIVER|WIFE|HUSBAND|SON|DAUGHTER|FRIEND|NEIGHBOUR|NEIGHBOR|CUSTOMER|VENDOR|VILLAGER|CHILD|OMO|ELEGBON|OLORI)\b/i;
 
 function characterScore(value: string): number {
   const key = normalizeKey(value);
@@ -532,7 +547,8 @@ function characterScore(value: string): number {
   const words = key.split(' ').filter(Boolean);
   let score = 0;
   if (CHARACTER_HINT.test(key)) score += 3;
-  if (/^(?:YOUNG|OLD|LITTLE|SMALL|ELDERLY)\b/.test(key)) score += 1;
+  if (/^(?:BROTHER|BRO|SISTER|SIS|UNCLE|AUNTY|MAMA|BABA|PAPA|PASTOR|OFFICER|OMO|ELEGBON|OLORI)\b/i.test(key)) score += 4;
+  if (/^(?:YOUNG|OLD|LITTLE|SMALL|ELDERLY)\b/i.test(key)) score += 1;
   if (words.length === 1) score += 2;
   else if (words.length <= 3) score += 1;
   return score;
