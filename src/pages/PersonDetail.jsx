@@ -1066,6 +1066,8 @@ const PersonDetail = () => {
               <TalentRepresentationCard
                 representations={representations}
                 personName={person.name}
+                personId={person.id}
+                canEdit={canManage}
               />
             </div>
           </div>

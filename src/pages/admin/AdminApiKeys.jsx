@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { supabase } from '../../lib/supabase';
 
@@ -41,6 +42,11 @@ export default function AdminApiKeys() {
   const [newKeyResult, setNewKeyResult] = useState(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
+  // Edit Key state
+  const [editingKey, setEditingKey] = useState(null);
+  const [editFormData, setEditFormData] = useState(null);
+  const [editLoading, setEditLoading] = useState(false);
+
   // Create form state
   const [formData, setFormData] = useState({
     name: '',
@@ -81,6 +87,83 @@ export default function AdminApiKeys() {
       const updated = exists ? prev.scopes.filter((s) => s !== scopeId) : [...prev.scopes, scopeId];
       return { ...prev, scopes: updated };
     });
+  };
+
+  const handleToggleEditScope = (scopeId) => {
+    setEditFormData((prev) => {
+      if (!prev) return prev;
+      const exists = prev.scopes.includes(scopeId);
+      const updated = exists ? prev.scopes.filter((s) => s !== scopeId) : [...prev.scopes, scopeId];
+      return { ...prev, scopes: updated };
+    });
+  };
+
+  const applyTierPresets = (tier, isEdit = false) => {
+    let rate = 60;
+    let scopes = ['films:read', 'people:read', 'credits:read'];
+    if (tier === 'pro') {
+      rate = 600;
+      scopes = ['films:read', 'people:read', 'credits:read', 'boxoffice:read'];
+    } else if (tier === 'enterprise') {
+      rate = 2000;
+      scopes = ['films:read', 'people:read', 'credits:read', 'boxoffice:read'];
+    }
+
+    if (isEdit) {
+      setEditFormData((prev) => ({
+        ...prev,
+        tier,
+        rate_limit_per_min: rate,
+        scopes,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        tier,
+        rate_limit_per_min: rate,
+        scopes,
+      }));
+    }
+  };
+
+  const handleOpenEdit = (key) => {
+    setEditingKey(key);
+    setEditFormData({
+      id: key.id,
+      name: key.name || '',
+      tier: key.tier || 'free',
+      scopes: Array.isArray(key.scopes) ? [...key.scopes] : ['films:read'],
+      rate_limit_per_min: key.rate_limit_per_min || 60,
+      is_active: Boolean(key.is_active),
+    });
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editFormData || !editFormData.name.trim()) return;
+    if (editFormData.scopes.length === 0) {
+      alert('Please select at least one permission scope.');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const res = await fetch('/api/data?_r=api-keys', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editFormData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update key');
+
+      setEditingKey(null);
+      setEditFormData(null);
+      fetchKeys();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const handleCreateKey = async (e) => {
@@ -176,19 +259,29 @@ export default function AdminApiKeys() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-white">Developer API & Partner Access</h1>
               <p className="text-sm text-text-muted mt-0.5">
-                Issue and manage scoped API keys for external developers, streamers, and research partners.
+                Issue, configure, and manage scoped API keys for external developers, streamers, and research partners.
               </p>
             </div>
           </div>
         </div>
 
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-black font-semibold text-sm hover:bg-amber-400 transition shadow-lg shadow-amber-500/20 active:scale-95"
-        >
-          <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
-          <span>Generate New Key</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/developers"
+            target="_blank"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface hover:bg-surface-2 border border-border text-white font-medium text-sm transition active:scale-95 shadow-sm"
+          >
+            <Icon icon="solar:document-text-linear" className="w-4 h-4 text-amber-400" />
+            <span>Developer Portal ↗</span>
+          </Link>
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-black font-semibold text-sm hover:bg-amber-400 transition shadow-lg shadow-amber-500/20 active:scale-95"
+          >
+            <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
+            <span>Generate New Key</span>
+          </button>
+        </div>
       </div>
 
       {/* Migration Notice if table not created */}
@@ -366,7 +459,14 @@ export default function AdminApiKeys() {
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      <div className="inline-flex items-center gap-1">
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(key)}
+                          className="p-1.5 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition"
+                          title="Edit Key, Tier & Permissions"
+                        >
+                          <Icon icon="solar:pen-bold" className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => handleToggleStatus(key)}
                           className={`p-1.5 rounded-lg border text-xs font-medium transition ${
@@ -393,6 +493,154 @@ export default function AdminApiKeys() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Free vs Pro vs Enterprise Tier Reference Guide */}
+      <div className="p-6 rounded-2xl bg-gradient-to-br from-surface/80 via-surface/40 to-surface/80 border border-border space-y-6 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-500">
+              <Icon icon="solar:shield-check-bold" className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Tier Access Matrix: Free vs. Pro vs. Enterprise</h3>
+              <p className="text-xs text-text-muted mt-0.5">
+                Understand and configure what each client tier receives across rate limits, scopes, and box office analytics.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/developers"
+            target="_blank"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/25 px-3 py-1.5 rounded-xl transition"
+          >
+            <span>View Public Developer Page</span>
+            <Icon icon="solar:arrow-right-up-linear" className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          {/* Free Tier */}
+          <div className="p-4 rounded-xl bg-surface-2/40 border border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-white text-sm">Free Tier</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
+                Standard
+              </span>
+            </div>
+            <p className="text-text-muted text-[11px] leading-relaxed">
+              For non-commercial indie developers, students, researchers, and hobby projects.
+            </p>
+            <ul className="space-y-1.5 text-text-muted pt-1">
+              <li className="flex items-center gap-2 text-white/90">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Films &amp; People Search</span>
+              </li>
+              <li className="flex items-center gap-2 text-white/90">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Full Credits &amp; Filmography</span>
+              </li>
+              <li className="flex items-center gap-2 text-white/90">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Rate Limit: <strong>60 req/min</strong></span>
+              </li>
+              <li className="flex items-center gap-2 text-white/90">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Max page size: <strong>20 items</strong></span>
+              </li>
+              <li className="flex items-center gap-2 text-text-muted">
+                <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5 text-red-400/80 shrink-0" />
+                <span className="line-through text-text-muted/60">Box Office Intelligence</span>
+              </li>
+              <li className="flex items-center gap-2 text-text-muted">
+                <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5 text-red-400/80 shrink-0" />
+                <span>Attribution required (Non-commercial)</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Pro Tier */}
+          <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/30 space-y-3 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none" />
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-white text-sm">Pro Partner</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                Recommended
+              </span>
+            </div>
+            <p className="text-blue-200/80 text-[11px] leading-relaxed">
+              For streaming portals, talent agencies, media publications, production studios, and fintech apps.
+            </p>
+            <ul className="space-y-1.5 text-text-muted pt-1">
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>Everything in Free</span>
+              </li>
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span><strong>Box Office Intelligence</strong> (<code className="text-blue-300">boxoffice:read</code>)</span>
+              </li>
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>High Rate Limit: <strong>600 req/min</strong> (10 req/s)</span>
+              </li>
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>Max page size: <strong>100 items</strong></span>
+              </li>
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span><strong>Full Commercial License</strong></span>
+              </li>
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>Streaming URLs &amp; Deep Metadata</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Enterprise Tier */}
+          <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-white text-sm">Enterprise</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                Custom
+              </span>
+            </div>
+            <p className="text-purple-200/80 text-[11px] leading-relaxed">
+              For major telecom platforms, OTT streaming services, broadcast networks, and data syndicators.
+            </p>
+            <ul className="space-y-1.5 text-text-muted pt-1">
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span>Everything in Pro</span>
+              </li>
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span>Ultra Throughput: <strong>2,000+ req/min</strong></span>
+              </li>
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span>Dedicated DB Connection Pool</span>
+              </li>
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span>99.9% Uptime SLA Guarantee</span>
+              </li>
+              <li className="flex items-center gap-2 text-white">
+                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span>Custom Webhooks &amp; Data Dumps</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 flex items-start gap-2.5">
+          <Icon icon="solar:info-circle-bold" className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="leading-relaxed">
+            <strong>How to edit or change a partner&apos;s tier:</strong> Click the <Icon icon="solar:pen-bold" className="inline w-3 h-3 text-amber-400 mx-0.5" /> (pencil icon) on any row in the table above. Selecting <em>Pro</em> automatically sets the rate limit to 600 req/min and adds the <code>boxoffice:read</code> scope.
+          </div>
+        </div>
       </div>
 
       {/* Developer API Documentation Accordion */}
@@ -515,12 +763,12 @@ export default function AdminApiKeys() {
                   <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">Plan Tier</label>
                   <select
                     value={formData.tier}
-                    onChange={(e) => setFormData({ ...formData, tier: e.target.value })}
+                    onChange={(e) => applyTierPresets(e.target.value, false)}
                     className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition"
                   >
-                    <option value="free">Free (Standard)</option>
-                    <option value="pro">Pro Partner</option>
-                    <option value="enterprise">Enterprise</option>
+                    <option value="free">Free (Standard - 60/min)</option>
+                    <option value="pro">Pro Partner (600/min + Box Office)</option>
+                    <option value="enterprise">Enterprise (2000/min)</option>
                   </select>
                 </div>
 
@@ -592,6 +840,178 @@ export default function AdminApiKeys() {
                 >
                   {createLoading && <Icon icon="solar:spinner-line" className="w-4 h-4 animate-spin" />}
                   <span>Generate Key</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Key & Tier Permissions Modal */}
+      {editingKey && editFormData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-bg border border-border rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl space-y-6 p-6">
+            <div className="flex items-center justify-between border-b border-border/40 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                  <Icon icon="solar:pen-bold" className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">Edit API Key Access &amp; Tier</h3>
+                  <p className="text-xs text-text-muted font-mono">{editingKey.key_prefix}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setEditingKey(null); setEditFormData(null); }}
+                className="text-text-muted hover:text-white transition p-1"
+              >
+                <Icon icon="solar:close-circle-bold" className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                  Organization / Client Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
+
+              {/* Plan Tier Presets */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    Plan Tier &amp; Preset
+                  </label>
+                  <span className="text-[11px] text-text-muted">Click to apply tier defaults</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'free', label: 'Free Tier', rate: '60 req/min', desc: 'Standard' },
+                    { id: 'pro', label: 'Pro Partner', rate: '600 req/min', desc: '+ Box Office' },
+                    { id: 'enterprise', label: 'Enterprise', rate: '2,000 req/min', desc: 'Custom SLA' },
+                  ].map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => applyTierPresets(t.id, true)}
+                      className={`p-2.5 rounded-xl border text-center transition ${
+                        editFormData.tier === t.id
+                          ? t.id === 'pro'
+                            ? 'bg-blue-500/15 border-blue-500 text-white font-bold shadow-lg shadow-blue-500/10'
+                            : t.id === 'enterprise'
+                            ? 'bg-purple-500/15 border-purple-500 text-white font-bold shadow-lg shadow-purple-500/10'
+                            : 'bg-amber-500/15 border-amber-500 text-white font-bold'
+                          : 'bg-surface/50 border-border text-text-muted hover:text-white hover:bg-surface'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{t.label}</div>
+                      <div className="text-[10px] opacity-80 font-mono mt-0.5">{t.rate}</div>
+                      <div className="text-[9px] text-text-muted mt-0.5">{t.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rate Limit */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    Rate Limit (/min)
+                  </label>
+                  <span className="text-[11px] text-text-muted">Max queries allowed per minute</span>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={editFormData.rate_limit_per_min}
+                  onChange={(e) => setEditFormData({ ...editFormData, rate_limit_per_min: e.target.value })}
+                  className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface border border-border">
+                <div>
+                  <div className="text-xs font-bold text-white">Key Activation Status</div>
+                  <div className="text-[11px] text-text-muted">Revoking blocks all incoming calls with this key immediately.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditFormData({ ...editFormData, is_active: !editFormData.is_active })}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition ${
+                    editFormData.is_active
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-red-500/15 text-red-400 border border-red-500/30'
+                  }`}
+                >
+                  {editFormData.is_active ? 'Active' : 'Revoked'}
+                </button>
+              </div>
+
+              {/* Scopes */}
+              <div className="space-y-2 pt-2">
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                  Permission Scopes <span className="text-red-400">*</span>
+                </label>
+                <div className="space-y-2">
+                  {AVAILABLE_SCOPES.map((scope) => {
+                    const isChecked = editFormData.scopes.includes(scope.id);
+                    return (
+                      <label
+                        key={scope.id}
+                        onClick={() => handleToggleEditScope(scope.id)}
+                        className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition select-none ${
+                          isChecked
+                            ? 'bg-amber-500/10 border-amber-500/40'
+                            : 'bg-surface/40 border-border hover:bg-surface'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="mt-1 rounded text-amber-500 focus:ring-0 focus:ring-offset-0 bg-surface border-border"
+                        />
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-white">{scope.label}</span>
+                            <code className="text-[10px] text-amber-400 font-mono px-1.5 py-0.5 rounded bg-black/40">
+                              {scope.id}
+                            </code>
+                          </div>
+                          <p className="text-xs text-text-muted leading-relaxed">{scope.description}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/40">
+                <button
+                  type="button"
+                  onClick={() => { setEditingKey(null); setEditFormData(null); }}
+                  className="px-4 py-2 rounded-xl border border-border hover:bg-surface text-text-muted hover:text-white text-sm transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editLoading}
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm transition flex items-center gap-2 disabled:opacity-50"
+                >
+                  {editLoading && <Icon icon="solar:spinner-line" className="w-4 h-4 animate-spin" />}
+                  <span>Save Changes</span>
                 </button>
               </div>
             </form>

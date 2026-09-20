@@ -12,6 +12,7 @@ import ImageField from '../../components/admin/ImageField';
 import AddCreditModal from '../../components/admin/AddCreditModal';
 import AwardsEditor from '../../components/admin/AwardsEditor';
 import PersonMediaEditor from '../../components/admin/PersonMediaEditor';
+import PersonRepresentationEditor from '../../components/admin/PersonRepresentationEditor';
 import { ALL_ROLES, CAST_ROLE, formatRole, normalizeRole } from '../../lib/creditRoles';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +22,59 @@ import { useLocalStorageDraft } from '../../hooks/useLocalStorageDraft';
 import { getFriendlyErrorMessage } from '../../utils/errors';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { AFRICAN_NATIONALITIES } from '../../utils/africanCountries';
+
+function FoldableSection({
+  title,
+  icon,
+  badge,
+  isOpen,
+  onToggle,
+  actions,
+  children,
+  className = '',
+}) {
+  return (
+    <div className={`rounded-2xl border border-border bg-surface-2/30 overflow-hidden transition-all shadow-sm ${className}`}>
+      <div
+        onClick={onToggle}
+        className="flex items-center justify-between px-5 py-3.5 bg-surface-2/70 hover:bg-surface-2 cursor-pointer transition-colors select-none group"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl transition-transform duration-200 group-hover:scale-110">{icon}</span>
+          <div className="flex items-center gap-2.5">
+            <h4 className="text-sm font-bold text-text-primary tracking-wide">{title}</h4>
+            {badge !== undefined && badge !== null && badge !== '' && (
+              <span className="text-[11px] font-mono font-bold bg-brand/15 text-brand border border-brand/25 rounded-full px-2.5 py-0.5">
+                {badge}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          {actions}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface transition-colors"
+            title={isOpen ? 'Collapse section' : 'Expand section'}
+          >
+            <Icon
+              icon="solar:alt-arrow-down-linear"
+              className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180 text-brand' : ''}`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="p-5 border-t border-border/60">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPeople() {
   const { user } = useAuth();
@@ -68,6 +122,56 @@ export default function AdminPeople() {
   const [isDeletingCredit, setIsDeletingCredit] = useState(false);
   const [updatingCreditId, setUpdatingCreditId] = useState(null);
 
+  // Foldable sections state for the edit drawer
+  const [collapsedSections, setCollapsedSections] = useState({
+    personal: false,
+    credits: false,
+    youtube: true,
+    youtubeFilmography: true,
+    social: true,
+    media: true,
+    representation: true,
+    awards: true,
+    settings: true,
+  });
+  const [creditFilterQuery, setCreditFilterQuery] = useState('');
+  const [creditDisplayLimit, setCreditDisplayLimit] = useState(30);
+
+  const toggleSection = (key) => {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const expandAllSections = () => {
+    setCollapsedSections({
+      personal: false,
+      credits: false,
+      youtube: false,
+      youtubeFilmography: false,
+      social: false,
+      media: false,
+      representation: false,
+      awards: false,
+      settings: false,
+    });
+  };
+
+  const collapseAllSections = () => {
+    setCollapsedSections({
+      personal: true,
+      credits: true,
+      youtube: true,
+      youtubeFilmography: true,
+      social: true,
+      media: true,
+      representation: true,
+      awards: true,
+      settings: true,
+    });
+  };
+
   // Shared by the drawer's initial load and the add-credit modal's save.
   const refetchCredits = async (personId) => {
     const { data } = await supabase
@@ -79,8 +183,28 @@ export default function AdminPeople() {
       .eq('person_id', personId)
       .order('billing_order');
 
-    setPersonCredits(data || []);
+    const creditsList = data || [];
+    setPersonCredits(creditsList);
+    if (creditsList.length > 15) {
+      setCollapsedSections((prev) => ({ ...prev, credits: true }));
+    }
   };
+
+  const filteredCredits = useMemo(() => {
+    if (!creditFilterQuery.trim()) return personCredits;
+    const q = creditFilterQuery.toLowerCase().trim();
+    return personCredits.filter(
+      (c) =>
+        (c.films?.title || '').toLowerCase().includes(q) ||
+        (c.role || '').toLowerCase().includes(q) ||
+        (c.character_name || '').toLowerCase().includes(q) ||
+        String(c.films?.year || '').includes(q)
+    );
+  }, [personCredits, creditFilterQuery]);
+
+  const visibleCredits = useMemo(() => {
+    return filteredCredits.slice(0, creditDisplayLimit);
+  }, [filteredCredits, creditDisplayLimit]);
 
   const updateCreditField = async (credit, patch) => {
     if (!editingPerson) return;
@@ -575,6 +699,18 @@ export default function AdminPeople() {
 
     setIsDrawerOpen(true);
   };
+
+  useEffect(() => {
+    const editId = searchParams.get('edit') || searchParams.get('person_id');
+    if (editId && (!editingPerson || editingPerson.id !== editId)) {
+      (async () => {
+        const { data: p } = await supabase.from('people').select('*').eq('id', editId).maybeSingle();
+        if (p) {
+          openEditDrawer(p);
+        }
+      })();
+    }
+  }, [searchParams]);
 
   const handleFetchYoutube = async () => {
     const identifierRaw =
@@ -1164,12 +1300,43 @@ export default function AdminPeople() {
             </div>
           )}
         <ErrorBoundary>
-        <form onSubmit={handleSave} className="p-8 space-y-10 flex-1 overflow-y-auto">
-          <section className="space-y-6">
-            <div className="flex items-center gap-2 pb-2 border-b border-border">
-              <span className="text-xl">👤</span>
-              <h4 className="text-xs font-bold text-text-muted">Personal Details</h4>
+        <form onSubmit={handleSave} className="p-6 sm:p-8 space-y-6 flex-1 overflow-y-auto">
+          {/* Section Toolbar: Expand All / Collapse All */}
+          <div className="sticky -top-6 sm:-top-8 z-20 -mx-6 sm:-mx-8 px-6 sm:px-8 py-3 bg-surface/95 backdrop-blur-md border-b border-border flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:layers-minimalistic-bold" className="w-4 h-4 text-brand" />
+              <span className="text-xs font-bold text-text-primary">Profile Sections</span>
+              {editingPerson && personCredits.length > 0 && (
+                <span className="text-[11px] font-mono font-bold bg-brand/10 text-brand border border-brand/20 px-2 py-0.5 rounded-full">
+                  {personCredits.length} Credits
+                </span>
+              )}
             </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={expandAllSections}
+                className="px-2.5 py-1 text-[11px] font-bold bg-surface-2 hover:bg-surface-3 text-text-primary border border-border rounded-lg transition-all"
+              >
+                Expand All
+              </button>
+              <button
+                type="button"
+                onClick={collapseAllSections}
+                className="px-2.5 py-1 text-[11px] font-bold bg-surface-2 hover:bg-surface-3 text-text-muted hover:text-text-primary border border-border rounded-lg transition-all"
+              >
+                Collapse All
+              </button>
+            </div>
+          </div>
+
+          {/* 1. Personal Details */}
+          <FoldableSection
+            title="Personal Details"
+            icon="👤"
+            isOpen={!collapsedSections.personal}
+            onToggle={() => toggleSection('personal')}
+          >
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-text-primary mb-2">Full Name</label>
@@ -1295,23 +1462,26 @@ export default function AdminPeople() {
                 />
               </div>
             </div>
-          </section>
+          </FoldableSection>
 
-          <section className="space-y-6">
-            <div className="flex items-center justify-between pb-2 border-b border-border">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">📺</span>
-                <h4 className="text-xs font-bold text-text-muted">YouTube Data</h4>
-              </div>
+          {/* 2. YouTube Data */}
+          <FoldableSection
+            title="YouTube Data"
+            icon="📺"
+            badge={formData.youtube_stats?.subscribers ? `${Number(formData.youtube_stats.subscribers).toLocaleString()} subs` : null}
+            isOpen={!collapsedSections.youtube}
+            onToggle={() => toggleSection('youtube')}
+            actions={
               <button
                 type="button"
                 onClick={handleFetchYoutube}
-                className="text-[10px] font-bold text-brand bg-brand/5 border border-brand/20 px-3 py-1 rounded-xl hover:bg-brand/10 transition-all flex items-center gap-1.5"
+                className="text-[10px] font-bold text-brand bg-brand/10 border border-brand/20 px-3 py-1 rounded-xl hover:bg-brand/20 transition-all flex items-center gap-1.5"
               >
                 Refresh Stats
               </button>
-            </div>
-            <div className="p-4 bg-surface-2 border border-border rounded-lg space-y-4">
+            }
+          >
+            <div className="p-4 bg-surface-2 border border-border rounded-xl space-y-4">
               <div>
                 <label className="block text-xs font-bold text-text-muted mb-1.5">Channel URL or ID</label>
                 <input 
@@ -1334,119 +1504,178 @@ export default function AdminPeople() {
                 </div>
               )}
             </div>
-          </section>
+          </FoldableSection>
 
+          {/* 3. Film Credits (Foldable with Fast Search and Pagination for 250+ credits) */}
           {editingPerson && (
-            <section className="space-y-6">
-              <div className="flex items-center justify-between pb-2 border-b border-border">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">🎞️</span>
-                  <h4 className="text-xs font-bold text-text-muted">Film Credits</h4>
-                  {personCredits.length > 0 && (
-                    <span className="text-[10px] font-black bg-brand/10 text-brand border border-brand/20 rounded-xl px-2 py-0.5">
-                      {personCredits.length}
-                    </span>
-                  )}
-                </div>
+            <FoldableSection
+              title="Film Credits"
+              icon="🎞️"
+              badge={personCredits.length > 0 ? `${personCredits.length}` : null}
+              isOpen={!collapsedSections.credits}
+              onToggle={() => toggleSection('credits')}
+              actions={
                 <button
                   type="button"
                   onClick={() => setShowAddCredit(true)}
-                  className="flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
+                  className="flex items-center gap-1.5 text-xs font-bold text-brand bg-brand/10 hover:bg-brand hover:text-white border border-brand/20 px-3 py-1 rounded-xl transition-all"
                 >
-                  <Icon icon="solar:add-circle-linear" width="16" /> Add credit
+                  <Icon icon="solar:add-circle-linear" width="16" />
+                  <span>Add credit</span>
                 </button>
-              </div>
-
-              {personCredits.length === 0 && (
-                <p className="text-xs text-text-muted italic">
-                  No credits yet. Click &quot;Add credit&quot; to attach this person to a film.
-                </p>
-              )}
-
-              <div className="space-y-3">
-                {personCredits.map(credit => {
-                  const roleValue = normalizeRole(credit.role);
-                  const knownRole = ALL_ROLES.some((r) => r.value === roleValue);
-                  const busy = updatingCreditId === credit.id;
-
-                  return (
-                  <div key={credit.id} className="flex items-start gap-3 p-3 bg-surface-2 border border-border rounded-lg group hover:border-brand/30 transition-all">
-                    <div className="w-10 h-14 bg-surface rounded border border-border overflow-hidden flex-shrink-0">
-                      {credit.films?.poster_url ? (
-                        <img src={credit.films.poster_url} className="w-full h-full object-cover" alt="" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[8px] bg-surface-3 text-text-muted">NO POSTER</div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-text-primary truncate">{credit.films?.title}</div>
-                          {credit.films?.year && (
-                            <div className="text-[10px] text-text-muted mt-0.5 font-medium">{credit.films.year}</div>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setDeletingCredit(credit)}
-                          disabled={busy}
-                          className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all flex-shrink-0"
-                          title="Remove credit"
-                        >
-                          <Icon icon="solar:trash-bin-trash-linear" width="16" />
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <select
-                          value={roleValue}
-                          onChange={(e) => updateCreditField(credit, { role: e.target.value })}
-                          disabled={busy}
-                          className="bg-surface border border-border rounded-lg px-2 py-1.5 text-[10px] text-text-primary font-bold focus:border-brand outline-none disabled:opacity-50"
-                        >
-                          {!knownRole && roleValue && (
-                            <option value={roleValue}>{formatRole(roleValue)}</option>
-                          )}
-                          {ALL_ROLES.map((r) => (
-                            <option key={r.value} value={r.value}>{r.label}</option>
-                          ))}
-                        </select>
-                        {roleValue === CAST_ROLE && (
-                          <input
-                            type="text"
-                            placeholder="Character name"
-                            defaultValue={credit.character_name || ''}
-                            key={`${credit.id}-${credit.character_name || ''}`}
-                            onBlur={(e) => {
-                              const next = e.target.value.trim();
-                              const prev = (credit.character_name || '').trim();
-                              if (next === prev) return;
-                              updateCreditField(credit, {
-                                character_name: next ? toTitleCase(next) : null,
-                              });
-                            }}
-                            disabled={busy}
-                            className="flex-1 min-w-[8rem] bg-surface border border-border rounded-lg px-2 py-1.5 text-[10px] text-text-primary font-medium focus:border-brand outline-none disabled:opacity-50"
-                          />
-                        )}
-                      </div>
-                    </div>
+              }
+            >
+              <div className="space-y-4">
+                {/* Search & Fast Filtering when person has credits */}
+                {personCredits.length > 6 && (
+                  <div className="flex items-center gap-2 bg-surface-2 border border-border rounded-xl px-3 py-2">
+                    <Icon icon="solar:magnifer-linear" className="w-4 h-4 text-text-muted shrink-0" />
+                    <input
+                      type="text"
+                      placeholder={`Search ${personCredits.length} credits by title, role, year...`}
+                      value={creditFilterQuery}
+                      onChange={(e) => {
+                        setCreditFilterQuery(e.target.value);
+                        setCreditDisplayLimit(30);
+                      }}
+                      className="w-full bg-transparent text-xs text-text-primary placeholder:text-text-muted outline-none"
+                    />
+                    {creditFilterQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setCreditFilterQuery('')}
+                        className="text-text-muted hover:text-text-primary text-xs"
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
-                  );
-                })}
+                )}
+
+                {personCredits.length === 0 ? (
+                  <p className="text-xs text-text-muted italic py-3 text-center">
+                    No credits yet. Click &quot;Add credit&quot; to attach this person to a film.
+                  </p>
+                ) : filteredCredits.length === 0 ? (
+                  <p className="text-xs text-text-muted italic py-3 text-center">
+                    No credits matching &quot;{creditFilterQuery}&quot;.
+                  </p>
+                ) : (
+                  <>
+                    <div className="space-y-2.5">
+                      {visibleCredits.map(credit => {
+                        const roleValue = normalizeRole(credit.role);
+                        const knownRole = ALL_ROLES.some((r) => r.value === roleValue);
+                        const busy = updatingCreditId === credit.id;
+
+                        return (
+                          <div key={credit.id} className="flex items-start gap-3 p-3 bg-surface-2 border border-border rounded-xl group hover:border-brand/30 transition-all">
+                            <div className="w-10 h-14 bg-surface rounded border border-border overflow-hidden flex-shrink-0">
+                              {credit.films?.poster_url ? (
+                                <img src={credit.films.poster_url} className="w-full h-full object-cover" alt="" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[8px] bg-surface-3 text-text-muted">NO POSTER</div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0 space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="text-xs font-bold text-text-primary truncate">{credit.films?.title}</div>
+                                  {credit.films?.year && (
+                                    <div className="text-[10px] text-text-muted mt-0.5 font-medium">{credit.films.year}</div>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingCredit(credit)}
+                                  disabled={busy}
+                                  className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all flex-shrink-0"
+                                  title="Remove credit"
+                                >
+                                  <Icon icon="solar:trash-bin-trash-linear" width="16" />
+                                </button>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <select
+                                  value={roleValue}
+                                  onChange={(e) => updateCreditField(credit, { role: e.target.value })}
+                                  disabled={busy}
+                                  className="bg-surface border border-border rounded-lg px-2 py-1.5 text-[10px] text-text-primary font-bold focus:border-brand outline-none disabled:opacity-50"
+                                >
+                                  {!knownRole && roleValue && (
+                                    <option value={roleValue}>{formatRole(roleValue)}</option>
+                                  )}
+                                  {ALL_ROLES.map((r) => (
+                                    <option key={r.value} value={r.value}>{r.label}</option>
+                                  ))}
+                                </select>
+                                {roleValue === CAST_ROLE && (
+                                  <input
+                                    type="text"
+                                    placeholder="Character name"
+                                    defaultValue={credit.character_name || ''}
+                                    key={`${credit.id}-${credit.character_name || ''}`}
+                                    onBlur={(e) => {
+                                      const next = e.target.value.trim();
+                                      const prev = (credit.character_name || '').trim();
+                                      if (next === prev) return;
+                                      updateCreditField(credit, {
+                                        character_name: next ? toTitleCase(next) : null,
+                                      });
+                                    }}
+                                    disabled={busy}
+                                    className="flex-1 min-w-[8rem] bg-surface border border-border rounded-lg px-2 py-1.5 text-[10px] text-text-primary font-medium focus:border-brand outline-none disabled:opacity-50"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {filteredCredits.length > creditDisplayLimit && (
+                      <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
+                        <span className="text-text-muted text-[11px]">
+                          Showing {visibleCredits.length} of {filteredCredits.length} credits
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setCreditDisplayLimit(prev => prev + 50)}
+                            className="px-3 py-1 rounded-lg bg-surface border border-border text-[11px] font-semibold hover:border-brand transition"
+                          >
+                            Show 50 more
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCreditDisplayLimit(filteredCredits.length)}
+                            className="px-3 py-1 rounded-lg bg-brand/10 text-brand border border-brand/20 text-[11px] font-semibold hover:bg-brand/20 transition"
+                          >
+                            Show all ({filteredCredits.length})
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            </section>
+            </FoldableSection>
           )}
 
+          {/* 4. YouTube Filmography */}
           {editingPerson && youtubeFilmography.length > 0 && (
-            <section className="space-y-6">
-              <div className="flex items-center gap-2 pb-2 border-b border-border">
-                <span className="text-xl">📺</span>
-                <h4 className="text-xs font-bold text-text-muted">YouTube Filmography</h4>
-              </div>
+            <FoldableSection
+              title="YouTube Filmography"
+              icon="🎬"
+              badge={`${youtubeFilmography.length} videos`}
+              isOpen={!collapsedSections.youtubeFilmography}
+              onToggle={() => toggleSection('youtubeFilmography')}
+            >
               <div className="grid grid-cols-1 gap-3">
                 {youtubeFilmography.map(video => (
-                  <div key={video.video_id} className="flex items-center gap-4 p-3 bg-surface-2 border border-border rounded-lg group hover:border-brand/30 transition-all">
-                    <div className="w-20 aspect-video bg-surface rounded border border-border overflow-hidden flex-shrink-0">
+                  <div key={video.video_id} className="flex items-center gap-4 p-3 bg-surface-2 border border-border rounded-xl group hover:border-brand/30 transition-all">
+                    <div className="w-20 aspect-video bg-surface rounded-lg border border-border overflow-hidden flex-shrink-0">
                       {video.thumbnail_url ? (
                         <img src={video.thumbnail_url} className="w-full h-full object-cover" alt="" />
                       ) : (
@@ -1462,14 +1691,16 @@ export default function AdminPeople() {
                   </div>
                 ))}
               </div>
-            </section>
+            </FoldableSection>
           )}
 
-          <section className="space-y-6">
-            <div className="flex items-center gap-2 pb-2 border-b border-border">
-              <span className="text-xl">🔗</span>
-              <h4 className="text-xs font-bold text-text-muted">Social Profiles</h4>
-            </div>
+          {/* 5. Social Profiles */}
+          <FoldableSection
+            title="Social Profiles"
+            icon="🔗"
+            isOpen={!collapsedSections.social}
+            onToggle={() => toggleSection('social')}
+          >
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-text-primary mb-2">Instagram URL</label>
@@ -1526,29 +1757,60 @@ export default function AdminPeople() {
                 ))}
               </div>
             </div>
-          </section>
+          </FoldableSection>
 
-          {/* Actor Media & Gallery: Showreels, Monologues, Scene Clips, BTS, Stills */}
+          {/* 6. Actor Media & Gallery */}
           {editingPerson && (
-            <PersonMediaEditor
-              personId={editingPerson.id}
-              personName={formData.name}
-            />
+            <FoldableSection
+              title="Media & Gallery"
+              icon="📸"
+              isOpen={!collapsedSections.media}
+              onToggle={() => toggleSection('media')}
+            >
+              <PersonMediaEditor
+                personId={editingPerson.id}
+                personName={formData.name}
+              />
+            </FoldableSection>
           )}
 
-          {/* Awards & nominations -> people.awards (jsonb). Renders on the
-              person page grouped by organisation, IMDb-style. */}
-          <AwardsEditor
-            variant="person"
-            value={formData.awards}
-            onChange={(awards) => setFormData({ ...formData, awards })}
-          />
+          {/* 7. Talent Agency & Management Representation */}
+          {editingPerson && (
+            <FoldableSection
+              title="Talent Agency & Management"
+              icon="💼"
+              isOpen={!collapsedSections.representation}
+              onToggle={() => toggleSection('representation')}
+            >
+              <PersonRepresentationEditor
+                personId={editingPerson.id}
+                personName={formData.name}
+              />
+            </FoldableSection>
+          )}
 
-          <section className="space-y-6">
-            <div className="flex items-center gap-2 pb-2 border-b border-border">
-              <span className="text-xl">⚙️</span>
-              <h4 className="text-xs font-bold text-text-muted">Settings</h4>
-            </div>
+          {/* 8. Awards & Honors */}
+          <FoldableSection
+            title="Awards & Nominations"
+            icon="🏆"
+            badge={formData.awards?.length ? `${formData.awards.length}` : null}
+            isOpen={!collapsedSections.awards}
+            onToggle={() => toggleSection('awards')}
+          >
+            <AwardsEditor
+              variant="person"
+              value={formData.awards}
+              onChange={(awards) => setFormData({ ...formData, awards })}
+            />
+          </FoldableSection>
+
+          {/* 9. Settings & Visibility */}
+          <FoldableSection
+            title="Settings & Visibility"
+            icon="⚙️"
+            isOpen={!collapsedSections.settings}
+            onToggle={() => toggleSection('settings')}
+          >
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1570,7 +1832,7 @@ export default function AdminPeople() {
                 </div>
               </div>
               
-              <div className="flex items-center justify-between p-4 bg-surface-2 border border-border rounded-lg hover:border-brand/20 transition-all">
+              <div className="flex items-center justify-between p-4 bg-surface-2 border border-border rounded-xl hover:border-brand/20 transition-all">
                 <div>
                   <h4 className="text-sm font-bold text-text-primary">Verified Profile</h4>
                   <p className="text-[10px] text-text-muted font-bold">Display verification badge.</p>
@@ -1588,7 +1850,7 @@ export default function AdminPeople() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-surface-2 border border-border rounded-lg hover:border-brand/20 transition-all">
+              <div className="flex items-center justify-between p-4 bg-surface-2 border border-border rounded-xl hover:border-brand/20 transition-all">
                 <div>
                   <h4 className="text-sm font-bold text-text-primary">Spotlight</h4>
                   <p className="text-[10px] text-text-muted font-bold">Feature on landing page.</p>
@@ -1606,13 +1868,13 @@ export default function AdminPeople() {
                 </button>
               </div>
             </div>
-          </section>
+          </FoldableSection>
 
-          <div className="sticky bottom-0 bg-surface pt-4 pb-2 border-t border-border">
+          <div className="sticky bottom-0 bg-surface pt-4 pb-2 border-t border-border z-10">
             <button 
               type="submit" 
               disabled={isSaving} 
-              className="w-full bg-brand text-white p-4 rounded-xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-brand/20 disabled:opacity-50"
+              className="w-full bg-brand text-white p-4 rounded-xl font-bold hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl shadow-brand/20 disabled:opacity-50"
             >
               {isSaving ? 'Saving...' : editingPerson ? 'Update' : 'Add Profile'}
             </button>

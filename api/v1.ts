@@ -39,15 +39,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         scopes: key.scopes,
         rate_limit_per_min: key.rate_limit_per_min,
       },
+      tier_entitlements: {
+        tier: key.tier,
+        max_page_limit: key.tier === 'free' ? 20 : 100,
+        box_office_access: key.tier !== 'free',
+        commercial_license: key.tier !== 'free',
+        priority_support: key.tier !== 'free',
+      },
       available_endpoints: [
         'GET /api/v1/films',
         'GET /api/v1/films/:id',
         'GET /api/v1/films/:id/credits',
         'GET /api/v1/people',
         'GET /api/v1/people/:id',
-        'GET /api/v1/boxoffice',
+        'GET /api/v1/boxoffice (Pro & Enterprise)',
       ],
-      documentation: 'https://muvidb.com/admin/api-keys'
+      documentation: 'https://muvidb.com/developers'
     });
   }
 
@@ -150,7 +157,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!key) return;
 
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const maxLimitAllowed = key.tier === 'free' ? 20 : 100;
+    const limit = Math.min(maxLimitAllowed, Math.max(1, parseInt(req.query.limit as string) || 20));
     const offset = (page - 1) * limit;
 
     const { search, year, language, sort = 'popular' } = req.query;
@@ -259,7 +267,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!key) return;
 
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const maxLimitAllowed = key.tier === 'free' ? 20 : 100;
+    const limit = Math.min(maxLimitAllowed, Math.max(1, parseInt(req.query.limit as string) || 20));
     const offset = (page - 1) * limit;
 
     const { search, department } = req.query;
@@ -296,6 +305,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (resource === 'boxoffice') {
     const key = await requireApiKey(req, res, 'boxoffice:read');
     if (!key) return;
+
+    if (key.tier === 'free') {
+      return res.status(403).json({
+        error: 'Pro Tier Required',
+        message: 'Box Office intelligence (weekend rankings, lifetime gross, and admissions) is exclusive to Pro and Enterprise tiers. Upgrade your key or visit https://muvidb.com/developers#pricing.',
+        upgrade_url: 'https://muvidb.com/developers#pricing',
+        tier: key.tier
+      });
+    }
 
     const { data: rankings, error } = await supabase
       .from('person_box_office_rankings')
