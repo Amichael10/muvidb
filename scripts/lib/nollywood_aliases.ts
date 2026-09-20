@@ -40,6 +40,16 @@ export const NOLLYWOOD_ALIASES: Record<string, string> = {
   'macaroni': 'Debo Adedayo',
   'brain jotter': 'Chukwuebuka Emmanuel Amuzie',
   'eleniyan': 'Akinola Akano',
+  'erekere': 'Michael Olalekan Adeyemi',
+  'mc lively': 'Michael Sani Amanesi',
+  'mclively': 'Michael Sani Amanesi',
+  'barrister mike': 'Michael Sani Amanesi',
+  'micheal amanesi (mc lively)': 'Michael Sani Amanesi',
+  'micheal sani': 'Michael Sani Amanesi',
+  'michael sani': 'Michael Sani Amanesi',
+  'micheal sani amanesi': 'Michael Sani Amanesi',
+  'officer woos': 'Oladapo Jubril',
+  'sound sultan': 'Olanrewaju Fasasi',
 };
 
 export function resolveKnownAlias(rawName: string): string | null {

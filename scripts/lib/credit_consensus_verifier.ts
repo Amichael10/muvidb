@@ -1,4 +1,5 @@
 import { supabase as serviceSupabase } from './db';
+import { resolveKnownAlias } from './nollywood_aliases';
 export { serviceSupabase };
 
 export type RawCandidate = {
@@ -165,52 +166,77 @@ import { validateCreditsWithAi } from './ai_credit_validator';
  * 2. Multi-token overlap (First + Last)
  * 3. Surname search with Levenshtein similarity >= 85%
  */
+/**
+ * Fuzzy search for an existing person in Lumi's people database.
+ * 1. Alias dictionary resolution
+ * 2. Exact case-insensitive match (prioritizing stars by film_count)
+ * 3. Multi-token overlap (First + Last)
+ * 4. Surname search prioritized by film_count with Levenshtein similarity >= 85%
+ */
 export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: string; name: string } | null> {
   if (!name || name.trim().length < 2) return null;
-  const clean = normalizePersonName(name);
 
-  // 1. Direct ILIKE
+  // 1. Check known aliases first (e.g. Erekere -> Michael Olalekan Adeyemi, MC Lively -> Michael Sani Amanesi)
+  const aliasResolved = resolveKnownAlias(name);
+  const targetName = normalizePersonName(aliasResolved || name);
+  if (!targetName || targetName.length < 2) return null;
+
+  // 2. Direct ILIKE ordered by film_count (so if duplicate records exist, star is picked)
   const { data: directFind } = await serviceSupabase
     .from('people')
-    .select('id, name')
-    .ilike('name', clean)
+    .select('id, name, film_count')
+    .ilike('name', targetName)
+    .order('film_count', { ascending: false, nullsFirst: false })
     .limit(1);
 
-  if (directFind && directFind.length > 0) return directFind[0];
+  const directHit = directFind && directFind.length > 0 ? directFind[0] : null;
+  // If exact match has > 2 films, return immediately
+  if (directHit && (directHit.film_count || 0) > 2) {
+    return directHit;
+  }
 
-  // 2. Token search: First word + Last word
-  const parts = clean.split(/\s+/).filter(w => w.length > 2);
+  // 3. Token search & Surname fallback search (ordered by film_count)
+  const parts = targetName.split(/\s+/).filter(w => w.length > 2);
   if (parts.length >= 2) {
-    const { data: tokenHits } = await serviceSupabase
+    const surname = parts[parts.length - 1];
+    const { data: surnameHits } = await serviceSupabase
       .from('people')
-      .select('id, name')
-      .ilike('name', `%${parts[0]}%${parts[parts.length - 1]}%`)
-      .limit(5);
+      .select('id, name, film_count')
+      .ilike('name', `%${surname}%`)
+      .order('film_count', { ascending: false, nullsFirst: false })
+      .limit(30);
 
-    if (tokenHits && tokenHits.length > 0) {
-      for (const hit of tokenHits) {
-        if (nameSimilarity(hit.name, clean) >= 0.85) {
+    if (surnameHits && surnameHits.length > 0) {
+      for (const hit of surnameHits) {
+        const sim = nameSimilarity(hit.name, targetName);
+        if (sim >= 0.85) {
           return hit;
         }
       }
     }
 
-    // 3. Surname fallback search
-    const surname = parts[parts.length - 1];
-    const { data: surnameHits } = await serviceSupabase
-      .from('people')
-      .select('id, name')
-      .ilike('name', `%${surname}%`)
-      .limit(10);
+    const firstName = parts[0];
+    if (firstName.length >= 4) {
+      const { data: firstHits } = await serviceSupabase
+        .from('people')
+        .select('id, name, film_count')
+        .ilike('name', `%${firstName}%`)
+        .order('film_count', { ascending: false, nullsFirst: false })
+        .limit(20);
 
-    if (surnameHits && surnameHits.length > 0) {
-      for (const hit of surnameHits) {
-        if (nameSimilarity(hit.name, clean) >= 0.85) {
-          return hit;
+      if (firstHits && firstHits.length > 0) {
+        for (const hit of firstHits) {
+          const sim = nameSimilarity(hit.name, targetName);
+          if (sim >= 0.85) {
+            return hit;
+          }
         }
       }
     }
   }
+
+  // Fallback to direct hit if found (even with <= 2 films)
+  if (directHit) return directHit;
 
   return null;
 }
@@ -245,8 +271,19 @@ export async function reconcileAndVerifyCredits(
   const clusters: NameCluster[] = [];
 
   for (const obs of allRaw) {
-    const cleanName = normalizePersonName(obs.name);
+    const aliasMatch = resolveKnownAlias(obs.name);
+    const resolvedRaw = aliasMatch || obs.name;
+    const cleanName = normalizePersonName(resolvedRaw);
     if (!cleanName || cleanName.length < 3 || cleanName.split(' ').length < 2) continue;
+
+    // Ignore character roles turned into people
+    if (/^(?:brother|sister|uncle|aunty|mama|baba|papa|omo|elegbon|olori|pastor|officer|police)\s+/i.test(cleanName)) {
+      continue;
+    }
+    // Ignore corporate / business entities
+    if (/\b(?:agency|ventures|enterprises|properties|limited|ltd|holdings|services|company|studio|studios|productions?|props|costumes)\b/i.test(cleanName)) {
+      continue;
+    }
 
     const isNoise = NOISE_WORDS.some(nw => cleanName.toUpperCase().includes(nw));
     if (isNoise) continue;
