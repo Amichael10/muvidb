@@ -85,13 +85,19 @@ export async function handleApiKeysAdmin(req: VercelRequest, res: VercelResponse
     }
   }
 
-  // 3. PATCH: Revoke or reactivate key, or update scopes
+  // 3. PATCH: Revoke or reactivate key, or update details (tier, scopes, rate limit, name)
   if (req.method === 'PATCH') {
     try {
-      const { id, is_active, scopes, rate_limit_per_min } = req.body || {};
+      const { id, name, tier, is_active, scopes, rate_limit_per_min } = req.body || {};
       if (!id) return res.status(400).json({ error: 'Missing key id' });
 
       const updates: Record<string, any> = {};
+      if (typeof name === 'string' && name.trim().length >= 2) {
+        updates.name = name.trim();
+      }
+      if (typeof tier === 'string' && ['free', 'pro', 'enterprise'].includes(tier.toLowerCase())) {
+        updates.tier = tier.toLowerCase();
+      }
       if (typeof is_active === 'boolean') {
         updates.is_active = is_active;
         if (!is_active) {
@@ -100,8 +106,10 @@ export async function handleApiKeysAdmin(req: VercelRequest, res: VercelResponse
           updates.revoked_at = null;
         }
       }
-      if (Array.isArray(scopes)) updates.scopes = scopes;
-      if (rate_limit_per_min !== undefined) updates.rate_limit_per_min = Number(rate_limit_per_min);
+      if (Array.isArray(scopes)) updates.scopes = scopes.filter(Boolean);
+      if (rate_limit_per_min !== undefined) {
+        updates.rate_limit_per_min = Math.max(1, Math.min(Number(rate_limit_per_min) || 60, 10000));
+      }
 
       const { data, error } = await supabase
         .from('api_keys')

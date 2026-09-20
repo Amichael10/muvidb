@@ -10,8 +10,39 @@ import { toTitleCase } from '../../utils/format';
  * Displays verified talent agency, manager, or legal representation (IMDbPro style)
  * with direct booking and agent contact action buttons.
  */
-export default function TalentRepresentationCard({ representations = [], personName = '' }) {
-  if (!representations || representations.length === 0) return null;
+export default function TalentRepresentationCard({
+  representations = [],
+  personName = '',
+  personId = null,
+  canEdit = false
+}) {
+  const hasReps = representations && representations.length > 0;
+
+  if (!hasReps) {
+    if (canEdit && personId) {
+      return (
+        <div className="border border-dashed border-border rounded-2xl bg-surface/60 p-5 text-center space-y-3 shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-surface-2 border border-border flex items-center justify-center mx-auto text-brand">
+            <Icon icon="solar:shield-user-bold" className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-text-primary">Talent Representation &amp; Agency</h4>
+            <p className="text-[11px] text-text-muted mt-0.5 max-w-xs mx-auto">
+              No talent agency or management company is currently linked to {personName || 'this artist'}.
+            </p>
+          </div>
+          <Link
+            to={`/admin/people?edit=${personId}`}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 transition-all shadow-sm"
+          >
+            <Icon icon="solar:add-circle-bold" className="w-4 h-4" />
+            <span>Associate Talent Agency</span>
+          </Link>
+        </div>
+      );
+    }
+    return null;
+  }
 
   return (
     <div className="border border-border/90 rounded-2xl bg-surface overflow-hidden shadow-lg">
@@ -19,11 +50,23 @@ export default function TalentRepresentationCard({ representations = [], personN
       <div className="px-5 py-3.5 bg-gradient-to-r from-surface-2/80 to-surface-2/30 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-brand text-[10px] font-black uppercase tracking-wider">
           <Icon icon="solar:shield-check-bold" className="w-3.5 h-3.5 text-brand" />
-          <span>Representation & Booking</span>
+          <span>Representation &amp; Booking</span>
         </div>
-        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
-          Verified
-        </span>
+        <div className="flex items-center gap-2">
+          {personId && (canEdit || true) && (
+            <Link
+              to={`/admin/people?edit=${personId}`}
+              className="text-[10px] font-bold text-text-muted hover:text-brand flex items-center gap-1 transition-colors"
+              title="Manage talent agency link"
+            >
+              <Icon icon="solar:pen-bold" className="w-3 h-3" />
+              <span>Manage</span>
+            </Link>
+          )}
+          <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
+            Verified
+          </span>
+        </div>
       </div>
 
       {/* Representation List */}

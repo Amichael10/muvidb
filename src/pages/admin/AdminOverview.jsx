@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
@@ -520,11 +521,60 @@ export default function AdminOverview() {
               </ul>
             </div>
           ) : (
-            /* Automation Hub for Super Admin */
-            <div className="card-cal p-6 md:col-span-2 lg:col-span-1 xl:col-span-2">
-              <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-5">
-                Maintenance
-              </h3>
+            <>
+              {/* Developer API & Access Quick Access */}
+              <div className="card-cal p-6 md:col-span-2 lg:col-span-1 xl:col-span-2 bg-gradient-to-br from-brand/5 via-surface to-surface-2 border-brand/20">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[10px] font-bold text-brand uppercase tracking-wider flex items-center gap-2">
+                    <Icon icon="solar:key-minimalistic-square-bold" />
+                    Developer API & Access Control
+                  </h3>
+                  <Link
+                    to="/admin/api-keys"
+                    className="text-[10px] font-bold text-brand hover:underline flex items-center gap-1"
+                  >
+                    <span>Manage Keys</span>
+                    <Icon icon="solar:arrow-right-linear" />
+                  </Link>
+                </div>
+                <p className="text-xs text-text-muted mb-4">
+                  Configure REST API keys, assign tiers (Free vs Pro vs Enterprise), adjust rate limits, and manage endpoint permissions.
+                </p>
+                <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+                  <div className="p-2.5 rounded-lg bg-surface border border-border">
+                    <div className="text-[10px] font-bold text-emerald-400 uppercase">Free Tier</div>
+                    <div className="text-text-primary font-bold text-xs mt-0.5">60 req/min</div>
+                    <div className="text-[10px] text-text-muted">Films, People & Credits</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-surface border border-brand/30">
+                    <div className="text-[10px] font-bold text-amber-400 uppercase">Pro Tier</div>
+                    <div className="text-text-primary font-bold text-xs mt-0.5">600 req/min</div>
+                    <div className="text-[10px] text-text-muted">+ Box Office Grosses</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <Link
+                    to="/admin/api-keys"
+                    className="flex-1 py-2 px-3 rounded-lg bg-brand text-white text-xs font-bold text-center hover:bg-brand/90 transition shadow-sm"
+                  >
+                    Issue / Edit API Keys
+                  </Link>
+                  <Link
+                    to="/developers"
+                    target="_blank"
+                    className="py-2 px-3 rounded-lg bg-surface border border-border text-text-primary text-xs font-semibold hover:bg-surface-2 transition flex items-center gap-1"
+                  >
+                    <span>API Docs</span>
+                    <Icon icon="solar:arrow-right-up-linear" />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Automation Hub for Super Admin */}
+              <div className="card-cal p-6 md:col-span-2 lg:col-span-1 xl:col-span-2">
+                <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-5">
+                  Maintenance
+                </h3>
               <div className="space-y-4">
                 {[
                   { name: 'Fetch YouTube records', script: 'refresh-videos', desc: 'Sync latest external content', last: lastSyncs.videos, count: lastSyncs.videosCount },
@@ -558,7 +608,8 @@ export default function AdminOverview() {
                 ))}
               </div>
             </div>
-          )}
+          </>
+        )}
         </div>
       </div>
     </div>

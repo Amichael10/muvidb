@@ -5,6 +5,8 @@ import { uploadAdminImage, isEphemeralImageUrl } from '../../lib/imageUpload';
 const ASPECT = {
   poster: 'aspect-[2/3] w-20',
   backdrop: 'aspect-video w-32',
+  wide: 'aspect-video w-32',
+  portrait: 'aspect-[3/4] w-24',
   square: 'aspect-square w-20',
 };
 
@@ -77,10 +79,10 @@ export default function ImageField({
 
       <div className="flex gap-3">
         <div
-          className={`${ASPECT[aspect]} shrink-0 rounded-md border border-border bg-surface-2 overflow-hidden flex items-center justify-center`}
+          className={`${ASPECT[aspect] || ASPECT.backdrop} shrink-0 rounded-md border border-border bg-surface-2 overflow-hidden flex items-center justify-center max-w-full`}
         >
           {value ? (
-            <img src={value} alt="" className="w-full h-full object-cover" />
+            <img src={value} alt="" className="w-full h-full object-cover max-w-full" />
           ) : (
             <Icon icon="solar:gallery-linear" className="text-lg text-text-muted" />
           )}
