@@ -212,7 +212,7 @@ export function buildActorSpotlightSnapshot(input: {
     knownForDepartment: text(input.person.known_for_department),
     bio: text(input.person.bio),
     knownFor,
-    creditCount: credits.length,
+    creditCount: Number(input.person.film_count || input.person.creditCount || input.person.creditsCount) || credits.length,
   };
 }
 

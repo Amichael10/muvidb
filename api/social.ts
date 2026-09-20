@@ -260,6 +260,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       deleteSocialContentItem,
       createEditorVideoDraft,
       createUniversalSocialPost,
+      publishContentItemNow,
       resetSocialStudioData,
       getEditorialCalendar,
       seedEditorialCalendarSlots,
@@ -309,7 +310,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               posterUrl: k.poster_url || null,
               character: k.character || null,
             })),
-            creditCount: parsedCandidate.data?.creditCount || 10,
+            creditCount: parsedCandidate.data?.film_count ?? parsedCandidate.data?.creditCount ?? parsedCandidate.data?.creditsCount ?? (parsedCandidate.data?.knownFor?.length || 10),
           }
         : isPlay
           ? {
@@ -392,7 +393,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (task === 'calendar_plan') {
         const days = Number(req.query?.days || 30);
         const offset = Number(req.query?.offset || req.query?.shuffleOffset || 0);
-        return res.status(200).json(await getEditorialCalendar(days, offset));
+        const startDate = typeof req.query?.startDate === 'string' ? req.query.startDate : undefined;
+        return res.status(200).json(await getEditorialCalendar(days, offset, startDate));
       }
       if (task === 'slot_candidates') {
         const seriesSlug = String(req.query?.seriesSlug || 'filmography');
@@ -718,12 +720,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }, actor));
       }
 
-      if (task === 'publish_editor_video_now') {
+      if (task === 'publish_editor_video_now' || task === 'publish_now') {
         const actor = await requireSocialStudioAdmin(req);
         const { contentItemId } = req.body || {};
         if (typeof contentItemId !== 'string' || !contentItemId) return res.status(400).json({ error: 'contentItemId is required' });
-        await scheduleContentItem({ contentItemId, scheduledFor: new Date().toISOString() }, actor);
-        return res.status(200).json(await runSocialPublisher({ limit: 10, lockedBy: `studio:${actor.id}` }));
+        return res.status(200).json(await publishContentItemNow({ contentItemId }, actor));
       }
 
       if (task === 'review') {

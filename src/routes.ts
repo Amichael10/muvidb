@@ -110,6 +110,7 @@ export default [
         route('people-enrichment', 'pages/admin/AdminPeopleEnrichment.jsx'),
         route('outreach', 'pages/admin/AdminOutreach.jsx'),
         route('logs', 'pages/admin/AdminLogs.jsx'),
+        route('api-keys', 'pages/admin/AdminApiKeys.jsx'),
       ]),
     ]),
   ]),

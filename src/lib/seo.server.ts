@@ -93,6 +93,10 @@ export async function personSeo(slug: string, base: string) {
         films(
           id, title, year, poster_url, slug
         )
+      ),
+      talent_representations(
+        id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary, notes,
+        companies(id, name, slug, logo_url, company_type, headquarters, website, instagram_url)
       )
     `)
     .eq(keyFor(slug), slug)

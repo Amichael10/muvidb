@@ -33,7 +33,20 @@ function decodeHtml(html: string): string {
     .trim();
 }
 
-function cleanReviewTitle(rawTitle: string): { title: string; isReview: boolean; targetTitle: string; playOrMovie: 'play' | 'movie' } {
+const HOLLYWOOD_BLACKLIST = [
+  'house of the dragon', 'game of thrones', 'superman', 'batman', 'suicide squad',
+  'mortal kombat', 'deadpool', 'inside out', 'bad boys', 'jurassic', 'marvel',
+  'avengers', 'spider-man', 'star wars', 'fast & furious', 'hitman', 'the father',
+  'run (2020)', 'i am invincible', 'the equalizer', 'baby reindeer', 'shogun',
+  'yellowstone', 'the boys'
+];
+
+function isHollywoodOrNonAfrican(title: string, content: string = ''): boolean {
+  const lower = (title + ' ' + content).toLowerCase();
+  return HOLLYWOOD_BLACKLIST.some(kw => lower.includes(kw));
+}
+
+function cleanReviewTitle(rawTitle: string): { title: string; isReview: boolean; targetTitle: string; playOrMovie: 'play' | 'movie'; isHollywood: boolean } {
   const decoded = decodeHtml(rawTitle);
   const isReview = /review/i.test(decoded) || /is a \w+ disservice/i.test(decoded);
   
@@ -55,12 +68,14 @@ function cleanReviewTitle(rawTitle: string): { title: string; isReview: boolean;
 
   // Determine if it's a stage play
   const isPlay = /kalakuta queens|fela|stage play|theatre|theater|musical|broadway|terra kulture|muson/i.test(decoded);
+  const isHollywood = isHollywoodOrNonAfrican(decoded);
 
   return {
     title: decoded,
     isReview,
     targetTitle: target,
-    playOrMovie: isPlay ? 'play' : 'movie'
+    playOrMovie: isPlay ? 'play' : 'movie',
+    isHollywood
   };
 }
 
@@ -138,9 +153,14 @@ async function ingestFilmEfikoReviews() {
   let skippedNoMatch = 0;
 
   for (const post of posts) {
-    const { title, isReview, targetTitle, playOrMovie } = cleanReviewTitle(post.title.rendered);
+    const { title, isReview, targetTitle, playOrMovie, isHollywood } = cleanReviewTitle(post.title.rendered);
     const isCategoryReview = post.categories?.includes(66);
     if (!isReview && !isCategoryReview) continue;
+
+    if (isHollywood) {
+      console.log(`🚫 [HOLLYWOOD SKIPPED] "${title}"`);
+      continue;
+    }
 
     if (existingUrls.has(post.link)) {
       skippedDuplicates++;
@@ -154,34 +174,22 @@ async function ingestFilmEfikoReviews() {
     const postYear = new Date(post.date).getFullYear();
 
     if (playOrMovie === 'play' || /kalakuta queens/i.test(targetTitle)) {
-      // 1. Search in plays table
+      // 1. Search in plays table with fuzzy normalization
       let playId: string | null = null;
-      const { data: matchedPlays } = await supabase
-        .from('plays')
-        .select('id, title, year')
-        .ilike('title', `%${targetTitle.replace(/['’]/g, '%')}%`)
-        .limit(3);
+      const cleanPlaySearch = targetTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const { data: allPlays } = await supabase.from('plays').select('id, title, slug, year');
+      
+      const matched = (allPlays || []).find(p => {
+        const normTitle = p.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const normSlug = p.slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return normTitle.includes(cleanPlaySearch) || cleanPlaySearch.includes(normTitle) ||
+               normSlug.includes(cleanPlaySearch) || (cleanPlaySearch.includes('kalakuta') && normTitle.includes('kalakuta'));
+      });
 
-      if (matchedPlays && matchedPlays.length > 0) {
-        playId = matchedPlays[0].id;
+      if (matched) {
+        playId = matched.id;
       } else {
-        // Create play in plays table
-        const playSlug = targetTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const { data: newPlay, error: insertErr } = await supabase.from('plays').insert([{
-          title: targetTitle,
-          slug: `${playSlug}-${postYear}`,
-          playwright: 'Bolanle Austen-Peters',
-          director: 'Bolanle Austen-Peters',
-          venue: 'Terra Kulture Arena',
-          city: 'Lagos',
-          country: 'Nigeria',
-          year: postYear,
-          synopsis: quote,
-          source_url: post.link
-        }]).select('id').single();
-
-        if (newPlay) playId = newPlay.id;
-        else console.warn(`Could not create play for "${targetTitle}":`, insertErr?.message);
+        console.warn(`ℹ️ [STAGE PLAY NOT IN CATALOG] Stage play "${targetTitle}" must exist in plays table before reviews can be attached.`);
       }
 
       if (playId) {

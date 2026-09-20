@@ -138,15 +138,20 @@ export async function seedRollingCalendar(options: SeedCalendarOptions | number 
 
   const seriesMap = new Map(seriesList.map((s) => [s.slug, s.id]));
 
-  let startBaseDate = new Date();
-  if (opts.startDate) {
-    const parsed = new Date(opts.startDate);
-    if (!isNaN(parsed.getTime())) {
-      startBaseDate = parsed;
-    }
+  let startYear = new Date().getUTCFullYear();
+  let startMonth = new Date().getUTCMonth();
+  let startDay = new Date().getUTCDate();
+
+  if (opts.startDate && /^\d{4}-\d{2}-\d{2}$/.test(opts.startDate)) {
+    const [y, m, d] = opts.startDate.split('-').map(Number);
+    startYear = y;
+    startMonth = m - 1;
+    startDay = d;
   }
 
-  const startDateStr = startBaseDate.toISOString().split('T')[0];
+  const startDateStr = opts.startDate && /^\d{4}-\d{2}-\d{2}$/.test(opts.startDate)
+    ? opts.startDate
+    : `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
 
   // Optionally remove un-published planned slots from startDate onwards
   if (clearExisting) {
@@ -160,10 +165,9 @@ export async function seedRollingCalendar(options: SeedCalendarOptions | number 
   let createdCount = 0;
 
   for (let i = 0; i < daysAhead; i++) {
-    const d = new Date(startBaseDate);
-    d.setDate(startBaseDate.getDate() + i);
+    const d = new Date(Date.UTC(startYear, startMonth, startDay + i, 12, 0, 0));
     const dateStr = d.toISOString().split('T')[0];
-    const dayOfWeek = d.getDay();
+    const dayOfWeek = d.getUTCDay();
 
     const scheduleMap = postsPerDay === 1 ? SINGLE_POST_SCHEDULE : postsPerDay === 3 ? VIDEO_LANE_SCHEDULE : WEEKDAY_SCHEDULE;
     const slotConfigs = scheduleMap[dayOfWeek] || [
@@ -224,13 +228,20 @@ export async function generateDailyScheduleDrafts(options: GenerateScheduleDraft
   const { generateSocialDraft } = await import('../social_studio.js');
   const { fetchSeriesCandidates } = await import('./candidate_service.js');
 
-  let startBaseDate = new Date();
-  if (options.startDate) {
-    const parsed = new Date(options.startDate);
-    if (!isNaN(parsed.getTime())) {
-      startBaseDate = parsed;
-    }
+  let startYear = new Date().getUTCFullYear();
+  let startMonth = new Date().getUTCMonth();
+  let startDay = new Date().getUTCDate();
+
+  if (options.startDate && /^\d{4}-\d{2}-\d{2}$/.test(options.startDate)) {
+    const [y, m, d] = options.startDate.split('-').map(Number);
+    startYear = y;
+    startMonth = m - 1;
+    startDay = d;
   }
+
+  const startDateStr = options.startDate && /^\d{4}-\d{2}-\d{2}$/.test(options.startDate)
+    ? options.startDate
+    : `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
 
   // Pre-seed used entities to avoid duplicates from recent 14-day history
   const usedEntityIds = new Set<string>();
@@ -269,10 +280,9 @@ export async function generateDailyScheduleDrafts(options: GenerateScheduleDraft
   ];
 
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
-    const d = new Date(startBaseDate);
-    d.setDate(startBaseDate.getDate() + dayOffset);
+    const d = new Date(Date.UTC(startYear, startMonth, startDay + dayOffset, 12, 0, 0));
     const dateStr = d.toISOString().split('T')[0];
-    const isFriday = d.getDay() === 5;
+    const isFriday = d.getUTCDay() === 5;
 
     const dayItems: any[] = [];
 
@@ -380,7 +390,7 @@ export async function generateDailyScheduleDrafts(options: GenerateScheduleDraft
     success: true,
     totalCreated,
     daysAhead,
-    startDate: options.startDate || startBaseDate.toISOString().split('T')[0],
+    startDate: startDateStr,
     days: results,
   };
 }

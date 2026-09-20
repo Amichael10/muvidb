@@ -45,7 +45,7 @@ export type PlatformCaptions = {
 
 export type AICopyVariation = {
   key: 'A' | 'B' | 'C';
-  label: 'Informative' | 'Editorial' | 'Conversational';
+  label: 'Career Story' | 'Why Now' | 'Discovery' | 'Informative' | 'Editorial' | 'Conversational' | string;
   captions: PlatformCaptions;
 };
 
@@ -123,32 +123,35 @@ Goal: Frame the critical observation, debate, or review without marketing fluff.
   #MuviDB #AfricanCinema #[FilmTitle]`;
   }
 
-  if (seriesSlug.includes('behind') || seriesSlug === 'behind_the_camera' || (isPerson && seriesSlug.includes('crew'))) {
+  if (isPerson || seriesSlug.includes('behind') || seriesSlug === 'behind_the_camera' || seriesSlug.includes('filmography') || seriesSlug === 'you_know_the_face' || seriesSlug.includes('spotlight') || seriesSlug.includes('actor') || seriesSlug.includes('craft')) {
     return `
-CONTENT TYPE: BEHIND THE CAMERA / CREW
-Goal: "Every Film. Every Credit." Spotlight directors, cinematographers, writers, and editors.
-- Highlight the person's specific craft (e.g. framing, lighting, editing, directing).
-- Connect their known credits.
-- Example structure:
-  You know the film. Meet the person behind the camera.
-  [Person] worked as [Role] on [Film].
-  Their other credits across African cinema include [Film 2], [Film 3] and [Film 4].
-  Explore the filmmakers behind African cinema on MuviDB.
-  #MuviDB #AfricanCinema #[PersonName]`;
-  }
+CONTENT TYPE: ACTOR / CRAFT SPOTLIGHT (TALENT PROFILE)
+Goal: Document a creative career through verified database evidence.
+Guiding philosophy: "IMDb gives you the credits; MuviDB helps you notice the career behind them."
 
-  if (isPerson || seriesSlug.includes('filmography') || seriesSlug === 'you_know_the_face') {
-    return `
-CONTENT TYPE: THE FILMOGRAPHY / ACTOR SPOTLIGHT
-Goal: Database-led credit discovery.
-- Avoid generic celebration like "Celebrating the incredible journey of...".
-- Start from the person's most recognisable credit and lead the reader into deeper discovery of other projects.
-- Example structure:
-  You know [Person] from [Popular Film]. But their filmography goes much further.
-  From [Film 2] to [Film 3] and [Film 4], here are a few credits from their work across African cinema.
-  Which performance do you know them from?
-  Explore the full filmography on MuviDB.
-  #MuviDB #AfricanCinema #[PersonName]`;
+EDITORIAL REQUIREMENTS:
+1. Every caption must answer three questions:
+   - Who is this person?
+   - What pattern can we see in their work?
+   - Why are they worth noticing now?
+2. The PERSON, not the movie titles, must remain the primary subject of the story.
+3. NEVER summarize or dump their complete filmography. Select at most 2–3 relevant titles as narrative evidence to explain a pattern, progression, recent momentum, collaboration, genre, role, or career moment.
+4. STRICTLY BANNED CMS LANGUAGE: Do NOT write "Editing credit spotlight:", "The Filmography:", "Notable credits across African cinema:", or bulleted lists with emojis (e.g. "🎬 Title (Year)"). Output fluid, thoughtful editorial prose.
+5. GROUNDED HONESTY: If a person has only a few credits (e.g. 3–6), do NOT invent fake hyperbole like "one of Nollywood's fastest-rising icons/directors". Frame it honestly as an early chapter or a creative record steadily taking shape and documented on MuviDB.
+6. DETECT THE STORY ANGLE:
+   - Breakthrough / Why Now: Connected to a recent/trending project that brought them into focus.
+   - Momentum: Several credits in a short period (e.g. 2025–2026).
+   - Early Career: Small but growing verified body of work.
+   - Collaboration: Repeated work with a filmmaker, producer, or studio.
+   - Franchise / Story World: Multiple related productions (e.g. sequels, connected films).
+   - Behind the Camera: Spotlighting craft (directing, cinematography, editing, costume, sound).
+   - Range: Meaningful movement between genres or craft departments.
+   - Longevity: Career spanning many years.
+
+THREE DISTINCT EDITORIAL VARIATIONS:
+- Variation A · Career Story: Focus on the person's journey and progression. Trace a growing body of work across 2–3 chronological projects.
+- Variation B · Why Now: Anchored in the project or context that triggered the spotlight (e.g., "You may have come across [Name] through [Recent Project]. But the credit doesn't end there...").
+- Variation C · Discovery: Conversational, social-first radar hook (e.g., "One name you might want to remember: [Name]. 🎬 ... We're keeping track.").`;
   }
 
   if (seriesSlug.includes('stage') || seriesSlug.includes('theatre')) {
@@ -263,6 +266,35 @@ function buildMuviDBPrompt(req: AICopyRequest): string {
     ? captionVault.starters.map((starter, index) => `${index + 1}. ${starter}`).join('\n')
     : 'No fully verifiable starter is available for this candidate. Write directly from source data.';
 
+  const whyNow = data.why_now || data.whyNow || (req.candidate as any)?.assessment?.whyNow || '';
+  const primaryCraft = data.primary_craft || data.known_for_department || data.department || data.role || (seriesSlug.includes('crew') ? 'Crew / Behind the Camera' : 'Actor / Performer');
+  const country = data.country || data.nationality || 'African cinema';
+  const verifiedCreditCount = data.film_count || data.verified_credits_count || (Array.isArray(data.knownFor) ? data.knownFor.length : 'Multiple verified credits');
+  const recentProject = data.recent_project || data.spotlight_project || (Array.isArray(data.knownFor) && data.knownFor[0]?.title) || '';
+
+  const personSection = isPerson ? `
+STRUCTURED TALENT & CAREER DATA:
+- PERSON NAME: ${title}
+- PRIMARY CRAFT / ROLE: ${primaryCraft}
+- COUNTRY / REGION: ${country}
+- VERIFIED CREDIT COUNT: ${verifiedCreditCount}
+- REASON FOR SPOTLIGHT / WHY NOW: ${whyNow || 'Documenting verified creative work on MuviDB'}
+- RECENT / NOTABLE CREDITS (select 2–3 maximum as narrative evidence): ${knownFor || 'N/A'}
+- BIO / CONTEXT: ${bio || 'N/A'}
+` : '';
+
+  const taskInstructions = isPerson
+    ? `TASK:
+Generate 3 DISTINCT editorial copy variations for ${title}:
+- Variation A (Career Story): Focus on the creative journey and progression. Hook the reader on a career taking shape, weave at most 2–3 chronological credits into the prose as narrative evidence, and frame every film as adding another piece to their verified record on MuviDB.
+- Variation B (Why Now): Grounded in the recent project (${recentProject || 'their recent work'}) or the reason they are surfacing right now. Use that project as the entry point, acknowledge their broader verified credits, and emphasize that MuviDB is documenting the journey as it develops.
+- Variation C (Discovery): Conversational radar hook ("One name you might want to remember: ${title}..."). Highlight the satisfaction of seeing verified credits add up and encourage the audience to discover their complete profile on MuviDB.`
+    : `TASK:
+Generate 3 DISTINCT copy variations:
+- Variation A (Informative / Utility-First): Clean, factual, answers what & where immediately, credit clarity.
+- Variation B (Editorial / Storytelling): Engaging premise hook, thematic depth, credit connection.
+- Variation C (Conversational / Discussion): Direct thought-provoking question, cultural context, authentic discussion.`;
+
   return `You are the social copywriter for MuviDB (muvidb.com), the definitive discovery database and publication for African Cinema.
 You are NOT an influencer and you are NOT writing generic social media hype.
 
@@ -305,12 +337,9 @@ SOURCE DATA:
 - KNOWN FOR / CREDITS: ${knownFor}
 - BIO / CONTEXT: ${bio}
 - VENUE / DATES: ${venue}
+${personSection}
 
-TASK:
-Generate 3 DISTINCT copy variations:
-- Variation A (Informative / Utility-First): Clean, factual, answers what & where immediately, credit clarity.
-- Variation B (Editorial / Storytelling): Engaging premise hook, thematic depth, credit connection.
-- Variation C (Conversational / Discussion): Direct thought-provoking question, cultural context, authentic discussion.
+${taskInstructions}
 
 For EACH variation, provide tailored text for:
 - "instagram": Full caption with clean formatting, every supplied verified cast/crew @handle, and 3-5 hashtags at the bottom.
@@ -324,7 +353,7 @@ OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema without mark
   "variations": [
     {
       "key": "A",
-      "label": "Informative",
+      "label": "${isPerson ? 'Career Story' : 'Informative'}",
       "captions": {
         "instagram": "...",
         "threads": "...",
@@ -334,7 +363,7 @@ OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema without mark
     },
     {
       "key": "B",
-      "label": "Editorial",
+      "label": "${isPerson ? 'Why Now' : 'Editorial'}",
       "captions": {
         "instagram": "...",
         "threads": "...",
@@ -344,7 +373,7 @@ OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema without mark
     },
     {
       "key": "C",
-      "label": "Conversational",
+      "label": "${isPerson ? 'Discovery' : 'Conversational'}",
       "captions": {
         "instagram": "...",
         "threads": "...",
@@ -423,6 +452,94 @@ function applyVerifiedMovieAttribution(req: AICopyRequest, variations: AICopyVar
     }
     return { ...variation, captions };
   });
+}
+
+/**
+ * Generates grounded, editorial story variations for Actor/Craft Spotlights
+ * when AI is unavailable. Follows the 3 distinct storytelling angles:
+ * Option A · Career Story (journey & progression)
+ * Option B · Why Now (catalyst project hook)
+ * Option C · Discovery (conversational social radar)
+ */
+function buildPersonStoryFallbackVariations(req: AICopyRequest): AICopyVariation[] {
+  const { candidate } = req;
+  const data = candidate.data || {};
+  const name = String(candidate.name || 'This creator').trim();
+  const cleanTag = name.replace(/[^a-zA-Z0-9]/g, '');
+  const rawCount = Number(data.film_count || data.verified_credits_count || 0);
+  const knownFor: Array<{ title: string; year?: number }> = Array.isArray(data.knownFor) ? data.knownFor : [];
+  const creditCount = rawCount || knownFor.length || 0;
+  const countStr = creditCount > 0
+    ? `${creditCount} verified credit${creditCount === 1 ? '' : 's'}`
+    : 'verified credits';
+
+  // Find recent / trigger project
+  const whyNowText = String(data.why_now || data.whyNow || (candidate as any)?.assessment?.whyNow || '');
+  const whyNowMatch = whyNowText.match(/project\s+([^,.]+)/i);
+  const recentProject = whyNowMatch ? whyNowMatch[1].trim() : (knownFor[0]?.title || 'recent productions');
+
+  // Select 2-3 representative titles as evidence
+  const titles = knownFor.slice(0, 3);
+  let progressionSentence = '';
+  let titlesListSentence = '';
+  let remainingSentence = '';
+
+  if (titles.length >= 3) {
+    const t0 = `${titles[0].title}${titles[0].year ? ` in ${titles[0].year}` : ''}`;
+    const t1 = titles[1].title;
+    const t2 = `${titles[2].title}${titles[2].year ? ` in ${titles[2].year}` : ''}`;
+    progressionSentence = `From ${t0} to ${t1} and ${t2}, their recent work shows a creative career that is steadily taking shape.`;
+    titlesListSentence = `${titles[0].title}, ${titles[1].title} and ${titles[2].title}`;
+    remainingSentence = `${titles[1].title} and ${titles[2].title}`;
+  } else if (titles.length === 2) {
+    const t0 = `${titles[0].title}${titles[0].year ? ` in ${titles[0].year}` : ''}`;
+    const t1 = `${titles[1].title}${titles[1].year ? ` in ${titles[1].year}` : ''}`;
+    progressionSentence = `From ${t0} to ${t1}, their work traces a creative career that is steadily taking shape.`;
+    titlesListSentence = `${titles[0].title} and ${titles[1].title}`;
+    remainingSentence = titles[1].title;
+  } else if (titles.length === 1) {
+    const t0 = `${titles[0].title}${titles[0].year ? ` in ${titles[0].year}` : ''}`;
+    progressionSentence = `Anchored by work on ${t0}, their credits trace a creative career that is steadily taking shape.`;
+    titlesListSentence = titles[0].title;
+    remainingSentence = titles[0].title;
+  } else {
+    progressionSentence = `Their verified credits trace a creative career that is steadily taking shape across African cinema.`;
+    titlesListSentence = 'their latest productions';
+    remainingSentence = 'their recent productions';
+  }
+
+  return [
+    {
+      key: 'A',
+      label: 'Career Story',
+      captions: {
+        instagram: `${name} is building their credits one project at a time. 🎬\n\n${progressionSentence}\n\nWith ${countStr} currently documented on MuviDB, every film adds another piece to the record.\n\nDiscover ${name}'s credits and the productions they have worked on at MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
+        threads: `${name} is building credits one project at a time. ${progressionSentence} Explore their verified body of work on MuviDB. #AfricanCinema`,
+        facebook: `A creative career taking shape.\n\n${name}'s recent work traces a growing body of work across African cinema. ${progressionSentence}\n\nWith ${countStr} currently documented on MuviDB, every film adds another piece to the record.\n\nExplore their growing body of work on MuviDB.`,
+        tiktok: `${name} is building credits one project at a time 🎬 Follow their journey on MuviDB! #MuviDB #AfricanCinema #${cleanTag}`,
+      },
+    },
+    {
+      key: 'B',
+      label: 'Why Now',
+      captions: {
+        instagram: `You may have come across ${name} through ${recentProject}. But the credit doesn't end there.\n\nTheir work now spans several productions documented on MuviDB, including ${remainingSentence}.\n\nBehind every title is a growing creative record, and we're documenting that journey as it develops.\n\nSee ${name}'s verified credits on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
+        threads: `You may have come across ${name} through ${recentProject}, but the credit doesn't end there. Explore their verified credits and productions on MuviDB. #AfricanCinema`,
+        facebook: `You may have come across ${name} through ${recentProject}, but their creative record goes deeper.\n\nTheir work spans several productions documented on MuviDB, including ${remainingSentence}.\n\nBehind every title is a growing creative record, and we're documenting that journey as it develops. See ${name}'s verified credits on MuviDB.`,
+        tiktok: `You know ${name} from ${recentProject}, but the credits don't stop there. Explore their verified profile on MuviDB! #MuviDB #${cleanTag}`,
+      },
+    },
+    {
+      key: 'C',
+      label: 'Discovery',
+      captions: {
+        instagram: `One name you might want to remember: ${name}. 🎬\n\nTheir credits include ${titlesListSentence}, with ${countStr} currently connected to their MuviDB profile.\n\nSome careers are easier to appreciate when you can actually see the work adding up.\n\nWe're keeping track.\n\nDiscover their profile on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
+        threads: `One name you might want to remember: ${name}. 🎬 With credits including ${titlesListSentence}, see their work adding up on MuviDB. #AfricanCinema`,
+        facebook: `One name you might want to remember: ${name}.\n\nWith verified credits including ${titlesListSentence}, their creative record is actively taking shape. Explore their profile on MuviDB.`,
+        tiktok: `One name you might want to remember: ${name} 🎬 See their verified credits on MuviDB! #MuviDB #${cleanTag}`,
+      },
+    },
+  ];
 }
 
 /**
@@ -520,40 +637,7 @@ function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
   }
 
   if (isPerson) {
-    const knownFor = Array.isArray(data.knownFor) ? data.knownFor : [];
-    const known = knownFor.slice(0, 3).map((k: any) => `🎬 ${k.title}${k.year ? ` (${k.year})` : ''}`).join('\n');
-    return [
-      {
-        key: 'A',
-        label: 'Informative',
-        captions: {
-          instagram: `The Filmography: ${name} 🌟\n\nNotable credits across African cinema:\n${known || name}\n\nExplore the full verified credits on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
-          threads: `Exploring the filmography of ${name} on MuviDB. Which of their performances do you know best? #MuviDB #AfricanCinema`,
-          facebook: `The Filmography: ${name}\n\nFrom standout performances to memorable roles, explore ${name}'s verified credits and filmography on MuviDB!`,
-          tiktok: `Spotlight on ${name} 🌟 Discover their full filmography on MuviDB! #AfricanCinema #${cleanTag}`,
-        },
-      },
-      {
-        key: 'B',
-        label: 'Editorial',
-        captions: {
-          instagram: `You may know ${name} from their acclaimed roles, but their work across African cinema goes deeper.\n\nKey credits include:\n${known}\n\nFollow their full filmography on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
-          threads: `You know ${name}, but how many of their films have you seen? Check out their full credit history on MuviDB. #AfricanCinema`,
-          facebook: `You may know ${name} from recent roles, but their filmography spans several key African productions.\n\nExplore every film and every credit on MuviDB.`,
-          tiktok: `One actor, multiple memorable roles. Explore ${name}'s filmography on MuviDB! #MuviDB #${cleanTag}`,
-        },
-      },
-      {
-        key: 'C',
-        label: 'Conversational',
-        captions: {
-          instagram: `A great performance makes you remember the character long after the credits roll.\n\nWhat is your favorite ${name} role so far?\n\nExplore their full work on MuviDB.\n\n#MuviDB #AfricanCinema #${cleanTag}`,
-          threads: `What is the first film that comes to mind when you think of ${name}? Let's talk in the replies! 👇 #MuviDB`,
-          facebook: `Which performance made you a fan of ${name}? Share your favorite project below and explore their full credits on MuviDB.`,
-          tiktok: `Favorite ${name} role of all time? Drop your pick below! 👇 #MuviDB #${cleanTag}`,
-        },
-      },
-    ];
+    return buildPersonStoryFallbackVariations(req);
   }
 
   return [
@@ -591,6 +675,11 @@ function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
 }
 
 function applyCaptionBankToFallback(variations: AICopyVariation[], req: AICopyRequest): AICopyVariation[] {
+  if (req.candidate?.type === 'person') {
+    // For person profiles, the variations already have complete, bespoke editorial story hooks.
+    // Prepending a generic starter creates disjointed, duplicate text.
+    return variations;
+  }
   const { starters } = selectCaptionBankStarters({
     seriesSlug: req.series?.slug || '',
     candidate: req.candidate,
@@ -625,6 +714,11 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
   const allCaptions = variations.flatMap(variation => Object.values(variation.captions));
 
   if (allCaptions.some(caption => /\[[^\]]+\]/.test(caption))) return false;
+  if (req.candidate?.type === 'person') {
+    if (allCaptions.some(caption => /\b(the filmography:|editing credit spotlight:|notable credits across)\b/i.test(caption))) {
+      return false;
+    }
+  }
   if (lifecycle === 'upcoming' && allCaptions.some(caption => /\b(now streaming|currently streaming|available now|now showing|in cinemas now)\b/i.test(caption))) {
     return false;
   }
@@ -649,6 +743,10 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
  */
 export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResponse> {
   const preferred = req.preferredProvider || 'cohere';
+  const isPerson = req.candidate?.type === 'person';
+  const defaultLabels = isPerson
+    ? ['Career Story', 'Why Now', 'Discovery']
+    : ['Informative', 'Editorial', 'Conversational'];
 
   try {
     const prompt = buildMuviDBPrompt(req);
@@ -663,7 +761,7 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
     if (Array.isArray(parsed?.variations) && parsed.variations.length > 0) {
       variations = parsed.variations.map((v: any, i: number) => ({
         key: (v.key || ['A', 'B', 'C'][i] || 'A') as 'A' | 'B' | 'C',
-        label: (v.label || ['Informative', 'Editorial', 'Conversational'][i] || 'Informative') as 'Informative' | 'Editorial' | 'Conversational',
+        label: (v.label || defaultLabels[i] || defaultLabels[0]) as string,
         captions: {
           instagram: v.captions?.instagram || v.instagram || '',
           threads: v.captions?.threads || v.threads || '',
@@ -673,9 +771,9 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
       }));
     } else if (parsed?.variationA || parsed?.variationB || parsed?.variationC) {
       const map = [
-        { key: 'A' as const, label: 'Informative' as const, raw: parsed.variationA },
-        { key: 'B' as const, label: 'Editorial' as const, raw: parsed.variationB },
-        { key: 'C' as const, label: 'Conversational' as const, raw: parsed.variationC },
+        { key: 'A' as const, label: defaultLabels[0], raw: parsed.variationA },
+        { key: 'B' as const, label: defaultLabels[1], raw: parsed.variationB },
+        { key: 'C' as const, label: defaultLabels[2], raw: parsed.variationC },
       ];
       variations = map.filter(m => m.raw).map(m => ({
         key: m.key,
@@ -691,7 +789,7 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
       variations = [
         {
           key: 'A',
-          label: 'Informative',
+          label: defaultLabels[0],
           captions: {
             instagram: parsed.instagram || '',
             threads: parsed.threads || '',

@@ -71,6 +71,7 @@ export default function AdminLayout() {
     { path: '/admin/title-checker', label: 'Title Search', icon: 'solar:magnifer-zoom-in-bold' },
     { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear' },
     { path: '/admin/automation', label: 'Automation', icon: 'solar:server-square-linear' },
+    { path: '/admin/api-keys', label: 'Developer API', icon: 'solar:key-minimalistic-square-linear' },
   ];
 
   const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies', '/admin/critics', '/admin/plays', '/admin/title-checker'];

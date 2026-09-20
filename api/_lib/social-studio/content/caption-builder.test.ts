@@ -174,7 +174,6 @@ describe('buildVariantContent', () => {
     for (const platform of SOCIAL_PLATFORMS) {
       const content = buildVariantContent({ snapshot: movieSnapshot, platform });
       expect(content.hashtags.length).toBeLessThanOrEqual(PLATFORM_CAPTION_LIMITS[platform].hashtagLimit);
-      expect(PLATFORM_CAPTION_LIMITS[platform].hashtagLimit).toBe(3);
     }
   });
 

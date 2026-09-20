@@ -175,7 +175,7 @@ export default function FigmaSocialCardPreview({
   if (isPerson) {
     const knownForList = candidate?.data?.knownFor || [];
     const department = candidate?.data?.department || candidate?.category || 'Actor Spotlight';
-    const filmCount = candidate?.data?.film_count || knownForList.length || null;
+    const filmCount = candidate?.data?.film_count || candidate?.data?.creditCount || candidate?.data?.creditsCount || candidate?.film_count || knownForList.length || null;
 
     return (
       <div

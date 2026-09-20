@@ -433,15 +433,15 @@ export default function CriticDetail() {
         </div>
       </header>
 
-      {/* ─── 2. METACRITIC-STYLE SCORECARD & ANALYTICS BAR ─── */}
+      {/* ─── 2. METACRITIC-STYLE SCORECARD & ANALYTICS BAR (Editorial De-boxed) ─── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-20">
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-2xl backdrop-blur-md">
+        <div className="bg-surface/70 backdrop-blur-xl border border-border/50 rounded-3xl p-6 sm:p-8 shadow-xl shadow-black/20">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             
             {/* Left Column: Metascore Summary */}
-            <div className="lg:col-span-4 flex items-center gap-5 border-b lg:border-b-0 lg:border-r border-border/70 pb-6 lg:pb-0 lg:pr-8">
+            <div className="lg:col-span-4 flex items-center gap-5 border-b lg:border-b-0 lg:border-r border-border/50 pb-6 lg:pb-0 lg:pr-8">
               <div
-                className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center font-heading font-black shadow-lg border shrink-0 ${
+                className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center font-heading font-black shadow-md border shrink-0 ${
                   stats.avgScore100 >= 60
                     ? 'bg-emerald-600 text-white border-emerald-400/50'
                     : stats.avgScore100 >= 40
@@ -472,18 +472,18 @@ export default function CriticDetail() {
               </div>
             </div>
 
-            {/* Middle Column: Score Distribution Breakdown (Metacritic Signature) */}
+            {/* Middle Column: Score Distribution Breakdown */}
             <div className="lg:col-span-8 flex flex-col justify-center">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-text-secondary flex items-center gap-1.5">
                   <Icon icon="solar:chart-2-bold" className="text-brand w-4 h-4" />
                   Score Distribution (Metacritic Breakdown)
                 </span>
-                <span className="text-xs text-text-muted font-medium">Click a bar to filter</span>
+                <span className="text-xs text-text-muted font-medium">Click to filter</span>
               </div>
 
               {/* 3-Color Horizontal Stacked Distribution Bar */}
-              <div className="h-4 w-full rounded-full bg-surface-2 overflow-hidden flex shadow-inner border border-border/60">
+              <div className="h-3 w-full rounded-full bg-surface-2/80 overflow-hidden flex shadow-inner">
                 {stats.positive > 0 && (
                   <button
                     type="button"
@@ -513,66 +513,63 @@ export default function CriticDetail() {
                 )}
               </div>
 
-              {/* Distribution Legend & Counts */}
-              <div className="grid grid-cols-3 gap-2 mt-3 pt-2 text-xs">
+              {/* Sleek De-boxed Distribution Legend Pills */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-3.5 pt-1">
                 <button
                   type="button"
                   onClick={() => setSentimentFilter(sentimentFilter === 'positive' ? 'all' : 'positive')}
-                  className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     sentimentFilter === 'positive'
-                      ? 'bg-emerald-500/20 border-emerald-500 text-white font-bold'
-                      : 'bg-surface-2/40 border-border hover:border-emerald-500/40 text-text-muted'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-sm'
+                      : 'bg-surface-2/60 text-text-muted hover:text-text-primary hover:bg-surface-2'
                   }`}
                 >
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                    <span>Positive</span>
-                  </span>
-                  <span className="font-bold text-emerald-400">{stats.positive} ({stats.positivePct}%)</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
+                  <span>Positive</span>
+                  <span className="font-mono font-bold text-emerald-400">{stats.positive}</span>
+                  <span className="text-[11px] opacity-70">({stats.positivePct}%)</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setSentimentFilter(sentimentFilter === 'mixed' ? 'all' : 'mixed')}
-                  className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     sentimentFilter === 'mixed'
-                      ? 'bg-amber-500/20 border-amber-500 text-white font-bold'
-                      : 'bg-surface-2/40 border-border hover:border-amber-500/40 text-text-muted'
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50 shadow-sm'
+                      : 'bg-surface-2/60 text-text-muted hover:text-text-primary hover:bg-surface-2'
                   }`}
                 >
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                    <span>Mixed</span>
-                  </span>
-                  <span className="font-bold text-amber-400">{stats.mixed} ({stats.mixedPct}%)</span>
+                  <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
+                  <span>Mixed</span>
+                  <span className="font-mono font-bold text-amber-400">{stats.mixed}</span>
+                  <span className="text-[11px] opacity-70">({stats.mixedPct}%)</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setSentimentFilter(sentimentFilter === 'negative' ? 'all' : 'negative')}
-                  className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     sentimentFilter === 'negative'
-                      ? 'bg-rose-500/20 border-rose-500 text-white font-bold'
-                      : 'bg-surface-2/40 border-border hover:border-rose-500/40 text-text-muted'
+                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 shadow-sm'
+                      : 'bg-surface-2/60 text-text-muted hover:text-text-primary hover:bg-surface-2'
                   }`}
                 >
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-                    <span>Negative</span>
-                  </span>
-                  <span className="font-bold text-rose-400">{stats.negative} ({stats.negativePct}%)</span>
+                  <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_6px_rgba(248,113,113,0.6)]" />
+                  <span>Negative</span>
+                  <span className="font-mono font-bold text-rose-400">{stats.negative}</span>
+                  <span className="text-[11px] opacity-70">({stats.negativePct}%)</span>
                 </button>
               </div>
             </div>
 
           </div>
 
-          {/* High & Low Watermark Quick Highlights */}
+          {/* High & Low Watermark Quick Highlights (Borderless Editorial Cards) */}
           {(stats.highestRated || stats.lowestRated) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-6 border-t border-border/60">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-6 border-t border-border/40">
               {stats.highestRated && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-surface-2/50 border border-border">
-                  <div className="w-12 h-16 rounded-md overflow-hidden bg-black shrink-0 border border-border">
+                <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-surface-2/30 hover:bg-surface-2/50 transition-colors border-l-2 border-emerald-500">
+                  <div className="w-12 h-16 rounded-lg overflow-hidden bg-black/40 shrink-0 shadow-sm">
                     <ImageWithFallback
                       src={stats.highestRated.film?.poster_url}
                       alt={stats.highestRated.film?.title}
@@ -586,22 +583,22 @@ export default function CriticDetail() {
                       <Icon icon="solar:cup-star-bold" className="w-3.5 h-3.5" />
                       Highest Rated Film
                     </span>
-                    <h4 className="text-sm font-bold text-text-primary truncate">
+                    <h4 className="text-sm font-bold text-text-primary truncate mt-0.5">
                       {stats.highestRated.film?.title || 'Film'} ({stats.highestRated.film?.year})
                     </h4>
                     <p className="text-xs text-text-muted line-clamp-1 italic mt-0.5">
                       "{stats.highestRated.quote}"
                     </p>
                   </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-black text-xs shrink-0">
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-black text-xs shrink-0">
                     {normalizeRating(stats.highestRated.rating)?.formattedLabel || stats.highestRated.rating}
                   </span>
                 </div>
               )}
 
               {stats.lowestRated && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-surface-2/50 border border-border">
-                  <div className="w-12 h-16 rounded-md overflow-hidden bg-black shrink-0 border border-border">
+                <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-surface-2/30 hover:bg-surface-2/50 transition-colors border-l-2 border-rose-500">
+                  <div className="w-12 h-16 rounded-lg overflow-hidden bg-black/40 shrink-0 shadow-sm">
                     <ImageWithFallback
                       src={stats.lowestRated.film?.poster_url}
                       alt={stats.lowestRated.film?.title}
@@ -615,14 +612,14 @@ export default function CriticDetail() {
                       <Icon icon="solar:danger-triangle-bold" className="w-3.5 h-3.5" />
                       Most Critical Review
                     </span>
-                    <h4 className="text-sm font-bold text-text-primary truncate">
+                    <h4 className="text-sm font-bold text-text-primary truncate mt-0.5">
                       {stats.lowestRated.film?.title || 'Film'} ({stats.lowestRated.film?.year})
                     </h4>
                     <p className="text-xs text-text-muted line-clamp-1 italic mt-0.5">
                       "{stats.lowestRated.quote}"
                     </p>
                   </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-black text-xs shrink-0">
+                  <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40 font-black text-xs shrink-0">
                     {normalizeRating(stats.lowestRated.rating)?.formattedLabel || stats.lowestRated.rating}
                   </span>
                 </div>
@@ -633,14 +630,14 @@ export default function CriticDetail() {
         </div>
       </section>
 
-      {/* ─── 3. CRITIC'S LATEST SPOTLIGHT REVIEW (Editorial Feature) ─── */}
+      {/* ─── 3. CRITIC'S LATEST SPOTLIGHT REVIEW (Editorial Magazine Feature) ─── */}
       {spotlightReview && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-          <div className="relative rounded-2xl border border-brand/30 bg-gradient-to-r from-surface to-surface-2 p-6 sm:p-8 overflow-hidden shadow-xl">
-            <div className="absolute -right-16 -top-16 w-64 h-64 bg-brand/5 rounded-full blur-3xl pointer-events-none" />
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+          <div className="relative rounded-3xl bg-surface/50 border border-border/50 p-6 sm:p-8 overflow-hidden">
+            <div className="absolute -right-20 -top-20 w-80 h-80 bg-brand/5 rounded-full blur-3xl pointer-events-none" />
             
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6 relative z-10">
-              <div className="w-24 h-36 sm:w-28 sm:h-40 rounded-xl overflow-hidden shadow-2xl border border-border shrink-0 bg-black">
+              <div className="w-24 h-36 sm:w-28 sm:h-40 rounded-2xl overflow-hidden shadow-lg shrink-0 bg-black/40">
                 <ImageWithFallback
                   src={spotlightReview.film?.poster_url || spotlightReview.play?.poster_url}
                   alt={spotlightReview.film?.title || spotlightReview.play?.title}
@@ -652,7 +649,7 @@ export default function CriticDetail() {
 
               <div className="flex-1 text-center md:text-left min-w-0">
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
-                  <span className="px-2.5 py-0.5 rounded-full bg-brand/15 text-brand text-[10px] font-black uppercase tracking-wider border border-brand/30">
+                  <span className="px-3 py-0.5 rounded-full bg-brand/15 text-brand text-[10px] font-black uppercase tracking-wider">
                     Featured Latest Review
                   </span>
                   {(spotlightReview.film?.year || spotlightReview.play?.year) && (
@@ -661,13 +658,13 @@ export default function CriticDetail() {
                     </span>
                   )}
                   {normalizeRating(spotlightReview.rating) && (
-                    <span className={`px-2 py-0.5 rounded-md font-black text-xs ${normalizeRating(spotlightReview.rating).badgeClasses}`}>
+                    <span className={`px-2.5 py-0.5 rounded-full font-black text-xs ${normalizeRating(spotlightReview.rating).badgeClasses}`}>
                       {normalizeRating(spotlightReview.rating).formattedLabel}
                     </span>
                   )}
                 </div>
 
-                <h3 className="text-2xl font-black text-text-primary tracking-tight mb-3">
+                <h3 className="text-2xl font-black text-text-primary tracking-tight mb-2">
                   {spotlightReview.film?.slug ? (
                     <Link to={`/films/${spotlightReview.film.slug}`} className="hover:text-brand transition-colors">
                       {formatFilmTitle(spotlightReview.film.title)}
@@ -681,11 +678,11 @@ export default function CriticDetail() {
                   )}
                 </h3>
 
-                <blockquote className="text-base sm:text-lg italic text-text-primary leading-relaxed font-serif bg-surface/50 border-l-4 border-brand px-4 py-3 rounded-r-xl mb-4">
+                <blockquote className="text-base sm:text-lg italic text-text-primary leading-relaxed font-serif pl-4 border-l-2 border-brand/80 my-3.5">
                   "{spotlightReview.quote}"
                 </blockquote>
 
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs">
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs pt-1">
                   {spotlightReview.review_url && (
                     <a
                       href={spotlightReview.review_url}
@@ -765,18 +762,18 @@ export default function CriticDetail() {
             </div>
           </div>
 
-          {/* Interactive Filter & Search Controls */}
-          <div className="bg-surface border border-border rounded-2xl p-4 shadow-sm space-y-4">
+          {/* Interactive Filter & Search Controls (De-boxed) */}
+          <div className="space-y-4">
             
-            {/* Sentiment Quick Tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
+            {/* Sentiment Quick Tabs - Borderless Pill Navigation */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => setSentimentFilter('all')}
-                className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                className={`px-4 py-2 rounded-full transition-all shrink-0 cursor-pointer ${
                   sentimentFilter === 'all'
-                    ? 'bg-text-primary text-bg border-text-primary'
-                    : 'bg-surface-2 border-border text-text-muted hover:text-text-primary'
+                    ? 'bg-text-primary text-bg font-bold shadow-sm'
+                    : 'bg-surface-2/70 text-text-muted hover:text-text-primary hover:bg-surface-2'
                 }`}
               >
                 All Reviews ({reviews.length})
@@ -784,37 +781,37 @@ export default function CriticDetail() {
               <button
                 type="button"
                 onClick={() => setSentimentFilter('positive')}
-                className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
                   sentimentFilter === 'positive'
-                    ? 'bg-emerald-600 text-white border-emerald-500'
-                    : 'bg-surface-2 border-border text-emerald-400 hover:border-emerald-500/40'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-sm font-bold'
+                    : 'bg-surface-2/70 text-emerald-400/80 hover:text-emerald-400 hover:bg-surface-2'
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
                 Positive ({stats.positive})
               </button>
               <button
                 type="button"
                 onClick={() => setSentimentFilter('mixed')}
-                className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
                   sentimentFilter === 'mixed'
-                    ? 'bg-amber-500 text-black border-amber-400'
-                    : 'bg-surface-2 border-border text-amber-400 hover:border-amber-500/40'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50 shadow-sm font-bold'
+                    : 'bg-surface-2/70 text-amber-400/80 hover:text-amber-400 hover:bg-surface-2'
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
                 Mixed ({stats.mixed})
               </button>
               <button
                 type="button"
                 onClick={() => setSentimentFilter('negative')}
-                className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
                   sentimentFilter === 'negative'
-                    ? 'bg-rose-600 text-white border-rose-500'
-                    : 'bg-surface-2 border-border text-rose-400 hover:border-rose-500/40'
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 shadow-sm font-bold'
+                    : 'bg-surface-2/70 text-rose-400/80 hover:text-rose-400 hover:bg-surface-2'
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-rose-400" />
+                <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_6px_rgba(248,113,113,0.6)]" />
                 Negative ({stats.negative})
               </button>
             </div>
@@ -828,14 +825,14 @@ export default function CriticDetail() {
                   value={reviewSearch}
                   onChange={(e) => setReviewSearch(e.target.value)}
                   placeholder="Search film title, quote, or genre..."
-                  className="w-full bg-bg border border-border rounded-xl pl-10 pr-3 py-2.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-colors"
+                  className="w-full bg-surface-2/60 border border-border/60 rounded-xl pl-10 pr-3 py-2.5 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-colors"
                 />
               </div>
 
               <select
                 value={yearFilter}
                 onChange={(e) => setYearFilter(e.target.value)}
-                className="bg-bg border border-border rounded-xl px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
+                className="bg-surface-2/60 border border-border/60 rounded-xl px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
                 aria-label="Filter by release year"
               >
                 <option value="all">All release years</option>
@@ -847,7 +844,7 @@ export default function CriticDetail() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-bg border border-border rounded-xl px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
+                className="bg-surface-2/60 border border-border/60 rounded-xl px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
                 aria-label="Filter by review type"
               >
                 <option value="all">All review types</option>
@@ -859,7 +856,7 @@ export default function CriticDetail() {
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
-                className="bg-bg border border-border rounded-xl px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
+                className="bg-surface-2/60 border border-border/60 rounded-xl px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
                 aria-label="Sort reviews"
               >
                 <option value="newest">Newest review added</option>

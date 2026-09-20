@@ -88,34 +88,179 @@ const ASPECT_RATIOS = [
   { id: 'landscape_16_9', label: '16:9 Landscape', sub: 'YouTube / Widescreen' },
 ];
 
+function normalizeInitialData(data) {
+  if (!data) return null;
+
+  const id = data.id || null;
+  const title = data.title || '';
+
+  const rawVariants = Array.isArray(data.social_platform_variants)
+    ? data.social_platform_variants
+    : Array.isArray(data.variants)
+      ? data.variants
+      : [];
+
+  // Platforms
+  let platforms = [];
+  if (Array.isArray(data.platforms) && data.platforms.length) {
+    platforms = data.platforms;
+  } else if (rawVariants.length) {
+    platforms = rawVariants
+      .filter(v => v.status !== 'cancelled')
+      .map(v => v.platform)
+      .filter(Boolean);
+    if (!platforms.length) {
+      platforms = rawVariants.map(v => v.platform).filter(Boolean);
+    }
+  }
+  if (!platforms.length) {
+    platforms = ['instagram', 'threads', 'tiktok', 'facebook', 'x'];
+  }
+
+  // Captions
+  const platformCaptions = { ...(data.platformCaptions || {}) };
+  let universalCaption = data.universalCaption || data.caption || '';
+
+  rawVariants.forEach(v => {
+    if (v.platform && v.caption) {
+      platformCaptions[v.platform] = v.caption;
+      if (!universalCaption) universalCaption = v.caption;
+    }
+  });
+
+  const uniqueCaptions = new Set(Object.values(platformCaptions).filter(Boolean));
+  const isCustomizingPerPlatform = uniqueCaptions.size > 1;
+
+  // Media
+  let mediaAssets = [];
+  if (Array.isArray(data.mediaAssets) && data.mediaAssets.length) {
+    mediaAssets = data.mediaAssets;
+  } else {
+    const rawAssets = Array.isArray(data.social_assets)
+      ? data.social_assets
+      : Array.isArray(data.assets)
+        ? data.assets
+        : [];
+
+    if (rawAssets.length) {
+      mediaAssets = rawAssets.map((a, idx) => {
+        const publicUrl = a.public_url || a.publicUrl || '';
+        const isVideo = a.mime_type?.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(publicUrl);
+        return {
+          id: a.id || `asset_${idx}`,
+          publicUrl,
+          storagePath: a.storage_path || a.storagePath || '',
+          mimeType: a.mime_type || (isVideo ? 'video/mp4' : 'image/jpeg'),
+          width: a.width || 1080,
+          height: a.height || 1080,
+          format: a.format || (isVideo ? 'video_vertical_9_16' : 'portrait_4_5'),
+          fileSizeBytes: a.file_size_bytes || 0,
+        };
+      }).filter(a => Boolean(a.publicUrl));
+    }
+
+    if (!mediaAssets.length) {
+      for (const v of rawVariants) {
+        const carouselUrls = v.platform_options?.carousel_asset_urls;
+        if (Array.isArray(carouselUrls) && carouselUrls.length) {
+          mediaAssets = carouselUrls.map((url, idx) => ({
+            id: `carousel_${idx}`,
+            publicUrl: url,
+            mimeType: /\.(mp4|webm|mov)$/i.test(url) ? 'video/mp4' : 'image/jpeg',
+            width: 1080,
+            height: 1080,
+            format: 'carousel',
+          }));
+          break;
+        }
+      }
+    }
+  }
+
+  // Format
+  let format = data.format || data.content_type;
+  if (!['post', 'image', 'carousel', 'video'].includes(format)) {
+    if (mediaAssets.some(m => m.mimeType?.startsWith('video/') || m.format?.includes('video'))) {
+      format = 'video';
+    } else if (mediaAssets.length > 1) {
+      format = 'carousel';
+    } else if (mediaAssets.length === 1) {
+      format = 'image';
+    } else {
+      format = 'post';
+    }
+  }
+
+  // Aspect ratio
+  let aspectRatio = data.aspectRatio || 'portrait_4_5';
+  if (mediaAssets[0]?.format) {
+    const f = mediaAssets[0].format;
+    if (f.includes('9_16')) aspectRatio = 'vertical_9_16';
+    else if (f.includes('1_1')) aspectRatio = 'square_1_1';
+    else if (f.includes('16_9')) aspectRatio = 'landscape_16_9';
+    else if (f.includes('4_5')) aspectRatio = 'portrait_4_5';
+  }
+
+  // Schedule string for input[type="datetime-local"]
+  const rawSched = data.scheduledFor || data.scheduled_for || rawVariants.find(v => v.scheduled_for)?.scheduled_for;
+  let scheduledFor = '';
+  if (rawSched) {
+    try {
+      const d = new Date(rawSched);
+      if (!isNaN(d.getTime())) {
+        const pad = n => String(n).padStart(2, '0');
+        scheduledFor = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+    } catch {
+      scheduledFor = '';
+    }
+  }
+
+  return {
+    id,
+    title,
+    universalCaption,
+    platformCaptions,
+    isCustomizingPerPlatform,
+    selectedPlatforms: platforms,
+    mediaAssets,
+    postFormat: format,
+    aspectRatio,
+    scheduledFor,
+    status: data.status || 'draft',
+  };
+}
+
 export default function UniversalSocialComposer({
   connections = {},
   initialData = null,
   onPostCreated = () => {},
   onCancel = null,
 }) {
+  const parsed = useMemo(() => normalizeInitialData(initialData), [initialData]);
+
   // State
   const [selectedPlatforms, setSelectedPlatforms] = useState(() => 
-    initialData?.platforms?.length ? initialData.platforms : ['instagram', 'threads', 'tiktok', 'facebook', 'x']
+    parsed?.selectedPlatforms || ['instagram', 'threads', 'tiktok', 'facebook', 'x']
   );
-  const [postFormat, setPostFormat] = useState(() => initialData?.format || 'post');
-  const [aspectRatio, setAspectRatio] = useState(() => initialData?.aspectRatio || 'portrait_4_5');
-  const [title, setTitle] = useState(() => initialData?.title || '');
-  const [universalCaption, setUniversalCaption] = useState(() => initialData?.caption || '');
+  const [postFormat, setPostFormat] = useState(() => parsed?.postFormat || 'post');
+  const [aspectRatio, setAspectRatio] = useState(() => parsed?.aspectRatio || 'portrait_4_5');
+  const [title, setTitle] = useState(() => parsed?.title || '');
+  const [universalCaption, setUniversalCaption] = useState(() => parsed?.universalCaption || '');
   
   // Per-platform customization
-  const [isCustomizingPerPlatform, setIsCustomizingPerPlatform] = useState(false);
-  const [platformCaptions, setPlatformCaptions] = useState(() => initialData?.platformCaptions || {});
+  const [isCustomizingPerPlatform, setIsCustomizingPerPlatform] = useState(() => Boolean(parsed?.isCustomizingPerPlatform));
+  const [platformCaptions, setPlatformCaptions] = useState(() => parsed?.platformCaptions || {});
   const [activeCustomPlatform, setActiveCustomPlatform] = useState('instagram');
 
   // Media
-  const [mediaAssets, setMediaAssets] = useState(() => initialData?.mediaAssets || []);
+  const [mediaAssets, setMediaAssets] = useState(() => parsed?.mediaAssets || []);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const fileInputRef = useRef(null);
 
   // Scheduling
-  const [scheduledFor, setScheduledFor] = useState(() => initialData?.scheduledFor || '');
+  const [scheduledFor, setScheduledFor] = useState(() => parsed?.scheduledFor || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Live device preview platform
@@ -123,6 +268,21 @@ export default function UniversalSocialComposer({
 
   // AI assistant loading
   const [generatingAI, setGeneratingAI] = useState(false);
+
+  // Reactive sync if initialData changes while mounted
+  useEffect(() => {
+    if (parsed) {
+      setSelectedPlatforms(parsed.selectedPlatforms);
+      setPostFormat(parsed.postFormat);
+      setAspectRatio(parsed.aspectRatio);
+      setTitle(parsed.title);
+      setUniversalCaption(parsed.universalCaption);
+      setIsCustomizingPerPlatform(Boolean(parsed.isCustomizingPerPlatform));
+      setPlatformCaptions(parsed.platformCaptions);
+      setMediaAssets(parsed.mediaAssets);
+      setScheduledFor(parsed.scheduledFor);
+    }
+  }, [parsed]);
 
   // Sync preview platform if current preview platform gets deselected
   useEffect(() => {
@@ -317,8 +477,8 @@ export default function UniversalSocialComposer({
     let finalStatus = 'draft';
 
     if (actionType === 'publish_now') {
-      finalSchedule = new Date(Date.now() + 60_000).toISOString();
-      finalStatus = 'scheduled';
+      finalSchedule = new Date().toISOString();
+      finalStatus = 'publish_now';
     } else if (actionType === 'schedule') {
       if (!scheduledFor) {
         toast.error('Choose a date and time to schedule this post');
@@ -329,16 +489,18 @@ export default function UniversalSocialComposer({
     }
 
     setIsSubmitting(true);
+    const isEditing = Boolean(parsed?.id);
     const toastId = toast.loading(
       actionType === 'publish_now'
-        ? 'Queueing instant publish across platforms...'
+        ? 'Publishing immediately to selected platforms...'
         : actionType === 'schedule'
-          ? 'Scheduling multi-platform post...'
-          : 'Saving draft...'
+          ? (isEditing ? 'Updating schedule...' : 'Scheduling multi-platform post...')
+          : (isEditing ? 'Saving changes...' : 'Saving draft...')
     );
 
     try {
       const payload = {
+        contentItemId: parsed?.id || undefined,
         title: title || universalCaption.slice(0, 40) || 'Social Post',
         format: postFormat,
         platforms: selectedPlatforms,
@@ -360,10 +522,10 @@ export default function UniversalSocialComposer({
 
       toast.success(
         actionType === 'publish_now'
-          ? '🚀 Post queued for immediate publication!'
+          ? (data.processed ? `🚀 Post published to ${data.processed} channel(s)!` : '🚀 Publish triggered!')
           : actionType === 'schedule'
             ? '📅 Post scheduled successfully!'
-            : '💾 Draft saved!',
+            : (isEditing ? '💾 Changes saved!' : '💾 Draft saved!'),
         { id: toastId }
       );
 
@@ -385,11 +547,17 @@ export default function UniversalSocialComposer({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Platform-Agnostic Social Studio</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+              {parsed?.id ? 'Editing Scheduled / Queue Post' : 'Platform-Agnostic Social Studio'}
+            </span>
           </div>
-          <h2 className="text-2xl font-black tracking-tight text-white">Universal Publisher</h2>
+          <h2 className="text-2xl font-black tracking-tight text-white">
+            {parsed?.id ? (title || 'Edit Post') : 'Universal Publisher'}
+          </h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Compose once, preview natively, and distribute seamlessly to Instagram, Threads, TikTok, X, Facebook, and YouTube.
+            {parsed?.id
+              ? 'Modify post content, channels, attachments, or schedule, then save or publish.'
+              : 'Compose once, preview natively, and distribute seamlessly to Instagram, Threads, TikTok, X, Facebook, and YouTube.'}
           </p>
         </div>
 
@@ -410,7 +578,7 @@ export default function UniversalSocialComposer({
             className="px-4 py-2 text-xs font-bold text-white bg-surface-3 hover:bg-surface-4 rounded-lg border border-border hover:border-text-muted transition-colors flex items-center gap-1.5"
           >
             <Icon icon="solar:folder-with-files-linear" width="15" />
-            Save Draft
+            <span>{parsed?.id ? 'Save Changes' : 'Save Draft'}</span>
           </button>
           <button
             type="button"
@@ -419,7 +587,7 @@ export default function UniversalSocialComposer({
             className="px-5 py-2 text-xs font-black text-white bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 rounded-lg shadow-lg shadow-orange-500/20 transition-all flex items-center gap-1.5"
           >
             <Icon icon="solar:bolt-bold" width="16" />
-            Publish Now
+            <span>Publish Now</span>
           </button>
         </div>
       </div>
@@ -857,7 +1025,7 @@ export default function UniversalSocialComposer({
                   className="flex-1 sm:flex-initial px-5 py-2.5 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40"
                 >
                   <Icon icon="solar:calendar-mark-bold" width="16" />
-                  Schedule Post
+                  <span>{parsed?.id ? 'Update Schedule' : 'Schedule Post'}</span>
                 </button>
                 <button
                   type="button"

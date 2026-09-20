@@ -245,11 +245,15 @@ export default function CriticsList() {
       )}
 
       {/* ─── 3. SEARCH, PUBLICATION FILTERS & SORTING ─── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-        <div className="bg-surface border border-border rounded-2xl p-4 shadow-sm space-y-4">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+        <div className="space-y-4">
           
-          {/* Publication Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
+          {/* Publication Filter Pills (Open horizontal ribbon) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar text-xs">
+            <span className="text-[11px] font-black uppercase tracking-wider text-text-muted mr-1 shrink-0 flex items-center gap-1.5">
+              <Icon icon="solar:bookmark-bold" className="text-brand w-3.5 h-3.5" />
+              Outlet:
+            </span>
             {publicationsList.map((pub) => {
               const isSelected = selectedPublication.toLowerCase() === pub.toLowerCase();
               return (
@@ -257,10 +261,10 @@ export default function CriticsList() {
                   key={pub}
                   type="button"
                   onClick={() => setSelectedPublication(pub)}
-                  className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs transition-all shrink-0 cursor-pointer font-bold ${
                     isSelected
-                      ? 'bg-brand text-black border-brand font-black shadow-sm'
-                      : 'bg-surface-2 border-border text-text-muted hover:text-text-primary'
+                      ? 'bg-brand text-black shadow-md shadow-brand/20 font-black'
+                      : 'bg-surface/70 hover:bg-surface border border-border/60 hover:border-brand/40 text-text-muted hover:text-text-primary'
                   }`}
                 >
                   {pub === 'all' ? 'All Publications' : pub}
@@ -269,29 +273,31 @@ export default function CriticsList() {
             })}
           </div>
 
-          {/* Search & Sort Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+          {/* Search & Sort Row (Clean floating bar) */}
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-center">
             <div className="relative">
-              <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted w-4 h-4" />
+              <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search critic by name, publication, or beat..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-bg border border-border rounded-xl text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-colors"
+                className="w-full pl-11 pr-4 py-3 bg-surface/70 hover:bg-surface border border-border/80 focus:border-brand rounded-2xl text-xs text-text-primary placeholder-text-muted focus:outline-none transition-all shadow-sm"
               />
             </div>
 
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="bg-bg border border-border rounded-xl px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
-              aria-label="Sort critics directory"
-            >
-              <option value="reviews-desc">Most Reviews Published</option>
-              <option value="rating-desc">Highest Average Metascore</option>
-              <option value="name-asc">Critic Name A-Z</option>
-            </select>
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full sm:w-auto bg-surface/70 hover:bg-surface border border-border/80 rounded-2xl px-4 py-3 text-xs font-bold text-text-primary focus:outline-none focus:border-brand transition-all shadow-sm cursor-pointer pr-8"
+                aria-label="Sort critics directory"
+              >
+                <option value="reviews-desc">Most Reviews Published</option>
+                <option value="rating-desc">Highest Average Metascore</option>
+                <option value="name-asc">Critic Name A-Z</option>
+              </select>
+            </div>
           </div>
 
         </div>

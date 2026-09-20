@@ -36,6 +36,7 @@
     "harvest:automated": "tsx scripts/run_automated_credit_harvester.ts",
     "build:user-words": "tsx scripts/build_tesseract_user_words.ts",
     "harvest:legacy": "tsx scripts/harvest_credits.ts",
+    "cleanup:people": "tsx scripts/daily_people_cleanup.ts",
     "sync:kava": "tsx scripts/sync_feed_kappa.ts",
     "sync:circuits": "tsx scripts/circuits_sync.ts",
     "sync:nollistream": "tsx scripts/nollistream_sync.ts",

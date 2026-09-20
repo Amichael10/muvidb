@@ -134,14 +134,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const existingCc = response.headers.get('cache-control');
-    if (response.status === 200) {
-      const cc = existingCc || 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400';
+    const isPrivate =
+      pathname.startsWith('/admin') ||
+      pathname.startsWith('/dashboard') ||
+      pathname.startsWith('/pro-dashboard') ||
+      pathname.startsWith('/onboarding') ||
+      pathname.startsWith('/settings') ||
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname === '/forgot-password' ||
+      pathname === '/reset-password';
+
+    if (isPrivate) {
+      res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      res.setHeader('CDN-Cache-Control', 'private, no-cache, no-store');
+      res.setHeader('Vercel-CDN-Cache-Control', 'private, no-cache, no-store');
+    } else if (response.status === 200) {
+      const isFastChanging =
+        pathname === '/' ||
+        pathname.startsWith('/showtimes') ||
+        pathname.startsWith('/cinemas');
+      const sMaxAge = isFastChanging ? 3600 : 14400; // 1 hr for showtimes/home, 4 hrs for film & people catalog
+
+      const cc = existingCc || `public, max-age=60, s-maxage=${sMaxAge}, stale-while-revalidate=86400`;
       res.setHeader('Cache-Control', cc);
       if (!res.getHeader('CDN-Cache-Control')) {
-        res.setHeader('CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+        res.setHeader('CDN-Cache-Control', `public, s-maxage=${sMaxAge}, stale-while-revalidate=86400`);
       }
       if (!res.getHeader('Vercel-CDN-Cache-Control')) {
-        res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+        res.setHeader('Vercel-CDN-Cache-Control', `public, s-maxage=${sMaxAge}, stale-while-revalidate=86400`);
       }
     } else if (response.status === 404) {
       const cc = existingCc || 'public, max-age=60, s-maxage=300, stale-while-revalidate=3600';

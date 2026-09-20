@@ -1,10 +1,12 @@
 import { ytGet, parseDuration, cleanTitle } from '../api/_lib/yt_service.js';
+import { curateYouTubeTitle, isBloggerOrNonFilm, isSensationalizedYouTubeTitle } from '../api/_lib/youtube_title_policy.js';
 import { pickTmdbMatch } from '../api/_lib/tmdb_match.js';
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import { enrichMissingSynopsesConcurrent } from '../api/_lib/cohere_enrichment.js';
+import { runDailyPeopleCleanup } from './daily_people_cleanup';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
@@ -198,11 +200,21 @@ async function main() {
                   const existingFilmsMap = new Map();
 
                   for (const v of longVideos) {
-                    const cleanedTitle = cleanTitle(v.title);
+                    if (isBloggerOrNonFilm(v.title)) {
+                      console.log(`⏩ Skipping blogger/non-film: "${v.title}"`);
+                      continue;
+                    }
+                    const decision = curateYouTubeTitle(v.title);
+                    if (decision.action === 'skip' || !decision.title) {
+                      console.log(`⏩ Skipping sensational/non-film: "${v.title}" (${decision.reason})`);
+                      continue;
+                    }
+                    const cleanedTitle = decision.title;
                     const vidYear = v.published_at ? new Date(v.published_at).getFullYear() : null;
                     const tmdb = await enrichFromTMDB(cleanedTitle, vidYear);
                     filmsToInsert.push({
                       title: cleanedTitle, 
+                      original_title: decision.originalTitle || null,
                       year: vidYear,
                       release_type: 'youtube', 
                       source: 'youtube', 
@@ -288,6 +300,12 @@ async function main() {
     }
 
     console.log('\n✅ Completed full pass over all channels.');
+    console.log('🧹 Triggering automated people consensus, alias deduplication, and cleanup...');
+    try {
+      await runDailyPeopleCleanup();
+    } catch (cleanErr: any) {
+      console.error('⚠️ People cleanup encountered an error:', cleanErr.message);
+    }
     console.log('💤 Sleeping for 6 hours before next full pass...');
     await delay(6 * 60 * 60 * 1000);
   }

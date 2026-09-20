@@ -412,7 +412,17 @@ export default function AdminFilms() {
       if (featuredFilter === 'featured') countQuery = countQuery.eq('is_featured', true);
       if (featuredFilter === 'regular') countQuery = countQuery.eq('is_featured', false);
       if (sourceFilter !== 'all') countQuery = countQuery.eq('source', sourceFilter);
-      if (typeFilter !== 'all') countQuery = countQuery.eq('content_type', typeFilter);
+      if (typeFilter !== 'all') {
+        if (typeFilter === 'feature_film') {
+          countQuery = countQuery.in('content_type', ['feature_film', 'feature film']);
+        } else if (typeFilter === 'mini_series') {
+          countQuery = countQuery.in('content_type', ['mini_series', 'mini series']);
+        } else if (typeFilter === 'series') {
+          countQuery = countQuery.in('content_type', ['series', 'serie']);
+        } else {
+          countQuery = countQuery.eq('content_type', typeFilter);
+        }
+      }
       if (cinemaFilter === 'in_cinemas') countQuery = countQuery.eq('is_in_cinemas', true);
       if (cinemaFilter === 'not_in_cinemas') countQuery = countQuery.eq('is_in_cinemas', false);
       if (platformFilter !== 'all') {
@@ -442,7 +452,17 @@ export default function AdminFilms() {
       if (trendingFilter === 'trending') query = query.eq('is_trending', true);
       if (trendingFilter === 'regular') query = query.eq('is_trending', false);
       if (sourceFilter !== 'all') query = query.eq('source', sourceFilter);
-      if (typeFilter !== 'all') query = query.eq('content_type', typeFilter);
+      if (typeFilter !== 'all') {
+        if (typeFilter === 'feature_film') {
+          query = query.in('content_type', ['feature_film', 'feature film']);
+        } else if (typeFilter === 'mini_series') {
+          query = query.in('content_type', ['mini_series', 'mini series']);
+        } else if (typeFilter === 'series') {
+          query = query.in('content_type', ['series', 'serie']);
+        } else {
+          query = query.eq('content_type', typeFilter);
+        }
+      }
       if (cinemaFilter === 'in_cinemas') query = query.eq('is_in_cinemas', true);
       if (cinemaFilter === 'not_in_cinemas') query = query.eq('is_in_cinemas', false);
       if (platformFilter !== 'all') {
@@ -714,6 +734,7 @@ export default function AdminFilms() {
       const baseForm = {
         ...initialFormState,
         ...film,
+        content_type: (film.content_type === 'feature film' ? 'feature_film' : film.content_type === 'mini series' ? 'mini_series' : film.content_type === 'serie' ? 'series' : film.content_type) || 'movie',
         genres: film.genres || [],
         runtime_minutes: film.runtime_minutes || '',
         is_featured: film.is_featured || false,
@@ -1730,8 +1751,11 @@ export default function AdminFilms() {
             className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary text-xs focus:border-brand focus:ring-2 focus:ring-brand/20 shadow-sm transition-all appearance-none cursor-pointer"
           >
             <option value="all">All Types</option>
+            <option value="feature_film">Feature Films</option>
             <option value="movie">Movies</option>
             <option value="series">Series</option>
+            <option value="mini_series">Mini-series</option>
+            <option value="documentary">Documentaries</option>
           </select>
 
           <select
@@ -1768,6 +1792,7 @@ export default function AdminFilms() {
           >
             <option value="all">All Sources</option>
             <option value="manual">Manual</option>
+            <option value="imdb">IMDb Harvest</option>
             <option value="netflix_sync">Netflix Sync</option>
             <option value="prime_sync">Prime Sync</option>
             <option value="kava">Kava Sync</option>
@@ -1889,8 +1914,18 @@ export default function AdminFilms() {
                             {film.is_trending && <Icon icon="solar:fire-bold" className="w-3 h-3 text-amber-500" />}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border ${film.content_type === 'series' ? 'bg-purple-500/10 text-purple-600 border-purple-500/20' : 'bg-surface-3 text-text-muted border-border'}`}>
-                              {film.content_type || 'movie'}
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border ${
+                              film.content_type === 'series' || film.content_type === 'serie'
+                                ? 'bg-purple-500/10 text-purple-600 border-purple-500/20'
+                                : film.content_type === 'feature_film' || film.content_type === 'feature film'
+                                ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                : film.content_type === 'mini_series' || film.content_type === 'mini series'
+                                ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                : film.content_type === 'documentary'
+                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                : 'bg-surface-3 text-text-muted border-border'
+                            }`}>
+                              {(film.content_type || 'movie').replace(/_/g, ' ')}
                             </span>
                             {film.needs_review && (
                               <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 text-[8px] font-black uppercase tracking-tighter border border-red-500/20">
@@ -2390,13 +2425,20 @@ export default function AdminFilms() {
                     <label className="block text-xs font-bold text-text-primary mb-2">Content Type</label>
                     <select 
                       name="content_type" 
-                      value={formData.content_type || 'movie'} 
+                      value={
+                        formData.content_type === 'feature film' ? 'feature_film' :
+                        formData.content_type === 'mini series' ? 'mini_series' :
+                        formData.content_type === 'serie' ? 'series' :
+                        formData.content_type || 'movie'
+                      } 
                       onChange={handleChange} 
                       className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all appearance-none cursor-pointer"
                     >
                       <option value="movie">Movie</option>
+                      <option value="feature_film">Feature Film</option>
                       <option value="series">Series</option>
                       <option value="mini_series">Mini-series</option>
+                      <option value="documentary">Documentary</option>
                     </select>
                   </div>
                   <div>

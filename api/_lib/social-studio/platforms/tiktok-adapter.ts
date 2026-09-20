@@ -290,6 +290,10 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
       });
     }
 
+    const rawCoverIndex = Number(settings.photo_cover_index);
+    const requestedCoverIndex = Number.isFinite(rawCoverIndex) ? Math.max(0, Math.floor(rawCoverIndex)) : 0;
+    const photoCoverIndex = Math.min(Math.max(0, targetMediaUrls.length - 1), requestedCoverIndex);
+
     const photoPayload = {
       media_type: 'PHOTO',
       post_mode: postMode,
@@ -297,14 +301,28 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
       source_info: {
         source: 'PULL_FROM_URL',
         photo_images: targetMediaUrls,
-        photo_cover_index: Math.max(
-          1,
-          Math.min(targetMediaUrls.length, Math.floor(Number(settings.photo_cover_index) || 1)),
-        ),
+        photo_cover_index: photoCoverIndex,
       },
     };
 
-    const res = await this.postJson('/post/publish/content/init/', photoPayload);
+    let res: Record<string, any>;
+    let actualPostMode: 'DIRECT_POST' | 'MEDIA_UPLOAD' = postMode;
+    try {
+      res = await this.postJson('/post/publish/content/init/', photoPayload);
+    } catch (err: any) {
+      if (err?.details?.provider_code === 'unaudited_client_can_only_post_to_private_accounts' || err?.message?.includes('unaudited')) {
+        console.log('[TikTok Adapter] App unaudited for public direct posts. Falling back to MEDIA_UPLOAD draft mode...');
+        actualPostMode = 'MEDIA_UPLOAD';
+        photoPayload.post_mode = 'MEDIA_UPLOAD';
+        photoPayload.post_info = {
+          title: String(request.title || '').slice(0, 90),
+          description: String(request.caption || '').slice(0, 4000),
+        };
+        res = await this.postJson('/post/publish/content/init/', photoPayload);
+      } else {
+        throw err;
+      }
+    }
     const publishId = res.data?.publish_id;
     if (!publishId) {
       throw new SocialPlatformError({
@@ -314,7 +332,7 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
       });
     }
 
-    const statusResult = await this.checkPublishStatus(publishId, postMode);
+    const statusResult = await this.checkPublishStatus(publishId, actualPostMode);
     statusResult.providerResponse = { ...statusResult.providerResponse, creator_info: creatorInfo };
     return statusResult;
   }

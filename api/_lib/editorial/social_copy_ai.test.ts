@@ -102,4 +102,56 @@ describe('generated social copy grounding', () => {
     expect(response.variations.every(variation => Object.values(variation.captions).every(Boolean))).toBe(true);
     warning.mockRestore();
   });
+
+  it('generates story-first copy for talent spotlight across Career Story, Why Now, and Discovery angles without CMS metadata dumping', () => {
+    const req: AICopyRequest = {
+      candidate: {
+        id: 'sanusi-person',
+        type: 'person',
+        name: 'Sanusi Izihaq',
+        data: {
+          film_count: 5,
+          why_now: 'Connected to the recent project Lagbondoko',
+          knownFor: [
+            { title: 'Lagbondoko', year: 2025 },
+            { title: 'Gen Z School', year: 2026 },
+            { title: 'Gen Z School 2', year: 2026 },
+          ],
+        },
+      },
+      series: { slug: 'you_know_the_face', name: 'Craft Spotlight' },
+    };
+
+    const variations = generateGroundedFallbackCaptions(req);
+    expect(variations).toHaveLength(3);
+
+    const [optionA, optionB, optionC] = variations;
+    expect(optionA.label).toBe('Career Story');
+    expect(optionB.label).toBe('Why Now');
+    expect(optionC.label).toBe('Discovery');
+
+    // Option A: Career Story traces journey and progression
+    expect(optionA.captions.instagram).toContain('Sanusi Izihaq is building their credits one project at a time');
+    expect(optionA.captions.instagram).toContain('Lagbondoko in 2025');
+    expect(optionA.captions.instagram).toContain('Gen Z School and Gen Z School 2 in 2026');
+    expect(optionA.captions.instagram).toContain('5 verified credits currently documented on MuviDB');
+
+    // Option B: Why Now hooks into the recent project
+    expect(optionB.captions.instagram).toContain('You may have come across Sanusi Izihaq through Lagbondoko');
+    expect(optionB.captions.instagram).toContain('Gen Z School and Gen Z School 2');
+
+    // Option C: Discovery is conversational and radar-focused
+    expect(optionC.captions.instagram).toContain('One name you might want to remember: Sanusi Izihaq');
+    expect(optionC.captions.instagram).toContain('5 verified credits');
+
+    // Banned CMS language must NOT exist anywhere in any caption
+    const allText = variations.flatMap(v => Object.values(v.captions)).join('\n');
+    expect(allText).not.toContain('The Filmography:');
+    expect(allText).not.toContain('Editing credit spotlight:');
+    expect(allText).not.toContain('Notable credits across African cinema:');
+    expect(allText).not.toContain('🎬 Lagbondoko (2025)');
+
+    // Grounding check passes
+    expect(areGeneratedVariationsGrounded(req, variations)).toBe(true);
+  });
 });

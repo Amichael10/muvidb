@@ -1,14 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { isValidAuth } from './_lib/auth';
-import statusHandler from './_automation/status';
-import fetchChannelsHandler from './_automation/fetch-channels';
-import enrichActorsHandler from './_automation/enrich-actors';
-import scrapeImdbActorHandler from './_lib/scrape_imdb_actor_handler';
-import deduplicatorHandler from './_lib/deduplicator_handler';
-import peopleEnrichmentHandler from './_lib/people_enrichment_handler';
-import { renewYouTubeWebSubSubscriptions, youtubeWebSubHandler } from './_lib/youtube_websub';
-import { handleTelegramOps } from './_lib/telegram_ops_handler';
-import { handleAuthEmailHook } from './_lib/auth_email_handler';
+import { isValidAuth } from './_lib/auth.js';
+import statusHandler from './_automation/status.js';
+import fetchChannelsHandler from './_automation/fetch-channels.js';
+import enrichActorsHandler from './_automation/enrich-actors.js';
+import scrapeImdbActorHandler from './_lib/scrape_imdb_actor_handler.js';
+import deduplicatorHandler from './_lib/deduplicator_handler.js';
+import peopleEnrichmentHandler from './_lib/people_enrichment_handler.js';
+import { renewYouTubeWebSubSubscriptions, youtubeWebSubHandler } from './_lib/youtube_websub.js';
+import { handleTelegramOps } from './_lib/telegram_ops_handler.js';
+import { handleAuthEmailHook } from './_lib/auth_email_handler.js';
 
 export const maxDuration = 60;
 

@@ -223,4 +223,9 @@ scripts/*.json
 tessdata/
 *.traineddata
 
+# Temporary scraping and profiling dumps
+bp_*
+rhoda_*
+
+
 

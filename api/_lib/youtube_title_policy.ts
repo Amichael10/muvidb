@@ -39,6 +39,33 @@ const NOISE = /(latest|new[- ]?(?:nigerian|nollywood|yoruba|african)?\s*(?:movie
 
 const BAD_PREFIX = /^(please|watch|you will|you must|you'?ll|you (?:cannot|can'?t|should|shall|would|could)|our |my |your |don'?t|dn'?t|do not|every(?:one|body|lady|woman|man)|i (?:ask|urge|beg)|if (?:you|u)|just released|new released|new movie alert|latest movie|this (?:movie|story)|keep |drop |no matter|be the first|how |why |what happened|the day |the moment |the story of |a story of |when a |where a )\b/i;
 
+export const BLOGGER_NON_FILM_PATTERNS = [
+  // Birthday / Personal parties
+  /\b(?:birthday\s+(?:party|celebration|bash)|celebrates?\s+(?:her|his|their)?\s*birthday|happy\s+birthday|birthday\s+of)\b/i,
+  // Premiere / Red carpet / Press conference
+  /\b(?:premiere\s+of|movie\s+premiere\s+of|red\s+carpet|press\s+conference|press\s+briefing)\b/i,
+  // Gossip / Social media feuds & drama
+  /\b(?:takes\s+beef|beef\s+with|fight(?:ing)?\s+with|feud\s+with)\b/i,
+  /\b(?:said\s+this|speaks\s+(?:on|about)|reacts?\s+to|breaks?\s+silence|cries\s+out|calls?\s+out|blasts?\s+|shades?\s+at|opens?\s+up\s+on)\b/i,
+  /\b(?:leaked\s+(?:video|audio|tape)|scandal\s+exposed|caught\s+(?:on\s+camera|red[- ]handed))\b/i,
+  /\b(?:is\s+a\s+single\s+mother|gives\s+birth\s+to|confession\s+of|secret\s+revealed\s+about)\b/i,
+  // Lifestyle / Wealth / Celebrity vlogs
+  /\b(?:house\s+warming|buys?\s+(?:a\s+)?new\s+car|mansions?\s+and\s+cars|net\s*worth\s+of|biography\s+of|lifestyle\s+of)\b/i,
+  /\b(?:wedding\s+ceremony\s+of|traditional\s+wedding\s+of|burial\s+ceremony\s+of)\b/i,
+  // BTS / Bloopers / Compilations
+  /\b(?:behind\s+the\s+scenes|blooper(?:s)?|funny\s+moments\s+on\s+set)\b/i,
+  /\b(?:the\s+best\s+of|greatest\s+scenes\s+of|top\s+\d+\s+scenes\s+of)\s+[A-Z]/i,
+  // Interviews & talk shows
+  /\b(?:full\s+interview\s+with|exclusive\s+interview\s+with|sit[- ]down\s+with|in\s+conversation\s+with)\b/i,
+  /\b(?:step\s+out\s+with\s+full\s+energy|threats\s+don'?t\s+move\s+them)\b/i,
+  /\bshade\s+corner\b/i
+];
+
+export function isBloggerOrNonFilm(raw: string): boolean {
+  const t = normalize(raw);
+  return BLOGGER_NON_FILM_PATTERNS.some(re => re.test(t));
+}
+
 function normalize(raw: string): string {
   return (raw || '')
     .replace(/[\u2018\u2019]/g, "'")
@@ -62,6 +89,7 @@ function wordCount(value: string): number {
 export function isSensationalizedYouTubeTitle(raw: string): boolean {
   const title = normalize(raw);
   if (!title) return false;
+  if (isBloggerOrNonFilm(title)) return true;
   if (STRONG_CLICKBAIT.test(title) || EMOTIONAL_PROMO.test(title) || BAD_PREFIX.test(title)) return true;
 
   // Catch sentence plot headlines starting with How/Why/What/When/The Day/The Moment/A Story Of
@@ -179,6 +207,15 @@ export function extractEmbeddedFilmTitle(raw: string): EmbeddedTitle | null {
 
 export function curateYouTubeTitle(raw: string): YouTubeTitleDecision {
   const original = normalize(raw);
+  if (isBloggerOrNonFilm(original)) {
+    return {
+      action: 'skip',
+      title: null,
+      originalTitle: original,
+      castSourceText: original,
+      reason: 'sensational-title-without-film-title',
+    };
+  }
   const sensational = isSensationalizedYouTubeTitle(original);
   const embedded = extractEmbeddedFilmTitle(original);
 

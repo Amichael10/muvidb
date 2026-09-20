@@ -446,10 +446,12 @@ export default function AdminSocialStudio() {
   const [manualFormData, setManualFormData] = useState({ username: '', displayName: '', externalAccountId: '', accessToken: '' });
 
   // 30-Day Calendar State
-  const getTomorrowDateStr = () => {
+  const getTodayDateStr = () => {
     const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const [calendarSlots, setCalendarSlots] = useState([]);
@@ -472,7 +474,7 @@ export default function AdminSocialStudio() {
   const [videoFilmOptions, setVideoFilmOptions] = useState([]);
   const [videoFilmSearch, setVideoFilmSearch] = useState({});
   const [clipperStatus, setClipperStatus] = useState('checking');
-  const [calendarStartDate, setCalendarStartDate] = useState(getTomorrowDateStr());
+  const [calendarStartDate, setCalendarStartDate] = useState(getTodayDateStr());
   const [postsPerDay, setPostsPerDay] = useState(1);
   const [shuffleOffset, setShuffleOffset] = useState(0);
 
@@ -680,7 +682,7 @@ export default function AdminSocialStudio() {
   const fetchCalendar = async (offset = shuffleOffset) => {
     setLoadingCalendar(true);
     try {
-      const res = await fetch(`/api/social?task=calendar_plan&days=30&offset=${offset}`, { headers: await authHeaders() });
+      const res = await fetch(`/api/social?task=calendar_plan&days=30&offset=${offset}&startDate=${calendarStartDate}`, { headers: await authHeaders() });
       const data = await res.json().catch(() => ([]));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setCalendarSlots(Array.isArray(data) ? data : []);
@@ -1569,24 +1571,22 @@ export default function AdminSocialStudio() {
     setReviewingId(contentItemId);
     const toastId = toast.loading('Initiating instant publish for selected channels...');
     try {
-      if (currentStatus !== 'scheduled') {
-        const schedRes = await fetch('/api/social?task=schedule', {
-          method: 'POST',
-          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contentItemId, scheduledFor: new Date().toISOString() }),
-        });
-        const schedData = await schedRes.json().catch(() => ({}));
-        if (!schedRes.ok) throw new Error(schedData.error || `HTTP ${schedRes.status}`);
-      }
-
-      const pubRes = await fetch('/api/social?task=publish_due', {
-        headers: await authHeaders(),
+      const res = await fetch('/api/social?task=publish_now', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId }),
       });
-      const pubData = await pubRes.json().catch(() => ({}));
-      if (!pubRes.ok) throw new Error(pubData.error || `HTTP ${pubRes.status}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-      toast.success('Publishing in progress! Uploading & publishing to selected channels.', { id: toastId });
-      refreshAll();
+      const processed = data.processed || 0;
+      toast.success(
+        processed > 0
+          ? `🚀 Successfully triggered publish for ${processed} channel(s)!`
+          : 'Publish request submitted!',
+        { id: toastId },
+      );
+      await refreshAll();
     } catch (err) {
       toast.error(err.message || 'Failed to trigger publishing', { id: toastId });
     } finally {
@@ -1734,13 +1734,20 @@ export default function AdminSocialStudio() {
     const startOffset = firstDay.getDay(); // 0 = Sun, 1 = Mon...
     const daysInMonth = lastDay.getDate();
 
+    const formatLocalDate = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
     const days = [];
     // Leading days
     for (let i = 0; i < startOffset; i++) {
       const prevDate = new Date(year, month, 1 - (startOffset - i));
       days.push({
         date: prevDate,
-        dateStr: prevDate.toISOString().slice(0, 10),
+        dateStr: formatLocalDate(prevDate),
         isCurrentMonth: false,
       });
     }
@@ -1749,7 +1756,7 @@ export default function AdminSocialStudio() {
       const currDate = new Date(year, month, i);
       days.push({
         date: currDate,
-        dateStr: currDate.toISOString().slice(0, 10),
+        dateStr: formatLocalDate(currDate),
         isCurrentMonth: true,
       });
     }
@@ -1759,7 +1766,7 @@ export default function AdminSocialStudio() {
       const nextDate = new Date(year, month + 1, i);
       days.push({
         date: nextDate,
-        dateStr: nextDate.toISOString().slice(0, 10),
+        dateStr: formatLocalDate(nextDate),
         isCurrentMonth: false,
       });
     }
@@ -2192,7 +2199,7 @@ export default function AdminSocialStudio() {
               <div className="grid grid-cols-7 divide-x divide-y divide-white/10 bg-surface">
                 {calendarMatrix.map(cell => {
                   const daySlots = slotsByDate[cell.dateStr] || [];
-                  const isToday = cell.dateStr === new Date().toISOString().slice(0, 10);
+                  const isToday = cell.dateStr === getTodayDateStr();
 
                   return (
                     <div
@@ -2311,7 +2318,7 @@ export default function AdminSocialStudio() {
             /* ========================================================================= */
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {calendarSlots.map(slot => {
-                const dateObj = new Date(slot.scheduled_date);
+                const dateObj = new Date(slot.scheduled_date ? `${slot.scheduled_date.slice(0, 10)}T12:00:00Z` : Date.now());
                 const dayName = dateObj.toLocaleDateString(undefined, { weekday: 'short' });
                 const monthDay = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
                 const series = slot.social_content_series || {};
@@ -2669,22 +2676,34 @@ export default function AdminSocialStudio() {
                         )}
 
                         {item.status === 'scheduled' ? (
-                          <button
-                            type="button"
-                            onClick={() => runCancelSchedule(item.id)}
-                            className="inline-flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-400 hover:bg-amber-500/20 transition-all"
-                          >
-                            <Icon icon="solar:close-circle-bold" width="14" />
-                            <span>Cancel Schedule</span>
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => runPublishNow(item.id, item.status)}
+                              disabled={reviewingId === item.id}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1.5 text-xs font-black text-white hover:bg-brand-hover shadow-md shadow-brand/20 active:scale-95 disabled:opacity-50 transition-all"
+                              title="Publish this scheduled post immediately without waiting for its scheduled time"
+                            >
+                              <Icon icon={reviewingId === item.id ? 'solar:spinner-linear' : 'solar:play-bold'} className={reviewingId === item.id ? 'animate-spin' : ''} width="14" />
+                              <span>Publish Now</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => runCancelSchedule(item.id)}
+                              className="inline-flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-400 hover:bg-amber-500/20 transition-all"
+                            >
+                              <Icon icon="solar:close-circle-bold" width="14" />
+                              <span>Cancel Schedule</span>
+                            </button>
+                          </>
                         ) : item.status !== 'published' ? (
                           <button
                             type="button"
                             onClick={() => runPublishNow(item.id, item.status)}
                             disabled={reviewingId === item.id}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1.5 text-xs font-black text-white hover:bg-brand-hover shadow-md shadow-brand/20 active:scale-95 transition-all"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1.5 text-xs font-black text-white hover:bg-brand-hover shadow-md shadow-brand/20 active:scale-95 disabled:opacity-50 transition-all"
                           >
-                            <Icon icon="solar:play-bold" width="14" />
+                            <Icon icon={reviewingId === item.id ? 'solar:spinner-linear' : 'solar:play-bold'} className={reviewingId === item.id ? 'animate-spin' : ''} width="14" />
                             <span>Publish Now</span>
                           </button>
                         ) : null}
@@ -2714,6 +2733,7 @@ export default function AdminSocialStudio() {
       {/* ========================================================================= */}
       {activeTab === 'composer' && (
         <UniversalSocialComposer
+          key={editingDraft?.id || 'new-universal-post'}
           connections={connections}
           initialData={editingDraft}
           onPostCreated={async () => {
@@ -2721,7 +2741,10 @@ export default function AdminSocialStudio() {
             setActiveTab('drafts');
             setEditingDraft(null);
           }}
-          onCancel={editingDraft ? () => setEditingDraft(null) : null}
+          onCancel={editingDraft ? () => {
+            setEditingDraft(null);
+            setActiveTab('drafts');
+          } : null}
         />
       )}
 

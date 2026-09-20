@@ -23,6 +23,7 @@ import PersonHeroMediaShowcase from '../components/person/PersonHeroMediaShowcas
 import CareerPassportModal from '../components/professional/CareerPassportModal'
 import PersonMediaSection from '../components/person/PersonMediaSection'
 import AddPersonMediaModal from '../components/person/AddPersonMediaModal'
+import TalentRepresentationCard from '../components/person/TalentRepresentationCard'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -166,6 +167,7 @@ const PersonDetail = () => {
     : null
 
   const [person, setPerson] = useState(seededPerson)
+  const [representations, setRepresentations] = useState(seededPerson?.talent_representations || [])
   const [media, setMedia] = useState(seededPerson?.person_media || [])
   const [showAddMedia, setShowAddMedia] = useState(false)
   const [stageCredits, setStageCredits] = useState([])
@@ -260,6 +262,10 @@ const PersonDetail = () => {
           films(
             id, title, year, poster_url, slug
           )
+        ),
+        talent_representations(
+          id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary, notes,
+          companies(id, name, slug, logo_url, company_type, headquarters, website, instagram_url)
         )
       `)
       .eq(col, val)
@@ -284,6 +290,21 @@ const PersonDetail = () => {
 
     setPerson(basePerson)
     setPersonId(data.id)
+
+    if (data.talent_representations) {
+      setRepresentations(data.talent_representations);
+    } else {
+      supabase
+        .from('talent_representations')
+        .select(`
+          id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary, notes,
+          companies(id, name, slug, logo_url, company_type, headquarters, website, instagram_url)
+        `)
+        .eq('person_id', data.id)
+        .then(({ data: repData }) => {
+          if (repData) setRepresentations(repData);
+        });
+    }
 
     if (data.person_media) {
       setMedia(data.person_media);
@@ -1040,6 +1061,12 @@ const PersonDetail = () => {
                   </div>
                 </div>
               )}
+
+              {/* Representation & Booking Card (IMDbPro Style) */}
+              <TalentRepresentationCard
+                representations={representations}
+                personName={person.name}
+              />
             </div>
           </div>
 
@@ -1211,9 +1238,9 @@ const PersonDetail = () => {
                       : 'group flex items-center gap-4 rounded-xl border border-border bg-surface p-3 hover:border-brand transition-colors'
                     }
                   >
-                    <div className={`relative overflow-hidden bg-surface-2 border border-border group-hover:border-brand transition-all shadow-sm ${
+                    <div className={`relative overflow-hidden bg-surface-2 border border-border group-hover:border-brand/70 transition-all duration-300 shadow-sm ${
                       filmographyView === 'grid'
-                        ? 'rounded-lg aspect-[2/3]'
+                        ? 'rounded-xl aspect-[2/3]'
                         : 'w-16 h-24 rounded-lg flex-shrink-0'
                     }`}>
                       <ImageWithFallback
@@ -1226,7 +1253,9 @@ const PersonDetail = () => {
                         sizes="(max-width: 639px) calc(50vw - 24px), (max-width: 767px) calc(33vw - 24px), (max-width: 1023px) calc(25vw - 24px), 180px"
                         loading="lazy"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent opacity-80" />
+                      {filmographyView === 'list' && (
+                        <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent to-transparent opacity-40 pointer-events-none" />
+                      )}
                       {(() => {
                         const source = film?.streaming_links?.box_office?.source || film?.box_office_source;
                         if (!source) return null;
@@ -1248,26 +1277,34 @@ const PersonDetail = () => {
                           <span>{formatViewCount(views)}</span>
                         </div>
                       )}
-                      {filmographyView === 'grid' && (
-                      <div className="absolute bottom-0 left-0 right-0 p-4">
-                        <p className="text-text-primary text-[11px] font-bold tracking-tight line-clamp-2 leading-tight group-hover:text-brand transition-colors">
+                    </div>
+
+                    {filmographyView === 'grid' && (
+                      <div className="mt-2.5 px-0.5 space-y-1">
+                        <p className="text-text-primary text-xs sm:text-sm font-bold tracking-tight line-clamp-1 group-hover:text-brand transition-colors">
                           {formatFilmTitle(title)}
                         </p>
-                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 text-[10px] text-text-muted flex-wrap leading-tight">
                           {year && (
-                            <p className="text-text-muted text-[9px] font-black tracking-widest uppercase">
+                            <span className="font-semibold text-text-muted">
                               {year}
-                            </p>
+                            </span>
                           )}
-                          {credit.character_name && (
-                            <p className="text-brand text-[9px] font-bold truncate">
+                          {year && (credit.character_name || (credit.role && credit.role.toLowerCase() !== 'actor')) && (
+                            <span className="text-border">•</span>
+                          )}
+                          {credit.character_name ? (
+                            <span className="text-brand font-medium truncate max-w-full">
                               as {toTitleCase(credit.character_name)}
-                            </p>
-                          )}
+                            </span>
+                          ) : credit.role && credit.role.toLowerCase() !== 'actor' ? (
+                            <span className="text-text-secondary font-medium truncate">
+                              {formatRole(credit.role)}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
-                      )}
-                    </div>
+                    )}
                     {filmographyView === 'list' && (
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2 mb-1">

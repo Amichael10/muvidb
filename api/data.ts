@@ -38,8 +38,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return handleWelcomeEmail(req, res);
     }
     if (key === 'auth-email') {
-      const { handleAuthEmailData } = await import('./_lib/auth_email_data.js');
-      return handleAuthEmailData(req, res);
+      const { handleAuthEmailHook } = await import('./_lib/auth_email_handler.js');
+      return handleAuthEmailHook(req, res);
     }
     if (key === 'auth-email-send') {
       const { handleAuthEmailSend } = await import('./_lib/auth_email_data.js');
@@ -64,6 +64,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (key === 'outreach') {
       const { handleOutreach } = await import('./_lib/outreach_handler.js');
       return handleOutreach(req, res);
+    }
+    if (key === 'api-keys') {
+      const { handleApiKeysAdmin } = await import('./_lib/api_keys_handler.js');
+      return handleApiKeysAdmin(req, res);
     }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });

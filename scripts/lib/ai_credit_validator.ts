@@ -56,7 +56,7 @@ export function isCleanHumanNameHeuristic(raw: string): { isValid: boolean; clea
   const containsNoise = NOISE_WORDS.some(nw => clean.toUpperCase().includes(nw));
   if (containsNoise) return { isValid: false, cleanName: null };
 
-  if (/\b(sound\s+man|prop\s+ser|gaffer|camera|movie|production|studio|pictures|director|producer|writer|editor|special\s+thanks)\b/i.test(clean)) {
+  if (/\b(sound\s+man|prop\s+ser|gaffer|camera|movie|production|studio|pictures|director|producer|writer|editor|special\s+thanks|receptionist|photographer|stillphotographer|bestboy|best\s+boy|secretary|doctor|police|warder|officer|costumier|costume|continuity|focus\s+puller|spark|welfare|security)\b/i.test(clean)) {
     return { isValid: false, cleanName: null };
   }
 

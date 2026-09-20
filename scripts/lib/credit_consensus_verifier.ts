@@ -27,6 +27,12 @@ export type VerifiedCredit = {
 // Common Nollywood honorifics / titles to strip
 const HONORIFICS = /^(?:Chief|Alhaja|Alhaji|Dr\.?|Doctor|Prof\.?|Professor|Pastor|Evang\.?|Evangelist|Otunba|Prince|Princess|King|Queen|Sir|Lady|Engr\.?|Amb\.?|Hon\.?)\s+/i;
 
+// Roles / characters commonly OCR-glued as prefixes
+const ROLE_PREFIXES = /^(?:Receptionist|Decedtionist|Stillphotographer|Still\s+Photographer|Bestboy|Best\s+Boy|Second\s+Unit(?:\s+Cameraman)?|Delivery\s+Man|Warder|Officer|Police(?:\s+Officer)?|Big\s+Lion|Armed\s+Robber|Dit|Subtitle|Costumier|Costume\s+Assts?|Costumer|Makeup(?:\s+Asst)?|Special\s+Effects|Cam\s+Tech|Props?\s+Sets?|Welfare|Security|Sound(?:\s+Recordist)?|Head\s+Of\s+Lights|Focus\s+Puller|Script(?:\s*supervisor)?)\s*[-:–]?\s+/i;
+
+// Roles / characters commonly OCR-glued as suffixes
+const ROLE_SUFFIXES = /\s+[-:–]?\s*(?:Scriptwriter|Script\s+Supervisor|Delivery\s+Man|Police\s+Officer|Stoneboy|Receptionist|Makeup|Set\s+Designer|Video\s+Bts|Spark|Costumier|Prop|Location|Continuity|Sound|Lights|Focus\s+Puller|Cam\s+Asst)$/i;
+
 // Post-nominal titles like (MON), (OON), (MFR), (JP)
 const POST_NOMINALS = /\s*\((?:MON|OON|MFR|CFR|GCFR|CON|JP|SAN|OFR|FNA)\)/gi;
 
@@ -37,7 +43,12 @@ export const NOISE_WORDS = [
   'SPECIAL THANKS', 'LOCATION', 'LOGISTICS', 'CAMERA ASSISTANT', 'LIGHTS',
   'CATERING', 'SECURITY', 'TRANSPORT', 'GENERATOR', 'WELFARE', 'MEDIA', 'GRAPHICS',
   'CLICK HERE', 'ALL RIGHTS RESERVED', 'THE END', 'CAST', 'CREW', 'FULL MOVIE',
-  'SOUND MAN', 'PROP SER', 'ASS RF GAFFER', 'CAMERA ASST', 'FOCUS PULLER', 'SET PROPS'
+  'SOUND MAN', 'PROP SER', 'ASS RF GAFFER', 'CAMERA ASST', 'FOCUS PULLER', 'SET PROPS',
+  'WE WOULD FOR YOU TO STAY CONNECTED', 'TILL DEATH', 'VOICE OVER ARTISTS',
+  'BTS STILL PHOTOS', 'DATA WRANGLER', 'EXECUTIVE PRODUCERS', 'PRODUCER EXECUTIVE PRODUCER',
+  'GRANDISH GLOBAL COMPANY', 'SEASON 3', 'NOLLYWOODMOVIES', 'NIGERIANMOVIES',
+  'HOST OF OTHERS', 'AND MANY MORE', 'AND UNEXPECTED', 'AND INTENSE', 'AND STRONG',
+  'HIDDEN BATTLES'
 ];
 
 export function normalizePersonName(raw: string): string {
@@ -49,6 +60,14 @@ export function normalizePersonName(raw: string): string {
   // Strip multiple leading honorifics (e.g. "Chief Dr. Pete Edochie")
   while (HONORIFICS.test(name)) {
     name = name.replace(HONORIFICS, '').trim();
+  }
+
+  // Strip glued role prefixes and suffixes
+  while (ROLE_PREFIXES.test(name)) {
+    name = name.replace(ROLE_PREFIXES, '').trim();
+  }
+  while (ROLE_SUFFIXES.test(name)) {
+    name = name.replace(ROLE_SUFFIXES, '').trim();
   }
 
   name = name
@@ -251,7 +270,12 @@ export async function reconcileAndVerifyCredits(
       if (!matchedCluster.variants.includes(cleanName)) {
         matchedCluster.variants.push(cleanName);
       }
-      if (cleanName.length > matchedCluster.canonicalName.length && !cleanName.includes('.')) {
+      // Prefer clean 2-to-3 word names over longer contaminated strings with glued roles/characters
+      const incomingWordCount = cleanName.split(' ').length;
+      const canonicalWordCount = matchedCluster.canonicalName.split(' ').length;
+      if (canonicalWordCount > 3 && incomingWordCount >= 2 && incomingWordCount <= 3) {
+        matchedCluster.canonicalName = cleanName;
+      } else if (canonicalWordCount < 2 && incomingWordCount >= 2) {
         matchedCluster.canonicalName = cleanName;
       }
     }
