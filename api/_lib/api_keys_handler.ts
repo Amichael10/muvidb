@@ -15,12 +15,17 @@ export async function handleApiKeysAdmin(req: VercelRequest, res: VercelResponse
         .order('created_at', { ascending: false });
 
       if (error) {
-        // Table might not exist yet if migration was not executed
-        if (error.code === 'PGRST205' || error.message?.includes('does not exist')) {
+        // Table might not exist yet or lacks permissions
+        if (
+          error.code === 'PGRST205' ||
+          error.code === '42501' ||
+          error.message?.includes('does not exist') ||
+          error.message?.includes('permission denied')
+        ) {
           return res.status(200).json({
             keys: [],
             needs_migration: true,
-            message: 'api_keys table has not been created in Supabase yet.'
+            message: 'api_keys table requires database permissions. Run the migration SQL in Supabase SQL editor.'
           });
         }
         return res.status(500).json({ error: error.message });
@@ -70,6 +75,12 @@ export async function handleApiKeysAdmin(req: VercelRequest, res: VercelResponse
         .single();
 
       if (error) {
+        if (error.code === '42501' || error.message?.includes('permission denied')) {
+          return res.status(403).json({
+            error: 'Database permission denied for table public.api_keys. Run the migration SQL in Supabase SQL editor: GRANT ALL ON TABLE public.api_keys TO postgres, service_role, authenticated;',
+            needs_migration: true
+          });
+        }
         return res.status(500).json({ error: error.message });
       }
 
@@ -118,7 +129,15 @@ export async function handleApiKeysAdmin(req: VercelRequest, res: VercelResponse
         .select('id, name, key_prefix, tier, scopes, rate_limit_per_min, usage_count, is_active, created_at, revoked_at')
         .single();
 
-      if (error) return res.status(500).json({ error: error.message });
+      if (error) {
+        if (error.code === '42501' || error.message?.includes('permission denied')) {
+          return res.status(403).json({
+            error: 'Database permission denied for table public.api_keys. Run the migration SQL in Supabase SQL editor: GRANT ALL ON TABLE public.api_keys TO postgres, service_role, authenticated;',
+            needs_migration: true
+          });
+        }
+        return res.status(500).json({ error: error.message });
+      }
       return res.status(200).json({ success: true, key: data });
     } catch (err: any) {
       return res.status(500).json({ error: err?.message || 'Failed to update key' });
@@ -132,7 +151,15 @@ export async function handleApiKeysAdmin(req: VercelRequest, res: VercelResponse
       if (!id || typeof id !== 'string') return res.status(400).json({ error: 'Missing key id' });
 
       const { error } = await supabase.from('api_keys').delete().eq('id', id);
-      if (error) return res.status(500).json({ error: error.message });
+      if (error) {
+        if (error.code === '42501' || error.message?.includes('permission denied')) {
+          return res.status(403).json({
+            error: 'Database permission denied for table public.api_keys. Run the migration SQL in Supabase SQL editor: GRANT ALL ON TABLE public.api_keys TO postgres, service_role, authenticated;',
+            needs_migration: true
+          });
+        }
+        return res.status(500).json({ error: error.message });
+      }
 
       return res.status(200).json({ success: true, message: 'API key permanently removed' });
     } catch (err: any) {

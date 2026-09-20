@@ -41,11 +41,27 @@ export default function AdminApiKeys() {
   const [createLoading, setCreateLoading] = useState(false);
   const [newKeyResult, setNewKeyResult] = useState(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   // Edit Key state
   const [editingKey, setEditingKey] = useState(null);
   const [editFormData, setEditFormData] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
+
+  const copySqlFix = () => {
+    const sql = `-- Fix Table Permissions for public.api_keys
+GRANT ALL ON TABLE public.api_keys TO postgres, service_role, authenticated;
+GRANT SELECT ON TABLE public.api_keys TO anon;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, service_role, authenticated;
+ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Service role full access on api_keys" ON public.api_keys;
+CREATE POLICY "Service role full access on api_keys" ON public.api_keys FOR ALL TO service_role USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Admins can manage api_keys" ON public.api_keys;
+CREATE POLICY "Admins can manage api_keys" ON public.api_keys FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM public.users WHERE users.id = auth.uid() AND users.role IN ('admin', 'admin_limited'))) WITH CHECK (EXISTS (SELECT 1 FROM public.users WHERE users.id = auth.uid() AND users.role IN ('admin', 'admin_limited')));`;
+    navigator.clipboard.writeText(sql);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2500);
+  };
 
   // Create form state
   const [formData, setFormData] = useState({
@@ -55,16 +71,35 @@ export default function AdminApiKeys() {
     rate_limit_per_min: 60,
   });
 
+  const getAuthHeaders = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      return headers;
+    } catch {
+      return { 'Content-Type': 'application/json' };
+    }
+  };
+
   const fetchKeys = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/data?_r=api-keys');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/data?_r=api-keys', { headers });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch API keys');
 
       if (data.needs_migration) {
         setNeedsMigration(true);
+        setKeys([]);
+      } else if (!res.ok) {
+        if (data.error?.includes('permission denied')) {
+          setNeedsMigration(true);
+        }
+        throw new Error(data.error || 'Failed to fetch API keys');
       } else {
         setNeedsMigration(false);
         setKeys(data.keys || []);
@@ -148,9 +183,10 @@ export default function AdminApiKeys() {
 
     setEditLoading(true);
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/data?_r=api-keys', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(editFormData),
       });
       const data = await res.json();
@@ -176,13 +212,19 @@ export default function AdminApiKeys() {
 
     setCreateLoading(true);
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/data?_r=api-keys', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(formData),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate key');
+      if (!res.ok) {
+        if (data.needs_migration || data.error?.includes('permission denied')) {
+          setNeedsMigration(true);
+        }
+        throw new Error(data.error || 'Failed to generate key');
+      }
 
       setNewKeyResult(data.api_key);
       setIsCreateOpen(false);
@@ -209,9 +251,10 @@ export default function AdminApiKeys() {
     if (!window.confirm(confirmMsg)) return;
 
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/data?_r=api-keys', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ id: key.id, is_active: nextStatus }),
       });
       if (!res.ok) {
@@ -228,8 +271,10 @@ export default function AdminApiKeys() {
     if (!window.confirm(`Permanently delete key for "${key.name}"? This action cannot be undone.`)) return;
 
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`/api/data?_r=api-keys&id=${key.id}`, {
         method: 'DELETE',
+        headers,
       });
       if (!res.ok) {
         const data = await res.json();
@@ -284,16 +329,43 @@ export default function AdminApiKeys() {
         </div>
       </div>
 
-      {/* Migration Notice if table not created */}
+      {/* Migration / Permissions Notice if table lacks permissions or not created */}
       {needsMigration && (
-        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-3">
-          <div className="flex items-center gap-2 font-semibold text-amber-400">
-            <Icon icon="solar:danger-triangle-bold" className="w-5 h-5" />
-            <span>Database Setup Required</span>
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-500/15 to-amber-600/10 border border-amber-500/30 text-amber-200 space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 font-bold text-amber-400 text-base">
+              <Icon icon="solar:danger-triangle-bold" className="w-5 h-5 flex-shrink-0" />
+              <span>Database Table Setup & Permissions Required</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={copySqlFix}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition shadow-sm"
+              >
+                <Icon icon={copiedSql ? 'solar:check-circle-bold' : 'solar:copy-bold'} className="w-4 h-4" />
+                <span>{copiedSql ? 'Copied SQL!' : 'Copy SQL Fix'}</span>
+              </button>
+              <a
+                href="https://supabase.com/dashboard/project/pkenrmorywmuvnzfoylp/sql/new"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-surface-2 hover:bg-surface border border-border text-white text-xs font-medium transition"
+              >
+                <span>Supabase SQL Editor ↗</span>
+              </a>
+              <button
+                onClick={fetchKeys}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-black/30 hover:bg-black/50 border border-white/10 text-xs text-text-muted hover:text-white transition"
+                title="Recheck connection"
+              >
+                <Icon icon="solar:refresh-linear" className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <span>Recheck</span>
+              </button>
+            </div>
           </div>
           <p className="text-sm leading-relaxed text-amber-300/90">
-            The <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-200">public.api_keys</code> table has not been initialized in Supabase yet.
-            Please run the migration script <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-200">supabase/migrations/20260920_api_keys.sql</code> in your Supabase SQL Editor to enable API key storage.
+            PostgreSQL permissions for <code className="bg-black/50 px-1.5 py-0.5 rounded text-amber-200 font-mono text-xs">public.api_keys</code> must be granted to the Supabase API roles (<code className="bg-black/50 px-1.5 py-0.5 rounded text-amber-200 font-mono text-xs">service_role</code>, <code className="bg-black/50 px-1.5 py-0.5 rounded text-amber-200 font-mono text-xs">authenticated</code>).
+            Click <strong>Copy SQL Fix</strong> above and run it in your Supabase SQL Editor to enable API key generation immediately.
           </p>
         </div>
       )}
