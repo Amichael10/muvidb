@@ -6,6 +6,7 @@ type ThreadsAdapterOptions = {
   userId: string;
   apiVersion?: string;
   fetchImpl?: typeof fetch;
+  pollIntervalMs?: number;
 };
 
 type ThreadsApiError = {
@@ -48,12 +49,14 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
   private readonly userId: string;
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly pollIntervalMs: number;
 
   constructor(options: ThreadsAdapterOptions) {
     this.accessToken = options.accessToken;
     this.userId = options.userId;
     this.baseUrl = `https://graph.threads.net/${cleanVersion(options.apiVersion)}`;
     this.fetchImpl = options.fetchImpl || fetch;
+    this.pollIntervalMs = Math.max(10, options.pollIntervalMs ?? 3000);
   }
 
   private async post(path: string, body: URLSearchParams): Promise<Record<string, any>> {
@@ -108,10 +111,8 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
   }
 
   private async waitForContainer(containerId: string): Promise<void> {
-    const maxAttempts = 30; // up to 90 seconds for video container processing
-    const pollIntervalMs = 3000;
+    const maxAttempts = 30; // up to 90 seconds for media container processing
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
       const statusData = await this.get(`/${encodeURIComponent(containerId)}`, {
         fields: 'id,status,error_message',
       });
@@ -126,7 +127,16 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
           details: { status, error_message: statusData.error_message },
         });
       }
+
+      await new Promise((resolve) => setTimeout(resolve, this.pollIntervalMs));
     }
+
+    throw new SocialPlatformError({
+      platform: 'threads',
+      code: 'threads_media_processing_timeout',
+      message: 'Threads media container processing timed out.',
+      retryable: true,
+    });
   }
 
   private async permalink(postId: string): Promise<string | null> {
@@ -223,29 +233,38 @@ export class ThreadsPlatformAdapter implements SocialPlatformAdapter {
       });
     }
 
-    // Wait for the container to finish processing before publishing (essential for videos and carousels)
-    if (isVideoPublish) {
+    // Wait for the container to finish processing before publishing (essential for videos, images, and carousels)
+    if (mediaUrls.length > 0) {
       await this.waitForContainer(String(container.id));
     }
 
-    let published: Record<string, any>;
-    try {
-      published = await this.post(
-        `/${encodeURIComponent(this.userId)}/threads_publish`,
-        new URLSearchParams({ access_token: this.accessToken, creation_id: String(container.id) }),
-      );
-    } catch (error: any) {
-      const status = Number(error?.details?.status || 0);
-      if (error?.code === 'threads_network_error' || status >= 500) {
-        throw new SocialPlatformError({
-          platform: 'threads',
-          code: 'threads_publish_result_unknown',
-          message: 'Threads may have published this post. Check the account before retrying it.',
-          retryable: false,
-          details: { container_id: String(container.id), cause: error?.message || 'unknown_result' },
-        });
+    let published: Record<string, any> = {};
+    const maxPublishAttempts = 3;
+    for (let attempt = 0; attempt < maxPublishAttempts; attempt++) {
+      try {
+        published = await this.post(
+          `/${encodeURIComponent(this.userId)}/threads_publish`,
+          new URLSearchParams({ access_token: this.accessToken, creation_id: String(container.id) }),
+        );
+        break;
+      } catch (error: any) {
+        const subcode = Number(error?.details?.provider_subcode || error?.details?.error_subcode || 0);
+        if (subcode === 4279009 && attempt < maxPublishAttempts - 1) {
+          await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 2000));
+          continue;
+        }
+        const status = Number(error?.details?.status || 0);
+        if (error?.code === 'threads_network_error' || status >= 500) {
+          throw new SocialPlatformError({
+            platform: 'threads',
+            code: 'threads_publish_result_unknown',
+            message: 'Threads may have published this post. Check the account before retrying it.',
+            retryable: false,
+            details: { container_id: String(container.id), cause: error?.message || 'unknown_result' },
+          });
+        }
+        throw error;
       }
-      throw error;
     }
     if (!published.id) {
       throw new SocialPlatformError({

@@ -269,6 +269,8 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       completenessScore: p.bio ? 0.9 : 0.75,
       data: {
         ...p,
+        creditCount: p.film_count || (p.knownFor?.length ?? 0),
+        creditsCount: p.film_count || (p.knownFor?.length ?? 0),
         isRisingStar: true,
         handle: extractSocialHandle(p),
         socialHandles: {
@@ -318,6 +320,8 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
         completenessScore: p.bio ? 0.9 : 0.8,
         data: {
           ...p,
+          creditCount: p.film_count || (p.knownFor?.length ?? 0),
+          creditsCount: p.film_count || (p.knownFor?.length ?? 0),
           isCrew: true,
           department,
           handle: extractSocialHandle(p),
@@ -378,6 +382,8 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       completenessScore: p.bio ? 0.9 : 0.8,
       data: {
         ...p,
+        creditCount: p.film_count || (p.knownFor?.length ?? 0),
+        creditsCount: p.film_count || (p.knownFor?.length ?? 0),
         handle: extractSocialHandle(p),
       },
     }));
@@ -587,6 +593,8 @@ export async function searchCandidates(
           completenessScore: p.bio ? 0.9 : 0.8,
           data: {
             ...p,
+            creditCount: p.film_count || (p.knownFor?.length ?? 0),
+            creditsCount: p.film_count || (p.knownFor?.length ?? 0),
             handle: extractSocialHandle(p),
             socialHandles: {
               instagram: p.instagram_url,

@@ -78,10 +78,60 @@ CREATE POLICY "Public can view approved person media"
   FOR SELECT
   USING (status = 'approved');
 
--- 2. Service role full access
+-- 2. Authenticated users can insert media
+CREATE POLICY "Authenticated users can upload person media"
+  ON public.person_media
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    uploaded_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.people
+      WHERE id = person_media.person_id
+      AND claimed_by = auth.uid()
+    )
+  );
+
+-- 3. Profile owners can update and delete their media
+CREATE POLICY "Owners can update their person media"
+  ON public.person_media
+  FOR UPDATE
+  TO authenticated
+  USING (
+    uploaded_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.people
+      WHERE id = person_media.person_id
+      AND claimed_by = auth.uid()
+    )
+  )
+  WITH CHECK (
+    uploaded_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.people
+      WHERE id = person_media.person_id
+      AND claimed_by = auth.uid()
+    )
+  );
+
+CREATE POLICY "Owners can delete their person media"
+  ON public.person_media
+  FOR DELETE
+  TO authenticated
+  USING (
+    uploaded_by = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM public.people
+      WHERE id = person_media.person_id
+      AND claimed_by = auth.uid()
+    )
+  );
+
+-- 4. Service role full access
 CREATE POLICY "Service role full access on person_media"
   ON public.person_media
   FOR ALL
   TO service_role
   USING (true)
   WITH CHECK (true);
+

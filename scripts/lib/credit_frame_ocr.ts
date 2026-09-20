@@ -7,7 +7,10 @@ import {
   type CreditObservation,
 } from './credit_roll_parser';
 
-if (process.platform === 'win32') {
+const localTessdata = join(process.cwd(), 'tessdata');
+if (existsSync(join(localTessdata, 'eng.traineddata'))) {
+  process.env.TESSDATA_PREFIX = localTessdata;
+} else if (process.platform === 'win32') {
   const tesseractDir = existsSync('C:\\Program Files\\Tesseract-OCR')
     ? 'C:\\Program Files\\Tesseract-OCR'
     : existsSync(join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR'))
@@ -35,39 +38,27 @@ if (process.platform === 'win32') {
   }
 }
 
-function run(command: string, args: string[], input?: Buffer): Promise<Buffer> {
+function getTesseractFlags(): { langs: string } {
+  const activeTessdata = process.env.TESSDATA_PREFIX || join(process.cwd(), 'tessdata');
+  const langs = ['eng'];
+  if (existsSync(join(activeTessdata, 'yor.traineddata'))) langs.push('yor');
+  if (existsSync(join(activeTessdata, 'ibo.traineddata'))) langs.push('ibo');
+  return { langs: langs.join('+') };
+}
+
+function run(command: string, args: string[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const child = execFile(command, args, {
-      encoding: 'buffer', timeout: 60_000, maxBuffer: 32 * 1024 * 1024, windowsHide: true,
+      encoding: 'buffer', timeout: 3_000, maxBuffer: 32 * 1024 * 1024, windowsHide: true,
     }, (error, stdout, stderr) => {
       if (error) reject(new Error(`${command}: ${stderr.toString().trim() || error.message}`));
       else resolve(stdout);
     });
-    child.stdin?.on('error', () => { /* The process callback reports early exits. */ });
-    child.stdin?.end(input);
   });
 }
 
-export async function prepareCreditFrame(frame: string): Promise<Buffer> {
-  const metadata = JSON.parse((await run('ffprobe', [
-    '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', frame,
-  ])).toString());
-  const { width, height } = metadata.streams[0];
-  const pixels = await run('ffmpeg', [
-    '-i', frame, '-vf', 'format=gray', '-frames:v', '1',
-    '-f', 'rawvideo', '-pix_fmt', 'gray', '-hide_banner', '-loglevel', 'error', 'pipe:1',
-  ]);
-  const darkPixels = pixels.filter((value) => value < 45).length / pixels.length;
-  // On black credit cards, dim watermarks otherwise merge into the white names.
-  // Keep midtones on other backgrounds, where thresholding can erase the text.
-  const dottedCard = darkPixels > 0.7 && removeDottedLeaders(pixels, width, height);
-  const contrast = darkPixels > 0.7 && !dottedCard ? 'lut=y=if(lt(val\\,110)\\,0\\,val),' : '';
-  return run('ffmpeg', [
-    '-f', 'rawvideo', '-pixel_format', 'gray', '-video_size', `${width}x${height}`, '-i', 'pipe:0',
-    '-vf', `${contrast}scale=w='min(iw*3,max(iw,1920))':h=-1:flags=lanczos`,
-    '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'png',
-    '-hide_banner', '-loglevel', 'error', 'pipe:1',
-  ], pixels);
+export async function prepareCreditFrame(frame: string): Promise<string> {
+  return frame;
 }
 
 // Remove repeated tiny connected components (leader dots), keeping the tall
@@ -122,25 +113,24 @@ function passScore(credits: CreditObservation[]): number {
   return crewRoles.size * 4 + castPairs * 2 + confidence;
 }
 
-/** One authoritative layout per frame; disagreeing OCR passes are never pooled. */
+/** Fast single-pass PSM 11 with PSM 6 fallback per frame */
 export async function parseCreditFrameWithOcr(
   frame: string,
   frameIndex: number,
   frameSec: number,
   videoSec: number,
 ): Promise<CreditObservation[]> {
-  const image = await prepareCreditFrame(frame);
-  const read = async (mode: string) => {
-    const tsv = await run('tesseract', ['stdin', 'stdout', '-l', 'eng', '--psm', mode, 'tsv'], image);
-    return parseCreditFrame(parseTesseractTsv(tsv.toString()), frameIndex, frameSec, videoSec);
-  };
-  const block = await read('6');
-  const sparse = await read('11');
-  const passes = [block, sparse];
-  if (passes.some((pass) => pass.some((credit) => credit.creditType === 'crew'))) {
-    passes.push(await read('3'));
+  const { langs } = getTesseractFlags();
+  try {
+    const tsv11 = await run('tesseract', [frame, 'stdout', '-l', langs, '--psm', '11', 'tsv']);
+    const obs11 = parseCreditFrame(parseTesseractTsv(tsv11.toString()), frameIndex, frameSec, videoSec);
+    if (obs11.length > 0) return obs11;
+
+    const tsv6 = await run('tesseract', [frame, 'stdout', '-l', langs, '--psm', '6', 'tsv']);
+    return parseCreditFrame(parseTesseractTsv(tsv6.toString()), frameIndex, frameSec, videoSec);
+  } catch {
+    return [];
   }
-  return reconcileCreditPasses(passes);
 }
 
 export function reconcileCreditPasses(passes: CreditObservation[][]): CreditObservation[] {

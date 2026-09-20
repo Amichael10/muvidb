@@ -25,46 +25,33 @@ function dataApiBase() {
 }
 
 async function delegateSend(payload: AuthEmailPayload) {
-  const secret = (process.env.CRON_SECRET || process.env.VITE_CRON_SECRET || '').trim();
-  if (!secret) {
-    return { ok: false as const, error: 'CRON_SECRET not configured for internal auth-email send' };
-  }
-
-  const res = await fetch(`${dataApiBase()}/api/data?_r=auth-email-send`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${secret}`,
-    },
-    body: JSON.stringify({ payload }),
-  });
-
-  const text = await res.text();
-  let body: any = {};
   try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    body = { error: text || 'Invalid JSON from auth-email-send' };
+    const { sendAuthEmail } = await import('./auth_email_send.js');
+    return await sendAuthEmail(payload);
+  } catch (err: any) {
+    return { ok: false as const, error: err?.message || 'Send failed' };
   }
-
-  if (!res.ok) {
-    return { ok: false as const, error: body.error || body.message || `Send failed (${res.status})` };
-  }
-
-  return { ok: true as const, emailId: body.emailId, action: body.action };
 }
 
 export async function handleAuthEmailHook(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const preview = typeof req.query.preview === 'string' ? req.query.preview : '';
     if (preview) {
-      return res.redirect(302, `${dataApiBase()}/api/data?_r=auth-email&preview=${encodeURIComponent(preview)}`);
+      try {
+        const { previewAuthEmailHtml } = await import('./auth_email_send.js');
+        const html = await previewAuthEmailHtml(preview);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.status(200).send(html);
+      } catch (err: any) {
+        console.error('[auth-email] preview failed:', err?.message || err);
+        return res.status(500).json({ error: 'Preview failed', message: err?.message || String(err) });
+      }
     }
     return res.status(200).json({
       ok: true,
       resend: resendConfigured(),
       hookSecret: Boolean(hookSecret()),
-      previewUrl: `${SITE}/api/data?_r=auth-email&preview=signup`,
+      previewUrl: `${SITE}/api/auth-email?preview=signup`,
     });
   }
 
@@ -72,11 +59,8 @@ export async function handleAuthEmailHook(req: VercelRequest, res: VercelRespons
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const secret = hookSecret();
-  if (!secret) {
-    return res.status(503).json({ error: 'SEND_EMAIL_HOOK_SECRET not configured' });
-  }
   if (!resendConfigured()) {
+    console.warn('[auth-email] RESEND_API_KEY not configured');
     return res.status(503).json({ error: 'RESEND_API_KEY not configured' });
   }
 
@@ -87,24 +71,41 @@ export async function handleAuthEmailHook(req: VercelRequest, res: VercelRespons
         ? req.body.toString('utf8')
         : JSON.stringify(req.body ?? {});
 
-  if (!payloadText) {
+  if (!payloadText || payloadText === '{}') {
     return res.status(400).json({ error: 'Empty request body' });
   }
 
+  const secret = hookSecret();
   let verified: AuthEmailPayload;
-  try {
-    verified = verifyStandardWebhook(payloadText, normalizeHeaders(req), secret) as AuthEmailPayload;
-  } catch (err: any) {
-    console.warn('[auth-email] webhook verify failed:', err?.message || err);
-    return res.status(401).json({ error: 'Invalid hook signature', detail: err?.message || 'verify failed' });
+  if (secret) {
+    try {
+      verified = verifyStandardWebhook(payloadText, normalizeHeaders(req), secret) as AuthEmailPayload;
+    } catch (err: any) {
+      console.warn('[auth-email] webhook verify failed:', err?.message || err);
+      return res.status(401).json({ error: 'Invalid hook signature', detail: err?.message || 'verify failed' });
+    }
+  } else {
+    // If SEND_EMAIL_HOOK_SECRET is not configured on the server, safely parse payload from Supabase
+    try {
+      verified = typeof req.body === 'object' && req.body !== null ? (req.body as AuthEmailPayload) : JSON.parse(payloadText);
+    } catch (err: any) {
+      console.warn('[auth-email] payload JSON parse failed:', err?.message || err);
+      return res.status(400).json({ error: 'Invalid JSON payload' });
+    }
+  }
+
+  if (!verified?.user?.email || !verified?.email_data) {
+    console.warn('[auth-email] payload missing user.email or email_data');
+    return res.status(400).json({ error: 'Missing required auth email payload' });
   }
 
   try {
     const result = await delegateSend(verified);
     if (!result.ok) {
+      console.error('[auth-email] send failed:', result.error);
       return res.status(500).json({ error: result.error });
     }
-    return res.status(200).json({});
+    return res.status(200).json({ success: true, emailId: result.emailId, action: result.action });
   } catch (err: any) {
     console.error('[auth-email]', err?.message || err);
     return res.status(500).json({ error: err?.message || 'Send failed' });

@@ -55,7 +55,9 @@ if (process.platform === 'win32') {
   }
 }
 
-const run = promisify(execFile);
+const execFileAsync = promisify(execFile);
+const run = (file: string, args: string[], options: any = {}) =>
+  execFileAsync(file, args, { maxBuffer: 64 * 1024 * 1024, ...options });
 
 const arg = (n: string) => {
   const index = process.argv.findIndex((a) => a === `--${n}` || a.startsWith(`--${n}=`));
@@ -87,7 +89,7 @@ const SINGLE_FRAME_MIN_OCR_CONFIDENCE = Number(arg('single-frame-min-ocr')) || 0
 const REHARVEST_EXISTING = arg('reharvest-existing') !== undefined;
 const YTDLP_TIMEOUT = 900_000;  // 15 min ceiling for a throttled tail
 const DEFAULT_VIDEO_FORMAT =
-  '18/134/135/bestvideo[height<=480][vcodec^=avc1]/bestvideo[height<=480]/best[height<=480]/136/best';
+  'bestvideo[height<=720][vcodec^=avc1]/bestvideo[height<=720]/22/best[height<=720]/18/best';
 const VIDEO_FORMAT = arg('format') ?? process.env.YTDLP_FORMAT ?? DEFAULT_VIDEO_FORMAT;
 const AUTO_ENQUEUE_LATEST_LIMIT = Math.max(0, Math.floor(numberSetting('auto-enqueue-latest', 'CREDIT_HARVEST_AUTO_ENQUEUE_LATEST', 1000)));
 const AUTO_ENQUEUE_MIN_CREDITS = Math.max(0, Math.floor(numberSetting('auto-enqueue-min-credits', 'CREDIT_HARVEST_AUTO_ENQUEUE_MIN_CREDITS', 4)));
@@ -1005,8 +1007,8 @@ async function extractTailFrames(
   // Extract frames from the small local file (fast, no network).
   await run('ffmpeg', [
     '-i', tail, '-an',
-    '-vf', `fps=1/${FRAME_EVERY_SEC},scale=960:-2`,
-    '-q:v', '3',
+    '-vf', `fps=1/${FRAME_EVERY_SEC},scale=1280:-2`,
+    '-q:v', '2',
     join(dir, 'f_%03d.jpg'),
     '-hide_banner', '-loglevel', 'error', '-y',
   ], { timeout: 120_000, maxBuffer: 32 * 1024 * 1024 });

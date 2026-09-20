@@ -123,6 +123,7 @@ export const RELEASE_TYPE_OPTIONS = [
 /** films.content_type — the CHECK list from 20260616000000_add_content_type_and_series_fields.sql. */
 export const CONTENT_TYPE_OPTIONS = [
   { value: 'movie', label: 'Movie' },
+  { value: 'feature_film', label: 'Feature film' },
   { value: 'series', label: 'Series' },
   { value: 'mini_series', label: 'Mini-series' },
   { value: 'documentary', label: 'Documentary' },

@@ -105,7 +105,8 @@ export async function runCriticsSync(): Promise<{
   const feeds = [
     { url: 'https://afrocritik.com/feed/', source: 'Afrocritik' },
     { url: 'https://whatkeptmeup.com/feed/', source: 'What Kept Me Up' },
-    { url: 'https://filmefiko.com/feed/', source: 'Film Efiko' }
+    { url: 'https://filmefiko.com/feed/', source: 'Film Efiko' },
+    { url: 'https://nigerianmoviesreview.com/category/reviews/feed/', source: 'Nigerian Movies Review' }
   ];
 
   const candidateReviews: DiscoveredReview[] = [];

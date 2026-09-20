@@ -337,13 +337,74 @@ export async function resetSocialStudioData(actor: SocialActor) {
   return { success: true, message: 'Social Studio data reset to clean slate' };
 }
 
+export async function publishContentItemNow(input: { contentItemId: string }, actor: SocialActor) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  const { data: item, error } = await supabase
+    .from('social_content_items')
+    .select('id,status,title')
+    .eq('id', input.contentItemId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!item) throw httpError(404, 'Content item not found');
+
+  if (['published', 'publishing'].includes(item.status)) {
+    throw httpError(409, `Content item is already ${item.status}`);
+  }
+
+  // 1. If scheduled, cancel the existing schedule first so unstarted jobs are cancelled and item is approved
+  if (item.status === 'scheduled') {
+    await cancelContentSchedule({ contentItemId: input.contentItemId }, actor);
+    item.status = 'approved';
+  }
+
+  // 2. If draft or ready_for_review, submit and approve through review pipeline
+  if (item.status === 'draft') {
+    await reviewContentItem({ contentItemId: input.contentItemId, action: 'submit' }, actor);
+    item.status = 'ready_for_review';
+  }
+  if (item.status === 'ready_for_review') {
+    await reviewContentItem({ contentItemId: input.contentItemId, action: 'approve' }, actor);
+    item.status = 'approved';
+  }
+
+  // 3. Schedule for right now (due immediately)
+  await scheduleContentItem({ contentItemId: input.contentItemId, scheduledFor: nowIso }, actor);
+
+  // 4. Trigger publisher immediately to process this due job
+  const pubResult = await runSocialPublisher({
+    limit: 10,
+    lockedBy: `studio-publish-now:${actor.id}`,
+    now,
+  });
+
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: 'published_now',
+    eventData: { actor_id: actor.id, processed: pubResult.processed, results: pubResult.results },
+  });
+
+  return {
+    id: input.contentItemId,
+    title: item.title,
+    status: 'publishing',
+    processed: pubResult.processed,
+    results: pubResult.results,
+  };
+}
+
 export async function createUniversalSocialPost(input: {
+  contentItemId?: string;
   title?: string;
   format?: 'post' | 'image' | 'carousel' | 'video';
   platforms: string[];
   universalCaption: string;
   platformCaptions?: Record<string, string>;
   mediaAssets?: Array<{
+    id?: string;
     publicUrl: string;
     storagePath?: string;
     mimeType?: string;
@@ -353,7 +414,7 @@ export async function createUniversalSocialPost(input: {
     height?: number;
   }>;
   scheduledFor?: string | null;
-  status?: 'draft' | 'scheduled';
+  status?: 'draft' | 'scheduled' | 'publish_now';
 }, actor: SocialActor) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
 
@@ -367,7 +428,8 @@ export async function createUniversalSocialPost(input: {
   const title = String(input.title || '').trim().slice(0, 180) || universalCaption.slice(0, 50) || 'Social Post';
   const bucket = getAssetBucket();
 
-  const sourceId = crypto.randomUUID();
+  let contentItemId = input.contentItemId;
+
   const snapshot = {
     kind: 'universal_post',
     capturedAt: new Date().toISOString(),
@@ -377,17 +439,50 @@ export async function createUniversalSocialPost(input: {
     mediaCount: input.mediaAssets?.length || 0,
   };
 
-  const { data: contentItem, error: itemError } = await supabase.from('social_content_items').insert({
-    content_type: 'general_post',
-    title,
-    source_entity_type: 'universal_post',
-    source_entity_id: sourceId,
-    source_snapshot: snapshot,
-    status: 'draft',
-    generation_method: 'universal_composer',
-    created_by: actor.id,
-  }).select('id').single();
-  if (itemError) throw itemError;
+  if (contentItemId) {
+    await assertContentItemCanBeChanged(contentItemId);
+    await supabase.from('social_content_items').update({
+      title,
+      source_snapshot: snapshot,
+      status: 'draft',
+      updated_at: new Date().toISOString(),
+    }).eq('id', contentItemId);
+
+    const { data: oldVars } = await supabase
+      .from('social_platform_variants')
+      .select('id')
+      .eq('content_item_id', contentItemId);
+    const oldVarIds = (oldVars || []).map(v => v.id);
+    if (oldVarIds.length) {
+      await supabase
+        .from('social_publish_jobs')
+        .delete()
+        .in('platform_variant_id', oldVarIds)
+        .in('status', ['queued', 'retrying', 'cancelled']);
+
+      await supabase
+        .from('social_platform_variants')
+        .delete()
+        .in('id', oldVarIds)
+        .in('status', ['draft', 'approved', 'scheduled', 'cancelled']);
+    }
+
+    await supabase.from('social_assets').delete().eq('content_item_id', contentItemId);
+  } else {
+    const sourceId = crypto.randomUUID();
+    const { data: contentItem, error: itemError } = await supabase.from('social_content_items').insert({
+      content_type: 'general_post',
+      title,
+      source_entity_type: 'universal_post',
+      source_entity_id: sourceId,
+      source_snapshot: snapshot,
+      status: 'draft',
+      generation_method: 'universal_composer',
+      created_by: actor.id,
+    }).select('id').single();
+    if (itemError) throw itemError;
+    contentItemId = contentItem.id;
+  }
 
   const insertedAssets: Array<{ id: string; format: string; public_url: string }> = [];
   if (Array.isArray(input.mediaAssets) && input.mediaAssets.length > 0) {
@@ -398,7 +493,7 @@ export async function createUniversalSocialPost(input: {
       const assetFormat = media.format || (isVideo ? 'video_vertical_9_16' : 'portrait_4_5');
 
       const { data: asset, error: assetError } = await supabase.from('social_assets').insert({
-        content_item_id: contentItem.id,
+        content_item_id: contentItemId,
         format: assetFormat,
         storage_bucket: isR2Asset ? 'external' : bucket,
         storage_path: media.storagePath || '',
@@ -424,7 +519,7 @@ export async function createUniversalSocialPost(input: {
     const caption = String(platformSpecificCaption !== undefined && platformSpecificCaption !== null && platformSpecificCaption !== '' ? platformSpecificCaption : universalCaption).trim();
 
     return {
-      content_item_id: contentItem.id,
+      content_item_id: contentItemId,
       platform,
       status: 'draft',
       title,
@@ -444,22 +539,26 @@ export async function createUniversalSocialPost(input: {
   const { error: variantsError } = await supabase.from('social_platform_variants').insert(variants);
   if (variantsError) throw variantsError;
 
+  if (input.status === 'publish_now') {
+    return await publishContentItemNow({ contentItemId }, actor);
+  }
+
   if (input.status === 'scheduled' && input.scheduledFor) {
     try {
-      await scheduleContentItem({ contentItemId: contentItem.id, scheduledFor: input.scheduledFor }, actor);
+      await scheduleContentItem({ contentItemId, scheduledFor: input.scheduledFor }, actor);
     } catch (schedErr: any) {
       console.warn('Post created as draft but scheduling failed:', schedErr?.message);
     }
   }
 
   await insertSocialEvent({
-    contentItemId: contentItem.id,
-    eventType: 'universal_post_created',
+    contentItemId,
+    eventType: input.contentItemId ? 'universal_post_updated' : 'universal_post_created',
     eventData: { actor_id: actor.id, platforms, format, scheduled_for: input.scheduledFor || null },
   });
 
   return {
-    id: contentItem.id,
+    id: contentItemId,
     title,
     status: input.status === 'scheduled' && input.scheduledFor ? 'scheduled' : 'draft',
     platforms,
@@ -2484,10 +2583,13 @@ export async function reorderCarouselAssets(
   return { success: true, ...result };
 }
 
-export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
+export async function getEditorialCalendar(days = 30, shuffleOffset = 0, startDate?: string) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
-  const today = new Date().toISOString().split('T')[0];
-  const endDate = new Date();
+  const today = startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)
+    ? startDate
+    : new Date().toISOString().split('T')[0];
+  const startObj = new Date(`${today}T12:00:00Z`);
+  const endDate = new Date(startObj);
   endDate.setUTCDate(endDate.getUTCDate() + Math.max(1, days) - 1);
   const endDateString = endDate.toISOString().split('T')[0];
   const { data, error } = await supabase
@@ -2675,7 +2777,11 @@ export async function getEditorialCalendar(days = 30, shuffleOffset = 0) {
               completenessScore: candidate.completenessScore,
               contentType: candidateContentType,
               templateSlug: candidateTemplateSlug,
-              data: candidate.data || {},
+              data: {
+                ...candidate.data,
+                creditCount: candidate.data?.film_count || candidate.data?.creditCount || 0,
+                creditsCount: candidate.data?.film_count || candidate.data?.creditsCount || 0,
+              },
               editorialScore: assessment?.score || 0,
               whyNow: assessment?.whyNow || '',
             }

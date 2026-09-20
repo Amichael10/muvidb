@@ -2,12 +2,6 @@
   "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "build/client",
-  "crons": [
-    {
-      "path": "/api/cron/sync",
-      "schedule": "0 0 * * *"
-    }
-  ],
   "images": {
     "sizes": [
       16,
@@ -46,7 +40,7 @@
       "maxDuration": 60
     },
     "api/social.ts": {
-      "includeFiles": "{api/_lib/{fonts,decor,social-html-templates}/**,src/features/social-studio/**,node_modules/@sparticuz/chromium/**}",
+      "includeFiles": "{api/_lib/{fonts,decor,social-html-templates}/**,src/features/social-studio/**}",
       "maxDuration": 60
     },
     "api/cron/sync.ts": {
@@ -56,6 +50,9 @@
       "maxDuration": 60
     },
     "api/media.ts": {
+      "maxDuration": 60
+    },
+    "api/v1.ts": {
       "maxDuration": 60
     }
   },
@@ -90,6 +87,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/v1/:path*",
+      "destination": "/api/v1?_path=:path*"
+    },
+    {
+      "source": "/api/v1",
+      "destination": "/api/v1"
+    },
+    {
       "source": "/storage/v1/render/image/public/:path*",
       "destination": "https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/render/image/public/:path*"
     },
@@ -111,7 +116,7 @@
     },
     {
       "source": "/api/auth-email",
-      "destination": "/api/automation?action=auth-email"
+      "destination": "/api/data?_r=auth-email"
     },
     {
       "source": "/api/semantic-search",

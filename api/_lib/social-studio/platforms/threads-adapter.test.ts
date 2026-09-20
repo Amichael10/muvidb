@@ -33,9 +33,10 @@ describe('ThreadsPlatformAdapter', () => {
   it('uses the public asset URL for an image post', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'container-2' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 'FINISHED' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'post-2' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'post-2' }), { status: 200 }));
-    const adapter = new ThreadsPlatformAdapter({ accessToken: 'token', userId: 'user-1', fetchImpl });
+    const adapter = new ThreadsPlatformAdapter({ accessToken: 'token', userId: 'user-1', fetchImpl, pollIntervalMs: 10 });
 
     await adapter.publish(request({ assetUrl: 'https://cdn.example.com/post.jpg' }));
 

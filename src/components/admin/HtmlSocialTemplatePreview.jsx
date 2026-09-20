@@ -58,7 +58,8 @@ function templateData(candidate, templateSlug) {
     const firstName = candidate?.firstName || source.firstName || parts[0] || '';
     const lastName = candidate?.lastName || source.lastName || parts.slice(1).join(' ') || '';
     const dept = source.known_for_department || source.knownForDepartment || (source.roles && source.roles.length ? (Array.isArray(source.roles) ? source.roles.join(' . ') : source.roles) : 'ACTOR');
-    const creditsCount = String(source.creditsCount || source.creditCount || (source.knownFor && source.knownFor.length ? source.knownFor.length : (source.credits ? source.credits.length : 12)));
+    const rawCredits = source.film_count ?? source.creditCount ?? source.creditsCount ?? candidate?.film_count ?? (source.credits ? source.credits.length : null) ?? (source.knownFor && source.knownFor.length ? source.knownFor.length : 12);
+    const creditsCount = String(rawCredits);
     const nationality = (source.nationality || source.country || 'NIGERIAN').toUpperCase();
     return {
       name,

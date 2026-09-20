@@ -599,6 +599,87 @@ export const AWARD_ORGS = [
     submitLabel: 'Eko Star Awardees',
     tags: ['Lagos', 'Women in Film', 'NIFS', 'Leadership', 'Television & Cinema'],
   },
+  {
+    id: 'SEPTIMIUS',
+    label: 'Septimius',
+    full: 'Septimius Awards',
+    tagline: 'International Film Ceremony Honouring Global & Independent Talent',
+    category: 'festival',
+    location: 'Amsterdam, Netherlands',
+    frequency: 'Annual (August / September)',
+    founded: 2022,
+    accent: '#6366F1',
+    about:
+      'An annual international film festival and awards ceremony held in Amsterdam, Netherlands, celebrating independent feature films, documentaries, shorts, animations, series, and outstanding talent from Europe, America, Asia, Africa, and Oceania.',
+    when:
+      'Held annually in late summer (August/September) in Amsterdam, Netherlands.',
+    submissions:
+      'Entries are submitted via FilmFreeway across continental and international craft categories.',
+    entryPlan: {
+      fees: 'Standard Entry via FilmFreeway',
+      eligibility: 'Feature films, shorts, documentaries, animations, and series from all continents.',
+      formats: 'Secure online screener / DCP.',
+      categoriesCount: '30+ Continental & Technical Categories',
+      platform: 'FilmFreeway & Septimius Awards Portal',
+    },
+    submitUrl: 'https://septimiusawards.com/',
+    submitLabel: 'Septimius Official Portal',
+    tags: ['Amsterdam', 'International', 'Pan-African', 'Independent', 'Global Honours'],
+  },
+  {
+    id: 'OAFP',
+    label: 'OAFP Awards',
+    full: 'Odunlade Adekola Films Production Awards',
+    tagline: 'Annual Film & Talent Honours Celebrating Yoruba & Nollywood Excellence',
+    category: 'industry',
+    location: 'Abeokuta, Ogun State, Nigeria (OOPL Auditorium)',
+    frequency: 'Annual (December)',
+    founded: 2025,
+    accent: '#EA580C',
+    about:
+      'The Odunlade Adekola Films Production (OAFP) Awards celebrate exceptional achievements, stellar performances, technical brilliance, and cultural resonance across Yoruba cinema and the broader Nollywood creative ecosystem.',
+    when:
+      'Held annually in Abeokuta, Ogun State at the Olusegun Obasanjo Presidential Library (OOPL) Auditorium.',
+    submissions:
+      'Films and creative professionals submitted for annual peer adjudication across acting, directing, indigenous storytelling, and technical craft disciplines.',
+    entryPlan: {
+      fees: 'Annual Submission',
+      eligibility: 'Yoruba and Nollywood indigenous releases and participating industry practitioners.',
+      formats: 'Submitted film screeners and portfolio review.',
+      categoriesCount: '20 Industry & Craft Categories',
+      platform: 'OAFP Official Adjudication',
+    },
+    submitUrl: 'https://instagram.com/oafpawards',
+    submitLabel: 'OAFP Official Channel',
+    tags: ['Abeokuta', 'Yoruba Cinema', 'OAFP', 'Odunlade Adekola', 'Indigenous Excellence'],
+  },
+  {
+    id: 'ELOY',
+    label: 'ELOY Awards',
+    full: 'Exquisite Lady of the Year Awards',
+    tagline: 'Celebrating Women of Excellence Across Film, Media, Arts & Business',
+    category: 'industry',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual (November / December)',
+    founded: 2009,
+    accent: '#E11D48',
+    about:
+      'Founded by Tewa Onasanya and Exquisite Magazine in 2009, the ELOY (Exquisite Lady of the Year) Awards celebrate trailblazing women of excellence across creative arts, Nollywood cinema, television, media, entrepreneurship, and leadership.',
+    when:
+      'Held annually in late Q4 (November/December) in Lagos, Nigeria.',
+    submissions:
+      'Public nominations open mid-year across competitive acting, directing, producing, screenwriting, media, and creative enterprise categories, followed by academy review and public voting.',
+    entryPlan: {
+      fees: 'Free Public Nomination',
+      eligibility: 'Female professionals and creators across cinema, television, media, and creative enterprise with recognized work during the eligibility window.',
+      formats: 'Online nomination and portfolio/screener review.',
+      categoriesCount: '20+ Industry & Creative Categories',
+      platform: 'Official ELOY Portal',
+    },
+    submitUrl: 'https://www.eloyawards.com/',
+    submitLabel: 'ELOY Official Portal',
+    tags: ['Lagos', 'Women in Film', 'Exquisite Magazine', 'Nollywood', 'Television', 'Empowerment'],
+  },
 ];
 
 export function getAwardOrg(id) {
@@ -662,6 +743,9 @@ export function normOrg(raw) {
   if (upper.includes('BCFF') || upper.includes('BENIN CITY FILM') || upper.includes('BENIN FILM')) return 'BCFF';
   if (upper.includes('LIFANIMA') || upper.includes('ANIMATION FESTIVAL') || upper.includes('LAGOS INTERNATIONAL FESTIVAL OF ANIMATION')) return 'LIFANIMA';
   if (upper.includes('EKO STAR')) return 'EKO_STAR';
+  if (upper.includes('SEPTIMIUS')) return 'SEPTIMIUS';
+  if (upper.includes('OAFP') || upper.includes('ODUNLADE ADEKOLA')) return 'OAFP';
+  if (upper.includes('ELOY') || upper.includes('EXQUISITE LADY')) return 'ELOY';
   return s;
 }
 

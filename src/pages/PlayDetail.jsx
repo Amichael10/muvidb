@@ -46,8 +46,57 @@ export default function PlayDetail() {
     );
   }
 
-  const credits = play.credits || [];
+  const rawCredits = play.credits || [];
   const playDateLabel = getPlayDateLabel(play, '');
+
+  // Deduplicate performers by person ID or name to prevent repeated cards for multi-hyphenate roles
+  const uniquePerformers = React.useMemo(() => {
+    const map = new Map();
+    for (const cred of rawCredits) {
+      const person = cred.person || {};
+      const key = person.id || person.name || cred.id;
+      if (!key) continue;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          id: cred.id,
+          person,
+          roles: new Set([cred.role].filter(Boolean)),
+          characters: new Set([cred.character_name].filter(Boolean)),
+        });
+      } else {
+        const existing = map.get(key);
+        if (cred.role) existing.roles.add(cred.role);
+        if (cred.character_name) existing.characters.add(cred.character_name);
+        if (!existing.person.photo_url && person.photo_url) {
+          existing.person = person;
+        }
+      }
+    }
+
+    return Array.from(map.values()).map(item => {
+      // Normalize roles to prevent "Director" and "Director & Producer" redundantly repeating
+      const rawRoles = Array.from(item.roles);
+      const cleanedRoles = [];
+      for (const r of rawRoles) {
+        if (!cleanedRoles.some(cr => cr.toLowerCase().includes(r.toLowerCase()) || r.toLowerCase().includes(cr.toLowerCase()))) {
+          cleanedRoles.push(r);
+        } else {
+          // Keep the more descriptive one
+          const idx = cleanedRoles.findIndex(cr => cr.toLowerCase().includes(r.toLowerCase()) || r.toLowerCase().includes(cr.toLowerCase()));
+          if (r.length > cleanedRoles[idx].length) {
+            cleanedRoles[idx] = r;
+          }
+        }
+      }
+
+      return {
+        ...item,
+        roleDisplay: cleanedRoles.join(' · ') || 'Performer',
+        characterDisplay: Array.from(item.characters).join(', '),
+      };
+    });
+  }, [rawCredits]);
 
   return (
     <div className="min-h-screen bg-bg text-text-primary pb-20">
@@ -148,48 +197,69 @@ export default function PlayDetail() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Ensemble Stage Cast Section */}
         <section className="pt-12">
-          <h2 className="text-2xl font-bold text-text-primary mb-6 flex items-center gap-2">
-            <Icon icon="solar:users-group-two-rounded-bold" className="text-brand w-6 h-6" />
-            Stage Ensemble & Performers ({credits.length})
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-brand mb-1">Company & Ensemble</p>
+              <h2 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+                <Icon icon="solar:users-group-two-rounded-bold" className="text-brand w-6 h-6" />
+                Stage Ensemble & Performers ({uniquePerformers.length})
+              </h2>
+            </div>
+            {uniquePerformers.length > 0 && (
+              <span className="text-xs text-text-muted font-medium hidden sm:inline-block">
+                {uniquePerformers.length} credited {uniquePerformers.length === 1 ? 'member' : 'members'}
+              </span>
+            )}
+          </div>
 
-          {credits.length === 0 ? (
+          {uniquePerformers.length === 0 ? (
             <div className="bg-surface border border-border rounded-2xl p-12 text-center">
               <Icon icon="solar:user-rounded-line-duotone" className="w-16 h-16 text-text-muted mx-auto mb-3 opacity-40" />
               <p className="text-lg font-bold text-text-primary mb-1">No stage performers linked yet</p>
               <p className="text-xs text-text-muted">Performers for this production will appear here as cast credits are added.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {credits.map((cred) => {
-                const person = cred.person || {};
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+              {uniquePerformers.map((item) => {
+                const person = item.person || {};
                 return (
                   <Link
-                    key={cred.id}
+                    key={item.id}
                     to={`/people/${person.slug || person.id}`}
-                    className="group bg-surface border border-border hover:border-brand/50 rounded-xl p-3.5 flex flex-col items-center text-center transition-all hover:-translate-y-1"
+                    className="group bg-surface/70 hover:bg-surface border border-border/80 hover:border-brand/60 rounded-2xl p-4 flex flex-col justify-between items-center text-center transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-brand/5 min-h-[210px]"
                   >
-                    <ImageWithFallback
-                      src={person.photo_url}
-                      alt={person.name || 'Performer'}
-                      fallbackType="avatar"
-                      name={person.name || 'Performer'}
-                      className="w-20 h-20 rounded-full object-cover border-2 border-border group-hover:border-brand transition-colors mb-3 shadow-md"
-                      width={160}
-                      sizes="80px"
-                      loading="lazy"
-                    />
-                    <h3 className="text-xs font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
-                      {person.name || 'Unknown Performer'}
-                    </h3>
-                    <span className="text-[11px] font-semibold text-brand mt-0.5">
-                      {cred.role || 'Actor'}
-                    </span>
-                    {cred.character_name && (
-                      <span className="text-[10px] text-text-muted italic line-clamp-1 mt-0.5">
-                        as {cred.character_name}
+                    <div className="flex flex-col items-center w-full">
+                      <div className="relative mb-3">
+                        <ImageWithFallback
+                          src={person.photo_url}
+                          alt={person.name || 'Performer'}
+                          fallbackType="avatar"
+                          name={person.name || 'Performer'}
+                          className="w-20 h-20 rounded-full object-cover ring-2 ring-border/80 group-hover:ring-brand/60 transition-all shadow-lg shadow-black/20 group-hover:scale-105 duration-300"
+                          width={160}
+                          sizes="80px"
+                          loading="lazy"
+                        />
+                      </div>
+                      <h3 className="text-xs font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1 w-full px-1">
+                        {person.name || 'Unknown Performer'}
+                      </h3>
+                      <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 mt-2 rounded-full bg-brand/10 text-brand border border-brand/20 line-clamp-1 max-w-full">
+                        {item.roleDisplay}
                       </span>
-                    )}
+                    </div>
+
+                    <div className="w-full mt-2 pt-2 border-t border-border/40">
+                      {item.characterDisplay ? (
+                        <p className="text-[11px] text-text-muted italic line-clamp-1 font-medium">
+                          as {item.characterDisplay}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-text-muted/40 italic">
+                          Stage credit
+                        </p>
+                      )}
+                    </div>
                   </Link>
                 );
               })}

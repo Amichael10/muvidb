@@ -1,4 +1,4 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 import { supabase } from './lib/db';
@@ -179,6 +179,12 @@ async function main() {
 
     if (existingUrls.has(link)) {
       skippedExisting++;
+      continue;
+    }
+
+    const isHollywood = /house of the dragon|game of thrones|superman|batman|suicide squad|mortal kombat|deadpool|inside out|bad boys|jurassic|marvel|avengers|spider-man|star wars|fast & furious|hitman|the father|run \(2020\)|i am invincible|the equalizer|baby reindeer|shogun|yellowstone|the boys/i.test(rawTitle + ' ' + link);
+    if (isHollywood) {
+      console.log(`🚫 [HOLLYWOOD SKIPPED] "${rawTitle}"`);
       continue;
     }
 

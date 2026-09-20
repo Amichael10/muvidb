@@ -219,3 +219,13 @@ scripts/*.json
 !scripts/scraper/package.json
 !scripts/scraper/package-lock.json
 
+# Tesseract binary traineddata models
+tessdata/
+*.traineddata
+
+# Temporary scraping and profiling dumps
+bp_*
+rhoda_*
+
+
+

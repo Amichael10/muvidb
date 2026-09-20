@@ -134,6 +134,13 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
 
       await new Promise((resolve) => setTimeout(resolve, this.pollIntervalMs));
     }
+
+    throw new SocialPlatformError({
+      platform: 'instagram',
+      code: 'instagram_media_processing_timeout',
+      message: 'Instagram media container processing timed out.',
+      retryable: true,
+    });
   }
 
   private async permalink(mediaId: string): Promise<string | null> {
@@ -263,10 +270,8 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
       });
     }
 
-    // 2. Poll if video
-    if (isVideo) {
-      await this.waitForContainer(containerId);
-    }
+    // 2. Wait for container to finish processing before publishing
+    await this.waitForContainer(containerId);
 
     // 3. Publish Container
     const publishParams = new URLSearchParams({ creation_id: containerId });

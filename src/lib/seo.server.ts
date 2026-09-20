@@ -83,6 +83,20 @@ export async function personSeo(slug: string, base: string) {
           box_office_domestic, box_office_currency, box_office_source,
           film_genres(genres(name))
         )
+      ),
+      person_media(
+        id, media_type, category, title, description,
+        url, thumbnail_url, r2_key, embed_provider, embed_id,
+        duration_seconds, width, height, aspect_ratio,
+        film_id, character_name, photographer_credit, year,
+        is_primary, sort_order, status,
+        films(
+          id, title, year, poster_url, slug
+        )
+      ),
+      talent_representations(
+        id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary, notes,
+        companies(id, name, slug, logo_url, company_type, headquarters, website, instagram_url)
       )
     `)
     .eq(keyFor(slug), slug)

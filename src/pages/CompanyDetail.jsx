@@ -146,12 +146,48 @@ export default function CompanyDetail() {
     });
 
     comp.filmsWithRole = Array.from(filmMap.values());
+
+    // 3. Fetch Represented Talents linked via talent_representations
+    const { data: repLinks } = await supabase
+      .from('talent_representations')
+      .select(`
+        id,
+        representation_type,
+        agent_name,
+        contact_email,
+        contact_phone,
+        booking_url,
+        is_primary,
+        notes,
+        people (
+          id,
+          name,
+          slug,
+          photo_url,
+          known_for_department,
+          gender,
+          bio
+        )
+      `)
+      .eq('company_id', comp.id);
+
+    comp.representedTalents = (repLinks || [])
+      .map((r) => ({
+        ...r.people,
+        representation: r,
+      }))
+      .filter((p) => p && p.id);
+
     setCompany(comp);
     setLoading(false);
   };
 
   const allFilmsWithRole = useMemo(() => {
     return company?.filmsWithRole || [];
+  }, [company]);
+
+  const representedTalents = useMemo(() => {
+    return company?.representedTalents || [];
   }, [company]);
 
   // Studio Performance Scorecard & Financial Analytics
@@ -389,13 +425,16 @@ export default function CompanyDetail() {
             <div className="flex-1 text-center lg:text-left min-w-0">
               <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5 mb-2">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-brand/10 border border-brand/25 text-brand text-[10px] font-black uppercase tracking-wider">
-                  <Icon icon="solar:buildings-2-bold" className="w-3 h-3" />
-                  Verified Nollywood Studio
+                  <Icon
+                    icon={company.company_type === 'talent_agency' ? 'solar:users-group-rounded-bold' : 'solar:buildings-2-bold'}
+                    className="w-3 h-3"
+                  />
+                  {company.company_type === 'talent_agency' ? 'Verified Talent Agency' : 'Verified Nollywood Studio'}
                 </span>
 
                 {company.company_type && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-surface-2 border border-border text-text-secondary text-[11px] font-bold capitalize">
-                    {company.company_type}
+                    {company.company_type.replace(/_/g, ' ')}
                   </span>
                 )}
 
@@ -416,6 +455,15 @@ export default function CompanyDetail() {
                 <span>{allFilmsWithRole.length} Catalog Releases</span>
                 {studioMetrics.productionCount > 0 && <span>({studioMetrics.productionCount} Produced)</span>}
                 {studioMetrics.distributionCount > 0 && <span>({studioMetrics.distributionCount} Distributed)</span>}
+                {representedTalents.length > 0 && (
+                  <>
+                    <span>•</span>
+                    <span className="text-brand font-black flex items-center gap-1">
+                      <Icon icon="solar:users-group-rounded-bold" className="w-3.5 h-3.5" />
+                      {representedTalents.length} Signed Talents
+                    </span>
+                  </>
+                )}
               </div>
 
               {company.description && (
@@ -447,8 +495,21 @@ export default function CompanyDetail() {
                     className="inline-flex items-center gap-2 bg-brand hover:bg-brand-hover text-black font-bold px-5 py-2.5 rounded-xl transition-all shadow-md cursor-pointer"
                   >
                     <Icon icon="solar:global-bold" className="text-sm" />
-                    <span>Official Studio Website</span>
+                    <span>Official {company.company_type === 'talent_agency' ? 'Agency' : 'Studio'} Website</span>
                     <Icon icon="solar:arrow-right-up-linear" className="text-xs" />
+                  </a>
+                )}
+
+                {company.instagram_url && (
+                  <a
+                    href={company.instagram_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-surface hover:bg-surface-2 text-text-primary border border-border hover:border-brand font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
+                  >
+                    <Icon icon="ri:instagram-line" className="text-sm text-pink-500" />
+                    <span>Instagram</span>
+                    <Icon icon="solar:arrow-right-up-linear" className="text-xs text-text-muted" />
                   </a>
                 )}
 
@@ -458,7 +519,7 @@ export default function CompanyDetail() {
                   className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-surface border border-border hover:border-brand text-text-primary text-xs font-bold transition-colors cursor-pointer"
                 >
                   <Icon icon={copiedLink ? 'solar:check-circle-bold' : 'solar:share-linear'} className="text-sm text-brand" />
-                  <span>{copiedLink ? 'Link Copied!' : 'Share Studio Profile'}</span>
+                  <span>{copiedLink ? 'Link Copied!' : 'Share Profile'}</span>
                 </button>
               </div>
             </div>
@@ -602,6 +663,86 @@ export default function CompanyDetail() {
           )}
         </div>
       </section>
+
+      {/* ─── TALENT ROSTER (For Talent Agencies / Represented Talents) ─── */}
+      {representedTalents.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-brand text-xs font-black uppercase tracking-widest mb-1">
+                <Icon icon="solar:users-group-rounded-bold" className="w-4 h-4" />
+                Signed Talent Roster
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-heading font-black text-text-primary tracking-tight">
+                Represented Actors & Creatives
+              </h2>
+              <p className="text-xs text-text-muted mt-1">
+                Official represented talent roster managed by {toTitleCase(company.name)}
+              </p>
+            </div>
+            <span className="px-3.5 py-1.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-xs font-black tracking-wider self-start sm:self-auto flex items-center gap-1.5 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+              {representedTalents.length} Signed Talents
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6">
+            {representedTalents.map((talent) => {
+              const rep = talent.representation || {};
+              return (
+                <Link
+                  key={talent.id}
+                  to={`/people/${talent.slug || talent.id}`}
+                  className="group relative bg-surface border border-border hover:border-brand/60 rounded-2xl p-3.5 sm:p-4 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-black mb-3 shadow-md">
+                      <ImageWithFallback
+                        src={talent.photo_url}
+                        alt={talent.name}
+                        fallbackType="avatar"
+                        name={talent.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+
+                      {/* Rep Type Badge */}
+                      <div className="absolute top-2 left-2">
+                        <span className="px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-wider border border-white/10 shadow-sm">
+                          {rep.representation_type || 'Talent'}
+                        </span>
+                      </div>
+
+                      {/* Department Tag */}
+                      <div className="absolute bottom-2 left-2 right-2">
+                        <span className="text-[10px] font-black text-brand uppercase tracking-wider">
+                          {talent.known_for_department || 'Acting'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="font-heading font-black text-sm sm:text-base text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                        {talent.name}
+                      </h3>
+                      {rep.agent_name && (
+                        <p className="text-[11px] text-text-muted mt-0.5 line-clamp-1">
+                          Rep: <span className="text-text-secondary font-medium">{rep.agent_name}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between text-[11px] text-brand font-bold">
+                    <span>View Actor Profile</span>
+                    <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ─── 3. TOP COMMERCIAL BLOCKBUSTERS (HALL OF FAME) ─── */}
       {studioMetrics.rankedBlockbusters.length > 0 && (

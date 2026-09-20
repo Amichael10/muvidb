@@ -202,7 +202,7 @@ function actorData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   const lastName = s.lastName || parts.slice(1).join(' ') || '';
   const department = s.knownForDepartment || (s.roles && s.roles.length ? (Array.isArray(s.roles) ? s.roles.join(' . ') : s.roles) : 'ACTOR');
   const country = (s.nationality || s.country || 'NIGERIAN').toUpperCase();
-  const creditsCount = s.creditCount || s.creditsCount || (s.knownFor && s.knownFor.length ? s.knownFor.length : 12);
+  const creditsCount = s.film_count || s.creditCount || s.creditsCount || (s.knownFor && s.knownFor.length ? s.knownFor.length : 12);
   const photo = s.photoUrl || s.photoCutoutUrl || s.backdropUrl || s.posterUrl || s.photo || '';
 
   return {
@@ -256,9 +256,12 @@ async function renderHtmlTemplate(input: {
   const browser = isServerless
     ? await (async () => {
         const { default: serverlessChromium } = await import('@sparticuz/chromium');
+        const remotePackUrl =
+          process.env.CHROMIUM_REMOTE_PACK_URL ||
+          'https://pub-8c78c05976804a2da51ca287d5c3b229.r2.dev/bin/chromium-v149-pack.tar';
         return chromium.launch({
           args: serverlessChromium.args,
-          executablePath: await serverlessChromium.executablePath(),
+          executablePath: await serverlessChromium.executablePath(remotePackUrl),
           headless: true,
         });
       })()

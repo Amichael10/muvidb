@@ -17,6 +17,7 @@ describe('InstagramPlatformAdapter', () => {
   it('creates and publishes an image container without leaking token', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_1' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_1', permalink: 'https://instagram.com/p/123' }), { status: 200 }));
 
@@ -24,6 +25,7 @@ describe('InstagramPlatformAdapter', () => {
       accessToken: 'ig-secret-token',
       instagramAccountId: 'ig-user-1',
       fetchImpl,
+      pollIntervalMs: 10,
     });
 
     const result = await adapter.publish(request());

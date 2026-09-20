@@ -162,7 +162,15 @@ export default function AdminOutreach() {
         const films = Number(p.film_count || 0);
         if (films < Number(minFilms || 0)) return false;
         if (maxFilms && films > Number(maxFilms)) return false;
-        if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+
+        // When viewing a specific status (e.g. 'skipped', 'sent', 'queued', 'pending')
+        if (statusFilter !== 'all') {
+          if (p.status !== statusFilter) return false;
+        } else {
+          // When viewing 'All Candidates', exclude skipped so skipped candidates immediately disappear
+          if (p.status === 'skipped') return false;
+        }
+
         if (craftFilter !== 'all') {
           const dept = (p.known_for_department || '').toLowerCase();
           if (!dept.includes(craftFilter.toLowerCase())) return false;
@@ -183,9 +191,11 @@ export default function AdminOutreach() {
       const films = Number(p.film_count || 0);
       if (films < Number(minFilms || 0)) continue;
       if (maxFilms && films > Number(maxFilms)) continue;
-      base.all += 1;
       const status = outreachByPerson[p.id]?.status || 'pending';
       base[status] = (base[status] || 0) + 1;
+      if (status !== 'skipped') {
+        base.all += 1;
+      }
     }
     return base;
   }, [people, outreachByPerson, minFilms, maxFilms]);
@@ -198,8 +208,37 @@ export default function AdminOutreach() {
     setSelected(new Set());
   }, [search, statusFilter, craftFilter, minFilms, maxFilms]);
 
+  useEffect(() => {
+    if (page >= pageCount) {
+      setPage(Math.max(0, pageCount - 1));
+    }
+  }, [page, pageCount]);
+
   const upsertStatus = async (person, status, extra = {}) => {
     setSavingId(person.id);
+    const previousOutreach = outreachByPerson[person.id];
+
+    // Optimistic update: immediately update outreach state so candidate is removed from list with 0ms lag
+    setOutreachByPerson((prev) => ({
+      ...prev,
+      [person.id]: {
+        ...(prev[person.id] || {}),
+        person_id: person.id,
+        status,
+        ...extra,
+      },
+    }));
+
+    // If candidate was checked in selected, remove it immediately
+    setSelected((prev) => {
+      if (prev.has(person.id)) {
+        const next = new Set(prev);
+        next.delete(person.id);
+        return next;
+      }
+      return prev;
+    });
+
     try {
       const payload = {
         person_id: person.id,
@@ -227,6 +266,13 @@ export default function AdminOutreach() {
       return data;
     } catch (err) {
       console.error(err);
+      // Revert optimistic update on failure
+      setOutreachByPerson((prev) => {
+        const next = { ...prev };
+        if (previousOutreach) next[person.id] = previousOutreach;
+        else delete next[person.id];
+        return next;
+      });
       toast.error(err.message || 'Failed to update status');
       return null;
     } finally {
@@ -299,11 +345,50 @@ export default function AdminOutreach() {
 
   const bulkStatus = async (status) => {
     if (!selectedPeople.length) return;
-    for (const person of selectedPeople) {
-      await upsertStatus(person, status);
-    }
-    toast.success(`Marked ${selectedPeople.length} as ${status}`);
+    const targetPeople = [...selectedPeople];
+
+    // Optimistic batch update so items are removed immediately from view
+    setOutreachByPerson((prev) => {
+      const next = { ...prev };
+      for (const p of targetPeople) {
+        next[p.id] = {
+          ...(next[p.id] || {}),
+          person_id: p.id,
+          status,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      return next;
+    });
     clearSelect();
+
+    try {
+      const payloads = targetPeople.map((person) => ({
+        person_id: person.id,
+        status,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id || null,
+      }));
+
+      const { data, error } = await supabase
+        .from('artist_outreach')
+        .upsert(payloads, { onConflict: 'person_id' })
+        .select('id, person_id, status, notes, last_message, contacted_at, updated_at');
+      if (error) throw error;
+
+      if (data) {
+        setOutreachByPerson((prev) => {
+          const next = { ...prev };
+          for (const row of data) next[row.person_id] = row;
+          return next;
+        });
+      }
+      toast.success(`Marked ${targetPeople.length} as ${status}`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update some candidates');
+      load();
+    }
   };
 
   return (
@@ -685,14 +770,29 @@ export default function AdminOutreach() {
                             >
                               Replied
                             </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => upsertStatus(person, 'skipped')}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-bold text-text-muted hover:text-text-primary"
-                            >
-                              Skip
-                            </button>
+                            {person.status === 'skipped' ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => upsertStatus(person, 'pending')}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-500/40 text-xs font-bold text-amber-400 hover:bg-amber-500/10"
+                                title="Restore candidate to pending queue"
+                              >
+                                <Icon icon="solar:restart-linear" />
+                                Unskip
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => upsertStatus(person, 'skipped')}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-bold text-text-muted hover:text-text-primary hover:border-border/80"
+                                title="Skip and remove candidate from list"
+                              >
+                                <Icon icon="solar:close-circle-linear" />
+                                Skip
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
