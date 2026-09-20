@@ -544,12 +544,12 @@ export default function AdminOverview() {
                   <div className="p-2.5 rounded-lg bg-surface border border-border">
                     <div className="text-[10px] font-bold text-emerald-400 uppercase">Free Tier</div>
                     <div className="text-text-primary font-bold text-xs mt-0.5">60 req/min</div>
-                    <div className="text-[10px] text-text-muted">Films, People & Credits</div>
+                    <div className="text-[10px] text-text-muted">Max 500 Records Preview</div>
                   </div>
                   <div className="p-2.5 rounded-lg bg-surface border border-brand/30">
                     <div className="text-[10px] font-bold text-amber-400 uppercase">Pro Tier</div>
                     <div className="text-text-primary font-bold text-xs mt-0.5">600 req/min</div>
-                    <div className="text-[10px] text-text-muted">+ Box Office Grosses</div>
+                    <div className="text-[10px] text-text-muted">Full Catalog + Box Office</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pt-1">
