@@ -21,8 +21,6 @@ import { nationalityToCountryName } from '../utils/africanCountries'
 import { fetchPersonStageCredits, getPlayDateLabel } from '../lib/plays'
 import PersonHeroMediaShowcase from '../components/person/PersonHeroMediaShowcase'
 import CareerPassportModal from '../components/professional/CareerPassportModal'
-import PersonMediaSection from '../components/person/PersonMediaSection'
-import AddPersonMediaModal from '../components/person/AddPersonMediaModal'
 import TalentRepresentationCard from '../components/person/TalentRepresentationCard'
 
 const PLATFORM_STYLES = {
@@ -169,7 +167,6 @@ const PersonDetail = () => {
   const [person, setPerson] = useState(seededPerson)
   const [representations, setRepresentations] = useState(seededPerson?.talent_representations || [])
   const [media, setMedia] = useState(seededPerson?.person_media || [])
-  const [showAddMedia, setShowAddMedia] = useState(false)
   const [stageCredits, setStageCredits] = useState([])
   const [awardFilms, setAwardFilms] = useState({}) // film_id -> { slug, title, poster_url }
   const [personId, setPersonId] = useState(seededPerson?.id ?? null) // actual UUID
@@ -906,6 +903,17 @@ const PersonDetail = () => {
                     <span className="text-text-muted">Nationality: {label}</span>
                   );
                 })()}
+                {representations && representations.length > 0 && representations[0]?.companies?.name && (
+                  <span className="text-text-muted">
+                    Agency:{' '}
+                    <a
+                      href="#representation"
+                      className="text-brand font-medium hover:underline"
+                    >
+                      {representations[0].companies.name}
+                    </a>
+                  </span>
+                )}
                 {person.date_of_birth && (
                   <span className="text-text-muted">
                     Born: {formatDateOfBirth(person.date_of_birth)}
@@ -955,15 +963,6 @@ const PersonDetail = () => {
                   >
                     Official Channel
                   </a>
-                )}
-                
-                {canManage && (
-                  <button
-                    onClick={() => setShowAddMedia(true)}
-                    className="inline-flex min-h-[44px] flex-shrink-0 items-center gap-1.5 rounded-lg border border-brand bg-brand/10 px-5 py-3 text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white"
-                  >
-                    <Icon icon="solar:clapperboard-play-linear" width="16" /> Add Media
-                  </button>
                 )}
 
                 {person.claimed_by ? (
@@ -1061,14 +1060,6 @@ const PersonDetail = () => {
                   </div>
                 </div>
               )}
-
-              {/* Representation & Booking Card (IMDbPro Style) */}
-              <TalentRepresentationCard
-                representations={representations}
-                personName={person.name}
-                personId={person.id}
-                canEdit={canManage}
-              />
             </div>
           </div>
 
@@ -1134,16 +1125,6 @@ const PersonDetail = () => {
             </div>
           </section>
         )}
-
-        {/* IMDb-Style Dynamic Actor Media Hub */}
-        <PersonMediaSection
-          person={person}
-          media={media}
-          canManage={canManage}
-          onMediaAdded={(newMedia) => {
-            setMedia((prev) => [newMedia, ...prev]);
-          }}
-        />
 
         <div className="p-4 md:p-8 lg:p-12">
           <div className="mb-8 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
@@ -1534,6 +1515,32 @@ const PersonDetail = () => {
         </div>
         )}
 
+        {/* Talent Agency & Management Representation */}
+        {representations && representations.length > 0 && (
+          <div id="representation" className="p-4 md:p-8 lg:p-12 border-t border-border bg-surface/50">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="w-1.5 h-6 bg-brand rounded-full shrink-0" />
+              <div>
+                <h2 className="text-text-primary text-2xl md:text-3xl font-bold font-heading tracking-tighter">
+                  Representation &amp; Management
+                </h2>
+                <p className="text-text-muted text-xs font-semibold mt-0.5">
+                  Official agency, management, and booking representation
+                </p>
+              </div>
+            </div>
+
+            <div className="max-w-xl">
+              <TalentRepresentationCard
+                representations={representations}
+                personName={person.name}
+                personId={person.id}
+                canEdit={false}
+              />
+            </div>
+          </div>
+        )}
+
         {channel && (
           <div className="p-8 md:p-12 border-t border-border bg-surface-2/5 relative overflow-hidden">
             <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
@@ -1593,15 +1600,6 @@ const PersonDetail = () => {
           </div>
         )}
         {passportOpen && <CareerPassportModal person={person} credits={person.credits || []} stageCredits={stageCredits} onClose={() => setPassportOpen(false)} />}
-        {showAddMedia && (
-          <AddPersonMediaModal
-            person={person}
-            onClose={() => setShowAddMedia(false)}
-            onMediaAdded={(newMedia) => {
-              setMedia((prev) => [newMedia, ...prev]);
-            }}
-          />
-        )}
       </div>
     </div>
   )

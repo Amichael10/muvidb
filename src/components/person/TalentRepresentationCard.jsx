@@ -53,7 +53,7 @@ export default function TalentRepresentationCard({
           <span>Representation &amp; Booking</span>
         </div>
         <div className="flex items-center gap-2">
-          {personId && (canEdit || true) && (
+          {personId && canEdit && (
             <Link
               to={`/admin/people?edit=${personId}`}
               className="text-[10px] font-bold text-text-muted hover:text-brand flex items-center gap-1 transition-colors"
