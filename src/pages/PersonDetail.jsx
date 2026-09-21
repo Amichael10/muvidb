@@ -21,7 +21,6 @@ import { nationalityToCountryName } from '../utils/africanCountries'
 import { fetchPersonStageCredits, getPlayDateLabel } from '../lib/plays'
 import PersonHeroMediaShowcase from '../components/person/PersonHeroMediaShowcase'
 import CareerPassportModal from '../components/professional/CareerPassportModal'
-import TalentRepresentationCard from '../components/person/TalentRepresentationCard'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -906,12 +905,12 @@ const PersonDetail = () => {
                 {representations && representations.length > 0 && representations[0]?.companies?.name && (
                   <span className="text-text-muted">
                     Agency:{' '}
-                    <a
-                      href="#representation"
+                    <Link
+                      to={`/companies/${representations[0].companies.slug || representations[0].companies.id}`}
                       className="text-brand font-medium hover:underline"
                     >
                       {representations[0].companies.name}
-                    </a>
+                    </Link>
                   </span>
                 )}
                 {person.date_of_birth && (
@@ -1513,32 +1512,6 @@ const PersonDetail = () => {
             </div>
           )}
         </div>
-        )}
-
-        {/* Talent Agency & Management Representation */}
-        {representations && representations.length > 0 && (
-          <div id="representation" className="p-4 md:p-8 lg:p-12 border-t border-border bg-surface/50">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="w-1.5 h-6 bg-brand rounded-full shrink-0" />
-              <div>
-                <h2 className="text-text-primary text-2xl md:text-3xl font-bold font-heading tracking-tighter">
-                  Representation &amp; Management
-                </h2>
-                <p className="text-text-muted text-xs font-semibold mt-0.5">
-                  Official agency, management, and booking representation
-                </p>
-              </div>
-            </div>
-
-            <div className="max-w-xl">
-              <TalentRepresentationCard
-                representations={representations}
-                personName={person.name}
-                personId={person.id}
-                canEdit={false}
-              />
-            </div>
-          </div>
         )}
 
         {channel && (
