@@ -52,13 +52,10 @@ export const NOISE_WORDS = [
   'BTS STILL PHOTOS', 'DATA WRANGLER', 'EXECUTIVE PRODUCERS', 'PRODUCER EXECUTIVE PRODUCER',
   'GRANDISH GLOBAL COMPANY', 'SEASON 3', 'NOLLYWOODMOVIES', 'NIGERIANMOVIES',
   'HOST OF OTHERS', 'AND MANY MORE', 'AND UNEXPECTED', 'AND INTENSE', 'AND STRONG',
-<<<<<<< HEAD
   'HIDDEN BATTLES', 'THE MOVIE', 'LATEST MOVIE', 'OFFICIAL TRAILER', 'TEASER', 'SEASON',
-  'PART 1', 'PART 2', 'PART 3', 'EPISODE', 'BLOCKBUSTER', 'RELOADED', 'UNCUT'
-=======
-  'HIDDEN BATTLES', 'YANKID MEDIA PRO', 'JOYVISUAL', 'BOARD MEMBERS', 'BOARD MEMBER',
+  'PART 1', 'PART 2', 'PART 3', 'EPISODE', 'BLOCKBUSTER', 'RELOADED', 'UNCUT',
+  'YANKID MEDIA PRO', 'JOYVISUAL', 'BOARD MEMBERS', 'BOARD MEMBER',
   'ITY GUESTS', 'CITY GUESTS', 'BIG FISH', 'MEDIA PRO'
->>>>>>> 516378f15364c081bfcae209cce8ca5c4121f486
 ];
 
 export function normalizePersonName(raw: string): string {
@@ -194,19 +191,16 @@ export function extractCharacterFromName(raw: string): { name: string; character
     return { name: parenMatch[1].trim(), characterName: parenMatch[2].trim() };
   }
 
-  // 2. OCR title card pattern: 2 uppercase words + 1 mixed/lower case character or known character title
-  // E.g. "RHODA INAJU Kemi", "AKINOLA AKANO Chris", "LANRE DIWURA Jide", "ADESOKAN ABDULLAH Police officer"
+  // 2. Multi-word string splitting (3 to 5 words):
+  // E.g. "MARTINS SAM Sunny", "Martins Sam Sunny", "RHODA INAJU Kemi", "Rhoda Inaju Kemi", "ADEBAYO AYODIMEJI Camera Man"
   const words = clean.split(/\s+/).filter(Boolean);
   if (words.length >= 3 && words.length <= 5) {
-    const firstTwoUpper = /^[A-Z]{2,}$/.test(words[0]) && /^[A-Z]{2,}$/.test(words[1]);
-    const remainingText = words.slice(2).join(' ');
-    const remainingIsCharacter = /^[A-Z][a-z0-9'-]+/.test(words[2]) || CHARACTER_HINT.test(remainingText);
-    if (firstTwoUpper && remainingIsCharacter) {
-      return {
-        name: `${words[0]} ${words[1]}`,
-        characterName: remainingText,
-      };
-    }
+    const actorName = `${words[0]} ${words[1]}`;
+    const characterName = words.slice(2).join(' ');
+    return {
+      name: actorName,
+      characterName: characterName,
+    };
   }
 
   return { name: clean, characterName: null };
@@ -214,14 +208,31 @@ export function extractCharacterFromName(raw: string): { name: string; character
 
 /**
  * Fuzzy search for an existing person in Lumi's people database.
- * 1. Extract embedded character roles (e.g. "Rhoda Inaju as Kemi" -> Rhoda Inaju)
- * 2. Alias dictionary resolution (e.g. Erekere -> Michael Olalekan Adeyemi)
- * 3. Exact case-insensitive match (prioritizing stars by film_count)
- * 4. Surname / First name search prioritized by film_count with Levenshtein similarity >= 85%
- * 5. Prefix sub-slice search (e.g. "Rhoda Inaju Kemi" -> Rhoda Inaju match in DB)
+ * 1. Full string match check (to preserve existing legitimate 3-word stars like "Mercy Johnson Okojie")
+ * 2. Extract embedded character roles (e.g. "Rhoda Inaju Kemi" -> Rhoda Inaju + Kemi)
+ * 3. Alias dictionary resolution (e.g. Erekere -> Michael Olalekan Adeyemi)
+ * 4. Exact case-insensitive match on 2-word actor name (prioritizing stars by film_count)
+ * 5. Surname / First name search prioritized by film_count with Levenshtein similarity >= 85%
+ * 6. Prefix sub-slice search (e.g. "Rhoda Inaju Kemi" -> Rhoda Inaju match in DB)
  */
 export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: string; name: string; characterName?: string } | null> {
   if (!name || name.trim().length < 2) return null;
+
+  const rawClean = normalizePersonName(name);
+  if (!rawClean || rawClean.length < 2) return null;
+
+  // 1. Direct search on full candidate name FIRST
+  // (Preserves existing 3-word star entries in DB like "Mercy Johnson Okojie", "Yomi Fash Lanso")
+  const { data: fullDirectHits } = await serviceSupabase
+    .from('people')
+    .select('id, name, film_count')
+    .ilike('name', rawClean)
+    .order('film_count', { ascending: false, nullsFirst: false })
+    .limit(1);
+
+  if (fullDirectHits && fullDirectHits.length > 0) {
+    return { ...fullDirectHits[0] };
+  }
 
   const extracted = extractCharacterFromName(name);
   let detectedCharacter = extracted.characterName;
@@ -231,7 +242,7 @@ export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: stri
   const targetName = normalizePersonName(aliasResolved || extracted.name || name);
   if (!targetName || targetName.length < 2) return null;
 
-  // 1. Direct ILIKE ordered by film_count (so if duplicate records exist, star is picked)
+  // 2. Direct ILIKE on target 2-word actor name ordered by film_count
   const { data: directFind } = await serviceSupabase
     .from('people')
     .select('id, name, film_count')
@@ -240,12 +251,12 @@ export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: stri
     .limit(1);
 
   const directHit = directFind && directFind.length > 0 ? directFind[0] : null;
-  // If exact match has > 2 films, return immediately
-  if (directHit && (directHit.film_count || 0) > 2) {
+  // If exact match has > 0 films, return immediately
+  if (directHit && (directHit.film_count || 0) > 0) {
     return { ...directHit, characterName: detectedCharacter || undefined };
   }
 
-  // 2. Token search & Surname fallback search (ordered by film_count)
+  // 3. Token search & Surname fallback search (ordered by film_count)
   const parts = targetName.split(/\s+/).filter(w => w.length > 2);
   if (parts.length >= 2) {
     const surname = parts[parts.length - 1];
@@ -285,7 +296,7 @@ export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: stri
     }
   }
 
-  // 3. Prefix sub-slice search for multi-word candidate strings (e.g. "Rhoda Inaju Kemi")
+  // 4. Prefix sub-slice search for multi-word candidate strings (e.g. "Rhoda Inaju Kemi")
   if (parts.length >= 3) {
     for (let len = parts.length - 1; len >= 2; len--) {
       const prefixCandidate = parts.slice(0, len).join(' ');
@@ -331,7 +342,7 @@ export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: stri
     }
   }
 
-  // Fallback to direct hit if found (even with <= 2 films)
+  // Fallback to direct hit if found
   if (directHit) {
     return { ...directHit, characterName: detectedCharacter || undefined };
   }
@@ -371,7 +382,8 @@ export async function reconcileAndVerifyCredits(
   for (const obs of allRaw) {
     const aliasMatch = resolveKnownAlias(obs.name);
     const resolvedRaw = aliasMatch || obs.name;
-    const cleanName = normalizePersonName(resolvedRaw);
+    const extracted = extractCharacterFromName(resolvedRaw);
+    const cleanName = normalizePersonName(extracted.name);
     if (!cleanName || cleanName.length < 3 || cleanName.split(' ').length < 2) continue;
 
     // Ignore character roles turned into people
@@ -400,10 +412,16 @@ export async function reconcileAndVerifyCredits(
         characterNames: new Set(),
         sources: new Set(),
       };
+      if (extracted.characterName) {
+        matchedCluster.characterNames.add(extracted.characterName);
+      }
       clusters.push(matchedCluster);
     } else {
       if (!matchedCluster.variants.includes(cleanName)) {
         matchedCluster.variants.push(cleanName);
+      }
+      if (extracted.characterName) {
+        matchedCluster.characterNames.add(extracted.characterName);
       }
       // Prefer clean 2-to-3 word names over longer contaminated strings with glued roles/characters
       const incomingWordCount = cleanName.split(' ').length;
