@@ -21,7 +21,20 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_active ON public.api_keys (is_active);
 -- Enable RLS (Service Role bypasses RLS, public cannot read raw table)
 ALTER TABLE public.api_keys ENABLE ROW LEVEL SECURITY;
 
+-- Grant table privileges to Supabase roles
+GRANT ALL ON TABLE public.api_keys TO postgres, service_role, authenticated;
+GRANT SELECT ON TABLE public.api_keys TO anon;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, service_role, authenticated;
+
 -- Allow read/write only to service role or authenticated admins
+DROP POLICY IF EXISTS "Service role full access on api_keys" ON public.api_keys;
+CREATE POLICY "Service role full access on api_keys"
+    ON public.api_keys
+    FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -35,7 +48,7 @@ BEGIN
                 EXISTS (
                     SELECT 1 FROM public.users
                     WHERE users.id = auth.uid()
-                    AND users.role = 'admin'
+                    AND users.role IN ('admin', 'admin_limited')
                 )
             );
     END IF;

@@ -56,8 +56,8 @@ Return a JSON object with a "results" array matching this exact schema:
 
 import { NOISE_WORDS, normalizePersonName } from './credit_consensus_verifier';
 
-const CHARACTER_NAME_PREFIXES = /^(?:brother|bro|sister|sis|uncle|aunty|aunt|mama|baba|papa|pappy|pastor|alfa|imam|alhaji|alhaj|chief|king|queen|prince|princess|doctor|doc|nurse|officer|police|inspector|sergeant|gateman|gate\s+man|driver|landlord|landlady|maid|chairman|madam|elder|omo|elegbon|olori)\b/i;
-const CORPORATE_WORDS = /\b(?:agency|ventures|enterprises|properties|limited|ltd|holdings|services|company|consult|logistics|foundation|studio|studios|production|productions|entertainment|props|costumes|glamour|media\s*mind|land)\b/i;
+const CHARACTER_NAME_PREFIXES = /^(?:brother|bro|sister|sis|uncle|aunty|aunt|mama|baba|papa|pappy|pastor|alfa|imam|alhaji|alhaj|chief|king|queen|prince|princess|doctor|doc|nurse|officer|police|inspector|sergeant|gateman|gate\s+man|driver|landlord|landlady|maid|chairman|madam|elder|omo|elegbon|olori|board|members?|extras?|guests?|dancers?|artist|artsist|crew|cast|tattoo|ghost|big\s+fish)\b/i;
+const CORPORATE_WORDS = /\b(?:agency|ventures|enterprises|properties|limited|ltd|holdings|services|company|consult|logistics|foundation|studio|studios|production|productions|entertainment|props?|costumes|glamour|media(?:\s*pro|\s*mind)?|visuals?|concepts?|pictures|channel|network|tv|board\s*members?|ity\s*guests?|city\s*guests?|props?\s*sets?|set\s*props?)\b/i;
 
 export function isCleanHumanNameHeuristic(raw: string): { isValid: boolean; cleanName: string | null } {
   if (!raw) return { isValid: false, cleanName: null };
@@ -73,7 +73,7 @@ export function isCleanHumanNameHeuristic(raw: string): { isValid: boolean; clea
   if (CHARACTER_NAME_PREFIXES.test(clean)) return { isValid: false, cleanName: null };
   if (CORPORATE_WORDS.test(clean)) return { isValid: false, cleanName: null };
 
-  if (/\b(sound\s+man|prop\s+ser|gaffer|camera|movie|production|studio|pictures|director|producer|writer|editor|special\s+thanks|receptionist|photographer|stillphotographer|bestboy|best\s+boy|secretary|doctor|police|warder|officer|costumier|costume|continuity|focus\s+puller|spark|welfare|security)\b/i.test(clean)) {
+  if (/\b(sound\s+man|props?\s*sets?|set\s*props?|props?|gaffer|camera|movie|production|studio|pictures|director|producer|writer|editor|special\s+thanks|receptionist|photographer|stillphotographer|bestboy|best\s+boy|secretary|doctor|police|warder|officer|costumier|costume|continuity|focus\s+puller|spark|welfare|security|media(?:\s*pro)?|visuals?|board\s*members?|ity\s*guests?|city\s*guests?|extras?|tattoo|ghost)\b/i.test(clean)) {
     return { isValid: false, cleanName: null };
   }
 
@@ -111,7 +111,7 @@ export async function validateCreditsWithAi(
       });
     } else {
       // Obvious junk or candidate needing AI inspection
-      if (raw.length < 3 || raw.split(/\s+/).length > 4 || /\b(sound\s+man|prop\s+ser|gaffer|movie|part\s+\d+|the\s+end)\b/i.test(raw)) {
+      if (raw.length < 3 || raw.split(/\s+/).length > 4 || /\b(sound\s+man|props?\s*sets?|set\s*props?|props?|gaffer|movie|part\s+\d+|the\s+end|media(?:\s*pro)?|visuals?|board\s*members?|ity\s*guests?|city\s*guests?)\b/i.test(raw)) {
         results.push({
           raw,
           isValidHumanName: false,
