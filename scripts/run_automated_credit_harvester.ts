@@ -33,7 +33,7 @@ import {
   normalizePersonName,
   NOISE_WORDS,
 } from './lib/credit_consensus_verifier';
-import { parseCreditFrameWithOcr } from './lib/credit_frame_ocr';
+import { parseCreditFrameWithOcr, parseCreditFramesBatchWithOcr } from './lib/credit_frame_ocr';
 import { consolidateCreditObservations, type CreditObservation } from './lib/credit_roll_parser';
 
 if (process.platform === 'win32') {
@@ -95,15 +95,16 @@ const COOKIES_PATH = [
   arg('cookies'),
   process.env.YTDLP_COOKIES_PATH,
   join(process.cwd(), 'cookies.txt'),
+  join(process.cwd(), 'Cookies.txt'),
   'C:\\Users\\User\\Downloads\\Cookies.txt',
   'C:\\Users\\User\\Downloads\\cookies.txt',
-].find((p) => p && existsSync(p));
+].find((p) => p && existsSync(p) && statSync(p).size > 100);
 
 const configuredClient = arg('client') ?? process.env.YTDLP_YOUTUBE_CLIENT;
-const YT_CLIENT = !configuredClient || configuredClient === 'default' || configuredClient === 'auto'
-  ? 'android,web'
-  : configuredClient;
-const clientArgs = YT_CLIENT ? ['--extractor-args', `youtube:player_client=${YT_CLIENT}`] : [];
+const YT_CLIENT = configuredClient && configuredClient !== 'default' && configuredClient !== 'auto'
+  ? configuredClient
+  : 'mweb,web';
+const clientArgs = ['--extractor-args', `youtube:player_client=${YT_CLIENT}`];
 
 function cleanTitle(raw: string): string {
   return raw
@@ -265,17 +266,22 @@ function extractMetadataCandidates(title: string, description: string | null): R
   // 1. Check parenthesized cast in YouTube title: "MOVIE NAME (Actor One, Actor Two, Actor Three)"
   const titleParenMatch = title.match(/\(([^)]+)\)/);
   if (titleParenMatch) {
-    const names = titleParenMatch[1].split(/[,|&•/]/).map(s => s.trim()).filter(Boolean);
-    for (const raw of names) {
-      const clean = normalizePersonName(raw);
-      if (clean && clean.length > 3 && clean.split(' ').length >= 2 && !NOISE_WORDS.some(nw => clean.toUpperCase().includes(nw))) {
-        candidates.push({
-          name: clean,
-          role: 'actor',
-          creditType: 'actor',
-          confidence: 0.92,
-          sourceWorker: 'metadata',
-        });
+    const rawInside = titleParenMatch[1].trim();
+    // Ignore non-cast tags like (till Death), (Full Movie), (Part 1), (2026), etc.
+    const isTitleTag = /(?:till\s+death|full\s+movie|latest|official|trailer|teaser|season|part|episode|ep\s*\d|chapter|20\d\d|4k|hd|volume|vol\s*\d|story|reloaded|uncut|complete|yoruba|igbo|hausa|nollywood|english|blockbuster|thriller|drama|comedy)/i.test(rawInside);
+    if (!isTitleTag) {
+      const names = rawInside.split(/[,|&•/]/).map(s => s.trim()).filter(Boolean);
+      for (const raw of names) {
+        const clean = normalizePersonName(raw);
+        if (clean && clean.length > 3 && clean.split(' ').length >= 2 && !NOISE_WORDS.some(nw => clean.toUpperCase().includes(nw))) {
+          candidates.push({
+            name: clean,
+            role: 'actor',
+            creditType: 'actor',
+            confidence: 0.92,
+            sourceWorker: 'metadata',
+          });
+        }
       }
     }
   }
@@ -402,24 +408,22 @@ async function processFilm(film: any): Promise<boolean> {
     if (frames.length > 0) {
       console.log(`   🖼️  Extracted ${frames.length} frames.`);
       console.log(`   🔍 Worker 1: Running parallel layout-aware OCR across ${frames.length} frames...`);
+      const BATCH_SIZE = 15;
+      const allFrameItems = frames.map((framePath, idx) => {
+        const frameSec = idx * FRAME_EVERY_SEC;
+        return { frame: framePath, frameIndex: idx, frameSec, videoSec: startSec + frameSec };
+      });
+
       const observations: CreditObservation[] = [];
-      const BATCH_SIZE = 5;
       let doneCount = 0;
-      for (let i = frames.length - 1; i >= 0; i -= BATCH_SIZE) {
-        const batchPromises = [];
-        for (let j = 0; j < BATCH_SIZE && (i - j) >= 0; j++) {
-          const idx = i - j;
-          const frameSec = idx * FRAME_EVERY_SEC;
-          batchPromises.push(parseCreditFrameWithOcr(frames[idx], idx, frameSec, startSec + frameSec));
-        }
-        const results = await Promise.all(batchPromises);
-        doneCount += results.length;
-        if (doneCount % 20 === 0 || doneCount <= BATCH_SIZE || doneCount >= frames.length) {
+      for (let i = 0; i < allFrameItems.length; i += BATCH_SIZE) {
+        const batch = allFrameItems.slice(i, i + BATCH_SIZE);
+        const results = await parseCreditFramesBatchWithOcr(batch);
+        doneCount += batch.length;
+        if (doneCount % 30 === 0 || doneCount <= BATCH_SIZE || doneCount >= frames.length) {
           console.log(`      ... scanned frame ${doneCount}/${frames.length}`);
         }
-        for (const obs of results) {
-          if (obs && obs.length > 0) observations.push(...obs);
-        }
+        if (results && results.length > 0) observations.push(...results);
       }
 
       let consolidated = consolidateCreditObservations(observations);
@@ -430,18 +434,15 @@ async function processFilm(film: any): Promise<boolean> {
         const { frames: headFrames, startSec: headStartSec } = await extractHeadFrames(url, tempDir);
         if (headFrames.length > 0) {
           console.log(`   🎬 Scanning ${headFrames.length} opening title frames...`);
+          const headFrameItems = headFrames.map((framePath, idx) => {
+            const frameSec = idx * 2;
+            return { frame: framePath, frameIndex: idx, frameSec, videoSec: headStartSec + frameSec };
+          });
           const headObs: CreditObservation[] = [];
-          for (let i = 0; i < headFrames.length; i += BATCH_SIZE) {
-            const batchPromises = [];
-            for (let j = 0; j < BATCH_SIZE && (i + j) < headFrames.length; j++) {
-              const idx = i + j;
-              const frameSec = idx * 2;
-              batchPromises.push(parseCreditFrameWithOcr(headFrames[idx], idx, frameSec, headStartSec + frameSec));
-            }
-            const results = await Promise.all(batchPromises);
-            for (const obs of results) {
-              if (obs && obs.length > 0) headObs.push(...obs);
-            }
+          for (let i = 0; i < headFrameItems.length; i += BATCH_SIZE) {
+            const batch = headFrameItems.slice(i, i + BATCH_SIZE);
+            const results = await parseCreditFramesBatchWithOcr(batch);
+            if (results && results.length > 0) headObs.push(...results);
           }
           if (headObs.length > 0) {
             const headConsolidated = consolidateCreditObservations(headObs);

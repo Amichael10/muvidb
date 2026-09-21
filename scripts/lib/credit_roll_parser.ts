@@ -259,6 +259,28 @@ function smartTitle(value: string): string {
     .replace(/(['’])S\b/g, '$1s');
 }
 
+const COMMON_FIRST_NAMES = new Set([
+  'MERCY', 'CHIDI', 'GENEVIEVE', 'RAMSEY', 'OMOTOLA', 'ZUBBY', 'YUL', 'KEN', 'DESTINY',
+  'JIM', 'RITA', 'INI', 'REGINA', 'FUNKE', 'TOYIN', 'NKEM', 'PETE', 'PATIENCE', 'ODUNLADE',
+  'LATEEF', 'IBRAHIM', 'FEMI', 'GABRIEL', 'BOLANLE', 'FREDRICK', 'FREDERICK', 'MAJID',
+  'JOHN', 'PETER', 'PAUL', 'MARY', 'STELLA', 'CHINWE', 'NGOZI', 'EMEKA', 'CHUKWU',
+  'OKONKWO', 'NWOSU', 'OKAFOR', 'EZE', 'OBI', 'ANYANWU', 'ADEBAYO', 'OGUN', 'AFOLABI',
+  'MICHAEL', 'DANIEL', 'DAVID', 'JAMES', 'JOSEPH', 'SAMUEL', 'ALEX', 'CHRIS', 'SONIA',
+  'NKECHI', 'UCHE', 'CHINELO', 'KELECHI', 'NONSO', 'KAZIM', 'SOLOMON', 'RICHARD'
+]);
+
+function splitConcatenatedName(word: string): string {
+  if (word.length < 8) return word;
+  const upper = word.toUpperCase();
+  for (const fn of COMMON_FIRST_NAMES) {
+    if (upper.startsWith(fn) && upper.length >= fn.length + 3) {
+      const rest = word.slice(fn.length);
+      return `${word.slice(0, fn.length)} ${rest}`;
+    }
+  }
+  return word;
+}
+
 function personCandidateText(value: string): string {
   const text = lettersAndSpaces(
     value
@@ -276,7 +298,8 @@ function personCandidateText(value: string): string {
       .replace(/(^|\s)([A-Z])\.(?=\s|$)/g, '$1$2')
       .replace(/\.(?=\s*$)/, ''),
   );
-  const words = text.split(' ').filter(Boolean);
+  const rawWords = text.split(' ').filter(Boolean);
+  const words = rawWords.flatMap(w => splitConcatenatedName(w).split(' '));
   if (
     words.length >= 3
     && /^[A-Z]$/i.test(words[0])
@@ -384,6 +407,7 @@ function cleanCreditCharacter(value: string): string | null {
 }
 
 function averageConfidence(words: OcrWord[]): number {
+  if (!Array.isArray(words) || words.length === 0) return 0;
   const useful = words.filter((word) => word.confidence >= 0);
   if (!useful.length) return 0;
   const weighted = useful.reduce(
@@ -400,11 +424,42 @@ function averageConfidence(words: OcrWord[]): number {
 }
 
 function boxFor(words: OcrWord[]): [number, number, number, number] {
+  if (!Array.isArray(words) || words.length === 0) return [0, 0, 0, 0];
   const left = Math.min(...words.map((word) => word.left));
   const top = Math.min(...words.map((word) => word.top));
   const right = Math.max(...words.map((word) => word.left + word.width));
   const bottom = Math.max(...words.map((word) => word.top + word.height));
   return [left, top, right - left, bottom - top];
+}
+
+export function groupWordsIntoOcrLines(allWords: OcrWord[]): OcrLine[] {
+  if (!allWords || allWords.length === 0) return [];
+  const grouped = new Map<string, OcrWord[]>();
+  for (const word of allWords) {
+    const key = word.lineKey || `line_${Math.round(word.top / 15)}`;
+    const list = grouped.get(key) ?? [];
+    list.push(word);
+    grouped.set(key, list);
+  }
+  const lines = [...grouped.values()]
+    .map((words) => {
+      words.sort((a, b) => a.left - b.left);
+      const left = Math.min(...words.map((w) => w.left));
+      const top = Math.min(...words.map((w) => w.top));
+      const right = Math.max(...words.map((w) => w.left + w.width));
+      const bottom = Math.max(...words.map((w) => w.top + w.height));
+      return {
+        text: normalizeSpace(words.map((w) => w.text).join(' ')),
+        words,
+        left,
+        top,
+        right,
+        bottom,
+        confidence: averageConfidence(words),
+      };
+    })
+    .sort((a, b) => a.top - b.top || a.left - b.left);
+  return alignOcrRows(lines);
 }
 
 export function parseTesseractTsv(tsv: string): OcrLine[] {
@@ -444,25 +499,8 @@ export function parseTesseractTsv(tsv: string): OcrLine[] {
     grouped.set(lineKey, words);
   }
 
-  const lines = [...grouped.values()]
-    .map((words) => {
-      words.sort((a, b) => a.left - b.left);
-      const left = Math.min(...words.map((word) => word.left));
-      const top = Math.min(...words.map((word) => word.top));
-      const right = Math.max(...words.map((word) => word.left + word.width));
-      const bottom = Math.max(...words.map((word) => word.top + word.height));
-      return {
-        text: normalizeSpace(words.map((word) => word.text).join(' ')),
-        words,
-        left,
-        top,
-        right,
-        bottom,
-        confidence: averageConfidence(words),
-      };
-    })
-    .sort((a, b) => a.top - b.top || a.left - b.left);
-  return alignOcrRows(lines);
+  const allWords = [...grouped.values()].flat();
+  return groupWordsIntoOcrLines(allWords);
 }
 
 // Auto/sparse segmentation often puts each column in a separate OCR block.
@@ -499,6 +537,7 @@ export function alignOcrRows(lines: OcrLine[]): OcrLine[] {
 function findCastSeparator(lines: OcrLine[]): number | null {
   const gaps: Array<{ start: number; end: number; lineIndex: number }> = [];
   for (const [lineIndex, line] of lines.entries()) {
+    if (!line?.words) continue;
     for (let i = 0; i < line.words.length - 1; i++) {
       const current = line.words[i];
       const next = line.words[i + 1];
@@ -555,7 +594,8 @@ function characterScore(value: string): number {
 }
 
 function textForWords(words: OcrWord[]): string {
-  return words.map((word) => word.text).join(' ');
+  if (!Array.isArray(words)) return '';
+  return words.map((word) => word?.text || '').join(' ');
 }
 
 const LEADER_SEPARATOR_PATTERN = /(?:[.:;,+_=~]\s*){2,}[^A-Z]{0,64}(?=[A-Z])/g;
@@ -790,6 +830,7 @@ function splitTwoColumnLine(
 }
 
 function findLineSeparator(line: OcrLine): number | null {
+  if (!line?.words || line.words.length < 2) return null;
   let best: { gap: number; midpoint: number } | null = null;
   for (let i = 0; i < line.words.length - 1; i++) {
     const current = line.words[i];
@@ -813,9 +854,10 @@ function splitPeopleColumns(
     : splitAtSeparator(line, separatorX);
   const fallbackSeparator = split ? null : findLineSeparator(line);
   const resolvedSplit = split ?? (fallbackSeparator === null ? null : splitAtSeparator(line, fallbackSeparator));
-  if (!resolvedSplit) return [];
+  const wordGroups = resolvedSplit ?? [line.words];
+
   const people: Array<{ name: string; words: OcrWord[] }> = [];
-  for (const words of resolvedSplit) {
+  for (const words of wordGroups) {
     const person = allowSingleWord
       ? cleanCrewPersonName(textForWords(words), averageConfidence(words))
       : cleanPersonName(textForWords(words));
@@ -846,7 +888,7 @@ function wordLooksUppercase(value: string): boolean {
 }
 
 function splitMergedActorCharacter(line: OcrLine): { name: string; character: string; words: OcrWord[] } | null {
-  if (line.words.length < 3 || line.words.length > 6) return null;
+  if (!line?.words || line.words.length < 3 || line.words.length > 6) return null;
   for (let splitIndex = 2; splitIndex < line.words.length; splitIndex++) {
     const nameWords = line.words.slice(0, splitIndex);
     const characterWords = line.words.slice(splitIndex);
@@ -907,6 +949,7 @@ function castCharacterHeading(
 }
 
 function sameLineRoleAndName(line: OcrLine): { role: string; name: string; words: OcrWord[] } | null {
+  if (!line?.words || line.words.length < 2) return null;
   for (let i = line.words.length - 1; i >= 1; i--) {
     const left = line.words.slice(0, i);
     const right = line.words.slice(i);

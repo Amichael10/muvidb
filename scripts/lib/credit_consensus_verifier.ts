@@ -49,7 +49,8 @@ export const NOISE_WORDS = [
   'BTS STILL PHOTOS', 'DATA WRANGLER', 'EXECUTIVE PRODUCERS', 'PRODUCER EXECUTIVE PRODUCER',
   'GRANDISH GLOBAL COMPANY', 'SEASON 3', 'NOLLYWOODMOVIES', 'NIGERIANMOVIES',
   'HOST OF OTHERS', 'AND MANY MORE', 'AND UNEXPECTED', 'AND INTENSE', 'AND STRONG',
-  'HIDDEN BATTLES'
+  'HIDDEN BATTLES', 'THE MOVIE', 'LATEST MOVIE', 'OFFICIAL TRAILER', 'TEASER', 'SEASON',
+  'PART 1', 'PART 2', 'PART 3', 'EPISODE', 'BLOCKBUSTER', 'RELOADED', 'UNCUT'
 ];
 
 export function normalizePersonName(raw: string): string {
@@ -160,28 +161,66 @@ export function normalizeRole(rawRole: string | null | undefined, creditType: 'a
 
 import { validateCreditsWithAi } from './ai_credit_validator';
 
+const CHARACTER_HINT = /\b(?:MR|MRS|MISS|MS|DR|DOCTOR|PROF|PROFESSOR|PRINCIPAL|TEACHER|KING|QUEEN|CHIEF|PRINCE|PRINCESS|PASTOR|IMAM|ALFA|BABA|MAMA|MOTHER|FATHER|OFFICER|POLICE|INSPECTOR|LAWYER|BARRISTER|NURSE|JUDGE|ELDER|LANDLORD|LANDLADY|CHAIRMAN|MADAM|SIR|MAID|GUARD|GATEMAN|GATE MAN|BOSS|DRIVER|WIFE|HUSBAND|SON|DAUGHTER|FRIEND|NEIGHBOUR|NEIGHBOR|CUSTOMER|VENDOR|VILLAGER|CHILD|RECEPTIONIST|BESTIE|GIRLFRIEND|BOYFRIEND|EXTRA|LADY)\b/i;
+
+export function extractCharacterFromName(raw: string): { name: string; characterName: string | null } {
+  if (!raw) return { name: '', characterName: null };
+  const clean = raw.trim();
+
+  // 1. Explicit separators: "Rhoda Inaju as Kemi", "Rhoda Inaju - Kemi", "Rhoda Inaju (Kemi)"
+  const asMatch = clean.match(/^(.+?)\s+(?:as|AS|role\s+of|featuring\s+as)\s+(.+)$/i);
+  if (asMatch) {
+    return { name: asMatch[1].trim(), characterName: asMatch[2].trim() };
+  }
+
+  const dashMatch = clean.match(/^(.+?)\s+[-–:]\s+(.+)$/);
+  if (dashMatch) {
+    return { name: dashMatch[1].trim(), characterName: dashMatch[2].trim() };
+  }
+
+  const parenMatch = clean.match(/^(.+?)\s*\(([^)]+)\)$/);
+  if (parenMatch) {
+    return { name: parenMatch[1].trim(), characterName: parenMatch[2].trim() };
+  }
+
+  // 2. OCR title card pattern: 2 uppercase words + 1 mixed/lower case character or known character title
+  // E.g. "RHODA INAJU Kemi", "AKINOLA AKANO Chris", "LANRE DIWURA Jide", "ADESOKAN ABDULLAH Police officer"
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length >= 3 && words.length <= 5) {
+    const firstTwoUpper = /^[A-Z]{2,}$/.test(words[0]) && /^[A-Z]{2,}$/.test(words[1]);
+    const remainingText = words.slice(2).join(' ');
+    const remainingIsCharacter = /^[A-Z][a-z0-9'-]+/.test(words[2]) || CHARACTER_HINT.test(remainingText);
+    if (firstTwoUpper && remainingIsCharacter) {
+      return {
+        name: `${words[0]} ${words[1]}`,
+        characterName: remainingText,
+      };
+    }
+  }
+
+  return { name: clean, characterName: null };
+}
+
 /**
  * Fuzzy search for an existing person in Lumi's people database.
- * 1. Exact case-insensitive match
- * 2. Multi-token overlap (First + Last)
- * 3. Surname search with Levenshtein similarity >= 85%
+ * 1. Extract embedded character roles (e.g. "Rhoda Inaju as Kemi" -> Rhoda Inaju)
+ * 2. Alias dictionary resolution (e.g. Erekere -> Michael Olalekan Adeyemi)
+ * 3. Exact case-insensitive match (prioritizing stars by film_count)
+ * 4. Surname / First name search prioritized by film_count with Levenshtein similarity >= 85%
+ * 5. Prefix sub-slice search (e.g. "Rhoda Inaju Kemi" -> Rhoda Inaju match in DB)
  */
-/**
- * Fuzzy search for an existing person in Lumi's people database.
- * 1. Alias dictionary resolution
- * 2. Exact case-insensitive match (prioritizing stars by film_count)
- * 3. Multi-token overlap (First + Last)
- * 4. Surname search prioritized by film_count with Levenshtein similarity >= 85%
- */
-export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: string; name: string } | null> {
+export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: string; name: string; characterName?: string } | null> {
   if (!name || name.trim().length < 2) return null;
 
-  // 1. Check known aliases first (e.g. Erekere -> Michael Olalekan Adeyemi, MC Lively -> Michael Sani Amanesi)
-  const aliasResolved = resolveKnownAlias(name);
-  const targetName = normalizePersonName(aliasResolved || name);
+  const extracted = extractCharacterFromName(name);
+  let detectedCharacter = extracted.characterName;
+
+  // Check known aliases first (e.g. Erekere -> Michael Olalekan Adeyemi, MC Lively -> Michael Sani Amanesi)
+  const aliasResolved = resolveKnownAlias(extracted.name || name);
+  const targetName = normalizePersonName(aliasResolved || extracted.name || name);
   if (!targetName || targetName.length < 2) return null;
 
-  // 2. Direct ILIKE ordered by film_count (so if duplicate records exist, star is picked)
+  // 1. Direct ILIKE ordered by film_count (so if duplicate records exist, star is picked)
   const { data: directFind } = await serviceSupabase
     .from('people')
     .select('id, name, film_count')
@@ -192,10 +231,10 @@ export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: stri
   const directHit = directFind && directFind.length > 0 ? directFind[0] : null;
   // If exact match has > 2 films, return immediately
   if (directHit && (directHit.film_count || 0) > 2) {
-    return directHit;
+    return { ...directHit, characterName: detectedCharacter || undefined };
   }
 
-  // 3. Token search & Surname fallback search (ordered by film_count)
+  // 2. Token search & Surname fallback search (ordered by film_count)
   const parts = targetName.split(/\s+/).filter(w => w.length > 2);
   if (parts.length >= 2) {
     const surname = parts[parts.length - 1];
@@ -210,7 +249,7 @@ export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: stri
       for (const hit of surnameHits) {
         const sim = nameSimilarity(hit.name, targetName);
         if (sim >= 0.85) {
-          return hit;
+          return { ...hit, characterName: detectedCharacter || undefined };
         }
       }
     }
@@ -228,7 +267,53 @@ export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: stri
         for (const hit of firstHits) {
           const sim = nameSimilarity(hit.name, targetName);
           if (sim >= 0.85) {
-            return hit;
+            return { ...hit, characterName: detectedCharacter || undefined };
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Prefix sub-slice search for multi-word candidate strings (e.g. "Rhoda Inaju Kemi")
+  if (parts.length >= 3) {
+    for (let len = parts.length - 1; len >= 2; len--) {
+      const prefixCandidate = parts.slice(0, len).join(' ');
+      const characterCandidate = parts.slice(len).join(' ');
+
+      const { data: prefixHits } = await serviceSupabase
+        .from('people')
+        .select('id, name, film_count')
+        .ilike('name', prefixCandidate)
+        .order('film_count', { ascending: false, nullsFirst: false })
+        .limit(1);
+
+      if (prefixHits && prefixHits.length > 0) {
+        return {
+          id: prefixHits[0].id,
+          name: prefixHits[0].name,
+          characterName: detectedCharacter || characterCandidate,
+        };
+      }
+
+      // Token search on prefixCandidate
+      const pParts = prefixCandidate.split(/\s+/).filter(w => w.length > 2);
+      if (pParts.length >= 2) {
+        const { data: pHits } = await serviceSupabase
+          .from('people')
+          .select('id, name, film_count')
+          .ilike('name', `%${pParts[0]}%${pParts[pParts.length - 1]}%`)
+          .order('film_count', { ascending: false, nullsFirst: false })
+          .limit(5);
+
+        if (pHits && pHits.length > 0) {
+          for (const hit of pHits) {
+            if (nameSimilarity(hit.name, prefixCandidate) >= 0.85) {
+              return {
+                id: hit.id,
+                name: hit.name,
+                characterName: detectedCharacter || characterCandidate,
+              };
+            }
           }
         }
       }
@@ -236,7 +321,9 @@ export async function findPersonWithFuzzyMatch(name: string): Promise<{ id: stri
   }
 
   // Fallback to direct hit if found (even with <= 2 films)
-  if (directHit) return directHit;
+  if (directHit) {
+    return { ...directHit, characterName: detectedCharacter || undefined };
+  }
 
   return null;
 }
@@ -447,7 +534,7 @@ export async function reconcileAndVerifyCredits(
       personId,
       personName: finalPersonName,
       role: normalizedRole,
-      characterName: null,
+      characterName: dbPerson?.characterName || null,
       billingOrder: billingOrder++,
       consensusScore: Number(consensusScore.toFixed(2)),
       verifiedSources: Array.from(cluster.sources),

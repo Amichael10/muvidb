@@ -108,7 +108,7 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 OUTRO_DURATION  = int(os.getenv("OUTRO_DURATION", "300"))  # Last 5 minutes — where end-credit rolls live
-INTRO_DURATION  = 180   # First 3 minutes — many Nollywood films list cast here instead of an end-roll
+INTRO_DURATION  = 180   # First 3 minutes
 SCAN_INTRO      = os.getenv("SCAN_INTRO", "0").strip().lower() in ("1", "true", "yes")  # outro-only by default
 CREDITS_THRESHOLD = int(os.getenv("CREDITS_THRESHOLD", "5"))  # Films with FEWER than this many credits are "incomplete"
 FRAME_INTERVAL  = 2     # Fallback sample rate (seconds) if mpdecimate yields nothing
@@ -140,6 +140,7 @@ YT_BASE_FLAGS   = [
     "--quiet", 
     "--no-warnings",
     "--js-runtimes", "node",
+    "--extractor-args", "youtube:player_client=mweb,web",
     "--retries", "5", 
     "--socket-timeout", "60",
     "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -457,72 +458,94 @@ def read_frame_hybrid(frame: Path, paddle: "PaddleReader | None",
                       vlm: OllamaVisionOCR) -> str:
     """PaddleOCR-first, VLM-fallback read of a single frame.
 
-    PaddleOCR reads the frame. If it found text and every line is confident
-    (>= PADDLE_CONF_MIN), we trust it — no VLM. If any line is shaky (stylized
-    font, low contrast, motion blur), the whole frame is re-read by the VLM,
-    which uses layout/context to recover the names. Frames with no text at all
-    are treated as non-credit and skipped.
+    PaddleOCR reads the frame. Lines meeting PADDLE_ESC_FLOOR are kept.
+    If VLM is enabled and lines have shaky confidence, VLM is used as fallback.
     """
     if paddle is not None:
-        lines = paddle.read_lines(frame)
+        # 1. Try preprocessed frame (cropped + Otsu thresholded)
+        prep = preprocess_frame(frame)
+        lines = paddle.read_lines(prep) if prep != frame else []
         if not lines:
-            return ""  # No text — trust Paddle that this isn't a credit frame.
-        weakest = min(conf for _, conf in lines)
-        paddle_text = "\n".join(text for text, _ in lines)
-        if weakest >= PADDLE_CONF_MIN:
-            return paddle_text
-        # Below the floor PaddleOCR is reading noise, not stylized credits — the VLM
-        # can't rescue text that isn't there, so don't burn a call on it. Drop the frame.
-        if weakest < PADDLE_ESC_FLOOR:
+            lines = paddle.read_lines(frame)  # Fallback to raw frame
+            
+        if not lines:
+            return ""  # No text found
+
+        # 2. Filter lines individually by confidence floor
+        valid_lines = [text for text, conf in lines if conf >= PADDLE_ESC_FLOOR]
+        if not valid_lines:
             return ""
-        # Genuinely shaky-but-real text. Escalate to the VLM only if it's enabled
-        # (GPU); otherwise keep Paddle's best-effort read rather than dropping names.
-        if vlm is not None:
-            print(f"     ↑ Escalating frame to VLM (low confidence {weakest:.2f}).")
-            return vlm.read_text(frame)
+
+        paddle_text = "\n".join(valid_lines)
+
+        # 3. If any line has lower confidence than PADDLE_CONF_MIN and VLM is active, escalate
+        if any(conf < PADDLE_CONF_MIN for _, conf in lines) and vlm is not None:
+            print(f"     ↑ Escalating frame to VLM (some lines below high confidence threshold).")
+            vlm_text = vlm.read_text(frame)
+            if vlm_text.strip():
+                return vlm_text
+
         return paddle_text
+
     # No PaddleOCR available — pure VLM path (only reachable when VLM enabled).
     if vlm is not None:
         return vlm.read_text(frame)
     return ""
 
 # ── Video Slicing Helpers ─────────────────────────────────────────────────────
+def get_yt_flags(disable_proxy: bool = False) -> list[str]:
+    if not disable_proxy:
+        return YT_BASE_FLAGS
+    out = []
+    skip = False
+    for item in YT_BASE_FLAGS:
+        if skip:
+            skip = False
+            continue
+        if item == "--proxy":
+            skip = True
+            continue
+        out.append(item)
+    return out
+
 def get_video_info(url: str) -> tuple[str, float]:
     info_file = BASE_TEMP_DIR / "yt_info.txt"
     for attempt in range(1, 4):
-        try:
-            BASE_TEMP_DIR.mkdir(parents=True, exist_ok=True)
-            with open(info_file, "w", encoding="utf-8") as f:
-                result = subprocess.run(
-                    [sys.executable, "-m", "yt_dlp", *YT_BASE_FLAGS, "--print", "title,duration", url],
-                    stdout=f, stderr=subprocess.PIPE, text=True, timeout=120
-                )
-            if result.returncode != 0:
-                err = (result.stderr or "").strip().splitlines()
-                reason = err[-1] if err else "no stderr"
+        for use_proxy in (True, False):
+            try:
+                BASE_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+                flags = get_yt_flags(disable_proxy=not use_proxy)
+                with open(info_file, "w", encoding="utf-8") as f:
+                    result = subprocess.run(
+                        [sys.executable, "-m", "yt_dlp", *flags, "--print", "title,duration", url],
+                        stdout=f, stderr=subprocess.PIPE, text=True, timeout=120
+                    )
+                if result.returncode != 0:
+                    err = (result.stderr or "").strip().splitlines()
+                    reason = err[-1] if err else "no stderr"
+                    if "407" in reason or "Proxy" in reason:
+                        continue  # Proxy failed, retry direct
+                    if attempt < 3:
+                        time.sleep(5)
+                        break
+                    print(f"     yt-dlp info failed: {reason[:200]}")
+                    return "unknown_movie", 0.0
+                    
+                lines = info_file.read_text(encoding="utf-8").strip().splitlines()
+                title = lines[0] if lines else "unknown_movie"
+                try:
+                    duration = float(lines[1]) if len(lines) > 1 else 0.0
+                except:
+                    duration = 0.0
+                return title, duration
+            except Exception:
                 if attempt < 3:
                     time.sleep(5)
-                    continue
-                # Surface WHY so we can tell "video unavailable" (skip is correct)
-                # from "Sign in to confirm you're not a bot" (IP rate-limited).
-                print(f"     yt-dlp info failed: {reason[:200]}")
+                    break
                 return "unknown_movie", 0.0
-                
-            lines = info_file.read_text(encoding="utf-8").strip().splitlines()
-            title = lines[0] if lines else "unknown_movie"
-            try:
-                duration = float(lines[1]) if len(lines) > 1 else 0.0
-            except:
-                duration = 0.0
-            return title, duration
-        except Exception:
-            if attempt < 3:
-                time.sleep(5)
-                continue
-            return "unknown_movie", 0.0
-        finally:
-            if info_file.exists():
-                info_file.unlink()
+            finally:
+                if info_file.exists():
+                    info_file.unlink()
     return "unknown_movie", 0.0
 
 def download_segment(url: str, start: float, duration: float, out_path: Path) -> bool:
@@ -533,31 +556,38 @@ def download_segment(url: str, start: float, duration: float, out_path: Path) ->
     print(f"  [Download Slicer] Fetching segment {int(start//60)}m{int(start%60)}s "
           f"({int(duration)} seconds)...")
     for attempt in range(1, 3):  # Max 2 attempts
-        try:
-            part_file = Path(str(out_path) + ".part")
-            if part_file.exists():
-                part_file.unlink()
-            subprocess.run([
-                sys.executable, "-m", "yt_dlp", *YT_BASE_FLAGS,
-                "--download-sections", f"*{int(start)}-{int(start+duration)}",
-                "--no-part",
-                "-f", "bestvideo[height<=360]/best[height<=360]",
-                "-o", str(out_path),
-                url
-            ], check=True, timeout=600)
-            return True
-        except subprocess.CalledProcessError:
-            print(f"  ⚠️ Download attempt {attempt}/2 failed (stream error). Retrying once...")
-            if attempt < 2:
-                time.sleep(10)
-        except subprocess.TimeoutExpired:
-            # Timeout = YouTube throttling — no point retrying
-            print(f"  ⚠️ Download timed out (10 min). Likely throttled — skipping.")
-            return False
-        except Exception as e:
-            print(f"  ⚠️ Download attempt {attempt}/2 error: {e}")
-            if attempt < 2:
-                time.sleep(5)
+        for use_proxy in (True, False):
+            try:
+                part_file = Path(str(out_path) + ".part")
+                if part_file.exists():
+                    part_file.unlink()
+                flags = get_yt_flags(disable_proxy=not use_proxy)
+                subprocess.run([
+                    sys.executable, "-m", "yt_dlp", *flags,
+                    "--download-sections", f"*{int(start)}-{int(start+duration)}",
+                    "--no-part",
+                    "-f", "bestvideo[height<=360]/best[height<=360]",
+                    "-o", str(out_path),
+                    url
+                ], check=True, timeout=600)
+                return True
+            except subprocess.CalledProcessError as e:
+                err_text = str(e)
+                if "407" in err_text or "Proxy" in err_text:
+                    continue  # Retry without proxy
+                print(f"  ⚠️ Download attempt {attempt}/2 failed (stream error). Retrying once...")
+                if attempt < 2:
+                    time.sleep(10)
+                    break
+            except subprocess.TimeoutExpired:
+                # Timeout = YouTube throttling — no point retrying
+                print(f"  ⚠️ Download timed out (10 min). Likely throttled — skipping.")
+                return False
+            except Exception as e:
+                print(f"  ⚠️ Download attempt {attempt}/2 error: {e}")
+                if attempt < 2:
+                    time.sleep(5)
+                    break
     print(f"  ❌ Download failed for segment {int(start//60)}m{int(start%60)}s.")
     return False
 
