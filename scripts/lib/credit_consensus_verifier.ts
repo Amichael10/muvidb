@@ -29,10 +29,13 @@ export type VerifiedCredit = {
 const HONORIFICS = /^(?:Chief|Alhaja|Alhaji|Dr\.?|Doctor|Prof\.?|Professor|Pastor|Evang\.?|Evangelist|Otunba|Prince|Princess|King|Queen|Sir|Lady|Engr\.?|Amb\.?|Hon\.?)\s+/i;
 
 // Roles / characters commonly OCR-glued as prefixes
-const ROLE_PREFIXES = /^(?:Receptionist|Decedtionist|Stillphotographer|Still\s+Photographer|Bestboy|Best\s+Boy|Second\s+Unit(?:\s+Cameraman)?|Delivery\s+Man|Warder|Officer|Police(?:\s+Officer)?|Big\s+Lion|Armed\s+Robber|Dit|Subtitle|Costumier|Costume\s+Assts?|Costumer|Makeup(?:\s+Asst)?|Special\s+Effects|Cam\s+Tech|Props?\s+Sets?|Welfare|Security|Sound(?:\s+Recordist)?|Head\s+Of\s+Lights|Focus\s+Puller|Script(?:\s*supervisor)?)\s*[-:–]?\s+/i;
+const ROLE_PREFIXES = /^(?:Receptionist|Decedtionist|Stillphotographer|Still\s+Photographer|Bestboy|Best\s+Boy|Second\s+Unit(?:\s+Cameraman)?|Delivery\s+Man|Warder|Officer|Police(?:\s+Officer)?|Big\s+Lion|Armed\s+Robber|Dit|Subtitle|Costumier|Costume\s+Assts?|Costumer|Makeup(?:\s+Asst)?|Special\s+Effects|Cam\s+Tech|Props?\s+Sets?|Welfare|Security|Sound(?:\s+Recordist)?|Head\s+Of\s+Lights|Focus\s+Puller|Script(?:\s*supervisor)?|Artsist|Artist|Actor|Actress|Cast|Crew|Tattoo\s+Guy|Mama\s+Blessing|Board\s+Members?|Guests?|City\s+Guests?|Ity\s+Guests?)\s*[-:–]?\s+/i;
 
 // Roles / characters commonly OCR-glued as suffixes
 const ROLE_SUFFIXES = /\s+[-:–]?\s*(?:Scriptwriter|Script\s+Supervisor|Delivery\s+Man|Police\s+Officer|Stoneboy|Receptionist|Makeup|Set\s+Designer|Video\s+Bts|Spark|Costumier|Prop|Location|Continuity|Sound|Lights|Focus\s+Puller|Cam\s+Asst)$/i;
+
+// Channel / watermark suffixes commonly attached to names
+const WATERMARK_SUFFIXES = /\s+[-:–]?\s*(?:YT|YouTube|TV|Television|Channel)$/i;
 
 // Post-nominal titles like (MON), (OON), (MFR), (JP)
 const POST_NOMINALS = /\s*\((?:MON|OON|MFR|CFR|GCFR|CON|JP|SAN|OFR|FNA)\)/gi;
@@ -44,12 +47,13 @@ export const NOISE_WORDS = [
   'SPECIAL THANKS', 'LOCATION', 'LOGISTICS', 'CAMERA ASSISTANT', 'LIGHTS',
   'CATERING', 'SECURITY', 'TRANSPORT', 'GENERATOR', 'WELFARE', 'MEDIA', 'GRAPHICS',
   'CLICK HERE', 'ALL RIGHTS RESERVED', 'THE END', 'CAST', 'CREW', 'FULL MOVIE',
-  'SOUND MAN', 'PROP SER', 'ASS RF GAFFER', 'CAMERA ASST', 'FOCUS PULLER', 'SET PROPS',
+  'SOUND MAN', 'PROP SET', 'PROPS SET', 'SET PROPS', 'ASS RF GAFFER', 'CAMERA ASST', 'FOCUS PULLER',
   'WE WOULD FOR YOU TO STAY CONNECTED', 'TILL DEATH', 'VOICE OVER ARTISTS',
   'BTS STILL PHOTOS', 'DATA WRANGLER', 'EXECUTIVE PRODUCERS', 'PRODUCER EXECUTIVE PRODUCER',
   'GRANDISH GLOBAL COMPANY', 'SEASON 3', 'NOLLYWOODMOVIES', 'NIGERIANMOVIES',
   'HOST OF OTHERS', 'AND MANY MORE', 'AND UNEXPECTED', 'AND INTENSE', 'AND STRONG',
-  'HIDDEN BATTLES'
+  'HIDDEN BATTLES', 'YANKID MEDIA PRO', 'JOYVISUAL', 'BOARD MEMBERS', 'BOARD MEMBER',
+  'ITY GUESTS', 'CITY GUESTS', 'BIG FISH', 'MEDIA PRO'
 ];
 
 export function normalizePersonName(raw: string): string {
@@ -69,6 +73,9 @@ export function normalizePersonName(raw: string): string {
   }
   while (ROLE_SUFFIXES.test(name)) {
     name = name.replace(ROLE_SUFFIXES, '').trim();
+  }
+  while (WATERMARK_SUFFIXES.test(name)) {
+    name = name.replace(WATERMARK_SUFFIXES, '').trim();
   }
 
   name = name
@@ -277,11 +284,11 @@ export async function reconcileAndVerifyCredits(
     if (!cleanName || cleanName.length < 3 || cleanName.split(' ').length < 2) continue;
 
     // Ignore character roles turned into people
-    if (/^(?:brother|sister|uncle|aunty|mama|baba|papa|omo|elegbon|olori|pastor|officer|police)\s+/i.test(cleanName)) {
+    if (/^(?:brother|bro|sister|sis|uncle|aunty|aunt|mama|baba|papa|pappy|omo|elegbon|olori|pastor|officer|police|inspector|board|members?|guests?|extras?|dancers?|tattoo|ghost|big\s+fish)\b/i.test(cleanName)) {
       continue;
     }
-    // Ignore corporate / business entities
-    if (/\b(?:agency|ventures|enterprises|properties|limited|ltd|holdings|services|company|studio|studios|productions?|props|costumes)\b/i.test(cleanName)) {
+    // Ignore corporate / business entities / departments
+    if (/\b(?:agency|ventures|enterprises|properties|limited|ltd|holdings|services|company|studio|studios|productions?|props?|costumes|media(?:\s*pro)?|visuals?|concepts?|pictures|channel|network|tv|board\s*members?|ity\s*guests?|city\s*guests?|props?\s*sets?|set\s*props?)\b/i.test(cleanName)) {
       continue;
     }
 

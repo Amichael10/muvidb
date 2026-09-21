@@ -21,7 +21,7 @@ const GARBAGE_NAME_EXACT = new Set([
   'landlord', 'tenant', 'villager', 'villagers', 'elder', 'elders',
   'customer', 'customers', 'waiter', 'waitress', 'guest', 'guests', 'student', 'students',
   'dancer', 'dancers', 'crowd', 'extra', 'extras', 'heaven extras', 'ward extras',
-  'cast', 'crew', 'sound man', 'camera man', 'props', 'set props', 'costumier',
+  'cast', 'crew', 'sound man', 'camera man', 'props', 'prop set', 'props set', 'set props', 'costumier',
   'receptionist', 'decedtionist', 'pastor', 'priest',
   'voice over', 'narrator', 'delivery man', 'delivery boy', 'spark', 'best boy',
   'asst. editor', 'asst. costumier', 'sound engr', 'film credits', 'season 2',
@@ -39,7 +39,9 @@ const GARBAGE_NAME_EXACT = new Set([
   'trove empire', 'parables productions', '13 films', 'diamond concept',
   'toni concept', 'capitalfamefilms / chinaza',
   'brother sam', 'baggy land agency', 'nwiii fgii tkenna', 'kdzeem snonerdn',
-  'omo elemosho', 'ejime alakara', 'ogboluke iteledicon'
+  'omo elemosho', 'ejime alakara', 'ogboluke iteledicon',
+  'yankid media pro', 'joyvisual', 'board members', 'board member', 'ity guests', 'city guests',
+  'ghost', 'big fish'
 ]);
 
 const KNOWN_NAME_TYPOS: Record<string, string> = {
@@ -48,6 +50,7 @@ const KNOWN_NAME_TYPOS: Record<string, string> = {
   'akeek adeyemi': 'Akeem Adeyemi',
   'monsuru ljayegbemi': 'Monsuru Ijayegbemi',
   'isiaq sanusi': 'Sanusi Izihaq',
+  'fmeka fzeugwu': 'Emeka Ezeugwu',
 };
 
 const GARBAGE_PATTERNS = [
@@ -55,31 +58,34 @@ const GARBAGE_PATTERNS = [
   /^(?:We Would For You To Stay|Till Death|Voice Over Artstists|Bts Still Photos|Second Unit Camraman)/i,
   /^(?:Police Student|Ast Gaffer|Asst Makeup Artist|Data Wrangler|Executive Producers|Grandish Global)/i,
   /^(?:Nollywoodmovies|Nigerianmovies|Host Of Others|And Many More|And Unexpected|And Intense|And Strong|Hidden Battles)/i,
-  /^(?:Props Sets?|Set Props|Camera Asst|Focus Puller|Full Movie|Watch Part|Subscribe)/i,
+  /^(?:Props?\s*Sets?|Set\s*Props?|Prop\s*Set|Camera\s*Asst|Focus\s*Puller|Full\s*Movie|Watch\s*Part|Subscribe|Board\s*Members?|Ity\s*Guests?|City\s*Guests?|Big\s*Fish)/i,
+  /^(?:Edited\s*By|Directed\s*By|Produced\s*By|Executive\s*Produced\s*By|Written\s*By|Screenplay|Director|Producer|Editor|Cinematographer|Costumier|Costume\s*Designer|Sound\s*Designer|Still\s*Photographer|Camera\s*Operator|Gaffer|Best\s*Boy|Key\s*Grip|Production\s*Manager|Continuity|Script\s*Supervisor)$/i,
+  /^(?:Street\s*Boys?|Village\s*Boys?|Village\s*Girls?|Thugs?|Kidnappers?|Crowd|Villagers?|Extras?|Dancers?|Guests?|Customers?|Board\s*Members?|Ity\s*Guests?|City\s*Guests?)$/i,
   /^(?:Decedtionist|Tamitana Ovafaca)/i,
-  /\b(?:agency|ventures|enterprises|properties|limited|ltd|holdings|services|company|consult|logistics|foundation|studio|studios|production|productions|entertainment|props|costumes|glamour|media\s*mind|props\/set)\b/i,
+  /\b(?:agency|ventures|enterprises|properties|limited|ltd|holdings|services|company|consult|logistics|foundation|studio|studios|production|productions|entertainment|props?|costumes|glamour|media\s*mind|media\s*pro|props\/set|visuals?)\b/i,
+  /^[a-zA-Z]+visuals?$/i,
   /^[^a-zA-Z\s]+$/,
   /^\s*[-:–\.,\/\\_]+\s*$/,
 ];
 
 // YouTube channels and distributor watermark tags to strip
-const CHANNEL_WATERMARK_SUFFIXES = /\s+[-:–]?\s*(?:Apatatv|Apata\s*TV|Yorubahood|Sceneone(?:\s*TV)?|iBakaTV|Ibakatv|NollywoodPicturestv|Realnolly(?:\s*TV)?|Uche\s*Nancy\s*TV|Ruth\s*Kadiri(?:\s*247)?|PressPlay(?:\s*TV)?|Filmonly|Chukwudubem\s*TV|Movie\s*Mac\s*Tv|TV|Television|Channel)$/i;
+const CHANNEL_WATERMARK_SUFFIXES = /\s+[-:–]?\s*(?:Apatatv|Apata\s*TV|Yorubahood|Sceneone(?:\s*TV)?|iBakaTV|Ibakatv|NollywoodPicturestv|Realnolly(?:\s*TV)?|Uche\s*Nancy\s*TV|Ruth\s*Kadiri(?:\s*247)?|PressPlay(?:\s*TV)?|Filmonly|Chukwudubem\s*TV|Movie\s*Mac\s*Tv|YT|YouTube|TV|Television|Channel)$/i;
 const CHANNEL_WATERMARK_PREFIXES = /^(?:Apatatv|Apata\s*TV|Yorubahood|Sceneone(?:\s*TV)?|iBakaTV|Ibakatv|NollywoodPicturestv|Realnolly(?:\s*TV)?|Uche\s*Nancy\s*TV|Ruth\s*Kadiri(?:\s*247)?|PressPlay(?:\s*TV)?|Filmonly|Chukwudubem\s*TV|Movie\s*Mac\s*Tv)\s*[-:–]?\s+/i;
 
 // Glued role prefixes & suffixes to strip
-const ROLE_PREFIXES = /^(?:Receptionist|Decedtionist|Stillphotographer|Still\s+Photographer|Bestboy|Best\s+Boy|Second\s+Unit(?:\s+Cameraman)?|Delivery\s+Man|Warder|Officer|Police(?:\s+Officer)?|Big\s+Lion|Armed\s+Robber|Dit|Subtitle|Costumier(?:\s+Assist\.?)?|Costume\s+Assts?|Costumer|Makeup(?:\s+Asst)?|Special\s+Effects|Cam\s+Tech|Props?\s+Sets?|Welfare|Security|Sound(?:\s+Recordist|\s+Operator|\s+Man|\s+Engr)?|Production\s+Driver|Head\s+Of\s+Lights|Focus\s+Puller|Script(?:\s*supervisor)?|Ass\s+Rf\s+Gaffer|Gaffer|Screenplay|Director|Editor|Producer)\s*[-:–]?\s+/i;
+const ROLE_PREFIXES = /^(?:Receptionist|Decedtionist|Stillphotographer|Still\s+Photographer|Bestboy|Best\s+Boy|Second\s+Unit(?:\s+Cameraman)?|Delivery\s+Man|Warder|Officer|Police(?:\s+Officer)?|Big\s+Lion|Armed\s+Robber|Dit|Subtitle|Costumier(?:\s+Assist\.?)?|Costume\s+Assts?|Costumer|Makeup(?:\s+Asst)?|Special\s+Effects|Cam\s+Tech|Props?\s+Sets?|Welfare|Security|Sound(?:\s*man|\s+Recordist|\s+Operator|\s+Engr)?|Production\s+Driver|Head\s+Of\s+Lights|Focus\s+Puller|Script(?:\s*supervisor)?|Ass\s+Rf\s+Gaffer|Gaffer|Screenplay|Director|Editor|Producer|Artsist|Artist|Actor|Actress|Cast|Crew|Tattoo\s+Guy|Mama\s+Blessing|Board\s+Members?|City\s+Guests?|Ity\s+Guests?)\s*[-:–]?\s+/i;
 const ROLE_SUFFIXES = /\s+[-:–]?\s*(?:Scriptwriter|Script\s+Supervisor|Delivery\s+Man|Police\s+Officer|Stoneboy|Receptionist|Makeup|Set\s+Designer|Video\s+Bts|Spark|Costumier|Prop|Location|Continuity|Sound|Lights|Focus\s+Puller|Cam\s+Asst|Passenger|Gaffer)$/i;
 
 function cleanBoundaryPunctuation(str: string): string {
   let s = str.trim();
-  s = s.replace(/^[“"'\s\-:–\.,]+|[“"'\s\-:–\.,]+$/g, '').trim();
+  s = s.replace(/^[“"'‘’`\s\-:–\.,]+|[“"'‘’`\s\-:–\.,]+$/g, '').trim();
   if (s.startsWith('(') && !s.includes(')')) s = s.slice(1).trim();
   if (s.endsWith(')') && !s.includes('(')) s = s.slice(0, -1).trim();
   if (s.startsWith('(') && s.endsWith(')')) {
     const inside = s.slice(1, -1).trim();
     if (!inside.includes('(') && !inside.includes(')')) s = inside;
   }
-  return s.replace(/^[“"'\s\-:–\.,]+|[“"'\s\-:–\.,]+$/g, '').trim();
+  return s.replace(/^[“"'‘’`\s\-:–\.,]+|[“"'‘’`\s\-:–\.,]+$/g, '').trim();
 }
 
 function normalize(name: string): string {
@@ -120,6 +126,13 @@ function cleanNameString(raw: string): { clean: string; detectedRole: string | n
   }
 
   name = cleanBoundaryPunctuation(name);
+
+  // Title case only if a prefix/watermark/quote was stripped AND the resulting clean name is all UPPERCASE
+  const wasStripped = strippedWatermark || detectedRole !== null || cleanBoundaryPunctuation(raw) !== raw;
+  if (wasStripped && name === name.toUpperCase() && name.length > 3 && /[A-Z]/.test(name)) {
+    name = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  }
+
   return { clean: name, detectedRole, strippedWatermark };
 }
 
@@ -350,7 +363,39 @@ export async function runDailyPeopleCleanup() {
     }
 
     if (garbageIds.length > 0) {
-      log(`🗑️ Purging ${garbageIds.length} non-person garbage records & phantom credits...`);
+      log(`🗑️ Inspecting ${garbageIds.length} candidate garbage records for inverted credits...`);
+      for (let i = 0; i < garbageIds.length; i += 100) {
+        const chunk = garbageIds.slice(i, i + 100);
+        const { data: gCreds } = await supabase
+          .from('credits')
+          .select('id, person_id, film_id, role, character_name')
+          .in('person_id', chunk);
+
+        for (const gc of gCreds || []) {
+          if (gc.character_name && gc.character_name.trim().length >= 3) {
+            const charClean = cleanNameString(gc.character_name).clean;
+            const charWords = charClean.split(' ');
+            if (charWords.length >= 2 && charWords.length <= 4 && !isGarbagePerson(charClean) && /^[A-Z]/.test(charClean)) {
+              log(`🔄 Recovering inverted credit on film ${gc.film_id}: character "${charClean}" -> assigning to real person profile...`);
+              let { data: targetPerson } = await supabase.from('people').select('id, name').ilike('name', charClean).limit(1).maybeSingle();
+              if (!targetPerson) {
+                const slug = charClean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                const { data: newP } = await supabase.from('people').insert({ name: charClean, slug }).select('id, name').single();
+                if (newP) targetPerson = newP;
+              }
+              if (targetPerson) {
+                await supabase.from('credits').update({
+                  person_id: targetPerson.id,
+                  character_name: null,
+                }).eq('id', gc.id);
+                log(`   Assigned credit to "${targetPerson.name}" (${targetPerson.id})`);
+              }
+            }
+          }
+        }
+      }
+
+      log(`🗑️ Purging ${garbageIds.length} non-person garbage records & remaining phantom credits...`);
       for (let i = 0; i < garbageIds.length; i += 100) {
         const chunk = garbageIds.slice(i, i + 100);
         await supabase.from('credits').delete().in('person_id', chunk);
@@ -438,27 +483,35 @@ export async function runDailyPeopleCleanup() {
         }
       }
 
-      // 2. Detect same-film duplicate actors / OCR corruptions (e.g. "Arab Chidi Ebere Kinhsley" vs "Kingsley Ebere")
-      const actors = fCreds.filter(c => c.role === 'actor');
-      for (let i = 0; i < actors.length; i++) {
-        const a1 = actors[i];
-        const p1 = a1.people as any;
-        if (!p1?.name) continue;
+      // 2. Detect same-film duplicates / OCR corruptions across ALL roles (actors AND crew, e.g. "Fmeka Fzeugwu" vs "Emeka Ezeugwu" for sound)
+      const roleGroups = new Map<string, typeof fCreds>();
+      for (const c of fCreds) {
+        const r = c.role || 'crew';
+        if (!roleGroups.has(r)) roleGroups.set(r, []);
+        roleGroups.get(r)!.push(c);
+      }
 
-        for (let j = i + 1; j < actors.length; j++) {
-          const a2 = actors[j];
-          const p2 = a2.people as any;
-          if (!p2?.name || p1.id === p2.id) continue;
+      for (const [rName, credList] of roleGroups.entries()) {
+        for (let i = 0; i < credList.length; i++) {
+          const c1 = credList[i];
+          const p1 = c1.people as any;
+          if (!p1?.name) continue;
 
-          if (isDuplicateOnSameFilm(p1.name, p2.name)) {
-            const p1Score = (p1.photo_url ? 10 : 0) + (p1.film_count || 1);
-            const p2Score = (p2.photo_url ? 10 : 0) + (p2.film_count || 1);
-            const canonical = p1Score >= p2Score ? p1 : p2;
-            const duplicate = canonical.id === p1.id ? p2 : p1;
+          for (let j = i + 1; j < credList.length; j++) {
+            const c2 = credList[j];
+            const p2 = c2.people as any;
+            if (!p2?.name || p1.id === p2.id) continue;
 
-            log(`🤝 Same-Film Duplicate on "${f.title}": Merging "${duplicate.name}" -> "${canonical.name}"`);
-            await mergePersonCredits(duplicate.id, canonical.id);
-            coCreditMergedCount++;
+            if (isDuplicateOnSameFilm(p1.name, p2.name)) {
+              const p1Score = (p1.photo_url ? 10 : 0) + (p1.film_count || 1);
+              const p2Score = (p2.photo_url ? 10 : 0) + (p2.film_count || 1);
+              const canonical = p1Score >= p2Score ? p1 : p2;
+              const duplicate = canonical.id === p1.id ? p2 : p1;
+
+              log(`🤝 Same-Film Duplicate on "${f.title}" (${rName}): Merging "${duplicate.name}" -> "${canonical.name}"`);
+              await mergePersonCredits(duplicate.id, canonical.id);
+              coCreditMergedCount++;
+            }
           }
         }
       }
