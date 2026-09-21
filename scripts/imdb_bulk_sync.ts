@@ -468,7 +468,10 @@ function parseFullCredits(html: string, markdown: string): { cast: FilmMeta['cas
         continue;
       }
       // Plain name line under a section (no link)
-      if (/^[A-ZÀ-ÖØ-öø-ÿ][\w.'’\- ]{1,60}$/.test(line) && !/^edit$/i.test(line)) {
+      if (
+        /^[A-ZÀ-ÖØ-öø-ÿ][\w.'’\- ]{1,60}$/.test(line)
+        && !/^(?:edit|suggest an edit|clear all|see all|contribute|learn more|add missing.*)$/i.test(line.trim())
+      ) {
         push(line, role, null, null);
       }
     }
