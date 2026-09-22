@@ -29,7 +29,16 @@ type MatchCache = Map<string, MatchedFilm | null>; // normalized title → Match
 
 /** Remove cinema presentation labels without touching the actual film title. */
 export function cleanCinemaListingTitle(raw: string): string {
-  let title = (raw || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+  let title = (raw || '')
+    .replace(/&#39;/g, "'")
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8211;/g, "-")
+    .replace(/&#38;/g, "&")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .normalize('NFC')
+    .replace(/\s+/g, ' ')
+    .trim();
   let previous = '';
 
   while (title && title !== previous) {
@@ -200,6 +209,96 @@ async function recordPending(
   return inserted.id;
 }
 
+async function getOrCreatePerson(name: string, department = 'Acting'): Promise<string | null> {
+  const cleanName = (name || '').replace(/\s+/g, ' ').trim();
+  if (!cleanName || cleanName.length < 2) return null;
+
+  const { data: existing } = await supabase
+    .from('people')
+    .select('id')
+    .ilike('name', cleanName)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    return existing[0].id;
+  }
+
+  const slug = cleanName
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const { data: created, error } = await supabase
+    .from('people')
+    .insert({
+      name: cleanName,
+      slug,
+      known_for_department: department,
+      is_verified: false,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    const { data: retry } = await supabase
+      .from('people')
+      .select('id')
+      .ilike('name', cleanName)
+      .limit(1);
+    return retry?.[0]?.id || null;
+  }
+
+  return created?.id || null;
+}
+
+async function linkCredits(
+  filmId: string,
+  actors: string[] = [],
+  directors: string[] = [],
+  source = 'cinema-enrichment',
+) {
+  if (!actors.length && !directors.length) return;
+
+  const { data: existingCredits } = await supabase
+    .from('credits')
+    .select('person_id, role')
+    .eq('film_id', filmId);
+
+  const existingMap = new Set(
+    (existingCredits || []).map((c: any) => `${c.person_id}_${c.role}`)
+  );
+
+  for (const dirName of directors) {
+    const personId = await getOrCreatePerson(dirName, 'Directing');
+    if (personId && !existingMap.has(`${personId}_director`)) {
+      await supabase.from('credits').insert({
+        film_id: filmId,
+        person_id: personId,
+        role: 'director',
+        source,
+      });
+      existingMap.add(`${personId}_director`);
+    }
+  }
+
+  let order = (existingCredits?.length || 0) + 1;
+  for (const actorName of actors) {
+    const personId = await getOrCreatePerson(actorName, 'Acting');
+    if (personId && !existingMap.has(`${personId}_actor`)) {
+      await supabase.from('credits').insert({
+        film_id: filmId,
+        person_id: personId,
+        role: 'actor',
+        billing_order: order++,
+        source,
+      });
+      existingMap.add(`${personId}_actor`);
+    }
+  }
+}
+
 /**
  * Insert or update showtime rows for a cinema. Marks any showtimes for this
  * cinema+date range not present in the new batch as is_available=false, so
@@ -219,6 +318,7 @@ export async function upsertShowtimes(
   const unmatchedSeen = new Set<string>();
   const posterAttempts = new Set<string>();
   const backdropAttempts = new Set<string>();
+  const creditsAttempts = new Set<string>();
 
   // Track the date range so we know what to mark unavailable
   let minDate = scraped[0].showDate;
@@ -234,6 +334,7 @@ export async function upsertShowtimes(
           supabase,
           cleanCinemaListingTitle(st.filmTitle),
           source,
+          st.filmMeta,
         );
       }
       cache.set(key, film);
@@ -294,11 +395,23 @@ export async function upsertShowtimes(
 
     if (Object.keys(updatedFields).length > 0) {
       console.log(`[cinema-upsert] Enriching film "${st.filmTitle}":`, updatedFields);
-      const { error: enrichmentError } = await supabase.from('films').update(updatedFields).eq('id', filmId);
-      if (enrichmentError) {
-        throw new Error(`Film enrichment failed for "${st.filmTitle}": ${enrichmentError.message}`);
+      try {
+        const { error: enrichmentError } = await supabase.from('films').update(updatedFields).eq('id', filmId);
+        if (enrichmentError) {
+          console.warn(`[cinema-upsert] Film enrichment non-fatal notice for "${st.filmTitle}":`, enrichmentError.message);
+        } else {
+          Object.assign(film, updatedFields);
+        }
+      } catch (err: any) {
+        console.warn(`[cinema-upsert] Film enrichment network notice for "${st.filmTitle}":`, err.message);
       }
-      Object.assign(film, updatedFields);
+    }
+
+    if (!creditsAttempts.has(filmId) && (st.filmMeta?.actors?.length || st.filmMeta?.directors?.length)) {
+      creditsAttempts.add(filmId);
+      linkCredits(filmId, st.filmMeta.actors, st.filmMeta.directors, source).catch((err) => {
+        console.warn(`[cinema-upsert] Credit linking failed for "${st.filmTitle}":`, err.message);
+      });
     }
 
     if (st.showDate < minDate) minDate = st.showDate;
@@ -324,13 +437,17 @@ export async function upsertShowtimes(
       `${row.pending_film_id}|${row.cinema_id}|${row.show_date}|${row.show_time}|${row.format}`,
       row,
     ])).values());
-    const { error: pendingError } = await supabase
-      .from('pending_cinema_showtimes')
-      .upsert(uniquePendingRows, {
-        onConflict: 'pending_film_id,cinema_id,show_date,show_time,format',
-      });
-    if (pendingError) {
-      throw new Error(`Pending showtime upsert failed for cinema ${cinemaId}: ${pendingError.message}`);
+
+    for (let i = 0; i < uniquePendingRows.length; i += 50) {
+      const chunk = uniquePendingRows.slice(i, i + 50);
+      const { error: pendingError } = await supabase
+        .from('pending_cinema_showtimes')
+        .upsert(chunk, {
+          onConflict: 'pending_film_id,cinema_id,show_date,show_time,format',
+        });
+      if (pendingError) {
+        throw new Error(`Pending showtime upsert failed for cinema ${cinemaId}: ${pendingError.message}`);
+      }
     }
   }
 
@@ -343,13 +460,16 @@ export async function upsertShowtimes(
     row,
   ])).values());
 
-  // Batch upsert — conflict key matches showtimes_cinema_film_date_time_fmt_uidx
-  const { error } = await supabase
-    .from('showtimes')
-    .upsert(uniqueRows, { onConflict: 'cinema_id,film_id,show_date,show_time,format' });
+  // Batch upsert in chunks of 50 to prevent network payload / connection timeout issues
+  for (let i = 0; i < uniqueRows.length; i += 50) {
+    const chunk = uniqueRows.slice(i, i + 50);
+    const { error } = await supabase
+      .from('showtimes')
+      .upsert(chunk, { onConflict: 'cinema_id,film_id,show_date,show_time,format' });
 
-  if (error) {
-    throw new Error(`Showtime upsert failed for cinema ${cinemaId}: ${error.message}`);
+    if (error) {
+      throw new Error(`Showtime upsert failed for cinema ${cinemaId}: ${error.message}`);
+    }
   }
 
   // Mark old showtimes in the same cinema+date range as unavailable if

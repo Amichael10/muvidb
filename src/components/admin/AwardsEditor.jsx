@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { supabase } from '../../lib/supabase';
+import { AWARD_ORGS } from '../../lib/awards';
+import { getCategoriesForOrg } from '../../lib/awardsSync';
 
 /**
  * Awards & nominations editor for the jsonb `awards` column, shared by the
@@ -87,36 +89,33 @@ export default function AwardsEditor({ value, onChange, variant }) {
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <input
-                  type="text"
-                  placeholder="Organization"
+              {/* Organization, Year, Season */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <SearchableOrgPicker
                   value={award.organization || ''}
-                  onChange={(e) => update(idx, { organization: e.target.value })}
-                  className="bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+                  onChange={(org) => update(idx, { organization: org })}
                 />
                 <input
                   type="number"
-                  placeholder="Year"
+                  placeholder="Year (e.g. 2024)"
                   value={award.year || ''}
                   onChange={(e) => update(idx, { year: e.target.value })}
                   className="bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
                 />
                 <input
                   type="number"
-                  placeholder="Season"
+                  placeholder="Season (e.g. 10)"
                   value={award.season || ''}
                   onChange={(e) => update(idx, { season: e.target.value })}
                   className="bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
                 />
               </div>
 
-              <input
-                type="text"
-                placeholder="Category (e.g. Best Lead Actress)"
+              {/* Category Combobox */}
+              <SearchableCategoryPicker
+                organization={award.organization}
                 value={award.category || ''}
-                onChange={(e) => update(idx, { category: e.target.value })}
-                className="w-full bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+                onChange={(cat) => update(idx, { category: cat })}
               />
 
               {variant === 'person' ? (
@@ -146,6 +145,277 @@ export default function AwardsEditor({ value, onChange, variant }) {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Searchable Award Organization Combobox with suggestions from AWARD_ORGS and '+ Create New'
+ */
+function SearchableOrgPicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value || '');
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(value || '');
+  }, [value]);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  const filteredOrgs = useMemo(() => {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return AWARD_ORGS;
+    return AWARD_ORGS.filter(
+      (o) =>
+        o.id.toLowerCase().includes(q) ||
+        o.label.toLowerCase().includes(q) ||
+        (o.full && o.full.toLowerCase().includes(q))
+    );
+  }, [query]);
+
+  const exactMatch = AWARD_ORGS.some(
+    (o) =>
+      o.id.toLowerCase() === (query || '').trim().toLowerCase() ||
+      o.label.toLowerCase() === (query || '').trim().toLowerCase()
+  );
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <div className="flex items-center gap-1">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Organization (e.g. AMVCA, DIYMA)"
+            value={query}
+            onChange={(e) => {
+              const val = e.target.value;
+              setQuery(val);
+              onChange(val);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            className="w-full bg-surface border border-border p-2 pr-7 rounded-lg text-xs font-semibold focus:border-brand outline-none"
+          />
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => setOpen(!open)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+          >
+            <Icon icon={open ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} width="13" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const trimmed = query.trim();
+            if (trimmed) {
+              onChange(trimmed);
+              setOpen(false);
+            } else {
+              setOpen(true);
+            }
+          }}
+          className="p-2 rounded-lg bg-surface border border-border hover:border-brand/50 text-text-muted hover:text-brand transition-colors"
+          title="Create or select organization"
+        >
+          <Icon icon="solar:add-circle-bold" width="16" />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute z-40 left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface shadow-2xl">
+          {query.trim() && !exactMatch && (
+            <button
+              type="button"
+              onClick={() => {
+                const custom = query.trim();
+                onChange(custom);
+                setQuery(custom);
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left bg-brand/10 hover:bg-brand/20 text-brand border-b border-border text-xs font-bold transition-colors"
+            >
+              <Icon icon="solar:add-circle-linear" width="14" />
+              <span>Use custom: &quot;{query.trim()}&quot;</span>
+            </button>
+          )}
+
+          {filteredOrgs.map((org) => {
+            const isSelected =
+              value &&
+              (value.toLowerCase() === org.id.toLowerCase() ||
+                value.toLowerCase() === org.label.toLowerCase());
+            return (
+              <button
+                key={org.id}
+                type="button"
+                onClick={() => {
+                  onChange(org.id);
+                  setQuery(org.id);
+                  setOpen(false);
+                }}
+                className={`w-full flex flex-col items-start px-3 py-1.5 text-left border-b border-border/40 hover:bg-surface-2 transition-colors ${
+                  isSelected ? 'bg-brand/15 text-brand font-bold' : ''
+                }`}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-xs font-bold text-text-primary">
+                    {org.label || org.id}
+                  </span>
+                  {org.founded && (
+                    <span className="text-[10px] text-text-muted font-mono">est. {org.founded}</span>
+                  )}
+                </div>
+                {org.full && (
+                  <span className="text-[10px] text-text-muted truncate max-w-full">
+                    {org.full}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          {filteredOrgs.length === 0 && !query.trim() && (
+            <p className="px-3 py-2 text-xs text-text-muted italic">Type to search or add organization</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Searchable Award Category Combobox suggested by Organization + '+ Create New'
+ */
+function SearchableCategoryPicker({ organization, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value || '');
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(value || '');
+  }, [value]);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  const suggestions = useMemo(() => {
+    return getCategoriesForOrg(organization);
+  }, [organization]);
+
+  const filteredCategories = useMemo(() => {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return suggestions.slice(0, 30);
+    return suggestions
+      .filter((cat) => cat.toLowerCase().includes(q))
+      .slice(0, 30);
+  }, [suggestions, query]);
+
+  const exactMatch = suggestions.some(
+    (c) => c.toLowerCase() === (query || '').trim().toLowerCase()
+  );
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <div className="flex items-center gap-1">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Category (e.g. Best Director of the Year, Best Actor)"
+            value={query}
+            onChange={(e) => {
+              const val = e.target.value;
+              setQuery(val);
+              onChange(val);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            className="w-full bg-surface border border-border p-2 pr-7 rounded-lg text-xs focus:border-brand outline-none"
+          />
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => setOpen(!open)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+          >
+            <Icon icon={open ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} width="13" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const trimmed = query.trim();
+            if (trimmed) {
+              onChange(trimmed);
+              setOpen(false);
+            } else {
+              setOpen(true);
+            }
+          }}
+          className="p-2 rounded-lg bg-surface border border-border hover:border-brand/50 text-text-muted hover:text-brand transition-colors"
+          title="Create or select category"
+        >
+          <Icon icon="solar:add-circle-bold" width="16" />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute z-40 left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface shadow-2xl">
+          {query.trim() && !exactMatch && (
+            <button
+              type="button"
+              onClick={() => {
+                const custom = query.trim();
+                onChange(custom);
+                setQuery(custom);
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left bg-brand/10 hover:bg-brand/20 text-brand border-b border-border text-xs font-bold transition-colors"
+            >
+              <Icon icon="solar:add-circle-linear" width="14" />
+              <span>Create new: &quot;{query.trim()}&quot;</span>
+            </button>
+          )}
+
+          {filteredCategories.map((cat) => {
+            const isSelected = value && value.toLowerCase() === cat.toLowerCase();
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => {
+                  onChange(cat);
+                  setQuery(cat);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-1.5 text-left border-b border-border/40 hover:bg-surface-2 transition-colors ${
+                  isSelected ? 'bg-brand/15 text-brand font-bold' : 'text-text-primary'
+                }`}
+              >
+                <span className="text-xs truncate">{cat}</span>
+                {isSelected && <Icon icon="solar:check-read-linear" className="text-brand" width="14" />}
+              </button>
+            );
+          })}
+
+          {filteredCategories.length === 0 && !query.trim() && (
+            <p className="px-3 py-2 text-xs text-text-muted italic">Type to search or enter category</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

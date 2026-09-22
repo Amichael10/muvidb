@@ -11,6 +11,8 @@ import MergeModal from '../../components/admin/MergeModal';
 import ImageField from '../../components/admin/ImageField';
 import AddCreditModal from '../../components/admin/AddCreditModal';
 import AwardsEditor from '../../components/admin/AwardsEditor';
+import SearchableRolePicker from '../../components/admin/SearchableRolePicker';
+import { syncPersonAwardsToFilms } from '../../lib/awardsSync';
 import PersonMediaEditor from '../../components/admin/PersonMediaEditor';
 import PersonRepresentationEditor from '../../components/admin/PersonRepresentationEditor';
 import { ALL_ROLES, CAST_ROLE, formatRole, normalizeRole } from '../../lib/creditRoles';
@@ -601,6 +603,7 @@ export default function AdminPeople() {
       date_of_death: '',
       is_deceased: false,
       gender: 'Prefer not to say',
+      known_for_department: 'Actor',
       nationality: 'Nigerian',
       is_verified: false,
       is_spotlight: false,
@@ -657,6 +660,7 @@ export default function AdminPeople() {
       date_of_death: p.date_of_death || '',
       is_deceased: Boolean(p.is_deceased || p.date_of_death),
       gender: p.gender || 'Prefer not to say',
+      known_for_department: p.known_for_department || 'Actor',
       nationality: p.nationality || 'Nigerian',
       is_verified: p.is_verified || false,
       is_spotlight: p.is_spotlight || false,
@@ -769,6 +773,7 @@ export default function AdminPeople() {
         bio: formData.biography ? toSentenceCase(formData.biography) : (formData.bio || null),
         date_of_birth: formData.date_of_birth || null,
         gender: formData.gender || 'Prefer not to say',
+        known_for_department: formData.known_for_department || 'Actor',
         nationality: formData.nationality || 'Nigerian',
         photo_url: formData.photo_url || null,
         is_verified: Boolean(formData.is_verified),
@@ -844,6 +849,15 @@ export default function AdminPeople() {
           } catch (aliasErr) {
             console.error('Failed to sync person aliases:', aliasErr);
             toast.error('Profile saved, but alias sync failed (please apply DB permissions): ' + (aliasErr.message || aliasErr));
+          }
+
+          // Auto-sync awards to linked films
+          if (dataToSave.awards?.length) {
+            try {
+              await syncPersonAwardsToFilms(savedPersonId, dataToSave.name, dataToSave.awards);
+            } catch (syncErr) {
+              console.warn('Awards auto-sync to films had non-fatal error:', syncErr);
+            }
           }
         }
         toast.success(editingPerson ? 'Profile updated' : 'Person added');
@@ -1389,19 +1403,10 @@ export default function AdminPeople() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-text-primary mb-2">Primary Role</label>
-                  <select 
-                    value={formData.known_for_department} 
-                    onChange={e => setFormData({...formData, known_for_department: e.target.value})} 
-                    className="w-full bg-surface-2 border border-border p-3 rounded-lg text-sm focus:border-brand outline-none appearance-none cursor-pointer"
-                  >
-                    <option>Actor</option>
-                    <option>Skit Maker</option>
-                    <option>Producer</option>
-                    <option>Director</option>
-                    <option>Cinematographer</option>
-                    <option>Editor</option>
-                    <option>Other</option>
-                  </select>
+                  <SearchableRolePicker
+                    value={formData.known_for_department}
+                    onChange={(val) => setFormData({ ...formData, known_for_department: val })}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-text-primary mb-2">Nationality</label>

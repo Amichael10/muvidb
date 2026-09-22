@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Icon } from '@iconify/react';
 import { toTitleCase, toSentenceCase, formatFilmTitle } from '../utils/format';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+import PageHeader from '../components/ui/PageHeader';
 import SEO from '../components/SEO';
 
 /**
@@ -38,87 +39,83 @@ const CompanyCard = ({ company, metrics }) => {
   return (
     <Link
       to={`/companies/${company.slug || company.id}`}
-      className="group bg-surface hover:bg-surface-2/80 rounded-2xl overflow-hidden border border-border hover:border-brand/50 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-brand/5 hover:-translate-y-1 flex flex-col justify-between"
+      className="group bg-surface/70 hover:bg-surface rounded-xl border border-border/70 hover:border-brand/40 transition-all duration-300 shadow-sm hover:shadow-md flex flex-col justify-between hover:-translate-y-0.5"
     >
-      <div className="p-5 sm:p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-2xl border border-border overflow-hidden bg-black shrink-0 p-1 shadow-md group-hover:border-brand/40 transition-colors">
+      <div className="p-5">
+        <div className="flex items-start gap-3.5">
+          <div className="w-12 h-12 rounded-xl border border-border/80 overflow-hidden bg-surface-2 shrink-0 p-1 group-hover:border-brand/30 transition-colors">
             <ImageWithFallback
               src={company.logo_url}
               alt={toTitleCase(company.name)}
               fallbackType="company"
               name={toTitleCase(company.name)}
-              className="w-full h-full object-cover rounded-xl"
-              width={128}
-              sizes="64px"
+              className="w-full h-full object-cover rounded-lg"
+              width={96}
+              sizes="48px"
               loading="lazy"
             />
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-text-primary font-heading font-black text-base tracking-tight group-hover:text-brand transition-colors line-clamp-1">
-                {toTitleCase(company.name)}
-              </h3>
-            </div>
+            <h3 className="text-text-primary font-bold text-sm sm:text-[15px] tracking-tight group-hover:text-brand transition-colors truncate">
+              {toTitleCase(company.name)}
+            </h3>
 
-            <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-text-muted">
-              {company.founded_year && (
-                <span className="font-semibold text-[11px]">
-                  Est. {company.founded_year}
-                </span>
-              )}
-              {company.founded_year && company.company_type && <span>•</span>}
+            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-text-muted">
               {company.company_type && (
-                <span className="text-brand text-[11px] font-bold capitalize">
+                <span className="text-brand font-medium capitalize">
                   {company.company_type}
                 </span>
               )}
+              {company.company_type && company.founded_year && <span>•</span>}
+              {company.founded_year && (
+                <span>Est. {company.founded_year}</span>
+              )}
             </div>
-
-            {company.description && (
-              <p className="text-text-muted text-xs mt-2.5 line-clamp-2 leading-relaxed opacity-85">
-                {toSentenceCase(company.description)}
-              </p>
-            )}
           </div>
         </div>
 
-        {/* Commercial Highlights Pill Row */}
+        {company.description && (
+          <p className="text-text-muted text-xs mt-3 line-clamp-2 leading-relaxed opacity-80">
+            {toSentenceCase(company.description)}
+          </p>
+        )}
+
+        {/* Commercial Highlights */}
         {(boxOffice > 0 || views > 0) && (
-          <div className="mt-4 pt-3.5 border-t border-border/60 flex flex-wrap items-center gap-2">
+          <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-3 text-xs">
             {boxOffice > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black">
-                <Icon icon="solar:ticket-bold" className="w-3.5 h-3.5" />
-                {formatMoney(boxOffice)} Box Office
+              <span className="inline-flex items-center gap-1 font-semibold text-amber-400">
+                <Icon icon="solar:ticket-bold" className="w-3.5 h-3.5 text-amber-400/80" />
+                {formatMoney(boxOffice)}
               </span>
             )}
             {views > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black">
-                <Icon icon="solar:play-circle-bold" className="w-3.5 h-3.5" />
-                {formatViews(views)} YouTube Views
+              <span className="inline-flex items-center gap-1 font-semibold text-red-400">
+                <Icon icon="solar:play-circle-bold" className="w-3.5 h-3.5 text-red-400/80" />
+                {formatViews(views)}
               </span>
             )}
           </div>
         )}
 
-        {/* Top Hit Teaser */}
+        {/* Top Hit */}
         {topHit && (
-          <div className="mt-3 text-[11px] text-text-muted bg-surface-2/40 px-3 py-1.5 rounded-lg border border-border/50 flex items-center justify-between">
-            <span className="truncate max-w-[210px]">
-              Top: <strong className="text-text-primary">{formatFilmTitle(topHit.title)}</strong>
+          <div className="mt-2.5 flex items-center justify-between text-[11px] text-text-muted">
+            <span className="truncate pr-2">
+              Hit: <span className="text-text-primary font-medium">{formatFilmTitle(topHit.title)}</span>
             </span>
-            <span className="font-bold text-brand shrink-0 ml-2">
-              {topHit.boxOffice ? formatMoney(topHit.boxOffice) : formatViews(topHit.views) + ' views'}
+            <span className="font-semibold text-text-muted shrink-0 text-[10px]">
+              {topHit.boxOffice ? formatMoney(topHit.boxOffice) : `${formatViews(topHit.views)} views`}
             </span>
           </div>
         )}
       </div>
 
       {/* Card Footer */}
-      <div className="px-5 py-3.5 bg-surface-2/40 border-t border-border flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1.5 text-text-muted font-bold">
-          <Icon icon="solar:clapperboard-play-linear" className="w-4 h-4 text-brand" />
+      <div className="px-5 py-3 border-t border-border/40 flex items-center justify-between text-xs text-text-muted">
+        <div className="flex items-center gap-1.5 font-medium">
+          <Icon icon="solar:clapperboard-play-linear" className="w-3.5 h-3.5 text-brand/70" />
           <span>{filmCount} {filmCount === 1 ? 'Film' : 'Films'}</span>
         </div>
 
@@ -129,15 +126,15 @@ const CompanyCard = ({ company, metrics }) => {
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-text-muted hover:text-text-primary font-bold flex items-center gap-1 text-[11px]"
+              className="text-text-muted hover:text-text-primary font-medium flex items-center gap-1 text-[11px] transition-colors"
             >
               <span>Site</span>
               <Icon icon="solar:arrow-right-up-linear" className="w-3 h-3" />
             </a>
           )}
-          <span className="text-brand font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+          <span className="text-brand font-medium group-hover:translate-x-0.5 transition-transform flex items-center gap-1 text-[11px]">
             <span>Portfolio</span>
-            <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5" />
+            <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
           </span>
         </div>
       </div>
@@ -146,19 +143,19 @@ const CompanyCard = ({ company, metrics }) => {
 };
 
 const CompanySkeleton = () => (
-  <div className="bg-surface rounded-2xl overflow-hidden border border-border p-6 space-y-4">
-    <div className="flex gap-4">
-      <div className="w-16 h-16 rounded-2xl bg-surface-2 animate-shimmer shrink-0" />
-      <div className="flex-1 space-y-2.5">
-        <div className="h-4 w-3/4 bg-surface-2 rounded-md animate-shimmer" />
-        <div className="h-3 w-1/3 bg-surface-2 rounded-md animate-shimmer opacity-60" />
+  <div className="bg-surface/70 rounded-xl border border-border/70 p-5 space-y-3.5">
+    <div className="flex gap-3.5">
+      <div className="w-12 h-12 rounded-xl bg-surface-2 animate-shimmer shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-2/3 bg-surface-2 rounded animate-shimmer" />
+        <div className="h-3 w-1/3 bg-surface-2 rounded animate-shimmer opacity-60" />
       </div>
     </div>
-    <div className="space-y-2 pt-2">
-      <div className="h-3 w-full bg-surface-2 rounded-md animate-shimmer opacity-40" />
-      <div className="h-3 w-4/5 bg-surface-2 rounded-md animate-shimmer opacity-40" />
+    <div className="space-y-1.5 pt-1">
+      <div className="h-3 w-full bg-surface-2 rounded animate-shimmer opacity-40" />
+      <div className="h-3 w-4/5 bg-surface-2 rounded animate-shimmer opacity-40" />
     </div>
-    <div className="h-8 w-full bg-surface-2/60 rounded-xl animate-shimmer" />
+    <div className="h-5 w-1/2 bg-surface-2/60 rounded animate-shimmer pt-2" />
   </div>
 );
 
@@ -279,21 +276,6 @@ export default function Companies() {
     };
   }, [companies, companyMetrics]);
 
-  // Top market leaders spotlight (top 4 by commercial gross and views)
-  const spotlightCompanies = useMemo(() => {
-    return [...companies]
-      .filter((c) => {
-        const m = companyMetrics[c.id];
-        return m && (m.totalBoxOffice > 50_000_000 || m.totalViews > 5_000_000);
-      })
-      .sort((a, b) => {
-        const ma = companyMetrics[a.id];
-        const mb = companyMetrics[b.id];
-        return (mb?.totalBoxOffice || 0) - (ma?.totalBoxOffice || 0);
-      })
-      .slice(0, 4);
-  }, [companies, companyMetrics]);
-
   // Distinct studio types for dropdown filter
   const typeOptions = useMemo(() => {
     const set = new Set();
@@ -358,142 +340,60 @@ export default function Companies() {
         description="Discover Nollywood film studios, production companies, and theatrical distributors driving African cinema. Track box office metrics, YouTube viewership, and complete filmographies."
       />
 
-      {/* ─── 1. INDUSTRY MARKET OVERVIEW HERO ─── */}
-      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-surface/80 to-bg px-4 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 grid-bg opacity-15 pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto pt-12 pb-16 relative z-10">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/30 text-brand text-[10px] font-black uppercase tracking-[0.2em] mb-4">
-              <Icon icon="solar:buildings-2-bold" className="w-4 h-4" />
-              Industry Studios & Distribution Hub
-            </div>
-            <h1 className="font-heading text-4xl sm:text-6xl font-black tracking-tight text-text-primary leading-tight">
-              The Studios & Distributors of African Cinema
-            </h1>
-            <p className="mt-4 text-sm sm:text-base text-text-muted max-w-2xl leading-relaxed">
-              Explore the production powerhouses, theatrical distribution networks, and digital streaming creators driving Nollywood's commercial box office and worldwide cultural reach.
-            </p>
-          </div>
-
-          {/* Aggregate Market KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-10 max-w-4xl">
-            <div className="bg-surface/90 border border-border rounded-2xl p-4 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Studios & Distributors</span>
-              <p className="text-2xl sm:text-3xl font-heading font-black text-text-primary mt-1">
-                {industryStats.totalStudios}
-              </p>
-            </div>
-            <div className="bg-surface/90 border border-border rounded-2xl p-4 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Tracked Box Office</span>
-              <p className="text-2xl sm:text-3xl font-heading font-black text-amber-400 mt-1">
-                {formatMoney(industryStats.cumulativeBoxOffice) || '₦5.9B+'}
-              </p>
-            </div>
-            <div className="bg-surface/90 border border-border rounded-2xl p-4 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Tracked YouTube Views</span>
-              <p className="text-2xl sm:text-3xl font-heading font-black text-red-400 mt-1">
-                {formatViews(industryStats.cumulativeViews) || '140M+'}
-              </p>
-            </div>
-            <div className="bg-surface/90 border border-border rounded-2xl p-4 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block">Active Catalogues</span>
-              <p className="text-2xl sm:text-3xl font-heading font-black text-brand mt-1">
-                {industryStats.studiosWithFilms} Active
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── 2. MARKET LEADERS SPOTLIGHT ─── */}
-      {spotlightCompanies.length > 0 && metricFilter === 'all' && !search && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-20">
-          <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-brand">
-                <Icon icon="solar:cup-star-bold" className="w-4 h-4 text-amber-400" />
-                Market Leaders · Box Office & Digital Powerhouses
+      {/* ─── 1. PAGE HEADER & COMPACT METRICS ─── */}
+      <PageHeader
+        icon="solar:buildings-2-bold"
+        eyebrow="Industry Directory"
+        title="Studios & Distributors"
+        description="The production powerhouses, theatrical distribution networks, and digital streaming creators shaping African cinema."
+        count={companies.length}
+        countLabel="studios tracked"
+        actions={
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+            {industryStats.cumulativeBoxOffice > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface/70 border border-border/80 text-xs">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-text-muted">Tracked Box Office:</span>
+                <span className="font-bold text-amber-400">
+                  {formatMoney(industryStats.cumulativeBoxOffice)}
+                </span>
               </div>
-              <span className="text-xs text-text-muted font-semibold">Commercial Champions</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {spotlightCompanies.map((sc) => {
-                const m = companyMetrics[sc.id] || {};
-                return (
-                  <Link
-                    key={sc.id}
-                    to={`/companies/${sc.slug || sc.id}`}
-                    className="group p-4 rounded-xl bg-surface-2/50 hover:bg-surface-2 border border-border hover:border-brand/50 transition-all duration-300 shadow-sm flex flex-col justify-between hover:-translate-y-0.5"
-                  >
-                    <div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-12 h-12 rounded-xl overflow-hidden bg-black border border-border shrink-0 p-0.5">
-                          <ImageWithFallback
-                            src={sc.logo_url}
-                            alt={sc.name}
-                            fallbackType="company"
-                            name={sc.name}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-heading font-black text-sm text-text-primary group-hover:text-brand transition-colors truncate">
-                            {toTitleCase(sc.name)}
-                          </h4>
-                          <span className="text-[10px] text-brand font-bold capitalize block">
-                            {sc.company_type || 'Production Studio'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5 pt-1">
-                        {m.totalBoxOffice > 0 && (
-                          <div className="flex items-center justify-between text-xs font-bold text-amber-400">
-                            <span>Box Office:</span>
-                            <span>{formatMoney(m.totalBoxOffice)}</span>
-                          </div>
-                        )}
-                        {m.totalViews > 0 && (
-                          <div className="flex items-center justify-between text-xs font-bold text-red-400">
-                            <span>YouTube Views:</span>
-                            <span>{formatViews(m.totalViews)}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between text-[11px] text-text-muted">
-                          <span>Releases:</span>
-                          <span className="font-bold text-text-primary">{m.filmCount} films</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {m.topHit && (
-                      <div className="mt-3 pt-2.5 border-t border-border/50 text-[10px] text-text-muted truncate">
-                        Hit: <strong className="text-text-primary">{formatFilmTitle(m.topHit.title)}</strong>
-                      </div>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
+            )}
+            {industryStats.cumulativeViews > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface/70 border border-border/80 text-xs">
+                <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                <span className="text-text-muted">Digital Views:</span>
+                <span className="font-bold text-red-400">
+                  {formatViews(industryStats.cumulativeViews)}
+                </span>
+              </div>
+            )}
+            {industryStats.studiosWithFilms > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface/70 border border-border/80 text-xs">
+                <span className="w-2 h-2 rounded-full bg-brand shrink-0" />
+                <span className="text-text-muted">Catalogues:</span>
+                <span className="font-bold text-text-primary">
+                  {industryStats.studiosWithFilms} Active
+                </span>
+              </div>
+            )}
           </div>
-        </section>
-      )}
+        }
+      />
 
-      {/* ─── 3. SEARCH, FILTERS & SORTING ─── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-        <div className="bg-surface border border-border rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
+      {/* ─── 2. SEARCH, FILTERS & SORTING BAR ─── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border/70">
           
           {/* Quick Segment Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar text-xs font-semibold">
             <button
               type="button"
               onClick={() => setMetricFilter('all')}
               className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 cursor-pointer ${
                 metricFilter === 'all'
-                  ? 'bg-text-primary text-bg border-text-primary font-black shadow-sm'
-                  : 'bg-surface-2 border-border text-text-muted hover:text-text-primary'
+                  ? 'bg-surface-2 border-brand/50 text-text-primary font-bold shadow-xs'
+                  : 'bg-surface/50 border-border text-text-muted hover:text-text-primary hover:border-border/80'
               }`}
             >
               All Studios ({companies.length})
@@ -503,58 +403,67 @@ export default function Companies() {
               onClick={() => { setMetricFilter('box_office'); setSortBy('box_office'); }}
               className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                 metricFilter === 'box_office'
-                  ? 'bg-amber-500 text-black border-amber-400 font-black shadow-sm'
-                  : 'bg-surface-2 border-border text-amber-400 hover:border-amber-500/40'
+                  ? 'bg-amber-500/10 border-amber-500/40 text-amber-400 font-bold shadow-xs'
+                  : 'bg-surface/50 border-border text-text-muted hover:text-amber-400 hover:border-amber-500/30'
               }`}
             >
-              <Icon icon="solar:ticket-bold" className="w-3.5 h-3.5" />
-              Theatrical Box Office Earners
+              <Icon icon="solar:ticket-bold" className="w-3.5 h-3.5 text-amber-400" />
+              Theatrical Box Office
             </button>
             <button
               type="button"
               onClick={() => { setMetricFilter('youtube'); setSortBy('views'); }}
               className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                 metricFilter === 'youtube'
-                  ? 'bg-red-600 text-white border-red-500 font-black shadow-sm'
-                  : 'bg-surface-2 border-border text-red-400 hover:border-red-500/40'
+                  ? 'bg-red-500/10 border-red-500/40 text-red-400 font-bold shadow-xs'
+                  : 'bg-surface/50 border-border text-text-muted hover:text-red-400 hover:border-red-500/30'
               }`}
             >
-              <Icon icon="solar:play-circle-bold" className="w-3.5 h-3.5" />
-              YouTube Video Powerhouses
+              <Icon icon="solar:play-circle-bold" className="w-3.5 h-3.5 text-red-400" />
+              YouTube Powerhouses
             </button>
             <button
               type="button"
               onClick={() => setMetricFilter('with_films')}
               className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 cursor-pointer ${
                 metricFilter === 'with_films'
-                  ? 'bg-brand text-black border-brand font-black shadow-sm'
-                  : 'bg-surface-2 border-border text-text-muted hover:text-text-primary'
+                  ? 'bg-brand/10 border-brand/40 text-brand font-bold shadow-xs'
+                  : 'bg-surface/50 border-border text-text-muted hover:text-text-primary hover:border-border/80'
               }`}
             >
-              Linked to Films
+              With Releases
             </button>
           </div>
 
           {/* Search, Type & Sorting Controls */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] gap-3">
-            <div className="relative">
-              <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted w-4 h-4" />
+          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+            <div className="relative min-w-[220px] flex-1 sm:flex-initial">
+              <Icon icon="solar:magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted w-3.5 h-3.5 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search studio by name, type, or specialty..."
+                placeholder="Search studios..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-bg border border-border rounded-xl text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-colors"
+                className="w-full pl-9 pr-7 py-2 bg-surface/50 hover:bg-surface border border-border rounded-xl text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-brand transition-colors"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                >
+                  <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="bg-bg border border-border rounded-xl px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand capitalize"
-              aria-label="Filter by company type"
+              className="bg-surface/50 hover:bg-surface border border-border rounded-xl px-3 py-2 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand capitalize cursor-pointer"
+              aria-label="Filter by studio type"
             >
-              <option value="all">All Studio Types</option>
+              <option value="all">All Types</option>
               {typeOptions.map((t) => (
                 <option key={t} value={t} className="capitalize">{t}</option>
               ))}
@@ -563,43 +472,43 @@ export default function Companies() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="bg-bg border border-border rounded-xl px-3 py-2.5 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand"
+              className="bg-surface/50 hover:bg-surface border border-border rounded-xl px-3 py-2 text-xs font-semibold text-text-primary focus:outline-none focus:border-brand cursor-pointer"
               aria-label="Sort studios"
             >
-              <option value="box_office">Highest Box Office Earnings (₦)</option>
-              <option value="views">Most YouTube Views (▶)</option>
-              <option value="films">Most Catalog Releases</option>
-              <option value="founded">Newest Founded Studio</option>
-              <option value="name">Studio Name A–Z</option>
+              <option value="box_office">Box Office (High to Low)</option>
+              <option value="views">YouTube Views (High to Low)</option>
+              <option value="films">Film Releases (High to Low)</option>
+              <option value="founded">Year Founded</option>
+              <option value="name">Name (A–Z)</option>
             </select>
           </div>
 
         </div>
       </section>
 
-      {/* ─── 4. COMPANIES DIRECTORY GRID ─── */}
+      {/* ─── 3. COMPANIES DIRECTORY GRID ─── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <CompanySkeleton key={i} />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-24 bg-surface rounded-2xl border border-border">
-            <Icon icon="solar:buildings-linear" className="text-5xl mx-auto mb-3 opacity-30 text-brand" />
-            <h3 className="text-lg font-bold text-text-primary mb-1">No studios match these filters</h3>
+          <div className="text-center py-20 bg-surface/50 rounded-2xl border border-border/70">
+            <Icon icon="solar:buildings-linear" className="text-4xl mx-auto mb-3 opacity-30 text-brand" />
+            <h3 className="text-base font-bold text-text-primary mb-1">No studios match these filters</h3>
             <p className="text-xs text-text-muted mb-4">Try adjusting your search term or metric filter.</p>
             <button
               type="button"
               onClick={clearFilters}
-              className="px-5 py-2.5 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-colors cursor-pointer"
             >
               Reset Filters
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {filtered.map((company) => (
               <CompanyCard
                 key={company.id}

@@ -29,11 +29,13 @@ const supabase = (SUPABASE_URL && SUPABASE_KEY)
 
 // Known siteTokens and config mappings for Nigerian Cinema chains
 const KNOWN_TOKENS: Record<string, { adapter: string; config: Record<string, any> }> = {
-  'ikeja': { adapter: 'veezi', config: { siteToken: '4x3z2wcre0rek2beab5w344ae0' } },
-  'jabi': { adapter: 'veezi', config: { siteToken: 'ntfpkgyc0phrmzxb2ctk828vd4' } },
+  'ikeja': { adapter: 'veezi', config: { siteToken: '9chn7w68550a7sxgexpdng2ndm' } },
+  'jabi': { adapter: 'veezi', config: { siteToken: 'ypr75qx9nh88brqya85qtg3wqc' } },
+  'sec': { adapter: 'veezi', config: { siteToken: 'ntfpkgyc0phrmzxb2ctk828vd4' } },
   'abuja': { adapter: 'veezi', config: { siteToken: 'ntfpkgyc0phrmzxb2ctk828vd4' } },
-  'galleria': { adapter: 'veezi', config: { siteToken: '9z2w1vcre0rek2beab5w344ae1' } },
-  'victoria island': { adapter: 'veezi', config: { siteToken: '9z2w1vcre0rek2beab5w344ae1' } },
+  'galleria': { adapter: 'veezi', config: { siteToken: '4x3z2wcre0rek2beab5w344ae0' } },
+  'victoria island': { adapter: 'veezi', config: { siteToken: '4x3z2wcre0rek2beab5w344ae0' } },
+  'kaduna': { adapter: 'veezi', config: { siteToken: 'p2gfjfgyfxmt9hja0jzwvh162w' } },
 };
 
 // Default top cinema configurations in Nigeria
@@ -43,19 +45,31 @@ const DEFAULT_CINEMAS: Partial<CinemaRow>[] = [
     name: 'Silverbird Cinemas Ikeja City Mall',
     chain: 'Silverbird',
     scrape_adapter: 'veezi',
-    scrape_config: { siteToken: '4x3z2wcre0rek2beab5w344ae0' },
+    scrape_config: { siteToken: '9chn7w68550a7sxgexpdng2ndm' },
   },
   {
     name: 'Silverbird Cinemas Jabi Lake Abuja',
     chain: 'Silverbird',
     scrape_adapter: 'veezi',
-    scrape_config: { siteToken: 'ntfpkgyc0phrmzxb2ctk828vd4' },
+    scrape_config: { siteToken: 'ypr75qx9nh88brqya85qtg3wqc' },
   },
   {
     name: 'Silverbird Cinemas Galleria VI',
     chain: 'Silverbird',
     scrape_adapter: 'veezi',
-    scrape_config: { siteToken: '9z2w1vcre0rek2beab5w344ae1' },
+    scrape_config: { siteToken: '4x3z2wcre0rek2beab5w344ae0' },
+  },
+  {
+    name: 'Silverbird Entertainment Centre Abuja',
+    chain: 'Silverbird',
+    scrape_adapter: 'veezi',
+    scrape_config: { siteToken: 'ntfpkgyc0phrmzxb2ctk828vd4' },
+  },
+  {
+    name: 'Silverbird Cinemas Galaxy Mall Kaduna',
+    chain: 'Silverbird',
+    scrape_adapter: 'veezi',
+    scrape_config: { siteToken: 'p2gfjfgyfxmt9hja0jzwvh162w' },
   },
 
   // ── FILMHOUSE CINEMAS ──

@@ -51,7 +51,7 @@ export async function cinemaFetch(url: string, options: CinemaFetchOptions = {})
     const directRes = await fetch(url, {
       ...options,
       headers,
-      signal: AbortSignal.timeout(Math.min(timeoutMs, 8000)),
+      signal: AbortSignal.timeout(Math.min(timeoutMs, 20000)),
     });
 
     if (directRes.ok) {

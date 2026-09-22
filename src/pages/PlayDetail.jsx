@@ -25,29 +25,8 @@ export default function PlayDetail() {
     load();
   }, [slug]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!play) {
-    return (
-      <div className="min-h-screen bg-bg text-text-primary flex flex-col items-center justify-center p-6 text-center">
-        <Icon icon="solar:masks-line-duotone" className="w-20 h-20 text-text-muted opacity-40 mb-4" />
-        <h1 className="text-2xl font-bold text-text-primary mb-2">Stage Play Not Found</h1>
-        <p className="text-text-muted text-sm mb-6 max-w-md">We couldn't find a theatrical play matching this page.</p>
-        <Link to="/plays" className="px-6 py-2.5 rounded-xl bg-brand text-on-brand font-bold hover:bg-brand-hover transition-colors text-sm">
-          Return to Theatre Index
-        </Link>
-      </div>
-    );
-  }
-
-  const rawCredits = play.credits || [];
-  const playDateLabel = getPlayDateLabel(play, '');
+  const rawCredits = play?.credits || [];
+  const playDateLabel = play ? getPlayDateLabel(play, '') : '';
 
   // Deduplicate performers by person ID or name to prevent repeated cards for multi-hyphenate roles
   const uniquePerformers = React.useMemo(() => {
@@ -97,6 +76,27 @@ export default function PlayDetail() {
       };
     });
   }, [rawCredits]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!play) {
+    return (
+      <div className="min-h-screen bg-bg text-text-primary flex flex-col items-center justify-center p-6 text-center">
+        <Icon icon="solar:masks-line-duotone" className="w-20 h-20 text-text-muted opacity-40 mb-4" />
+        <h1 className="text-2xl font-bold text-text-primary mb-2">Stage Play Not Found</h1>
+        <p className="text-text-muted text-sm mb-6 max-w-md">We couldn't find a theatrical play matching this page.</p>
+        <Link to="/plays" className="px-6 py-2.5 rounded-xl bg-brand text-on-brand font-bold hover:bg-brand-hover transition-colors text-sm">
+          Return to Theatre Index
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg text-text-primary pb-20">

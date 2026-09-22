@@ -35,6 +35,9 @@ export interface ScrapedShowtime {
     rating?: string | null;        // e.g. "PG-13", "18"
     releaseYear?: number | null;
     genres?: string[];
+    actors?: string[];
+    directors?: string[];
+    isNollywood?: boolean;
   };
 
   /** Showtime itself, in local Nigeria time. */

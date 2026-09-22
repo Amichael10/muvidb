@@ -50,7 +50,7 @@ async function resolveFromTmdb(
   try {
     const search = await fetch(
       `https://api.themoviedb.org/3/search/movie?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(title)}`,
-      { signal: AbortSignal.timeout(10000) }
+      { signal: AbortSignal.timeout(2500) }
     );
     if (!search.ok) return null;
 
@@ -63,7 +63,7 @@ async function resolveFromTmdb(
 
     const detailsResponse = await fetch(
       `https://api.themoviedb.org/3/movie/${candidate.id}?api_key=${encodeURIComponent(apiKey)}&append_to_response=videos`,
-      { signal: AbortSignal.timeout(10000) }
+      { signal: AbortSignal.timeout(2500) }
     );
     if (!detailsResponse.ok) return null;
 
@@ -124,17 +124,65 @@ async function resolveFromTmdb(
   }
 }
 
+export async function resolveFromMeta(
+  supabase: SupabaseClient,
+  title: string,
+  source: string,
+  meta?: ScrapedShowtime['filmMeta'],
+): Promise<CinemaResolvedFilm | null> {
+  if (!meta?.isNollywood) return null;
+
+  const payload = {
+    title,
+    synopsis: meta.synopsis || null,
+    year: meta.releaseYear || new Date().getFullYear(),
+    poster_url: meta.posterUrl || null,
+    backdrop_url: meta.backdropUrl || null,
+    runtime_minutes: meta.runtimeMinutes || null,
+    genres: meta.genres?.length ? meta.genres : ['Drama'],
+    nfvcb_rating: meta.rating && ['G', 'PG', 'PG-13', '12A', '12', '15', '18'].includes(meta.rating.trim().toUpperCase()) ? meta.rating.trim().toUpperCase() : null,
+    source: `cinema-enrichment:${source}`,
+    release_type: 'cinema',
+    status: 'released',
+    is_nollywood: true,
+    is_in_cinemas: true,
+    coming_soon: false,
+    is_published: true,
+    needs_review: true,
+  };
+
+  const { data, error } = await supabase
+    .from('films')
+    .insert(payload)
+    .select('id,title,poster_url,backdrop_url,is_in_cinemas,synopsis,runtime_minutes,genres,year,nfvcb_rating,trailer_external_url')
+    .single();
+
+  if (!error && data) return data as CinemaResolvedFilm;
+  return null;
+}
+
 export function resolveMissingNollywoodFilm(
   supabase: SupabaseClient,
   title: string,
   source: string,
+  meta?: ScrapedShowtime['filmMeta'],
 ): Promise<CinemaResolvedFilm | null> {
   const key = normalizedTitle(title);
   if (!resolutionCache.has(key)) {
-    resolutionCache.set(key, resolveFromTmdb(supabase, title, source).catch((error) => {
-      console.error(`[cinema-resolver] TMDB lookup failed for "${title}":`, error);
+    resolutionCache.set(key, (async () => {
+      const fromTmdb = await resolveFromTmdb(supabase, title, source).catch((error) => {
+        console.error(`[cinema-resolver] TMDB lookup failed for "${title}":`, error);
+        return null;
+      });
+      if (fromTmdb) return fromTmdb;
+      if (meta?.isNollywood) {
+        return resolveFromMeta(supabase, title, source, meta).catch((error) => {
+          console.error(`[cinema-resolver] Meta lookup failed for "${title}":`, error);
+          return null;
+        });
+      }
       return null;
-    }));
+    })());
   }
   return resolutionCache.get(key)!;
 }
@@ -155,9 +203,10 @@ export function scrapedFilmUpdates(
   if (!film.trailer_external_url && meta.trailerUrl) updates.trailer_external_url = meta.trailerUrl;
 
   const rating = meta.rating?.trim().toUpperCase();
-  if (!film.nfvcb_rating && rating && ['G', 'PG', 'PG-13', '15', '18'].includes(rating)) {
+  if (!film.nfvcb_rating && rating && ['G', 'PG', 'PG-13', '12A', '12', '15', '18'].includes(rating)) {
     updates.nfvcb_rating = rating;
   }
 
   return updates;
 }
+

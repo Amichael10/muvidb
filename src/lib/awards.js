@@ -87,6 +87,33 @@ export const AWARD_ORGS = [
     tags: ['Diaspora', 'Toronto', 'International', 'Independent', 'Showcase'],
   },
   {
+    id: 'BINFF',
+    label: 'BINFF',
+    full: 'Brampton International Nollywood Film Festival',
+    tagline: 'Spotlighting Nollywood and African Diaspora Cinema in Canada',
+    category: 'festival',
+    location: 'Brampton, Ontario, Canada / Nigeria',
+    frequency: 'Annual (September)',
+    founded: 2021,
+    accent: '#D97706',
+    about:
+      'The Brampton International Nollywood Film Festival (BINFF) is an annual Canadian film festival and sister platform to TINFF, dedicated to showcasing Nollywood, African cinema, and global multicultural films. Founded to build strong cultural and industry bridges between Canada and the Nigerian film industry, BINFF celebrates outstanding achievements in feature films, shorts, television, web series, and technical craft.',
+    when:
+      'Held annually in September in Brampton, Ontario, Canada, featuring international screenings, industry panels, workshops, and the grand Gala Awards ceremony.',
+    submissions:
+      'Filmmakers submit via FilmFreeway and the official BINFF portal across categories including Best Film Nollywood, Best Director, Best Actor/Actress, Best Television/Web Series, and Technical Craft.',
+    entryPlan: {
+      fees: 'Standard Festival Fee ($25 – $55 on FilmFreeway)',
+      eligibility: 'Nollywood, African, Canadian, and international feature films, shorts, documentaries, and web series.',
+      formats: 'HD / 4K Digital screener via FilmFreeway / Vimeo.',
+      categoriesCount: '25+ Film, Television & Craft Categories',
+      platform: 'FilmFreeway & BINFF Official Portal',
+    },
+    submitUrl: 'https://www.binff.net/',
+    submitLabel: 'BINFF Official Portal',
+    tags: ['Brampton', 'Canada', 'Nollywood', 'Diaspora', 'Festival', 'TINFF Sister Festival', 'Web Series', 'African Cinema'],
+  },
+  {
     id: 'DIYMA',
     label: 'DIYMA',
     full: 'Distinct Indigenous Yoruba Movie Awards',
@@ -724,6 +751,7 @@ export function normOrg(raw) {
   if (upper.includes('AMVCA') || upper.includes('AFRICA MAGIC')) return 'AMVCA';
   if (upper.includes('AMAA') || upper.includes('AFRICA MOVIE ACADEMY')) return 'AMAA';
   if (upper.includes('TINFF') || upper.includes('INDUSTRY NOLLYWOOD')) return 'TINFF';
+  if (upper.includes('BINFF') || upper.includes('BRAMPTON INTERNATIONAL') || upper.includes('BRAMPTON NOLLYWOOD')) return 'BINFF';
   if (upper.includes('DIYMA') || upper.includes('DISTINCT INDIGENOUS')) return 'DIYMA';
   if (upper.includes('NTFF') || upper.includes('NOLLYWOOD TRAVEL') || upper.includes('TRAVEL FILM FESTIVAL')) return 'NTFF';
   if (upper.includes('AIFF') || upper.includes('ABUJA INTERNATIONAL') || upper.includes('ABUJA FILM')) return 'AIFF';

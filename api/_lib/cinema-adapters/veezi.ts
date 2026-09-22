@@ -15,6 +15,7 @@
 import type { AdapterResult, CinemaAdapter, CinemaRow, ScrapedShowtime } from './types.js';
 import { inferFormat } from './types.js';
 import { cinemaFetch } from './cinema-fetch.js';
+import { getSilverbirdEnrichment } from './silverbird-enricher.js';
 
 const VEEZI_BASE = 'https://ticketing.eu.veezi.com';
 const VEEZI_PURCHASE_BASE = 'https://ticketing.eu.veezi.com/purchase';
@@ -89,7 +90,16 @@ function parseVeeziTime(timeStr: string): string | null {
  * Strip HTML tags from a string.
  */
 function stripTags(html: string): string {
-  return html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&#39;/g, "'")
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8211;/g, "-")
+    .replace(/&#38;/g, '&')
+    .replace(/&amp;/g, '&')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -110,9 +120,9 @@ function extractTagContent(html: string, tagName: string): string | null {
 function parseVeeziHtml(html: string, siteToken: string): ScrapedShowtime[] {
   const showtimes: ScrapedShowtime[] = [];
 
-  // Split into per-film blocks: <div class="film" ...> ... </div> (until next film or end)
+  // Split into per-film blocks: <div class="film ..." ...> ... </div> (until next film or end)
   // Each film block contains: title, censor rating, poster img, and multiple date-containers
-  const filmBlocks = html.split(/<div\s+class=["']film["']/i).slice(1);
+  const filmBlocks = html.split(/<div[^>]+class=["'][^"']*\bfilm\b[^"']*["'][^>]*>/i).slice(1);
 
   for (const block of filmBlocks) {
     // Film title: <h3 class="title">Film Title</h3>
@@ -131,18 +141,20 @@ function parseVeeziHtml(html: string, siteToken: string): ScrapedShowtime[] {
     // Poster: <img class="poster" src="/Media/Poster?siteToken=...&code=...">
     let posterUrl: string | undefined;
     const posterMatch = block.match(/<img[^>]+class=["']poster["'][^>]+src=["']([^"']+)["']/i)
-      || block.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']poster["']/i);
+      || block.match(/<img[^>]+src=["']([^"']+)["'][^>]+class=["']poster["']/i)
+      || block.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
     if (posterMatch) {
       const src = posterMatch[1].replace(/&amp;/g, '&');
       posterUrl = src.startsWith('http') ? src : `${VEEZI_BASE}${src.startsWith('/') ? '' : '/'}${src}`;
     }
 
-    // Split film block into date-containers: <div class="date-container"> ...
-    const dateContainers = block.split(/<div\s+class=["']date-container["']/i).slice(1);
+    // Split film block into date-containers: <div class="date-container ..."> ...
+    const dateContainers = block.split(/<div[^>]+class=["'][^"']*\bdate-container\b[^"']*["'][^>]*>/i).slice(1);
 
     for (const dateBlock of dateContainers) {
-      // Date: <h4 class="date">Sunday 19, April</h4>
-      const dateMatch = dateBlock.match(/<h4\s+class=["']date["'][^>]*>([\s\S]*?)<\/h4>/i);
+      // Date: <h4 class="date">Sunday 19, April</h4> or <h3 class="date">...</h3>
+      const dateMatch = dateBlock.match(/<h[34][^>]*class=["'][^"']*date[^"']*["'][^>]*>([\s\S]*?)<\/h[34]>/i)
+        || dateBlock.match(/<h[34][^>]*>([\s\S]*?)<\/h[34]>/i);
       if (!dateMatch) continue;
       const rawDate = stripTags(dateMatch[1]);
       const showDate = parseVeeziDate(rawDate);
@@ -238,7 +250,7 @@ export const veeziAdapter: CinemaAdapter = async (cinema: CinemaRow): Promise<Ad
   }
 
   // Quick sanity check — the widget HTML always contains this class
-  if (!html.includes('session-times') && !html.includes('class="film"')) {
+  if (!html.includes('session-times') && !html.includes('film')) {
     return {
       cinemaId: cinema.id,
       showtimes: [],
@@ -247,6 +259,34 @@ export const veeziAdapter: CinemaAdapter = async (cinema: CinemaRow): Promise<Ad
   }
 
   const showtimes = parseVeeziHtml(html, siteToken);
+
+  // Automatically enrich with Silverbird website metadata (HD backdrops, HD posters, ratings, runtime, ensemble credits)
+  try {
+    const enrichedFilms = new Map<string, any>();
+    for (const st of showtimes) {
+      if (!enrichedFilms.has(st.filmTitle)) {
+        enrichedFilms.set(st.filmTitle, await getSilverbirdEnrichment(st.filmTitle));
+      }
+      const enrichment = enrichedFilms.get(st.filmTitle);
+      if (enrichment) {
+        st.filmMeta = {
+          ...st.filmMeta,
+          synopsis: enrichment.synopsis || st.filmMeta?.synopsis,
+          posterUrl: enrichment.posterUrl || st.filmMeta?.posterUrl,
+          backdropUrl: enrichment.backdropUrl || st.filmMeta?.backdropUrl,
+          runtimeMinutes: enrichment.runtimeMinutes || st.filmMeta?.runtimeMinutes,
+          rating: enrichment.rating || st.filmMeta?.rating,
+          releaseYear: enrichment.releaseYear || st.filmMeta?.releaseYear,
+          genres: enrichment.genres?.length ? enrichment.genres : st.filmMeta?.genres,
+          actors: enrichment.actors?.length ? enrichment.actors : undefined,
+          directors: enrichment.directors?.length ? enrichment.directors : undefined,
+          isNollywood: enrichment.isNollywood,
+        };
+      }
+    }
+  } catch (enrichErr: any) {
+    console.warn(`[veezi] Silverbird enrichment notice: ${enrichErr.message}`);
+  }
 
   const warnings: string[] = [];
   if (showtimes.length === 0) {

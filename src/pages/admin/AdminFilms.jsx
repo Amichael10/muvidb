@@ -7,6 +7,7 @@ import ConfirmModal from '../../components/admin/ConfirmModal';
 import MergeModal from '../../components/admin/MergeModal';
 import ImageField from '../../components/admin/ImageField';
 import AwardsEditor from '../../components/admin/AwardsEditor';
+import { syncFilmAwardsToPeople } from '../../lib/awardsSync';
 import CriticReviewsEditor from '../../components/admin/CriticReviewsEditor';
 import YouTubeFilmImport from '../../components/admin/YouTubeFilmImport';
 import { ALL_ROLES, canonicalizeRole } from '../../lib/creditRoles';
@@ -1397,6 +1398,15 @@ export default function AdminFilms() {
 
       const actionType = editingFilm ? 'update' : 'create';
       await logAdminAction(user, actionType, 'film', filmId, cleanFilmPayload.title, { year: cleanFilmPayload.year });
+
+      // Auto-sync film awards to matching people profiles
+      if (cleanFilmPayload.awards?.length) {
+        try {
+          await syncFilmAwardsToPeople(filmId, cleanFilmPayload.title, cleanFilmPayload.awards);
+        } catch (syncErr) {
+          console.warn('Film awards auto-sync to people had non-fatal error:', syncErr);
+        }
+      }
 
       toast.success('Film saved successfully');
       clearDraft();
