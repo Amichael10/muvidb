@@ -55,9 +55,9 @@ export default function AwardsEditor({ value, onChange, variant }) {
           No awards yet. Click &quot;Add award&quot; to record a win or nomination.
         </p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {awards.map((award, idx) => (
-            <div key={idx} className="rounded-lg border border-border bg-surface-2/30 p-3 space-y-3">
+            <div key={idx} className="rounded-xl border border-border bg-surface-2/30 p-4 space-y-3.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1 p-1 bg-surface rounded-lg border border-border">
                   <button
@@ -82,64 +82,91 @@ export default function AwardsEditor({ value, onChange, variant }) {
                 <button
                   type="button"
                   onClick={() => onChange(awards.filter((_, i) => i !== idx))}
-                  className="text-text-muted hover:text-red-500 transition-colors"
+                  className="p-1.5 text-text-muted hover:text-red-500 hover:bg-surface rounded-lg transition-colors"
                   title="Remove this award"
                 >
                   <Icon icon="solar:trash-bin-trash-linear" width="16" />
                 </button>
               </div>
 
-              {/* Organization, Year, Season */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <SearchableOrgPicker
-                  value={award.organization || ''}
-                  onChange={(org) => update(idx, { organization: org })}
-                />
-                <input
-                  type="number"
-                  placeholder="Year (e.g. 2024)"
-                  value={award.year || ''}
-                  onChange={(e) => update(idx, { year: e.target.value })}
-                  className="bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
-                />
-                <input
-                  type="number"
-                  placeholder="Season (e.g. 10)"
-                  value={award.season || ''}
-                  onChange={(e) => update(idx, { season: e.target.value })}
-                  className="bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
-                />
+              <div className="space-y-3">
+                {/* 1. Award Ceremony / Organization */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
+                    Award Ceremony / Festival
+                  </label>
+                  <SearchableOrgPicker
+                    value={award.organization || ''}
+                    onChange={(org) => update(idx, { organization: org })}
+                  />
+                </div>
+
+                {/* 2. Year and Season */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
+                      Year
+                    </label>
+                    <SearchableYearPicker
+                      value={award.year || ''}
+                      onChange={(yr) => update(idx, { year: yr })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
+                      Season / Edition (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 10"
+                      value={award.season || ''}
+                      onChange={(e) => update(idx, { season: e.target.value })}
+                      className="w-full bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Category Combobox */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
+                    Category
+                  </label>
+                  <SearchableCategoryPicker
+                    organization={award.organization}
+                    value={award.category || ''}
+                    onChange={(cat) => update(idx, { category: cat })}
+                  />
+                </div>
+
+                {/* 4. Film or Recipients */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
+                    {variant === 'person' ? 'Associated Movie / Project' : 'Recipients'}
+                  </label>
+                  {variant === 'person' ? (
+                    <FilmWorkPicker
+                      work={award.work || ''}
+                      filmId={award.film_id || null}
+                      onChange={({ work, film_id }) => update(idx, { work, film_id })}
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Recipients, comma separated (e.g. BB Sasore, Kemi Adetiba)"
+                      value={(award.recipients || []).join(', ')}
+                      onChange={(e) =>
+                        update(idx, {
+                          recipients: e.target.value
+                            .split(',')
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      className="w-full bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
+                    />
+                  )}
+                </div>
               </div>
-
-              {/* Category Combobox */}
-              <SearchableCategoryPicker
-                organization={award.organization}
-                value={award.category || ''}
-                onChange={(cat) => update(idx, { category: cat })}
-              />
-
-              {variant === 'person' ? (
-                <FilmWorkPicker
-                  work={award.work || ''}
-                  filmId={award.film_id || null}
-                  onChange={({ work, film_id }) => update(idx, { work, film_id })}
-                />
-              ) : (
-                <input
-                  type="text"
-                  placeholder="Recipients, comma separated (e.g. BB Sasore, Kemi Adetiba)"
-                  value={(award.recipients || []).join(', ')}
-                  onChange={(e) =>
-                    update(idx, {
-                      recipients: e.target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    })
-                  }
-                  className="w-full bg-surface border border-border p-2 rounded-lg text-xs focus:border-brand outline-none"
-                />
-              )}
             </div>
           ))}
         </div>
@@ -149,7 +176,7 @@ export default function AwardsEditor({ value, onChange, variant }) {
 }
 
 /**
- * Searchable Award Organization Combobox with suggestions from AWARD_ORGS and '+ Create New'
+ * Searchable Award Organization Combobox with deduplicated list and clean wide popover
  */
 function SearchableOrgPicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -168,18 +195,29 @@ function SearchableOrgPicker({ value, onChange }) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
 
+  // Strict deduplication of AWARD_ORGS by ID
+  const uniqueOrgs = useMemo(() => {
+    const seen = new Set();
+    return AWARD_ORGS.filter((o) => {
+      const key = (o.id || '').toUpperCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, []);
+
   const filteredOrgs = useMemo(() => {
     const q = (query || '').trim().toLowerCase();
-    if (!q) return AWARD_ORGS;
-    return AWARD_ORGS.filter(
+    if (!q) return uniqueOrgs;
+    return uniqueOrgs.filter(
       (o) =>
         o.id.toLowerCase().includes(q) ||
         o.label.toLowerCase().includes(q) ||
         (o.full && o.full.toLowerCase().includes(q))
     );
-  }, [query]);
+  }, [uniqueOrgs, query]);
 
-  const exactMatch = AWARD_ORGS.some(
+  const exactMatch = uniqueOrgs.some(
     (o) =>
       o.id.toLowerCase() === (query || '').trim().toLowerCase() ||
       o.label.toLowerCase() === (query || '').trim().toLowerCase()
@@ -187,11 +225,11 @@ function SearchableOrgPicker({ value, onChange }) {
 
   return (
     <div className="relative" ref={wrapRef}>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Organization (e.g. AMVCA, DIYMA)"
+            placeholder="Search award body (e.g. OAFP, AMVCA, DIYMA)..."
             value={query}
             onChange={(e) => {
               const val = e.target.value;
@@ -200,15 +238,15 @@ function SearchableOrgPicker({ value, onChange }) {
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
-            className="w-full bg-surface border border-border p-2 pr-7 rounded-lg text-xs font-semibold focus:border-brand outline-none"
+            className="w-full bg-surface border border-border p-2.5 pr-8 rounded-lg text-xs font-semibold focus:border-brand outline-none transition-colors"
           />
           <button
             type="button"
             tabIndex={-1}
             onClick={() => setOpen(!open)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
           >
-            <Icon icon={open ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} width="13" />
+            <Icon icon={open ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} width="14" />
           </button>
         </div>
         <button
@@ -222,7 +260,7 @@ function SearchableOrgPicker({ value, onChange }) {
               setOpen(true);
             }
           }}
-          className="p-2 rounded-lg bg-surface border border-border hover:border-brand/50 text-text-muted hover:text-brand transition-colors"
+          className="p-2.5 rounded-lg bg-surface border border-border hover:border-brand/50 text-text-muted hover:text-brand transition-colors flex items-center gap-1 text-xs font-bold"
           title="Create or select organization"
         >
           <Icon icon="solar:add-circle-bold" width="16" />
@@ -230,7 +268,7 @@ function SearchableOrgPicker({ value, onChange }) {
       </div>
 
       {open && (
-        <div className="absolute z-40 left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface shadow-2xl">
+        <div className="absolute z-50 left-0 w-full min-w-[320px] max-w-[92vw] top-full mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl backdrop-blur-xl">
           {query.trim() && !exactMatch && (
             <button
               type="button"
@@ -240,9 +278,9 @@ function SearchableOrgPicker({ value, onChange }) {
                 setQuery(custom);
                 setOpen(false);
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left bg-brand/10 hover:bg-brand/20 text-brand border-b border-border text-xs font-bold transition-colors"
+              className="w-full flex items-center gap-2 px-3.5 py-2.5 text-left bg-brand/10 hover:bg-brand/20 text-brand border-b border-border text-xs font-bold transition-colors"
             >
-              <Icon icon="solar:add-circle-linear" width="14" />
+              <Icon icon="solar:add-circle-linear" width="16" />
               <span>Use custom: &quot;{query.trim()}&quot;</span>
             </button>
           )}
@@ -261,21 +299,33 @@ function SearchableOrgPicker({ value, onChange }) {
                   setQuery(org.id);
                   setOpen(false);
                 }}
-                className={`w-full flex flex-col items-start px-3 py-1.5 text-left border-b border-border/40 hover:bg-surface-2 transition-colors ${
+                className={`w-full flex flex-col items-start px-3.5 py-2.5 text-left border-b border-border/30 hover:bg-surface-2 transition-colors ${
                   isSelected ? 'bg-brand/15 text-brand font-bold' : ''
                 }`}
               >
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-xs font-bold text-text-primary">
-                    {org.label || org.id}
-                  </span>
+                <div className="flex items-center justify-between w-full gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded">
+                      {org.id}
+                    </span>
+                    <span className="text-xs font-bold text-text-primary">
+                      {org.label !== org.id ? org.label : ''}
+                    </span>
+                  </div>
                   {org.founded && (
-                    <span className="text-[10px] text-text-muted font-mono">est. {org.founded}</span>
+                    <span className="text-[10px] text-text-muted font-mono whitespace-nowrap">
+                      est. {org.founded}
+                    </span>
                   )}
                 </div>
                 {org.full && (
-                  <span className="text-[10px] text-text-muted truncate max-w-full">
+                  <span className="text-[11px] text-text-muted mt-1 leading-snug">
                     {org.full}
+                  </span>
+                )}
+                {org.location && (
+                  <span className="text-[10px] text-text-muted/80 mt-0.5 flex items-center gap-1">
+                    <Icon icon="solar:map-point-linear" width="10" /> {org.location}
                   </span>
                 )}
               </button>
@@ -283,8 +333,97 @@ function SearchableOrgPicker({ value, onChange }) {
           })}
 
           {filteredOrgs.length === 0 && !query.trim() && (
-            <p className="px-3 py-2 text-xs text-text-muted italic">Type to search or add organization</p>
+            <p className="px-3.5 py-3 text-xs text-text-muted italic">Type to search or enter organization</p>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Scrollable Year Picker with quick selection of recent years or typing any year
+ */
+function SearchableYearPicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value ? String(value) : '');
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(value ? String(value) : '');
+  }, [value]);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  const years = useMemo(() => {
+    const currentYear = new Date().getFullYear() + 1; // 2026
+    const list = [];
+    for (let y = currentYear; y >= 2010; y--) {
+      list.push(y);
+    }
+    return list;
+  }, []);
+
+  const filteredYears = useMemo(() => {
+    const q = (query || '').trim();
+    if (!q) return years;
+    return years.filter((y) => String(y).includes(q));
+  }, [years, query]);
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <div className="relative">
+        <input
+          type="number"
+          placeholder="Year (e.g. 2023)"
+          value={query}
+          onChange={(e) => {
+            const val = e.target.value;
+            setQuery(val);
+            onChange(val);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          className="w-full bg-surface border border-border p-2 pr-7 rounded-lg text-xs focus:border-brand outline-none font-semibold"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setOpen(!open)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+        >
+          <Icon icon={open ? "solar:alt-arrow-up-linear" : "solar:alt-arrow-down-linear"} width="13" />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1.5 max-h-48 overflow-y-auto rounded-lg border border-border bg-surface shadow-2xl">
+          {filteredYears.map((yr) => {
+            const isSelected = String(value) === String(yr);
+            return (
+              <button
+                key={yr}
+                type="button"
+                onClick={() => {
+                  onChange(String(yr));
+                  setQuery(String(yr));
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-1.5 text-left border-b border-border/30 hover:bg-surface-2 transition-colors text-xs ${
+                  isSelected ? 'bg-brand/15 text-brand font-bold' : 'text-text-primary'
+                }`}
+              >
+                <span>{yr}</span>
+                {isSelected && <Icon icon="solar:check-read-linear" className="text-brand" width="14" />}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -329,7 +468,7 @@ function SearchableCategoryPicker({ organization, value, onChange }) {
 
   return (
     <div className="relative" ref={wrapRef}>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <div className="relative flex-1">
           <input
             type="text"
@@ -372,7 +511,7 @@ function SearchableCategoryPicker({ organization, value, onChange }) {
       </div>
 
       {open && (
-        <div className="absolute z-40 left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface shadow-2xl">
+        <div className="absolute z-50 left-0 w-full min-w-[300px] max-w-[92vw] top-full mt-1.5 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface shadow-2xl">
           {query.trim() && !exactMatch && (
             <button
               type="button"
@@ -382,7 +521,7 @@ function SearchableCategoryPicker({ organization, value, onChange }) {
                 setQuery(custom);
                 setOpen(false);
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left bg-brand/10 hover:bg-brand/20 text-brand border-b border-border text-xs font-bold transition-colors"
+              className="w-full flex items-center gap-2 px-3.5 py-2 text-left bg-brand/10 hover:bg-brand/20 text-brand border-b border-border text-xs font-bold transition-colors"
             >
               <Icon icon="solar:add-circle-linear" width="14" />
               <span>Create new: &quot;{query.trim()}&quot;</span>
@@ -400,7 +539,7 @@ function SearchableCategoryPicker({ organization, value, onChange }) {
                   setQuery(cat);
                   setOpen(false);
                 }}
-                className={`w-full flex items-center justify-between px-3 py-1.5 text-left border-b border-border/40 hover:bg-surface-2 transition-colors ${
+                className={`w-full flex items-center justify-between px-3.5 py-2 text-left border-b border-border/40 hover:bg-surface-2 transition-colors ${
                   isSelected ? 'bg-brand/15 text-brand font-bold' : 'text-text-primary'
                 }`}
               >
@@ -411,7 +550,7 @@ function SearchableCategoryPicker({ organization, value, onChange }) {
           })}
 
           {filteredCategories.length === 0 && !query.trim() && (
-            <p className="px-3 py-2 text-xs text-text-muted italic">Type to search or enter category</p>
+            <p className="px-3.5 py-3 text-xs text-text-muted italic">Type to search or enter category</p>
           )}
         </div>
       )}
@@ -518,7 +657,7 @@ function FilmWorkPicker({ work, filmId, onChange }) {
         </p>
       )}
       {open && query.trim().length >= 2 && (
-        <div className="absolute z-30 left-0 right-0 top-full mt-1 rounded-lg border border-border bg-surface shadow-xl overflow-hidden">
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 rounded-lg border border-border bg-surface shadow-xl overflow-hidden">
           {searching && (
             <p className="px-3 py-2 text-[10px] text-text-muted font-bold">Searching…</p>
           )}

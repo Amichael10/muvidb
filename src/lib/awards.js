@@ -654,33 +654,6 @@ export const AWARD_ORGS = [
     tags: ['Amsterdam', 'International', 'Pan-African', 'Independent', 'Global Honours'],
   },
   {
-    id: 'OAFP',
-    label: 'OAFP Awards',
-    full: 'Odunlade Adekola Films Production Awards',
-    tagline: 'Annual Film & Talent Honours Celebrating Yoruba & Nollywood Excellence',
-    category: 'industry',
-    location: 'Abeokuta, Ogun State, Nigeria (OOPL Auditorium)',
-    frequency: 'Annual (December)',
-    founded: 2025,
-    accent: '#EA580C',
-    about:
-      'The Odunlade Adekola Films Production (OAFP) Awards celebrate exceptional achievements, stellar performances, technical brilliance, and cultural resonance across Yoruba cinema and the broader Nollywood creative ecosystem.',
-    when:
-      'Held annually in Abeokuta, Ogun State at the Olusegun Obasanjo Presidential Library (OOPL) Auditorium.',
-    submissions:
-      'Films and creative professionals submitted for annual peer adjudication across acting, directing, indigenous storytelling, and technical craft disciplines.',
-    entryPlan: {
-      fees: 'Annual Submission',
-      eligibility: 'Yoruba and Nollywood indigenous releases and participating industry practitioners.',
-      formats: 'Submitted film screeners and portfolio review.',
-      categoriesCount: '20 Industry & Craft Categories',
-      platform: 'OAFP Official Adjudication',
-    },
-    submitUrl: 'https://instagram.com/oafpawards',
-    submitLabel: 'OAFP Official Channel',
-    tags: ['Abeokuta', 'Yoruba Cinema', 'OAFP', 'Odunlade Adekola', 'Indigenous Excellence'],
-  },
-  {
     id: 'ELOY',
     label: 'ELOY Awards',
     full: 'Exquisite Lady of the Year Awards',
