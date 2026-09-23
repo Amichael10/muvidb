@@ -4,6 +4,55 @@ import { requireApiKey } from './_lib/api_key_guard.js';
 import { supabase } from './_lib/supabase.js';
 
 const MAX_FREE_CATALOG_LIMIT = 500;
+const DEFAULT_PERSON_AVATAR_URL = 'https://muvidb.com/images/person-placeholder.png';
+
+/** Public image URLs must never contain line breaks from imported source data. */
+function publicImageUrl(value: unknown, fallback: string | null = null): string | null {
+  if (typeof value !== 'string') return fallback;
+  const url = value.trim().replace(/[\r\n]+/g, '');
+  return url || fallback;
+}
+
+function serializePerson(person: any, media: any[] = []) {
+  const approvedMedia = media.filter((item) => item.status === 'approved');
+  const primaryPhoto = approvedMedia.find((item) => item.media_type === 'photo' && item.is_primary)
+    || approvedMedia.find((item) => item.media_type === 'photo');
+  const avatarUrl = publicImageUrl(person.photo_url)
+    || publicImageUrl(primaryPhoto?.thumbnail_url)
+    || publicImageUrl(primaryPhoto?.url)
+    || DEFAULT_PERSON_AVATAR_URL;
+
+  return {
+    id: person.id,
+    slug: person.slug,
+    name: person.name,
+    // Keep avatar_url for existing API clients and expose the database field too.
+    avatar_url: avatarUrl,
+    photo_url: avatarUrl,
+    primary_department: person.known_for_department ?? null,
+    known_for_department: person.known_for_department ?? null,
+    biography: person.bio ?? null,
+    bio: person.bio ?? null,
+    gender: person.gender ?? null,
+    birth_date: person.date_of_birth ?? null,
+    birth_place: person.birthplace ?? null,
+    film_count: person.film_count ?? 0,
+    social_links: {
+      instagram: person.instagram_url ?? null,
+      facebook: person.facebook_url ?? null,
+      twitter: person.twitter_url ?? null,
+      tiktok: person.tiktok_url ?? null,
+    },
+  };
+}
+
+function serializeFilmImages(film: any) {
+  return {
+    ...film,
+    poster_url: publicImageUrl(film.poster_url),
+    backdrop_url: publicImageUrl(film.backdrop_url),
+  };
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -85,18 +134,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .select(`
           id,
           role,
-          department,
-          credit_order,
-          is_lead,
-          people(id, name, slug, avatar_url, primary_department)
+          billing_order,
+          character_name,
+          people(id, name, slug, photo_url, known_for_department)
         `)
         .eq('film_id', filmId)
-        .order('credit_order', { ascending: true, nullsFirst: false });
+        .order('billing_order', { ascending: true, nullsFirst: false });
 
       if (error) return res.status(500).json({ error: 'Failed to fetch film credits' });
 
-      const rawCast = (credits || []).filter(c => c.role === 'Actor' || c.department === 'Cast');
-      const rawCrew = (credits || []).filter(c => c.role !== 'Actor' && c.department !== 'Cast');
+      const normalizedCredits = (credits || []).map((credit: any) => ({
+        ...credit,
+        credit_order: credit.billing_order,
+        is_lead: credit.billing_order === 1,
+        department: credit.role?.toLowerCase() === 'actor' ? 'Cast' : 'Crew',
+        people: credit.people ? serializePerson(credit.people) : null,
+      }));
+      const rawCast = normalizedCredits.filter((credit: any) => credit.department === 'Cast');
+      const rawCrew = normalizedCredits.filter((credit: any) => credit.department !== 'Cast');
 
       const isFree = key.tier === 'free';
       const cast = isFree ? rawCast.slice(0, 10) : rawCast;
@@ -157,7 +212,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       return res.status(200).json({
         data: {
-          ...film,
+          ...serializeFilmImages(film),
           genres: (film.film_genres || []).map((fg: any) => fg.genres?.name).filter(Boolean),
           watch_links: film.film_watch_links || [],
           film_genres: undefined,
@@ -225,7 +280,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : (count || 0) > offset + limit;
 
     return res.status(200).json({
-      data: films || [],
+      data: (films || []).map(serializeFilmImages),
       pagination: {
         page,
         limit,
@@ -251,20 +306,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           id,
           slug,
           name,
-          avatar_url,
-          primary_department,
-          biography,
+          photo_url,
+          known_for_department,
+          bio,
           gender,
-          birth_date,
-          birth_place,
+          date_of_birth,
+          birthplace,
           film_count,
-          social_links,
+          instagram_url,
+          facebook_url,
+          twitter_url,
+          tiktok_url,
           credits(
             id,
             role,
-            department,
-            credit_order,
-            is_lead,
+            billing_order,
+            character_name,
             films(id, slug, title, year, poster_url, average_rating)
           )
         `)
@@ -274,22 +331,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (error) return res.status(500).json({ error: 'Failed to retrieve person details' });
       if (!person) return res.status(404).json({ error: 'Person not found' });
 
+      const { data: media, error: mediaError } = await supabase
+        .from('person_media')
+        .select('id, media_type, category, title, description, url, thumbnail_url, embed_provider, embed_id, duration_seconds, width, height, aspect_ratio, film_id, character_name, photographer_credit, year, is_primary, sort_order, status, created_at')
+        .eq('person_id', person.id)
+        .eq('status', 'approved')
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (mediaError) return res.status(500).json({ error: 'Failed to retrieve person media' });
+
       // Clean up nested credits
       const filmography = (person.credits || [])
         .filter((c: any) => c.films)
         .map((c: any) => ({
           credit_id: c.id,
           role: c.role,
-          department: c.department,
-          is_lead: c.is_lead,
-          film: c.films,
+          department: c.role?.toLowerCase() === 'actor' ? 'Cast' : 'Crew',
+          credit_order: c.billing_order,
+          is_lead: c.billing_order === 1,
+          character_name: c.character_name,
+          film: serializeFilmImages(c.films),
         }));
 
       return res.status(200).json({
         data: {
-          ...person,
+          ...serializePerson(person, media || []),
+          media: media || [],
           filmography,
-          credits: undefined,
         }
       });
     }
@@ -319,13 +388,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let query = supabase
       .from('people')
-      .select('id, slug, name, avatar_url, primary_department, film_count', { count: 'exact' });
+      .select('id, slug, name, photo_url, known_for_department, film_count', { count: 'exact' });
 
     if (search && typeof search === 'string') {
       query = query.ilike('name', `%${search.trim()}%`);
     }
     if (department && typeof department === 'string') {
-      query = query.ilike('primary_department', `%${department.trim()}%`);
+      query = query.ilike('known_for_department', `%${department.trim()}%`);
     }
 
     query = query.order('film_count', { ascending: false, nullsFirst: false }).range(offset, offset + limit - 1);
@@ -340,7 +409,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : (count || 0) > offset + limit;
 
     return res.status(200).json({
-      data: people || [],
+      data: (people || []).map((person: any) => serializePerson(person)),
       pagination: {
         page,
         limit,
@@ -381,17 +450,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         film_id,
         person_id,
         role,
-        department,
-        credit_order,
-        is_lead,
+        billing_order,
+        character_name,
         films(id, slug, title, year, poster_url),
-        people(id, slug, name, avatar_url)
+        people(id, slug, name, photo_url, known_for_department)
       `, { count: 'exact' });
 
     if (film_id && typeof film_id === 'string') query = query.eq('film_id', film_id);
     if (person_id && typeof person_id === 'string') query = query.eq('person_id', person_id);
     if (role && typeof role === 'string') query = query.ilike('role', `%${role.trim()}%`);
-    if (department && typeof department === 'string') query = query.ilike('department', `%${department.trim()}%`);
+    if (department && typeof department === 'string') {
+      const requestedDepartment = department.trim().toLowerCase();
+      if (requestedDepartment === 'cast') query = query.eq('role', 'actor');
+      else if (requestedDepartment === 'crew') query = query.neq('role', 'actor');
+      else query = query.ilike('role', `%${requestedDepartment}%`);
+    }
 
     query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
@@ -404,7 +477,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : (count || 0) > offset + limit;
 
     return res.status(200).json({
-      data: credits || [],
+      data: (credits || []).map((credit: any) => ({
+        ...credit,
+        credit_order: credit.billing_order,
+        is_lead: credit.billing_order === 1,
+        department: credit.role?.toLowerCase() === 'actor' ? 'Cast' : 'Crew',
+        films: credit.films ? serializeFilmImages(credit.films) : null,
+        people: credit.people ? serializePerson(credit.people) : null,
+      })),
       pagination: {
         page,
         limit,
