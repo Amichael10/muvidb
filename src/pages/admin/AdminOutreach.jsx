@@ -97,7 +97,9 @@ export default function AdminOutreach() {
         for (const row of rows || []) map[row.person_id] = row;
       }
 
-      setPeople(all);
+      // The outreach desk is a curated queue. Do not present every Instagram
+      // profile as an uncontacted candidate when it has not been queued.
+      setPeople(all.filter((person) => map[person.id]));
       setOutreachByPerson(map);
     } catch (err) {
       console.error(err);
@@ -153,10 +155,12 @@ export default function AdminOutreach() {
     return people
       .map((p) => {
         const outreach = outreachByPerson[p.id];
-        const status = outreach?.status || 'pending';
+        if (!outreach) return null;
+        const status = outreach.status;
         const handle = parseInstagramHandle(p.instagram_url);
         return { ...p, outreach, status, handle };
       })
+      .filter(Boolean)
       .filter((p) => {
         if (!p.handle) return false;
         const films = Number(p.film_count || 0);
@@ -191,7 +195,8 @@ export default function AdminOutreach() {
       const films = Number(p.film_count || 0);
       if (films < Number(minFilms || 0)) continue;
       if (maxFilms && films > Number(maxFilms)) continue;
-      const status = outreachByPerson[p.id]?.status || 'pending';
+      const status = outreachByPerson[p.id]?.status;
+      if (!status) continue;
       base[status] = (base[status] || 0) + 1;
       if (status !== 'skipped') {
         base.all += 1;
@@ -408,7 +413,7 @@ export default function AdminOutreach() {
           </div>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">Instagram Outreach Studio</h1>
           <p className="text-text-muted text-sm mt-1.5 max-w-3xl">
-            Target emerging filmmakers, cinematographers, editors, sound designers, and actors (1–5 credits) with tailored AI invites referencing their exact film credits.
+            Review the curated Instagram outreach queue and send tailored invites that reference each creator’s credited work.
           </p>
         </div>
 
@@ -421,15 +426,6 @@ export default function AdminOutreach() {
           >
             <Icon icon="solar:refresh-linear" className={loading ? 'animate-spin' : ''} />
             Refresh
-          </button>
-          <button
-            type="button"
-            disabled={generating}
-            onClick={handleGenerateAiBatch}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-brand to-amber-500 text-white text-xs font-bold shadow-lg shadow-brand/20 hover:opacity-95 transition-all disabled:opacity-50"
-          >
-            <Icon icon={generating ? 'solar:refresh-circle-linear' : 'solar:magic-stick-3-bold'} className={generating ? 'animate-spin text-base' : 'text-base'} />
-            {generating ? 'Synthesizing Pitches...' : 'Generate AI Batch (25)'}
           </button>
         </div>
       </header>
