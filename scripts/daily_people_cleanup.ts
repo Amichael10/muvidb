@@ -144,6 +144,40 @@ function isGarbagePerson(name: string): boolean {
   return GARBAGE_PATTERNS.some(rx => rx.test(name));
 }
 
+const prevRow = new Int32Array(256);
+const currRow = new Int32Array(256);
+
+function fastLevenshtein(s1: string, s2: string): number {
+  const l1 = s1.length;
+  const l2 = s2.length;
+  if (s1 === s2) return 0;
+  if (l1 === 0) return l2;
+  if (l2 === 0) return l1;
+  if (l2 >= 255) return levenshteinSimilarity(s1, s2); // fallback if extremely long string
+
+  for (let j = 0; j <= l2; j++) prevRow[j] = j;
+  for (let i = 1; i <= l1; i++) {
+    currRow[0] = i;
+    const c1 = s1.charCodeAt(i - 1);
+    for (let j = 1; j <= l2; j++) {
+      const cost = c1 === s2.charCodeAt(j - 1) ? 0 : 1;
+      currRow[j] = Math.min(prevRow[j] + 1, currRow[j - 1] + 1, prevRow[j - 1] + cost);
+    }
+    for (let j = 0; j <= l2; j++) prevRow[j] = currRow[j];
+  }
+  return prevRow[l2];
+}
+
+function fastLevenshteinSimilarity(a: string, b: string): number {
+  const an = a.length;
+  const bn = b.length;
+  if (an === 0) return bn === 0 ? 1 : 0;
+  if (bn === 0) return 0;
+  const maxLen = Math.max(an, bn);
+  const dist = fastLevenshtein(a, b);
+  return 1 - dist / maxLen;
+}
+
 function levenshteinSimilarity(a: string, b: string): number {
   const an = a.length;
   const bn = b.length;
@@ -168,7 +202,7 @@ function isDuplicateOnSameFilm(nameA: string, nameB: string): boolean {
   if (!normA || !normB) return false;
   if (normA === normB) return true;
 
-  const lev = levenshteinSimilarity(normA, normB);
+  const lev = fastLevenshteinSimilarity(normA, normB);
   if (lev >= 0.88) return true;
 
   const wordsA = normA.split(/\s+/).filter(w => w.length >= 3);
@@ -186,7 +220,7 @@ function isDuplicateOnSameFilm(nameA: string, nameB: string): boolean {
 
   let matchingTokens = 0;
   for (const wa of wordsA) {
-    if (wordsB.some(wb => wb === wa || (wa.length >= 5 && wb.length >= 5 && levenshteinSimilarity(wa, wb) >= 0.80) || (wa.length >= 4 && wb.length >= 6 && (wb.startsWith(wa) || wa.startsWith(wb))))) {
+    if (wordsB.some(wb => wb === wa || (wa.length >= 5 && wb.length >= 5 && fastLevenshteinSimilarity(wa, wb) >= 0.80) || (wa.length >= 4 && wb.length >= 6 && (wb.startsWith(wa) || wa.startsWith(wb))))) {
       matchingTokens++;
     }
   }
@@ -242,8 +276,9 @@ async function mergePersonCredits(sourceId: string, targetId: string, charName?:
   }
 }
 
-export async function runDailyPeopleCleanup() {
+export async function runDailyPeopleCleanup(options: { deep?: boolean } = {}) {
   const startedAt = new Date();
+  const isDeep = Boolean(options.deep || process.argv.includes('--deep'));
   const logs: string[] = [];
   let aliasMergedCount = 0;
   let purgedCount = 0;
@@ -256,296 +291,352 @@ export async function runDailyPeopleCleanup() {
     logs.push(`[${new Date().toISOString()}] ${msg}`);
   };
 
-  log('🚀 Starting Daily People Consensus & Deduplication Pipeline...');
+  log(`🚀 Starting People Consensus & Deduplication Pipeline (Mode: ${isDeep ? '🔥 DEEP FULL-DB SCAN' : '⚡ DAILY'})…`);
 
   try {
-    // -------------------------------------------------------------
-    // FULL DIRECTORY KEYSET SCAN
-    // -------------------------------------------------------------
-    log('--- Scanning Full Directory (Keyset Pagination) ---');
-    let lastId: string | null = null;
-    const allPeople: { id: string; name: string; film_count?: number; photo_url?: string }[] = [];
+    const maxPasses = isDeep ? 3 : 1;
+    let pass = 1;
 
-    while (true) {
-      let query = supabase.from('people').select('id, name, film_count, photo_url').order('id', { ascending: true }).limit(1000);
-      if (lastId) query = query.gt('id', lastId);
-      const { data, error } = await query;
-      if (error || !data || data.length === 0) break;
-      allPeople.push(...data);
-      lastId = data[data.length - 1].id;
-      if (data.length < 1000) break;
-    }
-    log(`📊 Scanned ${allPeople.length} total people records in directory.`);
+    while (pass <= maxPasses) {
+      if (maxPasses > 1) {
+        log(`\n=================== PASS ${pass} of ${maxPasses} ===================`);
+      }
+      let passMergesBefore = aliasMergedCount + coCreditMergedCount + fuzzyMergedCount + purgedCount + roleCleanedCount;
 
-    // -------------------------------------------------------------
-    // PHASE 1: ALIAS & KNOWN TYPO RESOLUTION (Erekere, Adunlade, Itele, Apa, Lalude, etc.)
-    // -------------------------------------------------------------
-    log('--- Phase 1: Resolving Known Aliases & OCR Star Typos ---');
-    const processedIds = new Set<string>();
+      // -------------------------------------------------------------
+      // FULL DIRECTORY KEYSET SCAN
+      // -------------------------------------------------------------
+      log('--- Scanning Directory (Keyset Pagination) ---');
+      let lastId: string | null = null;
+      const allPeople: { id: string; name: string; film_count?: number; photo_url?: string }[] = [];
 
-    for (const ap of allPeople) {
-      if (processedIds.has(ap.id)) continue;
-      const rawNorm = ap.name.trim().toLowerCase();
-      const canonicalTarget = NOLLYWOOD_ALIASES[rawNorm] || KNOWN_NAME_TYPOS[rawNorm];
+      while (true) {
+        let query = supabase.from('people').select('id, name, film_count, photo_url').order('id', { ascending: true }).limit(1000);
+        if (lastId) query = query.gt('id', lastId);
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) break;
+        allPeople.push(...data);
+        lastId = data[data.length - 1].id;
+        if (data.length < 1000) break;
+      }
+      log(`📊 Loaded ${allPeople.length} people records in directory.`);
 
-      if (canonicalTarget) {
-        const canonical = allPeople
-          .filter(p => p.id !== ap.id && p.name.trim().toLowerCase() === canonicalTarget.toLowerCase())
-          .sort((a, b) => ((b.photo_url ? 10 : 0) + (b.film_count || 0)) - ((a.photo_url ? 10 : 0) + (a.film_count || 0)))[0];
+      // -------------------------------------------------------------
+      // PHASE 1: ALIAS & KNOWN TYPO RESOLUTION (Erekere, Adunlade, Itele, Apa, Lalude, etc.)
+      // -------------------------------------------------------------
+      log('--- Phase 1: Resolving Known Aliases & OCR Star Typos ---');
+      const processedIds = new Set<string>();
 
-        let targetId = canonical?.id;
-        if (!targetId) {
-          const { data: dbCanonicals } = await supabase
-            .from('people')
-            .select('id, name, film_count')
-            .ilike('name', canonicalTarget)
-            .order('film_count', { ascending: false, nullsFirst: false })
-            .limit(1);
-          if (dbCanonicals && dbCanonicals.length > 0 && dbCanonicals[0].id !== ap.id) {
-            targetId = dbCanonicals[0].id;
+      for (const ap of allPeople) {
+        if (processedIds.has(ap.id)) continue;
+        const rawNorm = ap.name.trim().toLowerCase();
+        const canonicalTarget = NOLLYWOOD_ALIASES[rawNorm] || KNOWN_NAME_TYPOS[rawNorm];
+
+        if (canonicalTarget) {
+          const canonical = allPeople
+            .filter(p => p.id !== ap.id && p.name.trim().toLowerCase() === canonicalTarget.toLowerCase())
+            .sort((a, b) => ((b.photo_url ? 10 : 0) + (b.film_count || 0)) - ((a.photo_url ? 10 : 0) + (a.film_count || 0)))[0];
+
+          let targetId = canonical?.id;
+          if (!targetId) {
+            const { data: dbCanonicals } = await supabase
+              .from('people')
+              .select('id, name, film_count')
+              .ilike('name', canonicalTarget)
+              .order('film_count', { ascending: false, nullsFirst: false })
+              .limit(1);
+            if (dbCanonicals && dbCanonicals.length > 0 && dbCanonicals[0].id !== ap.id) {
+              targetId = dbCanonicals[0].id;
+            }
+          }
+
+          if (targetId) {
+            log(`🎭 Alias/Typo Match: Merging "${ap.name}" into canonical "${canonicalTarget}"...`);
+            await mergePersonCredits(ap.id, targetId);
+            processedIds.add(ap.id);
+            aliasMergedCount++;
           }
         }
+      }
 
-        if (targetId) {
-          log(`🎭 Alias/Typo Match: Merging "${ap.name}" into canonical "${canonicalTarget}"...`);
-          await mergePersonCredits(ap.id, targetId);
-          processedIds.add(ap.id);
-          aliasMergedCount++;
+      // -------------------------------------------------------------
+      // PHASE 2: EXACT NAME DUPLICATE CONSOLIDATION & GARBAGE PURGE
+      // -------------------------------------------------------------
+      log('--- Phase 2: Consolidating Exact Name Duplicates & Purging Garbage ---');
+      // 1. Group by exact normalized name to merge duplicates (e.g. 2 records for Patience Ozokwor)
+      const exactNameMap = new Map<string, typeof allPeople>();
+      for (const p of allPeople) {
+        if (processedIds.has(p.id)) continue;
+        const norm = normalize(p.name);
+        if (!norm || norm.length < 3) continue;
+        const list = exactNameMap.get(norm) || [];
+        list.push(p);
+        exactNameMap.set(norm, list);
+      }
+
+      for (const [normName, group] of exactNameMap.entries()) {
+        if (group.length > 1) {
+          // Sort best profile first
+          group.sort((a, b) => ((b.photo_url ? 10 : 0) + (b.film_count || 0)) - ((a.photo_url ? 10 : 0) + (a.film_count || 0)));
+          const primary = group[0];
+          for (let i = 1; i < group.length; i++) {
+            const dupe = group[i];
+            log(`👥 Consolidating duplicate profile: "${dupe.name}" (${dupe.film_count || 0} films) -> "${primary.name}" (${primary.film_count || 0} films)`);
+            await mergePersonCredits(dupe.id, primary.id);
+            processedIds.add(dupe.id);
+            aliasMergedCount++;
+          }
         }
       }
-    }
 
-    // -------------------------------------------------------------
-    // PHASE 2: EXACT NAME DUPLICATE CONSOLIDATION & GARBAGE PURGE
-    // -------------------------------------------------------------
-    log('--- Phase 2: Consolidating Exact Name Duplicates & Purging Garbage ---');
-    // 1. Group by exact normalized name to merge duplicates (e.g. 2 records for Patience Ozokwor)
-    const exactNameMap = new Map<string, typeof allPeople>();
-    for (const p of allPeople) {
-      if (processedIds.has(p.id)) continue;
-      const norm = normalize(p.name);
-      if (!norm || norm.length < 3) continue;
-      const list = exactNameMap.get(norm) || [];
-      list.push(p);
-      exactNameMap.set(norm, list);
-    }
+      // 2. Identify garbage & role strings to strip
+      const garbageIds: string[] = [];
+      const renames: { id: string; oldName: string; clean: string; detectedRole: string | null }[] = [];
 
-    for (const [normName, group] of exactNameMap.entries()) {
-      if (group.length > 1) {
-        // Sort best profile first
-        group.sort((a, b) => ((b.photo_url ? 10 : 0) + (b.film_count || 0)) - ((a.photo_url ? 10 : 0) + (a.film_count || 0)));
-        const primary = group[0];
-        for (let i = 1; i < group.length; i++) {
-          const dupe = group[i];
-          log(`👥 Consolidating duplicate profile: "${dupe.name}" (${dupe.film_count || 0} films) -> "${primary.name}" (${primary.film_count || 0} films)`);
-          await mergePersonCredits(dupe.id, primary.id);
-          processedIds.add(dupe.id);
-          aliasMergedCount++;
+      for (const p of allPeople) {
+        if (processedIds.has(p.id)) continue;
+        const norm = normalize(p.name);
+        if (PROTECTED_NAMES.has(norm)) continue;
+
+        const { clean, detectedRole } = cleanNameString(p.name);
+        if (isGarbagePerson(clean)) {
+          garbageIds.push(p.id);
+        } else if (clean !== p.name && clean.split(' ').length >= 2) {
+          renames.push({ id: p.id, oldName: p.name, clean, detectedRole });
         }
       }
-    }
 
-    // 2. Identify garbage & role strings to strip
-    const garbageIds: string[] = [];
-    const renames: { id: string; oldName: string; clean: string; detectedRole: string | null }[] = [];
+      if (garbageIds.length > 0) {
+        log(`🗑️ Inspecting ${garbageIds.length} candidate garbage records for inverted credits...`);
+        for (let i = 0; i < garbageIds.length; i += 100) {
+          const chunk = garbageIds.slice(i, i + 100);
+          const { data: gCreds } = await supabase
+            .from('credits')
+            .select('id, person_id, film_id, role, character_name')
+            .in('person_id', chunk);
 
-    for (const p of allPeople) {
-      if (processedIds.has(p.id)) continue;
-      const norm = normalize(p.name);
-      if (PROTECTED_NAMES.has(norm)) continue;
-
-      const { clean, detectedRole } = cleanNameString(p.name);
-      if (isGarbagePerson(clean)) {
-        garbageIds.push(p.id);
-      } else if (clean !== p.name && clean.split(' ').length >= 2) {
-        renames.push({ id: p.id, oldName: p.name, clean, detectedRole });
-      }
-    }
-
-    if (garbageIds.length > 0) {
-      log(`🗑️ Inspecting ${garbageIds.length} candidate garbage records for inverted credits...`);
-      for (let i = 0; i < garbageIds.length; i += 100) {
-        const chunk = garbageIds.slice(i, i + 100);
-        const { data: gCreds } = await supabase
-          .from('credits')
-          .select('id, person_id, film_id, role, character_name')
-          .in('person_id', chunk);
-
-        for (const gc of gCreds || []) {
-          if (gc.character_name && gc.character_name.trim().length >= 3) {
-            const charClean = cleanNameString(gc.character_name).clean;
-            const charWords = charClean.split(' ');
-            if (charWords.length >= 2 && charWords.length <= 4 && !isGarbagePerson(charClean) && /^[A-Z]/.test(charClean)) {
-              log(`🔄 Recovering inverted credit on film ${gc.film_id}: character "${charClean}" -> assigning to real person profile...`);
-              let { data: targetPerson } = await supabase.from('people').select('id, name').ilike('name', charClean).limit(1).maybeSingle();
-              if (!targetPerson) {
-                const slug = charClean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-                const { data: newP } = await supabase.from('people').insert({ name: charClean, slug }).select('id, name').single();
-                if (newP) targetPerson = newP;
-              }
-              if (targetPerson) {
-                await supabase.from('credits').update({
-                  person_id: targetPerson.id,
-                  character_name: null,
-                }).eq('id', gc.id);
-                log(`   Assigned credit to "${targetPerson.name}" (${targetPerson.id})`);
+          for (const gc of gCreds || []) {
+            if (gc.character_name && gc.character_name.trim().length >= 3) {
+              const charClean = cleanNameString(gc.character_name).clean;
+              const charWords = charClean.split(' ');
+              if (charWords.length >= 2 && charWords.length <= 4 && !isGarbagePerson(charClean) && /^[A-Z]/.test(charClean)) {
+                log(`🔄 Recovering inverted credit on film ${gc.film_id}: character "${charClean}" -> assigning to real person profile...`);
+                let { data: targetPerson } = await supabase.from('people').select('id, name').ilike('name', charClean).limit(1).maybeSingle();
+                if (!targetPerson) {
+                  const slug = charClean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                  const { data: newP } = await supabase.from('people').insert({ name: charClean, slug }).select('id, name').single();
+                  if (newP) targetPerson = newP;
+                }
+                if (targetPerson) {
+                  await supabase.from('credits').update({
+                    person_id: targetPerson.id,
+                    character_name: null,
+                  }).eq('id', gc.id);
+                  log(`   Assigned credit to "${targetPerson.name}" (${targetPerson.id})`);
+                }
               }
             }
           }
         }
-      }
 
-      log(`🗑️ Purging ${garbageIds.length} non-person garbage records & remaining phantom credits...`);
-      for (let i = 0; i < garbageIds.length; i += 100) {
-        const chunk = garbageIds.slice(i, i + 100);
-        await supabase.from('credits').delete().in('person_id', chunk);
-        await supabase.from('people').delete().in('id', chunk);
-      }
-      purgedCount += garbageIds.length;
-    }
-
-    for (const r of renames) {
-      const { data: existing } = await supabase.from('people').select('id, name').ilike('name', r.clean).limit(1);
-      if (existing && existing.length > 0 && existing[0].id !== r.id) {
-        log(`✂️ Merging "${r.oldName}" into existing canonical "${existing[0].name}"`);
-        await mergePersonCredits(r.id, existing[0].id, r.detectedRole);
-        roleCleanedCount++;
-      } else {
-        log(`✂️ Cleaning "${r.oldName}" -> "${r.clean}"`);
-        await supabase.from('people').update({ name: r.clean }).eq('id', r.id);
-        if (r.detectedRole) {
-          await supabase.from('credits').update({ character_name: r.detectedRole }).eq('person_id', r.id);
+        log(`🗑️ Purging ${garbageIds.length} non-person garbage records & remaining phantom credits...`);
+        for (let i = 0; i < garbageIds.length; i += 100) {
+          const chunk = garbageIds.slice(i, i + 100);
+          await supabase.from('credits').delete().in('person_id', chunk);
+          await supabase.from('people').delete().in('id', chunk);
         }
-        roleCleanedCount++;
+        purgedCount += garbageIds.length;
       }
-    }
 
-    // -------------------------------------------------------------
-    // PHASE 3: FILM CO-CREDIT RECONCILIATION (PHANTOM CHARACTERS & SAME-FILM DUPES)
-    // -------------------------------------------------------------
-    log('--- Phase 3: Film-Level Co-Credit & OCR Duplication Reconciliation ---');
-    const { data: recentFilms } = await supabase
-      .from('films')
-      .select('id, title')
-      .order('updated_at', { ascending: false })
-      .limit(60);
-
-    const filmIds = recentFilms?.map(f => f.id) || [];
-    const { data: allCredits } = await supabase
-      .from('credits')
-      .select('id, film_id, person_id, role, character_name, people(id, name, photo_url, film_count)')
-      .in('film_id', filmIds);
-
-    const creditsByFilm = new Map<string, any[]>();
-    for (const c of allCredits || []) {
-      const list = creditsByFilm.get(c.film_id) || [];
-      list.push(c);
-      creditsByFilm.set(c.film_id, list);
-    }
-
-    for (const f of recentFilms || []) {
-      const fCreds = creditsByFilm.get(f.id) || [];
-      if (fCreds.length === 0) continue;
-
-      // 0. Remove multiple identical credits for the exact same person on the same film
-      const seenPersonRole = new Set<string>();
-      for (const c of fCreds) {
-        const key = `${c.person_id}:${c.role}`;
-        if (seenPersonRole.has(key)) {
-          log(`🧹 Deduplicating duplicate credit for "${(c.people as any)?.name || c.person_id}" on "${f.title}"`);
-          await supabase.from('credits').delete().eq('id', c.id);
+      for (const r of renames) {
+        const { data: existing } = await supabase.from('people').select('id, name').ilike('name', r.clean).limit(1);
+        if (existing && existing.length > 0 && existing[0].id !== r.id) {
+          log(`✂️ Merging "${r.oldName}" into existing canonical "${existing[0].name}"`);
+          await mergePersonCredits(r.id, existing[0].id, r.detectedRole);
+          roleCleanedCount++;
         } else {
-          seenPersonRole.add(key);
+          log(`✂️ Cleaning "${r.oldName}" -> "${r.clean}"`);
+          await supabase.from('people').update({ name: r.clean }).eq('id', r.id);
+          if (r.detectedRole) {
+            await supabase.from('credits').update({ character_name: r.detectedRole }).eq('person_id', r.id);
+          }
+          roleCleanedCount++;
         }
       }
 
-      // 1. Detect phantom persons whose names match an actor's character name on the same film
-      const actorChars = new Map<string, string>();
-      for (const c of fCreds) {
-        if (c.role === 'actor' && c.character_name) {
-          actorChars.set(c.character_name.toLowerCase().trim(), (c.people as any)?.name);
+      // -------------------------------------------------------------
+      // PHASE 3: FILM CO-CREDIT RECONCILIATION (PHANTOM CHARACTERS & SAME-FILM DUPES)
+      // -------------------------------------------------------------
+      log(`--- Phase 3: Film-Level Co-Credit & OCR Duplication Reconciliation (${isDeep ? 'Deep: 500 films' : 'Standard: 100 films'}) ---`);
+      const filmLimit = isDeep ? 500 : 100;
+      const { data: recentFilms } = await supabase
+        .from('films')
+        .select('id, title')
+        .order('updated_at', { ascending: false })
+        .limit(filmLimit);
+
+      const filmIds = recentFilms?.map(f => f.id) || [];
+      const creditsByFilm = new Map<string, any[]>();
+      
+      for (let i = 0; i < filmIds.length; i += 100) {
+        const batchFilmIds = filmIds.slice(i, i + 100);
+        const { data: batchCredits } = await supabase
+          .from('credits')
+          .select('id, film_id, person_id, role, character_name, people(id, name, photo_url, film_count)')
+          .in('film_id', batchFilmIds);
+
+        for (const c of batchCredits || []) {
+          const list = creditsByFilm.get(c.film_id) || [];
+          list.push(c);
+          creditsByFilm.set(c.film_id, list);
         }
       }
 
-      for (const c of fCreds) {
-        const p = c.people as any;
-        if (!p?.name) continue;
-        if (actorChars.has(p.name.toLowerCase().trim())) {
-          const realActor = actorChars.get(p.name.toLowerCase().trim());
-          log(`🎬 Phantom Credit on "${f.title}": "${p.name}" matches character of "${realActor}". Removing credit...`);
-          await supabase.from('credits').delete().eq('id', c.id);
-          const { count } = await supabase.from('credits').select('*', { count: 'exact', head: true }).eq('person_id', p.id);
-          if ((count || 0) === 0) {
-            log(`   Purging orphaned phantom person "${p.name}"`);
-            await supabase.from('people').delete().eq('id', p.id);
-            purgedCount++;
+      for (const f of recentFilms || []) {
+        const fCreds = creditsByFilm.get(f.id) || [];
+        if (fCreds.length === 0) continue;
+
+        // 0. Remove multiple identical credits for the exact same person on the same film
+        const seenPersonRole = new Set<string>();
+        for (const c of fCreds) {
+          const key = `${c.person_id}:${c.role}`;
+          if (seenPersonRole.has(key)) {
+            log(`🧹 Deduplicating duplicate credit for "${(c.people as any)?.name || c.person_id}" on "${f.title}"`);
+            await supabase.from('credits').delete().eq('id', c.id);
+          } else {
+            seenPersonRole.add(key);
           }
         }
-      }
 
-      // 2. Detect same-film duplicates / OCR corruptions across ALL roles (actors AND crew, e.g. "Fmeka Fzeugwu" vs "Emeka Ezeugwu" for sound)
-      const roleGroups = new Map<string, typeof fCreds>();
-      for (const c of fCreds) {
-        const r = c.role || 'crew';
-        if (!roleGroups.has(r)) roleGroups.set(r, []);
-        roleGroups.get(r)!.push(c);
-      }
+        // 1. Detect phantom persons whose names match an actor's character name on the same film
+        const actorChars = new Map<string, string>();
+        for (const c of fCreds) {
+          if (c.role === 'actor' && c.character_name) {
+            actorChars.set(c.character_name.toLowerCase().trim(), (c.people as any)?.name);
+          }
+        }
 
-      for (const [rName, credList] of roleGroups.entries()) {
-        for (let i = 0; i < credList.length; i++) {
-          const c1 = credList[i];
-          const p1 = c1.people as any;
-          if (!p1?.name) continue;
+        for (const c of fCreds) {
+          const p = c.people as any;
+          if (!p?.name) continue;
+          if (actorChars.has(p.name.toLowerCase().trim())) {
+            const realActor = actorChars.get(p.name.toLowerCase().trim());
+            log(`🎬 Phantom Credit on "${f.title}": "${p.name}" matches character of "${realActor}". Removing credit...`);
+            await supabase.from('credits').delete().eq('id', c.id);
+            const { count } = await supabase.from('credits').select('*', { count: 'exact', head: true }).eq('person_id', p.id);
+            if ((count || 0) === 0) {
+              log(`   Purging orphaned phantom person "${p.name}"`);
+              await supabase.from('people').delete().eq('id', p.id);
+              purgedCount++;
+            }
+          }
+        }
 
-          for (let j = i + 1; j < credList.length; j++) {
-            const c2 = credList[j];
-            const p2 = c2.people as any;
-            if (!p2?.name || p1.id === p2.id) continue;
+        // 2. Detect same-film duplicates / OCR corruptions across ALL roles
+        const roleGroups = new Map<string, typeof fCreds>();
+        for (const c of fCreds) {
+          const r = c.role || 'crew';
+          if (!roleGroups.has(r)) roleGroups.set(r, []);
+          roleGroups.get(r)!.push(c);
+        }
 
-            if (isDuplicateOnSameFilm(p1.name, p2.name)) {
-              const p1Score = (p1.photo_url ? 10 : 0) + (p1.film_count || 1);
-              const p2Score = (p2.photo_url ? 10 : 0) + (p2.film_count || 1);
-              const canonical = p1Score >= p2Score ? p1 : p2;
-              const duplicate = canonical.id === p1.id ? p2 : p1;
+        for (const [rName, credList] of roleGroups.entries()) {
+          for (let i = 0; i < credList.length; i++) {
+            const c1 = credList[i];
+            const p1 = c1.people as any;
+            if (!p1?.name) continue;
 
-              log(`🤝 Same-Film Duplicate on "${f.title}" (${rName}): Merging "${duplicate.name}" -> "${canonical.name}"`);
-              await mergePersonCredits(duplicate.id, canonical.id);
-              coCreditMergedCount++;
+            for (let j = i + 1; j < credList.length; j++) {
+              const c2 = credList[j];
+              const p2 = c2.people as any;
+              if (!p2?.name || p1.id === p2.id) continue;
+
+              if (isDuplicateOnSameFilm(p1.name, p2.name)) {
+                const p1Score = (p1.photo_url ? 10 : 0) + (p1.film_count || 1);
+                const p2Score = (p2.photo_url ? 10 : 0) + (p2.film_count || 1);
+                const canonical = p1Score >= p2Score ? p1 : p2;
+                const duplicate = canonical.id === p1.id ? p2 : p1;
+
+                log(`🤝 Same-Film Duplicate on "${f.title}" (${rName}): Merging "${duplicate.name}" -> "${canonical.name}"`);
+                await mergePersonCredits(duplicate.id, canonical.id);
+                coCreditMergedCount++;
+              }
             }
           }
         }
       }
-    }
 
-    // -------------------------------------------------------------
-    // PHASE 4: GLOBAL 90%–100% IN-MEMORY FUZZY SIMILARITY DEDUPLICATION
-    // -------------------------------------------------------------
-    log('--- Phase 4: Checking 90%–100% Name Similarity Matches ---');
-    const { data: candidatePeople } = await supabase
-      .from('people')
-      .select('id, name, photo_url, film_count')
-      .order('created_at', { ascending: false })
-      .limit(600);
+      // -------------------------------------------------------------
+      // PHASE 4: FULL-DIRECTORY TOKEN-INDEXED FUZZY DEDUPLICATION (ALL PEOPLE)
+      // -------------------------------------------------------------
+      log(`--- Phase 4: Token-Indexed 90%–100% Fuzzy Deduplication across ALL ${allPeople.length} People ---`);
+      const peopleMap = new Map(allPeople.map(p => [p.id, p]));
+      const tokenBuckets = new Map<string, typeof allPeople>();
 
-    const peopleList = candidatePeople || [];
-    const mergedIds = new Set<string>();
+      // Index all people by distinctive tokens and bi-token prefixes
+      for (const p of allPeople) {
+        if (processedIds.has(p.id)) continue;
+        const norm = normalize(p.name);
+        if (!norm || norm.length < 4) continue;
+        const words = norm.split(' ').filter(w => w.length >= 3);
+        if (words.length < 2) continue; // Skip single names to prevent dangerous false positive merges
 
-    for (let i = 0; i < peopleList.length; i++) {
-      const p1 = peopleList[i];
-      if (mergedIds.has(p1.id)) continue;
+        for (const w of words) {
+          if (w.length >= 4) {
+            const prefix = w.slice(0, 4);
+            if (!tokenBuckets.has(prefix)) tokenBuckets.set(prefix, []);
+            tokenBuckets.get(prefix)!.push(p);
+          }
+        }
 
-      const norm1 = normalize(p1.name);
-      if (norm1.length < 4 || norm1.split(' ').length < 2) continue;
+        // Bi-token key: first 3 letters of first word + first 3 letters of second word (e.g. "odunlade adekola" -> "odu:ade")
+        if (words.length >= 2 && words[0].length >= 3 && words[1].length >= 3) {
+          const biKey = `${words[0].slice(0, 3)}:${words[1].slice(0, 3)}`;
+          if (!tokenBuckets.has(biKey)) tokenBuckets.set(biKey, []);
+          tokenBuckets.get(biKey)!.push(p);
+        }
+      }
 
-      for (let j = i + 1; j < peopleList.length; j++) {
-        const p2 = peopleList[j];
-        if (mergedIds.has(p2.id)) continue;
+      // Collect candidate pairs to check
+      const candidatePairs = new Set<string>();
+      for (const [key, bucket] of tokenBuckets.entries()) {
+        // Skip excessively large generic buckets (e.g. generic noise with > 250 records)
+        if (bucket.length > 250) continue;
+        for (let i = 0; i < bucket.length; i++) {
+          for (let j = i + 1; j < bucket.length; j++) {
+            const idA = bucket[i].id;
+            const idB = bucket[j].id;
+            if (idA !== idB && !processedIds.has(idA) && !processedIds.has(idB)) {
+              candidatePairs.add(idA < idB ? `${idA}:${idB}` : `${idB}:${idA}`);
+            }
+          }
+        }
+      }
 
+      log(`   🔍 Evaluating ${candidatePairs.size} candidate pairs for 90%+ similarity...`);
+      const mergedInFuzzy = new Set<string>();
+
+      for (const pair of candidatePairs) {
+        const [idA, idB] = pair.split(':');
+        if (mergedInFuzzy.has(idA) || mergedInFuzzy.has(idB)) continue;
+
+        const p1 = peopleMap.get(idA);
+        const p2 = peopleMap.get(idB);
+        if (!p1 || !p2) continue;
+
+        const norm1 = normalize(p1.name);
         const norm2 = normalize(p2.name);
-        if (norm2.length < 4 || norm2.split(' ').length < 2) continue;
+        if (norm1.length < 4 || norm2.length < 4) continue;
 
-        const sim = levenshteinSimilarity(norm1, norm2);
-        const isSubstring = (norm1.includes(norm2) || norm2.includes(norm1)) && Math.abs(norm1.length - norm2.length) <= 10;
+        // Length difference filter: 90% similarity requires lengths to be very close
+        const lenDiff = Math.abs(norm1.length - norm2.length);
+        const isSubstring = (norm1.includes(norm2) || norm2.includes(norm1)) && lenDiff <= 10;
+        if (!isSubstring && lenDiff > 3) continue;
+
+        // Fast character precheck: first or second character must match
+        if (!isSubstring && norm1[0] !== norm2[0] && norm1[1] !== norm2[1]) continue;
+
+        const sim = fastLevenshteinSimilarity(norm1, norm2);
 
         if (sim >= 0.90 || (isSubstring && sim >= 0.85)) {
           const p1Score = (p1.photo_url ? 10 : 0) + (p1.film_count || 1);
@@ -555,10 +646,19 @@ export async function runDailyPeopleCleanup() {
 
           log(`🔄 Merging 90%+ match: "${duplicate.name}" -> "${canonical.name}" (${(sim * 100).toFixed(1)}%)`);
           await mergePersonCredits(duplicate.id, canonical.id);
-          mergedIds.add(duplicate.id);
+          mergedInFuzzy.add(duplicate.id);
+          processedIds.add(duplicate.id);
           fuzzyMergedCount++;
         }
       }
+
+      const passMergesAfter = aliasMergedCount + coCreditMergedCount + fuzzyMergedCount + purgedCount + roleCleanedCount;
+      const passTotal = passMergesAfter - passMergesBefore;
+      log(`📊 Pass ${pass} finished with ${passTotal} total action(s).`);
+
+      // If no new actions were taken or single-pass mode, terminate loop
+      if (passTotal === 0 || !isDeep) break;
+      pass++;
     }
 
     // -------------------------------------------------------------

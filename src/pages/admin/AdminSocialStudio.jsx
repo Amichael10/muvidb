@@ -148,7 +148,7 @@ function sortAndFilterFilmsForVideoAutopilot(rawFilms = [], usedFilmIds = new Se
     if (!value) return false;
     try {
       const parsed = new URL(value);
-      return /youtube\.com|youtu\.be|\.mp4(?:$|\?)|\.webm(?:$|\?)|\.mov(?:$|\?)/i.test(parsed.hostname + parsed.pathname + parsed.search);
+      return /youtube\.com|youtu\.be|\.mp4(?:$|\?)|\.webm(?:$|\?)|\.mov(?:$|\?)|\.m3u8(?:$|\?)/i.test(parsed.hostname + parsed.pathname + parsed.search);
     } catch { return false; }
   };
 
@@ -756,7 +756,7 @@ export default function AdminSocialStudio() {
     let cancelled = false;
     Promise.all([
       supabase.from('films')
-        .select('id,title,release_date,year,created_at,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url')
+        .select('id,title,release_date,year,created_at,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,streaming_links,release_type,is_in_cinemas')
         .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
         .order('release_date', { ascending: false, nullsLast: true })
         .order('created_at', { ascending: false })
@@ -805,7 +805,7 @@ export default function AdminSocialStudio() {
       if (!eligibleFilms.length) {
         const [{ data: films }, { data: socialData }] = await Promise.all([
           supabase.from('films')
-            .select('id,title,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at')
+            .select('id,title,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,release_date,year,created_at,streaming_links,release_type,is_in_cinemas')
             .or('trailer_youtube_id.not.is.null,trailer_external_url.not.is.null,youtube_watch_url.not.is.null')
             .order('release_date', { ascending: false, nullsLast: true })
             .order('created_at', { ascending: false }).limit(1000),
@@ -994,7 +994,7 @@ export default function AdminSocialStudio() {
       const { data, error } = await supabase
         .from('films')
         .select(`
-          id,title,release_date,year,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,
+          id,title,release_date,year,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,streaming_links,release_type,is_in_cinemas,
           credits(
             id,role,job,billing_order,character_name,
             people(id,name,instagram_url,twitter_url,slug)
@@ -1024,7 +1024,25 @@ export default function AdminSocialStudio() {
     const angle = customAngle || row.angle || 'editorial';
     const sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
     const channelName = '';
-    const platform = 'YouTube';
+    const platform = film.streaming_links?.homitv
+      ? 'HomiTV'
+      : film.streaming_links?.nollistream
+      ? 'NolliStream'
+      : film.streaming_links?.netflix
+      ? 'Netflix'
+      : film.streaming_links?.prime_video
+      ? 'Prime Video'
+      : film.streaming_links?.circuits
+      ? 'Circuits.tv'
+      : film.streaming_links?.kava
+      ? 'Kava'
+      : film.streaming_links?.docuth
+      ? 'Docuth'
+      : film.streaming_links?.ebonylife
+      ? 'EbonyLife ON Plus'
+      : (film.release_type === 'cinema' || film.is_in_cinemas)
+      ? 'Cinemas'
+      : 'YouTube';
     
     const rawCredits = asRelationArray(film.credits);
     const cast = rawCredits

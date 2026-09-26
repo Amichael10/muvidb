@@ -1200,6 +1200,11 @@ export default function AdminFilms() {
         runtime_minutes: formData.runtime_minutes && !isNaN(parseInt(formData.runtime_minutes)) ? parseInt(formData.runtime_minutes) : null,
         tmdb_id: formData.tmdb_id && !isNaN(parseInt(formData.tmdb_id)) ? parseInt(formData.tmdb_id) : null,
         tmdb_rating: formData.tmdb_rating && !isNaN(parseFloat(formData.tmdb_rating)) ? parseFloat(formData.tmdb_rating) : null,
+        nfvcb_rating: formData.nfvcb_rating || null,
+        title_locked: Boolean(
+          editingFilm?.title_locked
+          || (editingFilm && toSentenceCase(formData.title.trim()) !== editingFilm.title)
+        ),
         is_trending: Boolean(formData.is_trending),
         is_featured: Boolean(formData.is_featured),
         is_in_cinemas: Boolean(formData.is_in_cinemas),
@@ -1793,6 +1798,7 @@ export default function AdminFilms() {
             <option value="ebonylife">EbonyLife</option>
             <option value="circuits">Circuits</option>
             <option value="nollistream">NolliStream</option>
+            <option value="homitv">HomiTV</option>
           </select>
 
           <select
@@ -2016,7 +2022,12 @@ export default function AdminFilms() {
                             <Icon icon="solar:clapperboard-play-bold" className="w-4 h-4" />
                           </a>
                         )}
-                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && !film.streaming_links?.nollistream && (
+                        {film.streaming_links?.homitv && (
+                          <a href={film.streaming_links.homitv} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-purple-600/10 text-[#6D1DDC] hover:bg-[#6D1DDC] hover:text-white transition-all shadow-sm" title="HomiTV Link">
+                            <Icon icon="solar:tv-bold" className="w-4 h-4" />
+                          </a>
+                        )}
+                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && !film.streaming_links?.nollistream && !film.streaming_links?.homitv && (
                           <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter opacity-40">Offline</span>
                         )}
                       </div>
@@ -3014,7 +3025,7 @@ export default function AdminFilms() {
                 <div>
                   <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Available On Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits', 'nollistream'].map((type) => {
+                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits', 'nollistream', 'homitv'].map((type) => {
                       const isActive = type === 'cinema' 
                         ? formData.release_type === 'cinema'
                         : (formData.streaming_links && type in formData.streaming_links) || formData.release_type === type;
@@ -3117,6 +3128,7 @@ export default function AdminFilms() {
                       { id: 'ebonylife', label: 'EbonyLife', placeholder: 'https://ebonylifeonplus.com/...' },
                       { id: 'circuits', label: 'Circuits', placeholder: 'https://www.circuits.tv/...' },
                       { id: 'nollistream', label: 'NolliStream', placeholder: 'https://nollistream.net/movie/...' },
+                      { id: 'homitv', label: 'HomiTV', placeholder: 'https://homitv.com/watch/...' },
                     ].map(platform => {
                       const isActive = (formData.streaming_links && platform.id in formData.streaming_links) || formData.release_type === platform.id;
                       if (!isActive) return null;

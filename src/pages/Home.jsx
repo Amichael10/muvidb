@@ -26,7 +26,7 @@ const CriticsLoungeSection = lazy(() => import('../components/film/CriticsLounge
 const HOME_ROW_CAP = 12;
 
 // Platforms shown in the homepage "New to Stream" tabbed rail.
-const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits', 'nollistream'].includes(p.id));
+const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits', 'nollistream', 'homitv'].includes(p.id));
 const NEW_STREAM_IDS = NEW_STREAM.map(p => p.id);
 const CINEMA_SHOWTIME_PAGE_SIZE = 1000;
 

@@ -7,13 +7,15 @@
  * - Worker 3: Consensus, zero-duplicate reconciliation & direct credit auto-commit
  *
  * Usage:
- *   npx tsx scripts/run_automated_credit_harvester.ts                  # Continuous background daemon
- *   npx tsx scripts/run_automated_credit_harvester.ts --once           # Process 1 film and stop
- *   npx tsx scripts/run_automated_credit_harvester.ts --film=<id>      # Process specific film
- *   npx tsx scripts/run_automated_credit_harvester.ts --page=1         # Start from page 1 (dashboard order)
- *   npx tsx scripts/run_automated_credit_harvester.ts --force          # Re-process films even if they already have credits
- *   npx tsx scripts/run_automated_credit_harvester.ts --min-credits=0  # Minimum credit threshold (default 4)
- *   npx tsx scripts/run_automated_credit_harvester.ts --tail=300       # 5-minute tail (default 240s)
+ *   npx tsx scripts/run_automated_credit_harvester.ts                            # Continuous background daemon
+ *   npx tsx scripts/run_automated_credit_harvester.ts --title="Saamu Alajo"      # Process all films matching title/original_title
+ *   npx tsx scripts/run_automated_credit_harvester.ts --company="Odunlade"       # Process films from a specific production company
+ *   npx tsx scripts/run_automated_credit_harvester.ts --once                     # Process 1 film and stop
+ *   npx tsx scripts/run_automated_credit_harvester.ts --film=<id>                # Process specific film by UUID
+ *   npx tsx scripts/run_automated_credit_harvester.ts --page=1                   # Start from page 1 (dashboard order)
+ *   npx tsx scripts/run_automated_credit_harvester.ts --force                    # Re-process films even if they already have credits
+ *   npx tsx scripts/run_automated_credit_harvester.ts --min-credits=0            # Minimum credit threshold (default 4)
+ *   npx tsx scripts/run_automated_credit_harvester.ts --tail=300                 # 5-minute tail (default 240s)
  */
 
 import { execFile } from 'node:child_process';
@@ -91,6 +93,8 @@ const TAIL_SECONDS = Number(arg('tail')) || 240; // Default: last 4 minutes
 const FRAME_EVERY_SEC = Number(arg('frame-every')) || 3; // Default: 1 frame every 3 seconds (~80 frames for 240s tail)
 const ONCE = arg('once') !== undefined;
 const SINGLE_FILM = arg('film');
+const TITLE_FILTER = arg('title') ?? arg('query') ?? arg('search');
+const COMPANY_FILTER = arg('company') ?? arg('company-id');
 const COOKIES_PATH = [
   arg('cookies'),
   process.env.YTDLP_COOKIES_PATH,
@@ -544,13 +548,50 @@ async function main() {
     console.log(`⚡ Force mode enabled: processing films regardless of existing credit count.`);
   }
 
+  let companyFilmIds: string[] | null = null;
+  if (COMPANY_FILTER) {
+    const { data: comp } = await serviceSupabase
+      .from('companies')
+      .select('id, name')
+      .or(`id.eq.${COMPANY_FILTER},name.ilike.%${COMPANY_FILTER}%`)
+      .limit(1);
+    if (comp?.[0]) {
+      const { data: fc } = await serviceSupabase
+        .from('film_companies')
+        .select('film_id')
+        .eq('company_id', comp[0].id);
+      companyFilmIds = (fc || []).map((r: any) => r.film_id);
+      console.log(`🏢 Company filter active: "${comp[0].name}" (${companyFilmIds.length} linked films)`);
+    } else {
+      console.error(`❌ Company "${COMPANY_FILTER}" not found.`);
+      return;
+    }
+  }
+
+  if (TITLE_FILTER) {
+    console.log(`🎯 Title filter active: matching films containing "${TITLE_FILTER}"`);
+  }
+
   while (true) {
     console.log(`\n🔎 Finding next batch of films (offset: ${offset})...`);
 
-    const { data: films, error } = await serviceSupabase
+    let query = serviceSupabase
       .from('films')
       .select('id, title, year, release_date, youtube_watch_url, trailer_youtube_id, synopsis, created_at')
-      .or('youtube_watch_url.not.is.null,trailer_youtube_id.not.is.null')
+      .or('youtube_watch_url.not.is.null,trailer_youtube_id.not.is.null');
+
+    if (TITLE_FILTER) {
+      query = query.or(`title.ilike.%${TITLE_FILTER}%,original_title.ilike.%${TITLE_FILTER}%`);
+    }
+    if (companyFilmIds) {
+      if (companyFilmIds.length === 0) {
+        console.log('🎉 No films found for this company.');
+        return;
+      }
+      query = query.in('id', companyFilmIds);
+    }
+
+    const { data: films, error } = await query
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -568,6 +609,10 @@ async function main() {
     dbErrorCount = 0;
 
     if (!films || films.length === 0) {
+      if (TITLE_FILTER || COMPANY_FILTER || ONCE) {
+        console.log('🎉 Finished processing all matching films for filter.');
+        return;
+      }
       console.log('🎉 Reached end of film library. Resetting offset to 0 and sleeping for 60s...');
       offset = 0;
       attemptedFilmIds.clear();

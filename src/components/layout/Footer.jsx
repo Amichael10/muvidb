@@ -180,6 +180,9 @@ export default function Footer() {
             </p>
           </a>
 
+          {/* Google Preferred Source button */}
+          <div google-add-preferred-source-btn="" className="my-2" />
+
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between text-[10px] font-mono uppercase tracking-wider text-white/40">
             <p>
               © {new Date().getFullYear()} MuviDB Archive. Made for African cinema lovers.

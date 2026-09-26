@@ -23,14 +23,31 @@ export interface OutreachCandidate {
  */
 export function extractInstagramHandle(urlOrHandle: string): string {
   if (!urlOrHandle) return '';
-  let clean = urlOrHandle.trim();
-  clean = clean.replace(/\?.*$/, '').replace(/\/$/, '');
-  const match = clean.match(/(?:instagram\.com\/|@)?([a-zA-Z0-9._]+)$/i);
-  if (match && match[1]) {
-    const handle = match[1];
-    return handle.startsWith('@') ? handle : `@${handle}`;
+  let clean = urlOrHandle.trim().replace(/[?#].*$/, '').replace(/\/+$/, '');
+  if (!clean) return '';
+
+  const igIndex = clean.toLowerCase().indexOf('instagram.com/');
+  if (igIndex !== -1) {
+    clean = clean.substring(igIndex + 'instagram.com/'.length);
   }
-  return clean.startsWith('@') ? clean : `@${clean}`;
+
+  const segments = clean.split('/').map((s) => s.trim()).filter(Boolean);
+  let candidate = segments[0] || '';
+  candidate = candidate.replace(/^@/, '').trim();
+
+  const reserved = ['p', 'reel', 'reels', 'stories', 'explore', 'direct', 'accounts'];
+  if (reserved.includes(candidate.toLowerCase()) && segments[1]) {
+    candidate = segments[1].replace(/^@/, '').trim();
+  }
+
+  if (
+    /^[a-zA-Z0-9._]{1,30}$/.test(candidate) &&
+    candidate.toLowerCase() !== 'instagram.com' &&
+    !candidate.startsWith('http')
+  ) {
+    return `@${candidate}`;
+  }
+  return '';
 }
 
 /**
@@ -66,28 +83,28 @@ export async function generatePersonalizedPitch(params: {
   profileUrl: string;
   claimUrl: string;
 }): Promise<string> {
-  const { name, department, highlightFilms, profileUrl, claimUrl } = params;
+  const { name, highlightFilms, profileUrl, claimUrl } = params;
   const firstName = name.split(' ')[0] || name;
-  const craft = department || 'filmmaking / acting';
-  const filmsMention = highlightFilms.length > 0
-    ? highlightFilms.map(f => `"${f}"`).join(' and ')
-    : 'your latest projects';
+  const filmMention = highlightFilms.length > 0
+    ? highlightFilms.map(f => f.trim()).join(' and ')
+    : 'Nollywood projects';
 
-  const prompt = `You are writing a warm, authentic, professional Instagram Direct Message (DM) to an African cinema creator (actor/crew) on behalf of MuviDB (the African cinema & Nollywood database).
+  const prompt = `You are writing a warm, authentic, personal Instagram Direct Message (DM) to an African cinema creator on behalf of MuviDB (the African cinema database).
 
 Recipient Name: ${name} (Call them ${firstName})
-Their Craft/Role: ${craft}
-Films they worked on: ${filmsMention}
-Their Live Profile URL: ${profileUrl}
-Their 1-Click Profile Claim URL: ${claimUrl}
+Films they worked on: ${filmMention}
+Profile Link: ${profileUrl}
+Claim Link: ${claimUrl}
 
-Write a natural, concise Instagram DM (3-5 short sentences max):
-1. Greet them warmly and genuinely appreciate their work on ${filmsMention}.
-2. Let them know their verified filmography is already indexed and live on MuviDB (${profileUrl}).
-3. Invite them to claim their page for free (${claimUrl}) so they can customize their bio, headshot, and receive direct production/casting inquiries.
-4. Keep the tone friendly, respectful, and celebratory of African cinema creators. Use 1 or 2 relevant emojis. Do not sound spammy or corporate.
+Write a natural DM following this exact structure and tone:
+"Hi ${firstName} 👋
+I came across your work while we were documenting the cast and credits for ${filmMention}, and I realised you already have quite a body of work behind you.
+We’re building MuviDB to properly document African films and the people who make them, especially work that often gets missed because it lives on YouTube and other platforms.
+We’ve started putting your filmography together here: ${profileUrl}
+If you notice anything missing or incorrect, I’d genuinely love for you to tell us. You can also claim the page whenever you want, which lets you update your photo and profile directly: ${claimUrl}
+Keep going. We’re looking forward to documenting more of your work 🎬"
 
-Output ONLY the final DM text.`;
+Output ONLY the final DM text. Do not wrap in extra quotes.`;
 
   try {
     const aiResponse = await generateAIContent(prompt);
@@ -98,12 +115,7 @@ Output ONLY the final DM text.`;
     }
     return message;
   } catch (err) {
-    // Fallback template if AI router is offline
-    const mentions = highlightFilms.length > 0
-      ? `your work on ${filmsMention}`
-      : 'your work in Nollywood';
-
-    return `Hi ${firstName}! 👋 Big fan of ${mentions}. We’ve indexed your filmography on MuviDB, the African cinema database: ${profileUrl}\n\nYou can claim your official page here to update your bio and headshot: ${claimUrl}\n\nKeep creating amazing work! 🎬✨`;
+    return `Hi ${firstName} 👋\nI came across your work while we were documenting the cast and credits for ${filmMention}, and I realised you already have quite a body of work behind you.\nWe’re building MuviDB to properly document African films and the people who make them, especially work that often gets missed because it lives on YouTube and other platforms.\nWe’ve started putting your filmography together here: ${profileUrl}\nIf you notice anything missing or incorrect, I’d genuinely love for you to tell us. You can also claim the page whenever you want, which lets you update your photo and profile directly: ${claimUrl}\nKeep going. We’re looking forward to documenting more of your work 🎬`;
   }
 }
 

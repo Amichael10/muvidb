@@ -9,6 +9,9 @@
  *   npx tsx scripts/instagram_outreach_worker.ts --limit 10
  *   npx tsx scripts/instagram_outreach_worker.ts --dry-run
  */
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import fs from 'fs';
 import path from 'path';
 import { chromium } from 'playwright-extra';
@@ -17,6 +20,7 @@ import dotenv from 'dotenv';
 import { supabase as serviceSupabase } from './lib/db.js';
 import { getSessionPath, isSessionSaved } from './lib/ig_session_manager.js';
 import { sendTelegramMessage } from '../api/_lib/telegram.js';
+import { extractInstagramHandle } from '../api/_lib/outreach_generator.js';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -58,14 +62,49 @@ function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-async function typeHumanLike(page: any, selector: string, text: string) {
-  await page.focus(selector);
+async function typeHumanLike(page: any, input: any, text: string) {
+  await input.focus();
   for (const char of text) {
     await page.keyboard.type(char, { delay: randomBetween(35, 95) });
     if (char === '\n') {
       await page.waitForTimeout(randomBetween(120, 250));
     }
   }
+}
+
+async function findExactMessageButton(page: any, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const candidates = [
+      page.getByRole('button', { name: 'Message', exact: true }),
+      page.getByRole('link', { name: 'Message', exact: true }),
+      page.locator('header div[role="button"]').filter({ hasText: /^\s*Message\s*$/ }),
+    ];
+
+    for (const candidate of candidates) {
+      const count = await candidate.count();
+      for (let index = 0; index < count; index++) {
+        const element = candidate.nth(index);
+        if (await element.isVisible().catch(() => false)) return element;
+      }
+    }
+
+    await page.waitForTimeout(500);
+  }
+
+  return null;
+}
+
+async function findMessageInput(page: any) {
+  const input = page.locator([
+    'div[aria-label="Message"][contenteditable="true"]',
+    'div[role="textbox"][contenteditable="true"]',
+    'textarea[placeholder*="Message" i]',
+  ].join(', ')).filter({ visible: true }).first();
+
+  await input.waitFor({ state: 'visible', timeout: 20000 });
+  return input;
 }
 
 async function runWorker() {
@@ -147,12 +186,11 @@ async function runWorker() {
       const context = await browser.newContext({
         storageState: sessionPath,
         viewport: { width: 1280, height: 800 },
-        userAgent:
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       });
 
       page = await context.newPage();
-      await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded' });
+      await page.goto('https://www.instagram.com/', { waitUntil: 'commit', timeout: 15000 }).catch(() => {});
+      await page.waitForSelector('main, header, div[role="main"]', { timeout: 10000 }).catch(() => {});
       await page.waitForTimeout(3000);
 
       // Verify we are logged in
@@ -170,12 +208,8 @@ async function runWorker() {
       const messageText = item.last_message;
 
       // Extract handle
-      let handle = '';
-      const handleMatch = igUrl.match(/(?:instagram\.com\/|@)?([a-zA-Z0-9._]+)\/?/);
-      if (handleMatch) {
-        handle = handleMatch[1].replace('@', '').trim();
-      }
-
+      const rawHandle = extractInstagramHandle(igUrl);
+      const handle = rawHandle.replace(/^@/, '').trim();
       console.log(`\n--------------------------------------------------------`);
       console.log(`[${i + 1}/${queue.length}] Processing: ${personName} (@${handle})`);
 
@@ -201,7 +235,8 @@ async function runWorker() {
 
       try {
         console.log(`🔎 Navigating to profile: https://www.instagram.com/${handle}/`);
-        await page.goto(`https://www.instagram.com/${handle}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.goto(`https://www.instagram.com/${handle}/`, { waitUntil: 'commit', timeout: 30000 });
+        await page.waitForSelector('body', { state: 'visible', timeout: 10000 });
         await page.waitForTimeout(randomBetween(2500, 4500));
 
         // Check if user not found or unavailable
@@ -221,9 +256,7 @@ async function runWorker() {
 
         // Look for "Message" button
         // Instagram uses button with text "Message" or role button with "Message"
-        let messageBtn = await page.$(
-          'div[role="button"]:has-text("Message"), button:has-text("Message"), div:has-text("Message")[role="button"]'
-        );
+        const messageBtn = await findExactMessageButton(page);
 
         if (!messageBtn) {
           // Direct navigation to direct message if button isn't visible
@@ -237,7 +270,13 @@ async function runWorker() {
 
         if (messageBtn) {
           await messageBtn.click();
-          await page.waitForTimeout(randomBetween(3000, 5000));
+          await Promise.race([
+            page.waitForURL(/\/direct\//, { timeout: 20000 }),
+            page.locator('[contenteditable="true"][role="textbox"], textarea[placeholder*="Message" i]')
+              .first()
+              .waitFor({ state: 'visible', timeout: 20000 }),
+          ]).catch(() => {});
+          await page.waitForTimeout(randomBetween(1500, 2500));
         } else {
           // Fallback direct URL format: https://www.instagram.com/direct/t/ (needs profile ID)
           console.warn(`⚠️ Could not find Message button for @${handle}.`);
@@ -257,18 +296,14 @@ async function runWorker() {
         }
 
         // Locate DM message input box
-        const messageInputSelector =
-          'div[aria-label="Message"][contenteditable="true"], div[role="textbox"][contenteditable="true"], textarea[placeholder*="Message"]';
-        
-        await page.waitForSelector(messageInputSelector, { timeout: 15000 }).catch(() => {});
-        const inputElem = await page.$(messageInputSelector);
+        const inputElem = await findMessageInput(page).catch(() => null);
 
         if (!inputElem) {
-          throw new Error('Message text input area not found in DM view');
+          throw new Error(`Message button did not open a DM composer (URL: ${page.url()})`);
         }
 
         console.log(`✍️ Typing personalized pitch (${messageText.length} chars)...`);
-        await typeHumanLike(page, messageInputSelector, messageText);
+        await typeHumanLike(page, inputElem, messageText);
         await page.waitForTimeout(randomBetween(1000, 2000));
 
         // Hit Enter or click Send

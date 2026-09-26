@@ -185,6 +185,7 @@ export default function FilmCard({
       docuth: { icon: 'solar:play-bold', color: 'text-[#0048A8]', label: 'Watch on Docuth' },
       ebonylife: { icon: 'solar:play-circle-bold', color: 'text-[#F8A008]', label: 'Watch on EbonyLife' },
       circuits: { icon: 'solar:clapperboard-play-bold', color: 'text-[#F0532B]', label: 'Watch on Circuits' },
+      homitv: { icon: 'solar:tv-bold', color: 'text-[#6D1DDC]', label: 'Watch on HomiTV' },
     };
     
     Object.keys(platformMap).forEach(key => {

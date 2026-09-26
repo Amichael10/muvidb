@@ -532,112 +532,6 @@ export default function SocialDraftComposer({
   const [composerAiVariations, setComposerAiVariations] = useState([]);
   const [composerSelectedVarKey, setComposerSelectedVarKey] = useState('B');
 
-  const handleAttachRenderedVideo = async (renderedAsset) => {
-    if (!renderedAsset?.public_url && !renderedAsset?.url && !renderedAsset?.publicUrl) return false;
-    const videoUrl = renderedAsset.public_url || renderedAsset.url || renderedAsset.publicUrl;
-    const ratio = renderedAsset.aspectRatio || '9:16';
-    const platformTargets = {
-      '1:1': ['instagram', 'facebook', 'threads'],
-      '4:5': ['instagram', 'facebook'],
-      '9:16': ['instagram', 'facebook', 'tiktok'],
-      '16:9': ['facebook', 'threads'],
-    };
-    const targetPlatforms = platformTargets[ratio] || ['instagram', 'tiktok'];
-    const dimensions = {
-      '1:1': { width: 1080, height: 1080, format: 'square_1_1' },
-      '4:5': { width: 1080, height: 1350, format: 'portrait_4_5' },
-      '9:16': { width: 1080, height: 1920, format: 'video_vertical_9_16' },
-      '16:9': { width: 1920, height: 1080, format: 'landscape_16_9' },
-    };
-    const targetDimensions = dimensions[ratio] || dimensions['9:16'];
-    const contentItemId = result?.contentItem?.id;
-    const matchingVariants = (result?.variants || []).filter(variant => targetPlatforms.includes(variant.platform));
-
-    if (!contentItemId || !matchingVariants.length) {
-      toast.error('Generate the social draft and select a compatible platform before attaching the clip.');
-      return false;
-    }
-
-    let attachments = [];
-    try {
-      attachments = await Promise.all(matchingVariants.map(async variant => {
-        const response = await fetch('/api/social?task=attach_custom_asset', {
-          method: 'POST',
-          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contentItemId,
-            variantId: variant.id,
-            publicUrl: videoUrl,
-            format: targetDimensions.format,
-            width: targetDimensions.width,
-            height: targetDimensions.height,
-            driveFileId: renderedAsset.driveFileId || renderedAsset.drive_file_id,
-            r2Key: renderedAsset.r2Key || renderedAsset.r2_key,
-            aspectRatio: ratio,
-          }),
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || `Could not attach the clip to ${variant.platform}`);
-        return { variantId: variant.id, assetId: data.id };
-      }));
-    } catch (error) {
-      toast.error(error.message || 'The clip was rendered but could not be attached to the draft.');
-      return false;
-    }
-    const attachedAssetIds = new Map(attachments.map(entry => [entry.variantId, entry.assetId]));
-
-    const newAsset = {
-      id: `rendered_video_${Date.now()}`,
-      publicUrl: videoUrl,
-      public_url: videoUrl,
-      mediaType: 'video',
-      format: 'custom_video',
-      width: targetDimensions.width,
-      height: targetDimensions.height,
-      aspectRatio: ratio,
-      driveFileId: renderedAsset.driveFileId || renderedAsset.drive_file_id,
-      drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id,
-      r2Key: renderedAsset.r2Key || renderedAsset.r2_key,
-      r2_key: renderedAsset.r2Key || renderedAsset.r2_key,
-    };
-
-    setResult(prev => {
-      if (!prev) return prev;
-      const updatedAssets = [newAsset, ...(prev.assets || []).filter(a => a.mediaType !== 'video')];
-      const updatedVariants = (prev.variants || []).map(v => {
-        if (!targetPlatforms.includes(v.platform)) return v;
-
-        return {
-          ...v,
-          selected_asset_id: attachedAssetIds.get(v.id) || v.selected_asset_id,
-          media_urls: [videoUrl],
-          drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id || v.drive_file_id,
-          r2_key: renderedAsset.r2Key || renderedAsset.r2_key || v.r2_key,
-          platform_options: {
-            ...(v.platform_options || {}),
-            video_url: videoUrl,
-            asset_url: videoUrl,
-            drive_file_id: renderedAsset.driveFileId || renderedAsset.drive_file_id,
-            r2_key: renderedAsset.r2Key || renderedAsset.r2_key,
-            aspect_ratio: ratio,
-            asset_format: targetDimensions.format,
-            post_format: 'single',
-          },
-        };
-      });
-      return {
-        ...prev,
-        assets: updatedAssets,
-        variants: updatedVariants,
-      };
-    });
-
-    setCanvasAspectRatio(ratio);
-    const platformNames = matchingVariants.map(variant => variant.platform).join(', ');
-    toast.success(`🎬 ${ratio} clip attached to ${platformNames}!`);
-    return true;
-  };
-
   const handleCanvasCutVideo = async (cutData) => {
     setVideoStudioOpen(true);
   };
@@ -1023,7 +917,87 @@ export default function SocialDraftComposer({
       setCanvasAspectRatio(clipData.aspectRatio);
     }
     setPostFormat('single');
-    toast.success(`🎬 Attached video clip (${clipData.formattedStart || '00:00'} - ${clipData.formattedEnd || ''}) to draft!`);
+    toast.success(`👁️ Attached preview loop (${clipData.formattedStart || '00:00'} - ${clipData.formattedEnd || ''}) to canvas. (Click "Cut, Crop & Attach MP4 Video" to render real MP4)`);
+  };
+
+  const handleAttachRenderedVideo = async (clipAsset) => {
+    if (!clipAsset || !clipAsset.publicUrl) return;
+    const newAsset = {
+      id: `clip-${Date.now()}`,
+      publicUrl: clipAsset.publicUrl,
+      public_url: clipAsset.publicUrl,
+      mediaType: 'video',
+      format: 'custom_video',
+      title: clipAsset.title || 'Rendered Video Clip',
+      duration: clipAsset.duration || 0,
+      width: clipAsset.aspectRatio === '9:16' ? 1080 : 1920,
+      height: clipAsset.aspectRatio === '9:16' ? 1920 : 1080,
+      isRenderedMp4: true,
+      r2Key: clipAsset.r2Key || clipAsset.r2_key,
+    };
+
+    setResult(curr => {
+      if (!curr) {
+        return {
+          assets: [newAsset],
+          variants: (platforms || ['tiktok', 'instagram']).map(p => ({
+            platform: p,
+            selected_asset_id: newAsset.id,
+            selected_asset: newAsset,
+            platform_options: {
+              video_url: clipAsset.publicUrl,
+              asset_url: clipAsset.publicUrl,
+              post_format: 'single',
+            },
+          })),
+        };
+      }
+      const updatedAssets = [newAsset, ...(curr.assets || []).filter(a => a.id !== newAsset.id)];
+      const updatedVariants = (curr.variants || []).map(v => {
+        if (!activePreviewPlatform || v.platform === activePreviewPlatform) {
+          return {
+            ...v,
+            selected_asset_id: newAsset.id,
+            selected_asset: newAsset,
+            platform_options: {
+              ...(v.platform_options || {}),
+              video_url: clipAsset.publicUrl,
+              asset_url: clipAsset.publicUrl,
+              post_format: 'single',
+            },
+          };
+        }
+        return v;
+      });
+      return { ...curr, assets: updatedAssets, variants: updatedVariants };
+    });
+
+    if (clipAsset.aspectRatio) {
+      setCanvasAspectRatio(clipAsset.aspectRatio);
+    }
+    setPostFormat('single');
+
+    if (result?.contentItem?.id) {
+      try {
+        await fetch('/api/social?task=attach_custom_asset', {
+          method: 'POST',
+          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contentItemId: result.contentItem.id,
+            publicUrl: clipAsset.publicUrl,
+            format: 'custom_video',
+            width: newAsset.width,
+            height: newAsset.height,
+            r2Key: clipAsset.r2Key || clipAsset.r2_key,
+            aspectRatio: clipAsset.aspectRatio,
+          }),
+        });
+      } catch (err) {
+        console.warn('Could not persist asset to backend draft:', err);
+      }
+    }
+
+    toast.success(`🎉 Attached rendered MP4 video clip (${clipAsset.aspectRatio || '9:16'}) to draft!`);
   };
 
   const handleResetComposer = () => {

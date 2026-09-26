@@ -924,7 +924,7 @@ async function extractCastFromTitles(res: VercelResponse) {
     try {
       // 1. Update film title
       if (item.new_title && item.new_title !== item.old_title) {
-        await supabase.from('films').update({ title: item.new_title }).eq('id', item.id);
+        await supabase.from('films').update({ title: item.new_title }).eq('id', item.id).eq('title_locked', false);
         console.log(`Title: "${item.old_title}" → "${item.new_title}"`);
       }
 

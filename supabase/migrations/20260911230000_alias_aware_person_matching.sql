@@ -3,7 +3,8 @@
 
 CREATE INDEX IF NOT EXISTS idx_person_aliases_alias_key ON public.person_aliases (alias_key);
 CREATE INDEX IF NOT EXISTS idx_person_aliases_person_id ON public.person_aliases (person_id);
-CREATE INDEX IF NOT EXISTS idx_person_aliases_alias_trgm ON public.person_aliases USING gin (alias gin_trgm_ops);
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA extensions;
+CREATE INDEX IF NOT EXISTS idx_person_aliases_alias_trgm ON public.person_aliases USING gin (alias extensions.gin_trgm_ops);
 
 -- Enhanced match_people_by_name: checks exact name, name_key swap, and person_aliases
 CREATE OR REPLACE FUNCTION public.match_people_by_name(

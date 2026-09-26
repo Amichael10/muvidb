@@ -142,7 +142,9 @@ export async function runCastExtraction(options: { limit?: number } = {}) {
 
   for (const item of castExtracted) {
     if (item.new_title && item.new_title !== item.old_title) {
-      updatePromises.push(supabase.from('films').update({ title: item.new_title }).eq('id', item.id));
+      updatePromises.push(
+        supabase.from('films').update({ title: item.new_title }).eq('id', item.id).eq('title_locked', false),
+      );
     }
 
     for (const actorName of item.cast) {
@@ -203,6 +205,7 @@ export async function runTitleCleanup(options: { limit?: number } = {}) {
   const { data: messyFilms } = await supabase
     .from('films')
     .select('id, title')
+    .eq('title_locked', false)
     .or('title.ilike.%|%,title.ilike.%YORUBA%,title.ilike.%MOVIE%,title.ilike.%PART%,title.ilike.%2024%,title.ilike.%2025%,title.ilike.%FULL%,title.ilike.%NIGERIAN%,title.ilike.%(%,title.ilike.%[%,title.ilike.%-%,title.ilike.%LATEST%')
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -245,7 +248,7 @@ export async function runTitleCleanup(options: { limit?: number } = {}) {
       );
       const updateResults = await Promise.all(
         batchChanges.map((item: any) =>
-          supabase.from('films').update({ title: item.new_title.trim() }).eq('id', item.id)
+          supabase.from('films').update({ title: item.new_title.trim() }).eq('id', item.id).eq('title_locked', false)
         )
       );
       titlesApplied += updateResults.filter((res: any) => !res.error).length;

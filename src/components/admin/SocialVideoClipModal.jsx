@@ -969,9 +969,10 @@ export default function SocialVideoClipModal({
                     onClick={() => handleApplyPreviewToCanvas('clip')}
                     disabled={!videoUrl || clipDuration <= 0}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/40 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white hover:bg-white/10 disabled:opacity-50"
+                    title="Embeds iframe preview loop into composer without downloading or rendering MP4"
                   >
                     <Icon icon="solar:eye-bold" width="14" />
-                    <span>Canvas Preview</span>
+                    <span>Preview in Canvas</span>
                   </button>
 
                   {/* Primary Cut, Crop & Attach MP4 Video Button */}
@@ -980,7 +981,7 @@ export default function SocialVideoClipModal({
                     onClick={handleRenderAndAttachClip}
                     disabled={!videoUrl || clipDuration <= 0 || isRendering}
                     className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-amber-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 disabled:opacity-50 shadow-lg"
-                    title="Cuts precise segment, crops to 1:1 or 9:16, and attaches MP4 video to draft"
+                    title="Downloads source, cuts with local FFmpeg, crops to ratio, uploads to storage, and attaches real MP4 to draft"
                   >
                     <Icon icon="solar:clapperboard-edit-bold" width="16" />
                     <span>🎬 Cut, Crop & Attach MP4 Video</span>
@@ -1106,8 +1107,9 @@ export default function SocialVideoClipModal({
                     type="button"
                     onClick={() => handleApplyPreviewToCanvas('whole')}
                     className="rounded-xl border border-white/20 bg-black/40 px-4 py-2.5 text-xs font-black uppercase text-white hover:bg-white/10"
+                    title="Embeds whole video iframe preview into composer without downloading or rendering MP4"
                   >
-                    Canvas Preview
+                    Preview in Canvas
                   </button>
                   <button
                     type="button"

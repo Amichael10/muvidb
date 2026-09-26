@@ -113,7 +113,7 @@ async function repairLinkedYouTubeFilms(
   const filmIds = Array.from(new Set(linked.map((video) => linkedFilmByVideo.get(video.video_id)).filter(Boolean))) as string[];
   const { data: films, error } = await supabase
     .from('films')
-    .select('id,title,original_title,synopsis,needs_review,source')
+    .select('id,title,original_title,title_locked,synopsis,needs_review,source')
     .in('id', filmIds);
   if (error) throw error;
 
@@ -127,7 +127,9 @@ async function repairLinkedYouTubeFilms(
     const deterministicTitleChanged = policy.action !== 'skip'
       && policy.title
       && cleanTitle(film.title).toLocaleLowerCase() !== cleanTitle(policy.title).toLocaleLowerCase();
-    return !film.original_title || deterministicTitleChanged || synopsisNeedsRewrite(film.synopsis);
+    return !film.original_title
+      || (!film.title_locked && deterministicTitleChanged)
+      || synopsisNeedsRewrite(film.synopsis);
   });
   if (!candidates.length) return { repaired: 0, creditsAdded: 0, synopsisGenerated: 0 };
 
@@ -164,7 +166,7 @@ async function repairLinkedYouTubeFilms(
     const update: Record<string, any> = {
       original_title: film.original_title || policy.originalTitle || video.title,
     };
-    if (cleanedTitle && cleanedTitle.length >= 2) update.title = cleanedTitle;
+    if (!film.title_locked && cleanedTitle && cleanedTitle.length >= 2) update.title = cleanedTitle;
     if (ai?.synopsis) {
       update.synopsis = ai.synopsis;
       update.needs_review = false;
@@ -622,7 +624,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                     const { data: existingList } = await supabase
                       .from('films')
                       .select('id, poster_url')
-                      .ilike('title', cleanedBase)
+                      .or(`title.ilike.${cleanedBase},original_title.ilike.%${cleanedBase}%`)
                       .eq('content_type', 'series')
                       .eq('source', 'youtube')
                       .order('created_at', { ascending: true })
@@ -709,7 +711,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                   // catalogue), link this video to it instead of creating a copy.
                   const { data: dupFilm } = await supabase
                     .from('films').select('id')
-                    .ilike('title', cleanedTitle)
+                    .or(`title.ilike.${cleanedTitle},original_title.ilike.%${cleanedTitle}%`)
                     .order('created_at', { ascending: true })
                     .limit(1);
                   if (dupFilm?.[0]) {

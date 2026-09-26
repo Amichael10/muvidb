@@ -2,16 +2,12 @@
 
 const SITE_URL = (import.meta.env.VITE_PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
 
-export const DEFAULT_OUTREACH_TEMPLATE = `Hi {first_name},
-
-We're building MuviDB — a home for African film and the people who make it — and I'd love to introduce it to you.
-
-We've created your public profile with a direct share link that covers your journey:
-{profile_url}
-
-Please take a look and let us know if we missed any information, or if there's anything you'd like us to change (for example your photo or bio). We're still fact-checking data, so credits may not be fully up to date yet.
-
-Looking forward to hearing from you.`;
+export const DEFAULT_OUTREACH_TEMPLATE = `Hi {first_name} 👋
+I came across your work while we were documenting cast and credits, and I realised you already have quite a body of work behind you.
+We’re building MuviDB to properly document African films and the people who make them, especially work that often gets missed because it lives on YouTube and other platforms.
+We’ve started putting your filmography together here: {profile_url}
+If you notice anything missing or incorrect, I’d genuinely love for you to tell us. You can also claim the page whenever you want, which lets you update your photo and profile directly: {claim_url}
+Keep going. We’re looking forward to documenting more of your work 🎬`;
 
 export const OUTREACH_STATUSES = [
   { id: 'pending', label: 'Not contacted', tone: 'muted' },

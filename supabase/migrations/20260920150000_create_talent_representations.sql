@@ -23,11 +23,13 @@ CREATE INDEX IF NOT EXISTS idx_talent_representations_company ON talent_represen
 ALTER TABLE talent_representations ENABLE ROW LEVEL SECURITY;
 
 -- Allow public read access
+DROP POLICY IF EXISTS "Public read access for talent_representations" ON talent_representations;
 CREATE POLICY "Public read access for talent_representations"
   ON talent_representations FOR SELECT
   USING (true);
 
 -- Allow authenticated users / service role full write access
+DROP POLICY IF EXISTS "Service role write access for talent_representations" ON talent_representations;
 CREATE POLICY "Service role write access for talent_representations"
   ON talent_representations FOR ALL
   TO authenticated, service_role

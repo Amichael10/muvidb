@@ -52,6 +52,7 @@ const WatchOptions = ({ film, isFullWidth = false }) => {
     docuth: 'https://web.docuth.com',
     ebonylife: 'https://ebonylifeonplus.com',
     circuits: 'https://www.circuits.tv',
+    homitv: 'https://homitv.com',
   };
 
   // Prefer the shared PLATFORMS catalogue (icons + real logos).

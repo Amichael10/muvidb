@@ -6,7 +6,7 @@ import { PLATFORMS, platformFilter } from '../../lib/platforms';
 
 // Platforms that get a "New to Stream" tab on the homepage.
 const STREAM_PLATFORMS = PLATFORMS.filter((p) =>
-  ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits'].includes(p.id)
+  ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits', 'nollistream', 'homitv'].includes(p.id)
 );
 
 export default function AdminNewReleases() {

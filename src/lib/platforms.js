@@ -19,6 +19,7 @@ export const PLATFORMS = [
   { id: 'ebonylife',   name: 'EbonyLife ON Plus', icon: 'solar:play-circle-bold', color: '#F8A008', logo: '/images/platforms/ebonylife.png' },
   { id: 'circuits',    name: 'Circuits.tv', icon: 'solar:clapperboard-play-bold', color: '#F0532B', logo: '/images/platforms/circuits.png' },
   { id: 'nollistream', name: 'NolliStream', icon: 'solar:play-circle-bold',  color: '#D0A008', logo: '/images/platforms/nollistream.png' },
+  { id: 'homitv',      name: 'HomiTV',      icon: 'solar:tv-bold',           color: '#6D1DDC', logo: '/images/platforms/homitv.png' },
   { id: 'cinema',      name: 'In Cinemas',  icon: 'solar:ticket-bold',       color: '#FF5A1F', isCinema: true },
 ];
 

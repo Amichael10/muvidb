@@ -1,14 +1,49 @@
 User-agent: Googlebot
 Allow: /
+Disallow: /search
+Disallow: /search/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /auth/
+Disallow: /login
+Disallow: /user/
+Disallow: /watchlist
 
 User-agent: Googlebot-Image
 Allow: /
+Disallow: /admin/
+Disallow: /api/
 
 User-agent: Bingbot
 Allow: /
+Disallow: /search
+Disallow: /search/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /auth/
+Disallow: /login
+Disallow: /user/
+Disallow: /watchlist
 
 User-agent: *
 Allow: /
+Disallow: /search
+Disallow: /search/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /auth/
+Disallow: /login
+Disallow: /user/
+Disallow: /watchlist
 
 # Block AI scrapers & commercial SEO dataset harvesters
 User-agent: GPTBot
@@ -86,16 +121,5 @@ Disallow: /
 User-agent: SemrushBot
 Disallow: /
 
+# Canonical Sitemap Index (Googlebot reads all chunked sub-sitemaps from here)
 Sitemap: https://muvidb.com/sitemap.xml
-Sitemap: https://muvidb.com/sitemap-static.xml
-Sitemap: https://muvidb.com/sitemap-films.xml
-Sitemap: https://muvidb.com/sitemap-people.xml
-Sitemap: https://muvidb.com/sitemap-watch.xml
-Sitemap: https://muvidb.com/sitemap-companies.xml
-Sitemap: https://muvidb.com/sitemap-cinemas.xml
-Sitemap: https://muvidb.com/sitemap-channels.xml
-Sitemap: https://muvidb.com/sitemap-critics.xml
-Sitemap: https://muvidb.com/sitemap-plays.xml
-Sitemap: https://muvidb.com/sitemap-careers.xml
-Sitemap: https://muvidb.com/sitemap-awards.xml
-Sitemap: https://muvidb.com/sitemap-tvshows.xml

@@ -19,6 +19,18 @@ export function getPlatformBranding(candidate, series) {
       ctaText: 'STREAM ON KAVA',
     };
   }
+  if (text.includes('homitv') || text.includes('homi')) {
+    return {
+      name: 'HomiTV',
+      badge: 'NOW ON HOMITV',
+      accent: '#6D1DDC',
+      bgGlow: 'rgba(109, 29, 220, 0.25)',
+      platformIcon: 'solar:tv-bold',
+      status: 'NOW STREAMING',
+      subtext: 'Watch on HomiTV.com',
+      ctaText: 'STREAM ON HOMITV',
+    };
+  }
   if (text.includes('circuit')) {
     return {
       name: 'Circuits',
