@@ -1201,10 +1201,7 @@ export default function AdminFilms() {
         tmdb_id: formData.tmdb_id && !isNaN(parseInt(formData.tmdb_id)) ? parseInt(formData.tmdb_id) : null,
         tmdb_rating: formData.tmdb_rating && !isNaN(parseFloat(formData.tmdb_rating)) ? parseFloat(formData.tmdb_rating) : null,
         nfvcb_rating: formData.nfvcb_rating || null,
-        title_locked: Boolean(
-          editingFilm?.title_locked
-          || (editingFilm && toSentenceCase(formData.title.trim()) !== editingFilm.title)
-        ),
+        title_locked: true,
         is_trending: Boolean(formData.is_trending),
         is_featured: Boolean(formData.is_featured),
         is_in_cinemas: Boolean(formData.is_in_cinemas),
@@ -1410,6 +1407,30 @@ export default function AdminFilms() {
           await syncFilmAwardsToPeople(filmId, cleanFilmPayload.title, cleanFilmPayload.awards);
         } catch (syncErr) {
           console.warn('Film awards auto-sync to people had non-fatal error:', syncErr);
+        }
+      }
+
+      // If film is published or in cinemas, trigger WhatsApp followers notification (non-blocking)
+      if (cleanFilmPayload.is_published || cleanFilmPayload.is_in_cinemas) {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          fetch('/api/whatsapp?action=trigger-alert', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              filmId,
+              title: cleanFilmPayload.title,
+              slug: cleanFilmPayload.slug,
+              posterUrl: cleanFilmPayload.poster_url,
+              releaseType: cleanFilmPayload.release_type,
+            }),
+          }).catch(e => console.warn('WhatsApp alert trigger edge:', e));
+        } catch (waErr) {
+          console.warn('WhatsApp trigger error:', waErr);
         }
       }
 
@@ -3221,6 +3242,7 @@ export default function AdminFilms() {
             variant="film"
             value={formData.awards}
             onChange={(awards) => setFormData({ ...formData, awards })}
+            filmCredits={credits}
           />
 
           {editingFilm?.id && (

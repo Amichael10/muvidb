@@ -87,7 +87,10 @@ export default function AdminChannelDetail() {
 
   const stats = useMemo(() => {
     const total = videos.length;
-    const pending = videos.filter(v => v.films?.needs_review).length;
+    const pending = videos.filter(v => {
+      const f = Array.isArray(v.films) ? v.films[0] : v.films;
+      return f?.needs_review;
+    }).length;
     const approved = total - pending;
     return { total, pending, approved };
   }, [videos]);
@@ -143,13 +146,14 @@ export default function AdminChannelDetail() {
 
   const filteredFilms = useMemo(() => {
     return videos.filter(v => {
-      const filmTitle = v.films?.title || '';
+      const film = Array.isArray(v.films) ? v.films[0] : v.films;
+      const filmTitle = film?.title || '';
       const videoTitle = v.title || '';
       const titleMatches = filmTitle.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           videoTitle.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const isPending = !v.films || v.films.needs_review;
-      const isApproved = v.films && !v.films.needs_review;
+      const isPending = !film || film.needs_review;
+      const isApproved = film && !film.needs_review;
       const isHidden = v.is_hidden;
 
       if (statusFilter === 'hidden') return titleMatches && isHidden;
@@ -301,26 +305,38 @@ export default function AdminChannelDetail() {
                         <p className="text-text-muted text-xs font-black uppercase tracking-widest">No matching signals in current buffer</p>
                      </td>
                    </tr>
-                 ) : filteredFilms.map(vid => (
+                 ) : filteredFilms.map(vid => {
+                    const film = Array.isArray(vid.films) ? vid.films[0] : vid.films;
+                    const dateFormatted = vid.published_at ? (() => {
+                      const d = new Date(vid.published_at);
+                      return isNaN(d.getTime()) ? '-' : d.toLocaleDateString();
+                    })() : '-';
+                    return (
                     <tr key={vid.id} className="group hover:bg-surface-2/50 transition-all duration-300">
                       <td className="px-10 py-8">
                         <div className="flex items-center gap-6">
                            <ImageWithFallback src={vid.thumbnail_url} alt="" fallbackType="video" name={vid.title} className="w-24 h-14 rounded-md object-cover border border-border shadow-md transition-transform group-hover:scale-105" />
                            <div className="min-w-0">
                               <p className="text-text-primary font-black text-sm truncate max-w-sm mb-1">{vid.title}</p>
-                              <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest italic">{new Date(vid.published_at).toLocaleDateString()}</p>
+                              <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest italic">{dateFormatted}</p>
                            </div>
                         </div>
                       </td>
                       <td className="px-10 py-8">
-                        {vid.films ? (
+                        {film ? (
                           <div className="flex items-center gap-4">
-                             <div className="w-8 h-12 bg-surface-3 rounded-md border border-border overflow-hidden">
-                                {vid.films.poster_url && <img src={vid.films.poster_url} alt="" className="w-full h-full object-cover" />}
+                             <div className="w-8 h-12 bg-surface-3 rounded-md border border-border overflow-hidden shrink-0">
+                                <ImageWithFallback
+                                  src={film.poster_url}
+                                  alt={film.title || ''}
+                                  fallbackType="film"
+                                  name={film.title || ''}
+                                  className="w-full h-full object-cover"
+                                />
                              </div>
                              <div className="min-w-0">
-                                <p className="text-text-primary font-bold text-xs truncate max-w-[200px]">{vid.films.title}</p>
-                                <p className="text-[9px] text-text-muted font-bold uppercase tracking-widest">{vid.films.year || 'TBD'}</p>
+                                <p className="text-text-primary font-bold text-xs truncate max-w-[200px]">{film.title || 'Untitled'}</p>
+                                <p className="text-[9px] text-text-muted font-bold uppercase tracking-widest">{film.year || 'TBD'}</p>
                              </div>
                           </div>
                         ) : (
@@ -328,7 +344,7 @@ export default function AdminChannelDetail() {
                         )}
                       </td>
                       <td className="px-10 py-8">
-                        {vid.films?.needs_review ? (
+                        {film?.needs_review ? (
                           <span className="inline-flex items-center px-4 py-1.5 rounded-xl bg-brand/10 border border-brand/20 text-brand text-[9px] font-black uppercase tracking-widest shadow-sm">
                              <span className="w-1 h-1 rounded-full bg-brand animate-pulse mr-2" /> Needs Audit
                           </span>
@@ -379,7 +395,8 @@ export default function AdminChannelDetail() {
                           </div>
                       </td>
                     </tr>
-                 ))}
+                    );
+                 })}
                </tbody>
              </table>
            </div>
@@ -391,6 +408,25 @@ export default function AdminChannelDetail() {
         report={syncReport} 
         onClose={() => setSyncReport(null)} 
       />
+    </div>
+  );
+}
+
+
+export function ErrorBoundary({ error }) {
+  return (
+    <div className="p-12 text-center bg-surface border border-red-500/20 rounded-md shadow-2xl m-8">
+      <div className="w-20 h-20 bg-red-500/10 rounded-md flex items-center justify-center text-3xl mx-auto mb-6">??</div>
+      <h1 className="text-2xl font-black text-red-500 mb-2 uppercase tracking-wide">Channel Signal Failed</h1>
+      <p className="text-text-muted mb-6 text-sm max-w-md mx-auto">{error?.message || 'Failed to render channel assets.'}</p>
+      <div className="flex justify-center gap-4">
+        <button onClick={() => window.location.reload()} className="px-6 py-3 bg-brand text-white rounded-lg text-xs font-black uppercase tracking-widest hover:bg-brand-hover">
+          Reload Page
+        </button>
+        <Link to="/admin/channels" className="px-6 py-3 bg-surface-2 border border-border text-text-primary rounded-lg text-xs font-black uppercase tracking-widest hover:border-brand/30">
+          Back to Channels
+        </Link>
+      </div>
     </div>
   );
 }

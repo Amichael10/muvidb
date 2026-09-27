@@ -335,3 +335,22 @@ export default function AdminLayout() {
     </div>
   );
 }
+
+
+export function ErrorBoundary({ error }) {
+  return (
+    <div className="p-12 text-center bg-surface border border-red-500/20 rounded-md shadow-2xl m-8">
+      <div className="w-16 h-16 bg-red-500/10 rounded-md flex items-center justify-center text-2xl mx-auto mb-4">??</div>
+      <h1 className="text-xl font-black text-red-500 mb-2 uppercase tracking-wide">Admin Interface Error</h1>
+      <p className="text-text-muted mb-6 text-sm max-w-md mx-auto">{error?.message || 'An unexpected error occurred in this admin section.'}</p>
+      <div className="flex justify-center gap-4">
+        <button onClick={() => window.location.reload()} className="px-6 py-3 bg-brand text-white rounded-lg text-xs font-black uppercase tracking-widest hover:bg-brand-hover">
+          Reload
+        </button>
+        <a href="/admin" className="px-6 py-3 bg-surface-2 border border-border text-text-primary rounded-lg text-xs font-black uppercase tracking-widest hover:border-brand/30">
+          Admin Overview
+        </a>
+      </div>
+    </div>
+  );
+}

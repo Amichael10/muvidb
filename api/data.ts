@@ -69,6 +69,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handleApiKeysAdmin } = await import('./_lib/api_keys_handler.js');
       return handleApiKeysAdmin(req, res);
     }
+    if (key === 'whatsapp') {
+      const { handleWhatsApp } = await import('./_lib/whatsapp_handler.js');
+      return handleWhatsApp(req, res);
+    }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
   } catch (err: any) {

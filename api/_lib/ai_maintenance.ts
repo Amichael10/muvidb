@@ -202,10 +202,14 @@ export async function runTitleCleanup(options: { limit?: number } = {}) {
   console.log('[AI Maintenance] Starting title cleanup...');
   const limit = Math.max(1, Math.min(options.limit || 40, 500));
   
+  // Only clean standalone messy movie titles where title_locked is false.
+  // Never wipe series episodes (which contain subtitles/episode numbers) into bare parent series names.
   const { data: messyFilms } = await supabase
     .from('films')
     .select('id, title')
     .eq('title_locked', false)
+    .neq('content_type', 'series')
+    .is('episode_number', null)
     .or('title.ilike.%|%,title.ilike.%YORUBA%,title.ilike.%MOVIE%,title.ilike.%PART%,title.ilike.%2024%,title.ilike.%2025%,title.ilike.%FULL%,title.ilike.%NIGERIAN%,title.ilike.%(%,title.ilike.%[%,title.ilike.%-%,title.ilike.%LATEST%')
     .order('created_at', { ascending: false })
     .limit(limit);

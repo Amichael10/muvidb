@@ -21,6 +21,7 @@ import { nationalityToCountryName } from '../utils/africanCountries'
 import { fetchPersonStageCredits, getPlayDateLabel } from '../lib/plays'
 import PersonHeroMediaShowcase from '../components/person/PersonHeroMediaShowcase'
 import CareerPassportModal from '../components/professional/CareerPassportModal'
+import WhatsAppOptInModal from '../components/person/WhatsAppOptInModal'
 
 const PLATFORM_STYLES = {
   cinema:   { label: 'Cinema',   bg: 'bg-yellow-500/20',  text: 'text-yellow-400',  dot: 'bg-yellow-400' },
@@ -183,6 +184,7 @@ const PersonDetail = () => {
   const [filmographyView, setFilmographyView] = useState('grid')
   const [awardsOpen, setAwardsOpen] = useState(false)
   const [passportOpen, setPassportOpen] = useState(false)
+  const [whatsappOptInOpen, setWhatsappOptInOpen] = useState(false)
 
   const canManage = Boolean(
     user && (
@@ -523,7 +525,18 @@ const PersonDetail = () => {
       })
       return
     }
+
+    const wasFollowing = isFollowing
     await toggleFollow()
+
+    // If user just followed (was not following before) and hasn't set up WhatsApp yet:
+    if (!wasFollowing) {
+      // Check if user already has a saved phone or opted out
+      const hasPhone = Boolean(user.whatsapp_phone || user.user_metadata?.whatsapp_phone)
+      if (!hasPhone) {
+        setWhatsappOptInOpen(true)
+      }
+    }
   }
 
   const creditsByRole = (role) => {
@@ -1573,6 +1586,13 @@ const PersonDetail = () => {
           </div>
         )}
         {passportOpen && <CareerPassportModal person={person} credits={person.credits || []} stageCredits={stageCredits} onClose={() => setPassportOpen(false)} />}
+        <WhatsAppOptInModal
+          isOpen={whatsappOptInOpen}
+          onClose={() => setWhatsappOptInOpen(false)}
+          personName={person?.name}
+          personId={personId}
+          user={user}
+        />
       </div>
     </div>
   )

@@ -124,11 +124,11 @@ async function repairLinkedYouTubeFilms(
     // Never allow automated YouTube sync to overwrite films curated manually by an admin
     if (film.source === 'manual') return false;
     const policy = curateYouTubeTitle(video.title);
-    const deterministicTitleChanged = policy.action !== 'skip'
-      && policy.title
-      && cleanTitle(film.title).toLocaleLowerCase() !== cleanTitle(policy.title).toLocaleLowerCase();
+    // Never overwrite existing Production Map film titles during background sync.
+    // The raw upload title is always preserved in Asset Intelligence (channel_videos.title).
+    const needsTitleRepair = !film.title_locked && !film.title;
     return !film.original_title
-      || (!film.title_locked && deterministicTitleChanged)
+      || needsTitleRepair
       || synopsisNeedsRewrite(film.synopsis);
   });
   if (!candidates.length) return { repaired: 0, creditsAdded: 0, synopsisGenerated: 0 };
@@ -166,7 +166,10 @@ async function repairLinkedYouTubeFilms(
     const update: Record<string, any> = {
       original_title: film.original_title || policy.originalTitle || video.title,
     };
-    if (!film.title_locked && cleanedTitle && cleanedTitle.length >= 2) update.title = cleanedTitle;
+    // Only populate title if film has no title at all and is not locked
+    if (!film.title_locked && !film.title && cleanedTitle && cleanedTitle.length >= 2) {
+      update.title = cleanedTitle;
+    }
     if (ai?.synopsis) {
       update.synopsis = ai.synopsis;
       update.needs_review = false;
