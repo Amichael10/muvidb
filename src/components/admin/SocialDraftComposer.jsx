@@ -40,12 +40,12 @@ export const EDITORIAL_THEMES = [
   {
     id: 'where_to_watch',
     seriesSlug: 'where_to_watch',
-    name: 'Where To Watch (Streaming Spotlight)',
+    name: 'Streaming Alert (Movie Poster)',
     category: 'Streaming & VOD',
     badge: 'Wednesday Theme',
     icon: 'solar:tv-linear',
     entity: 'film',
-    description: 'Streaming platform callout (Netflix, Prime Video, YouTube, Showmax) with cast tags & watchlist CTAs.',
+    description: 'Publish the current portrait movie poster with synopsis, cast and crew. Instagram: @muvi_database.',
     placeholder: 'Search streaming film (e.g. A Tribe Called Judah, Anikulapo, The Black Book)…',
     templateSlug: 'now-showing-cinemas-v1',
     contentType: 'where_to_watch',
@@ -509,7 +509,7 @@ export default function SocialDraftComposer({
   const [postFormat, setPostFormat] = useState('single');
   const [carouselAssets, setCarouselAssets] = useState([]);
   const [uploadingCustom, setUploadingCustom] = useState(false);
-  const [uploadScope, setUploadScope] = useState('active'); // 'active' (target current channel) | 'all' (all selected channels)
+  const [uploadScope, setUploadScope] = useState('all'); // Carousels normally publish the same media to every selected channel.
   const [reorderingCarousel, setReorderingCarousel] = useState(false);
   const [replaceSlideIndex, setReplaceSlideIndex] = useState(null);
   const [scheduling, setScheduling] = useState(false);
@@ -689,11 +689,58 @@ export default function SocialDraftComposer({
     return () => { cancelled = true; };
   }, [activeTheme.id]);
 
-  const selectedDestinationAccounts = useMemo(() => destinationAccounts.filter(row => row.destination_id === destinationId), [destinationAccounts, destinationId]);
-  const accountForPlatform = useMemo(() => Object.fromEntries(selectedDestinationAccounts.map(row => {
+  const selectedDestinationAccounts = useMemo(() => {
+    const mainId = destinations.find(row => row.slug === 'main-muvidb')?.id;
+    return destinationAccounts.filter(row => row.destination_id === (activeTheme.id === 'where_to_watch' && row.platform !== 'instagram' ? mainId : destinationId));
+  }, [destinationAccounts, destinationId, destinations, activeTheme.id]);
+  const accountForPlatform = useMemo(() => {
+    const mapped = Object.fromEntries(selectedDestinationAccounts.map(row => {
     const linked = Array.isArray(row.social_connections) ? row.social_connections[0] : row.social_connections;
     return [row.platform, linked || null];
-  })), [selectedDestinationAccounts]);
+    }));
+    if (activeTheme.id === 'where_to_watch') mapped.instagram = availableSocialAccounts.find(row => row.platform === 'instagram' && String(row.username || '').replace(/^@/, '').toLowerCase() === 'muvi_database') || null;
+    return mapped;
+  }, [selectedDestinationAccounts, availableSocialAccounts, activeTheme.id]);
+  const [posterChanged, setPosterChanged] = useState(false);
+  const [refreshingPoster, setRefreshingPoster] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setPosterChanged(false);
+    if (activeTheme.id !== 'where_to_watch' || !result?.contentItem?.id) return;
+    const check = async () => {
+      try {
+        const response = await fetch('/api/social?task=streaming_poster', {
+          method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contentItemId: result.contentItem.id }),
+        });
+        const body = await response.json();
+        if (active && response.ok) setPosterChanged(body.changed);
+      } catch { /* A later focus retries this read-only check. */ }
+    };
+    check();
+    window.addEventListener('focus', check);
+    return () => { active = false; window.removeEventListener('focus', check); };
+  }, [activeTheme.id, result?.contentItem?.id]);
+  const refreshPoster = async () => {
+    setRefreshingPoster(true);
+    try {
+      const response = await fetch('/api/social?task=streaming_poster', {
+        method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId: result.contentItem.id, refresh: true }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'Could not update poster');
+      setResult(current => ({ ...current, assets: body.assets, variants: current.variants.map(variant => ({
+        ...variant, selected_asset_id: body.assets[0].id,
+        platform_options: { ...variant.platform_options, poster_only: true, post_format: 'single', carousel_asset_urls: [] },
+      })) }));
+      setPosterChanged(false);
+      setPostFormat('single');
+      setCarouselAssets([]);
+      toast.success('Updated to the current portrait poster');
+    } catch (error) { toast.error(error.message); }
+    finally { setRefreshingPoster(false); }
+  };
   const themeWordLimit = THEME_WORD_LIMITS[activeTheme.id] || 55;
 
   const setDestinationAccount = async (platform, connectionId) => {
@@ -1173,7 +1220,7 @@ export default function SocialDraftComposer({
         ...data,
         variants: (data.variants || []).map(variant => ({
           ...variant,
-          caption: clampWords(variant.caption, themeWordLimit),
+          caption: activeTheme.id === 'where_to_watch' ? variant.caption : clampWords(variant.caption, themeWordLimit),
           hashtags: Array.isArray(variant.hashtags) ? variant.hashtags.slice(0, 3) : [],
         })),
       };
@@ -1414,8 +1461,13 @@ export default function SocialDraftComposer({
 
   const handleSchedule = async (preset, customValue) => {
     if (!result?.contentItem?.id) return;
-    if (postFormat === 'carousel' && carouselAssets.length < 2) {
-      return toast.error('Add at least 2 media items before scheduling this carousel');
+    const invalidCarousels = (result.variants || []).filter(variant => {
+      const options = variant.platform_options || {};
+      return options.post_format === 'carousel'
+        && (!Array.isArray(options.carousel_asset_urls) || options.carousel_asset_urls.length < 2);
+    });
+    if (invalidCarousels.length) {
+      return toast.error(`Add at least 2 saved items to: ${invalidCarousels.map(variant => variant.platform).join(', ')}`);
     }
     let targetDate = new Date();
     if (preset === 'today_6pm') {
@@ -2278,6 +2330,16 @@ export default function SocialDraftComposer({
             />
           </button>
 
+          {activeTheme.id === 'where_to_watch' && (
+            <div className="mt-3 rounded-xl border border-brand/30 bg-brand/5 p-3 text-sm text-text-primary">
+              <p>Uses the film’s current portrait poster. Instagram: <strong>@muvi_database</strong>.</p>
+              {!accountForPlatform.instagram && <p className="mt-1 text-amber-400">Connect @muvi_database in Connections before publishing to Instagram.</p>}
+              {result?.contentItem?.id && <button type="button" disabled={refreshingPoster} onClick={refreshPoster} className="mt-2 font-bold text-brand disabled:opacity-50">
+                {refreshingPoster ? 'Updating poster…' : posterChanged ? 'Poster changed — update draft' : 'Use latest film poster'}
+              </button>}
+              <p className="mt-1 text-xs text-text-muted">Scheduled posts keep their reviewed poster. Reopen the post to change it.</p>
+            </div>
+          )}
           {step3Open && (
             <div className="mt-3 space-y-3">
               {destinations.length > 0 && (
@@ -2294,7 +2356,7 @@ export default function SocialDraftComposer({
                       const choices = availableSocialAccounts.filter(connection => connection.platform === platform.value);
                       return <label key={platform.value} className={`rounded-lg border px-2 py-1 text-[9px] font-bold ${account?.status === 'connected' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
                         <span className="mr-1">{platform.label}:</span>
-                        <select value={account?.id || ''} onChange={event => setDestinationAccount(platform.value, event.target.value)} className="max-w-[150px] bg-transparent outline-none">
+                        <select disabled={activeTheme.id === 'where_to_watch'} value={account?.id || ''} onChange={event => setDestinationAccount(platform.value, event.target.value)} className="max-w-[150px] bg-transparent outline-none">
                           <option value="">No account linked</option>
                           {choices.map(connection => <option key={connection.id} value={connection.id}>{connection.username ? `@${connection.username}` : connection.display_name || connection.external_account_id}</option>)}
                         </select>
@@ -2494,6 +2556,20 @@ export default function SocialDraftComposer({
                         <option value="all">All Selected Channels</option>
                       </select>
                     </div>
+                    {activeVariantPostFormat === 'carousel' && (
+                      <div className="flex flex-wrap gap-1">
+                        {(result?.variants || []).map(variant => {
+                          const count = Array.isArray(variant.platform_options?.carousel_asset_urls)
+                            ? variant.platform_options.carousel_asset_urls.length
+                            : 0;
+                          return (
+                            <span key={variant.id} className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase ${count >= 2 ? 'border-emerald-500/30 text-emerald-400' : 'border-amber-500/30 text-amber-300'}`}>
+                              {variant.platform}: {count} item{count === 1 ? '' : 's'}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
@@ -2756,7 +2832,7 @@ export default function SocialDraftComposer({
                           </a>
                         )}
                         <span className="rounded-full border border-border px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-text-muted">
-                          {postFormat === 'carousel' ? `${activeVisualAssets.length} slides` : selectedSingleAsset?.format === 'custom_design' ? 'Your poster' : 'MuviDB graphic'}
+                          {postFormat === 'carousel' ? `${activeVisualAssets.length} slides` : activeVariant?.platform_options?.poster_only || selectedSingleAsset?.format === 'custom_design' ? 'Movie poster' : 'MuviDB graphic'}
                         </span>
                       </div>
                     </div>
@@ -3484,7 +3560,7 @@ export default function SocialDraftComposer({
                     </div>
                     <div className="rounded-xl border border-white/10 bg-surface p-3">
                       <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Visual</p>
-                      <p className="mt-1 text-xs font-bold text-text-primary">{selectedSingleAsset?.format === 'custom_design' ? 'Custom poster' : 'Generated'}</p>
+                      <p className="mt-1 text-xs font-bold text-text-primary">{activeVariant?.platform_options?.poster_only ? 'Movie poster' : selectedSingleAsset?.format === 'custom_design' ? 'Custom poster' : 'Generated'}</p>
                     </div>
                     <div className="rounded-xl border border-white/10 bg-surface p-3">
                       <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Channel</p>

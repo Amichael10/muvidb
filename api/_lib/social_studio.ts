@@ -1,3 +1,6 @@
+import { resolveDestinationConnection } from './social-studio/destination-routing.js';
+import { downloadSocialImage, preparePoster, socialPhotoUrl } from './social-studio/content/poster-media.js';
+import { assertCarouselVariantsReady } from './social-studio/domain/carousel-validation.js';
 import type { User } from '@supabase/supabase-js';
 import type { VercelRequest } from '@vercel/node';
 import { supabase } from './supabase.js';
@@ -425,6 +428,9 @@ export async function createUniversalSocialPost(input: {
 
   const universalCaption = String(input.universalCaption || '').trim();
   const format = input.format || (input.mediaAssets?.length ? (input.mediaAssets.length > 1 ? 'carousel' : (input.mediaAssets[0].mimeType?.startsWith('video/') ? 'video' : 'image')) : 'post');
+  if (format === 'carousel' && (!Array.isArray(input.mediaAssets) || input.mediaAssets.filter(asset => asset?.publicUrl).length < 2)) {
+    throw httpError(400, 'A carousel needs at least 2 uploaded media items');
+  }
   const title = String(input.title || '').trim().slice(0, 180) || universalCaption.slice(0, 50) || 'Social Post';
   const bucket = getAssetBucket();
 
@@ -686,7 +692,7 @@ async function processJob(job: any, lockedBy: string, now: Date) {
 
   const { data: contentItem, error: contentError } = await supabase
     .from('social_content_items')
-    .select('id,status,source_snapshot')
+    .select('id,status,source_snapshot,destination_id,content_type')
     .eq('id', variant.content_item_id)
     .single();
   if (contentError) throw contentError;
@@ -748,31 +754,34 @@ async function processJob(job: any, lockedBy: string, now: Date) {
   try {
     let adapter: SocialPlatformAdapter;
     const publishMode = getSocialPublishMode();
+    if (publishMode === 'live' && !variant.connection_id && (contentItem.destination_id || contentItem.content_type === 'where_to_watch')) {
+      variant.connection_id = await resolveDestinationConnection(contentItem.destination_id, variant.platform, contentItem.content_type);
+    }
     if (publishMode === 'mock') {
       adapter = new MockSocialPlatformAdapter();
     } else if (publishMode === 'live' && variant.platform === 'threads') {
-      const { connection, accessToken } = await getThreadsPublishingCredentials();
+      const { connection, accessToken } = await getThreadsPublishingCredentials(variant.connection_id);
       adapter = new ThreadsPlatformAdapter({
         accessToken,
         userId: connection.external_account_id,
         apiVersion: process.env.THREADS_GRAPH_API_VERSION,
       });
     } else if (publishMode === 'live' && variant.platform === 'instagram') {
-      const { connection, accessToken } = await getPlatformPublishingCredentials('instagram');
+      const { connection, accessToken } = await getPlatformPublishingCredentials('instagram', variant.connection_id);
       adapter = new InstagramPlatformAdapter({
         accessToken,
         instagramAccountId: connection.external_account_id,
         apiVersion: process.env.META_GRAPH_API_VERSION,
       });
     } else if (publishMode === 'live' && variant.platform === 'facebook') {
-      const { connection, accessToken } = await getPlatformPublishingCredentials('facebook');
+      const { connection, accessToken } = await getPlatformPublishingCredentials('facebook', variant.connection_id);
       adapter = new FacebookPlatformAdapter({
         accessToken,
         pageId: connection.external_account_id,
         apiVersion: process.env.META_GRAPH_API_VERSION,
       });
     } else if (publishMode === 'live' && variant.platform === 'tiktok') {
-      const { connection, accessToken } = await getPlatformPublishingCredentials('tiktok');
+      const { connection, accessToken } = await getPlatformPublishingCredentials('tiktok', variant.connection_id);
       adapter = new TikTokPlatformAdapter({
         accessToken,
         openId: connection.external_account_id,
@@ -785,6 +794,18 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       });
     }
 
+    if (adapter instanceof TikTokPlatformAdapter && !job.provider_publish_id && assetUrl && !/\.(mp4|mov|webm)(?:$|\?)/i.test(assetUrl)) {
+      const preparedUrls: string[] = [];
+      for (const [index, url] of (assetUrls.length ? assetUrls : [assetUrl]).entries()) {
+        const prepared = await preparePoster(await downloadSocialImage(url), false);
+        const path = `tiktok/${variant.id}/${index}.jpg`;
+        const { error } = await supabase.storage.from(getAssetBucket()).upload(path, prepared.jpeg, { contentType: 'image/jpeg', upsert: true });
+        if (error) throw error;
+        preparedUrls.push(socialPhotoUrl(path));
+      }
+      assetUrl = preparedUrls[0];
+      assetUrls = preparedUrls;
+    }
     const result = adapter instanceof TikTokPlatformAdapter && job.provider_publish_id
       ? await adapter.checkPublishStatus(
           String(job.provider_publish_id),
@@ -1113,7 +1134,7 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
   const [creditsResult, channelVideoResult] = await Promise.all([
     supabase
       .from('credits')
-      .select('role,character_name,billing_order,people!inner(id,name,instagram_url)')
+      .select('role,character_name,billing_order,people!inner(id,name,instagram_url,tiktok_url)')
       .eq('film_id', filmId)
       .order('billing_order', { ascending: true, nullsFirst: false })
       .limit(40),
@@ -1211,6 +1232,52 @@ function templateFormats(config: unknown, templateSlug?: string | null): SocialA
 }
 
 type StoredAsset = { id: string; format: SocialAssetFormat; publicUrl: string; width: number; height: number; slide?: number };
+
+async function storePosterAsset(contentItemId: string, poster: Awaited<ReturnType<typeof preparePoster>>, sourceUrl: string): Promise<{ rows: StoredAsset[]; carouselAssets?: Record<string, StoredAsset[]>; error?: string }> {
+  const bucket = getAssetBucket();
+  const path = `${contentItemId}/poster-${Date.now()}.jpg`;
+  const { error: uploadError } = await supabase.storage.from(bucket).upload(path, poster.jpeg, { contentType: 'image/jpeg' });
+  if (uploadError) throw uploadError;
+  const { data: url } = supabase.storage.from(bucket).getPublicUrl(path);
+  const { data, error } = await supabase.from('social_assets').upsert({
+    content_item_id: contentItemId, format: 'portrait_4_5', storage_bucket: bucket, storage_path: path,
+    public_url: url.publicUrl, mime_type: 'image/jpeg', width: poster.width, height: poster.height,
+    file_size_bytes: poster.jpeg.length, render_metadata: { poster_only: true, source_url: sourceUrl },
+  }, { onConflict: 'content_item_id,format' }).select('id').single();
+  if (error) throw error;
+  return { rows: [{ id: data.id, format: 'portrait_4_5', publicUrl: url.publicUrl, width: poster.width, height: poster.height }] };
+}
+
+export async function refreshStreamingPoster(contentItemId: string, refresh: boolean) {
+  const { data: item, error } = await supabase.from('social_content_items')
+    .select('id,status,content_type,source_entity_id,source_snapshot').eq('id', contentItemId).single();
+  if (error) throw error;
+  if (item.content_type !== 'where_to_watch') throw httpError(400, 'This is not a Streaming Alert');
+  const { data: film, error: filmError } = await supabase.from('films').select('poster_url').eq('id', item.source_entity_id).single();
+  if (filmError) throw filmError;
+  const changed = film.poster_url !== item.source_snapshot?.posterUrl;
+  if (!refresh) return { changed, posterUrl: film.poster_url };
+  if (!['draft', 'approved', 'ready_for_review'].includes(item.status)) {
+    throw httpError(409, 'Reopen this post for editing before updating its poster.');
+  }
+  const poster = await preparePoster(await downloadSocialImage(film.poster_url || ''));
+  const assets = await storePosterAsset(item.id, poster, film.poster_url);
+  const { data: variants, error: variantsError } = await supabase.from('social_platform_variants')
+    .select('id,platform_options').eq('content_item_id', item.id);
+  if (variantsError) throw variantsError;
+  for (const variant of variants || []) {
+    const { error: updateError } = await supabase.from('social_platform_variants').update({
+      selected_asset_id: assets.rows[0].id,
+      platform_options: { ...variant.platform_options, poster_only: true, poster_source_url: film.poster_url,
+        post_format: 'single', carousel_assets: [], carousel_asset_urls: [] },
+    }).eq('id', variant.id);
+    if (updateError) throw updateError;
+  }
+  const { error: snapshotError } = await supabase.from('social_content_items')
+    .update({ source_snapshot: { ...item.source_snapshot, posterUrl: film.poster_url } }).eq('id', item.id);
+  if (snapshotError) throw snapshotError;
+  return { changed: false, posterUrl: film.poster_url, assets: assets.rows };
+}
 
 export function defaultContentTypeForSeries(seriesSlug: string, candidateType: string): SocialContentType {
   if (seriesSlug === 'critics_say' || seriesSlug === 'one_film_two_takes') return 'critics_say';
@@ -1386,6 +1453,9 @@ export async function generateSocialDraft(
     };
   }
 
+  const posterOnly = input.contentType === 'where_to_watch' && !input.skipAssets;
+  const poster = posterOnly && snapshot.kind === 'upcoming_movie'
+    ? await preparePoster(await downloadSocialImage(snapshot.posterUrl || '')) : null;
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
     snapshot.kind === 'actor_spotlight'
@@ -1396,7 +1466,7 @@ export async function generateSocialDraft(
           ? `What's On Stage — ${snapshot.title}`
           : input.contentType === 'weekend_watchlist'
             ? `Weekend Watchlist — ${snapshot.title}`
-            : `Upcoming Movie — ${snapshot.title}`;
+            : `${input.contentType === 'where_to_watch' ? 'Streaming Alert' : 'Upcoming Movie'} — ${snapshot.title}`;
 
   const { data: contentItem, error: insertError } = await supabase
     .from('social_content_items')
@@ -1422,7 +1492,9 @@ export async function generateSocialDraft(
   // because each variant needs to point at one. A render failure degrades to a
   // caption-only draft rather than failing generation — the item is still
   // reviewable and can be re-rendered later.
-  const assets = input.skipAssets
+  const assets = poster
+    ? await storePosterAsset(contentItem.id, poster, (snapshot as any).posterUrl)
+    : input.skipAssets
     ? { rows: [] as StoredAsset[] }
     : await renderAndStoreAssets({
         contentItemId: contentItem.id,
@@ -1451,6 +1523,7 @@ export async function generateSocialDraft(
       hashtags: content.hashtags,
       selected_asset_id: format ? assetIdByFormat.get(format) ?? null : null,
       platform_options: {
+        ...(poster ? { poster_source_url: (snapshot as any).posterUrl, poster_only: true } : {}),
         caption_limit: PLATFORM_CAPTION_LIMITS[platform].captionLimit,
         asset_format: format,
         ...(useCarousel
@@ -1473,7 +1546,7 @@ export async function generateSocialDraft(
   const { data: variants, error: variantError } = await supabase
     .from('social_platform_variants')
     .insert(variantRows)
-    .select('id,platform,status,caption,title,hashtags,selected_asset_id');
+    .select('id,platform,status,caption,title,hashtags,selected_asset_id,platform_options');
 
   if (variantError) {
     // Leave the item behind in a terminal state instead of deleting it, so the
@@ -1922,7 +1995,7 @@ export async function scheduleContentItem(
 
   const { data: item, error } = await supabase
     .from('social_content_items')
-    .select('id,status,title')
+    .select('id,status,title,destination_id,content_type')
     .eq('id', input.contentItemId)
     .maybeSingle();
 
@@ -1967,8 +2040,14 @@ export async function scheduleContentItem(
 
   if (variantError) throw variantError;
   if (!variants?.length) throw httpError(409, 'No approved variants to schedule');
+  assertCarouselVariantsReady(variants);
 
   for (const variant of variants) {
+    if (getSocialPublishMode() === 'live') {
+      const connectionId = await resolveDestinationConnection(item.destination_id, variant.platform, item.content_type);
+      const { error: routeError } = await supabase.from('social_platform_variants').update({ connection_id: connectionId }).eq('id', variant.id);
+      if (routeError) throw routeError;
+    }
     const urls = Array.isArray(variant.platform_options?.carousel_asset_urls)
       ? variant.platform_options.carousel_asset_urls.filter((url: unknown) => typeof url === 'string')
       : [];

@@ -112,16 +112,16 @@ export function buildMovieHook(tagline: string | null, synopsis: string | null, 
   return parts.filter(Boolean).join('\n\n');
 }
 
-function formatCastList(cast: SnapshotCastMember[]): string {
+function formatCastList(cast: SnapshotCastMember[], platform: SocialPlatform): string {
   if (!cast.length) return '';
-  const handlesOrNames = cast.map(c => (c.handle ? c.handle : c.name));
+  const handlesOrNames = cast.map(c => (platform === 'instagram' ? c.handle : platform === 'tiktok' ? c.tiktokHandle : null) || c.name);
   return `Starring:\n${handlesOrNames.join('\n')}`;
 }
 
-function formatCrewList(credits: SnapshotCreditedPerson[]): string {
+function formatCrewList(credits: SnapshotCreditedPerson[], platform: SocialPlatform): string {
   const crew = credits.filter(credit => credit.role !== 'actor');
   if (!crew.length) return '';
-  return `Crew:\n${crew.map(credit => `${credit.role.replace(/_/g, ' ')} — ${credit.instagramHandle}`).join('\n')}`;
+  return `Crew:\n${crew.map(credit => `${credit.role.replace(/_/g, ' ')} — ${(platform === 'instagram' ? credit.instagramHandle : platform === 'tiktok' ? credit.tiktokHandle : null) || credit.name}`).join('\n')}`;
 }
 
 function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
@@ -161,7 +161,7 @@ function birthdayBody(snapshot: BirthdaySpotlightSnapshot): string[] {
   return lines;
 }
 
-function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
+function movieBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlatform): string[] {
   const lines: string[] = [];
   const yearSuffix = snapshot.year ? ` (${snapshot.year})` : '';
 
@@ -186,12 +186,12 @@ function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
   }
 
   // 4. Starring line-by-line with direct @handles
-  const castBlock = formatCastList(snapshot.topCast);
+  const castBlock = formatCastList(snapshot.topCast, platform);
   if (castBlock) {
     lines.push(castBlock);
   }
 
-  const crewBlock = formatCrewList(snapshot.creditedPeople || []);
+  const crewBlock = formatCrewList(snapshot.creditedPeople || [], platform);
   if (crewBlock) {
     lines.push(crewBlock);
   }
@@ -290,7 +290,7 @@ export function buildVariantContent(input: {
           ? theatreBody(input.snapshot)
           : input.snapshot.kind === 'upcoming_movie' && input.snapshot.criticReview
             ? criticsBody(input.snapshot)
-            : movieBody(input.snapshot);
+            : movieBody(input.snapshot, input.platform);
   const body = lines.filter(Boolean).join('\n\n');
 
   const hashtagBlock = hashtags.map(tag => `#${tag}`).join(' ');

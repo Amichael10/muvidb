@@ -267,21 +267,22 @@ export async function completeThreadsOAuth(req: VercelRequest) {
   return data;
 }
 
-export async function getThreadsConnection() {
-  const { data, error } = await supabase
+export async function getThreadsConnection(connectionId?: string | null) {
+  let query = supabase
     .from('social_connections')
     .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at,token_ciphertext,token_iv,token_auth_tag')
     .eq('platform', 'threads')
-    .eq('status', 'connected')
-    .order('updated_at', { ascending: false })
+    .eq('status', 'connected');
+  if (connectionId) query = query.eq('id', connectionId);
+  const { data, error } = await query.order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
   return data;
 }
 
-export async function getThreadsPublishingCredentials() {
-  const connection = await getThreadsConnection();
+export async function getThreadsPublishingCredentials(connectionId?: string | null) {
+  const connection = await getThreadsConnection(connectionId);
   if (!connection) throw httpError(409, 'Connect the MuviDB Threads account before publishing');
 
   let { accessToken } = decryptThreadsToken(connection);
@@ -325,15 +326,14 @@ export async function disconnectThreads() {
   return { disconnected: true };
 }
 
-export async function getPlatformPublishingCredentials(platform: string) {
-  const { data: connection, error } = await supabase
+export async function getPlatformPublishingCredentials(platform: string, connectionId?: string | null) {
+  let query = supabase
     .from('social_connections')
     .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at,connection_metadata,token_ciphertext,token_iv,token_auth_tag')
     .eq('platform', platform)
-    .eq('status', 'connected')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .eq('status', 'connected');
+  if (connectionId) query = query.eq('id', connectionId);
+  const { data: connection, error } = await query.order('updated_at', { ascending: false }).limit(1).maybeSingle();
 
   if (error) throw error;
   if (!connection) throw httpError(409, `Connect the MuviDB ${platform} account before publishing`);
@@ -400,6 +400,7 @@ export function sanitizeThreadsConnection(connection: any) {
     platform: connection.platform,
     displayName: connection.display_name,
     username: connection.username,
+    externalAccountId: connection.external_account_id,
     profileImageUrl: connection.profile_image_url,
     status: connection.status,
     grantedScopes: connection.granted_scopes || [],
@@ -428,6 +429,16 @@ export async function getAllPlatformConnections() {
   return result;
 }
 
+export async function listPlatformConnections() {
+  const { data, error } = await supabase
+    .from('social_connections')
+    .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at')
+    .eq('status', 'connected')
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(sanitizeThreadsConnection);
+}
+
 export async function disconnectPlatform(platform: string) {
   const { error } = await supabase
     .from('social_connections')
@@ -436,6 +447,20 @@ export async function disconnectPlatform(platform: string) {
     .eq('status', 'connected');
   if (error) throw error;
   return { disconnected: true, platform };
+}
+
+export async function disconnectPlatformConnection(platform: string, connectionId: string) {
+  const { data, error } = await supabase
+    .from('social_connections')
+    .update({ status: 'revoked', token_ciphertext: null, token_iv: null, token_auth_tag: null })
+    .eq('id', connectionId)
+    .eq('platform', platform)
+    .eq('status', 'connected')
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw httpError(404, 'Connected account not found');
+  return { disconnected: true, platform, connectionId };
 }
 
 export async function savePlatformConnection(input: {

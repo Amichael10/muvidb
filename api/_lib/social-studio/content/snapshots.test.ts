@@ -92,7 +92,8 @@ describe('buildUpcomingMovieSnapshot', () => {
     expect(snapshot.watchAvailability).toContain('YouTube via Example Pictures');
     expect(snapshot.youtubeChannelName).toBe('Example Pictures');
     expect(snapshot.topCast[0].handle).toBe('@actor.one');
-    expect(snapshot.creditedPeople.map(person => person.instagramHandle)).toEqual(['@actor.one', '@director.two']);
+    expect(snapshot.creditedPeople.map(person => person.instagramHandle)).toEqual(['@actor.one', '@director.two', null]);
+    expect(snapshot.creditedPeople[2].name).toBe('Producer Three');
   });
 });
 

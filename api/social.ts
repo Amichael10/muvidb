@@ -275,7 +275,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       getThreadsConnection,
       sanitizeThreadsConnection,
       getAllPlatformConnections,
+      listPlatformConnections,
       disconnectPlatform,
+      disconnectPlatformConnection,
       savePlatformConnection,
     } = await import('./_lib/threads_oauth.js');
 
@@ -384,10 +386,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (task === 'threads_status' || task === 'connections_status') {
         const connection = await getThreadsConnection();
         const allConnections = await getAllPlatformConnections();
+        const connectionAccounts = await listPlatformConnections();
         return res.status(200).json({
           configuration: getThreadsConfiguration(req),
           connection: sanitizeThreadsConnection(connection),
           connections: allConnections,
+          connectionAccounts,
         });
       }
       if (task === 'calendar_plan') {
@@ -556,7 +560,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await requireSocialStudioAdmin(req);
         const platform = String(req.body?.platform || '').toLowerCase();
         if (!platform) return res.status(400).json({ error: 'Platform is required' });
-        return res.status(200).json(await disconnectPlatform(platform));
+        const connectionId = String(req.body?.connectionId || '');
+        return res.status(200).json(connectionId
+          ? await disconnectPlatformConnection(platform, connectionId)
+          : await disconnectPlatform(platform));
       }
 
       if (task === 'save_connection') {
@@ -708,6 +715,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: (parseErr as Error).message });
         }
         return res.status(201).json(await generateSocialDraft(parsed, actor));
+      }
+
+      if (task === 'streaming_poster') {
+        await requireSocialStudioAdmin(req);
+        const { assertUuid } = await import('./_lib/social-studio/domain/validation.js');
+        assertUuid(req.body?.contentItemId, 'contentItemId');
+        const { refreshStreamingPoster } = await import('./_lib/social_studio.js');
+        return res.status(200).json(await refreshStreamingPoster(req.body.contentItemId, req.body.refresh === true));
       }
 
       if (task === 'create_editor_video_draft') {

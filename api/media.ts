@@ -34,6 +34,16 @@ function sniffImageType(buf: Buffer): string | null {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Route consolidated ops to their handlers; default (no op) is the image proxy.
   const op = req.query.op;
+  if (op === 'social-photo') {
+    const path = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!/^tiktok\/[a-f0-9-]{36}\/\d+\.jpg$/.test(path)) return res.status(400).send('Invalid photo path');
+    const { supabase } = await import('./_lib/supabase.js');
+    const { data, error } = await supabase.storage.from(process.env.SOCIAL_ASSET_BUCKET || 'social-published-assets').download(path);
+    if (error || !data) return res.status(404).send('Photo not found');
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.status(200).send(Buffer.from(await data.arrayBuffer()));
+  }
   if (op === 'health') return handleHealth(req, res);
   if (op === 'mirror') return handleMirrorImages(req, res);
   if (op === 'external' || req.query.provider) {

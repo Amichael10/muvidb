@@ -440,6 +440,7 @@ export default function AdminSocialStudio() {
       x: null,
       youtube: null,
     },
+    accounts: [],
   });
   const [channelsModalOpen, setChannelsModalOpen] = useState(false);
   const [manualConnectPlatform, setManualConnectPlatform] = useState(null);
@@ -505,6 +506,7 @@ export default function AdminSocialStudio() {
           facebook: data.connections?.facebook || null,
           tiktok: data.connections?.tiktok || null,
         },
+        accounts: Array.isArray(data.connectionAccounts) ? data.connectionAccounts : [],
       }));
     } catch (error) {
       setConnections(current => ({ ...current, loading: false }));
@@ -572,8 +574,9 @@ export default function AdminSocialStudio() {
     }
   };
 
-  const disconnectAccount = async (platform) => {
-    const confirmed = window.confirm(`Disconnect MuviDB ${platform}? This will stop automated posts to ${platform}.`);
+  const disconnectAccount = async (platform, connectionId = null, username = '') => {
+    const accountLabel = username ? ` @${String(username).replace(/^@/, '')}` : '';
+    const confirmed = window.confirm(`Disconnect${accountLabel || ` MuviDB ${platform}`}? This will stop automated posts using this account.`);
     if (!confirmed) return;
 
     setConnections(prev => ({ ...prev, connecting: true }));
@@ -581,11 +584,11 @@ export default function AdminSocialStudio() {
       const res = await fetch('/api/social?task=disconnect_platform', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform }),
+        body: JSON.stringify({ platform, connectionId }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success(`Disconnected ${platform}`);
+      toast.success(`Disconnected${accountLabel || ` ${platform}`}`);
       await fetchConnectionsStatus();
     } catch (err) {
       toast.error(err.message || `Failed to disconnect ${platform}`);
@@ -1727,7 +1730,7 @@ export default function AdminSocialStudio() {
 
   const counts = summary.counts || emptySummary.counts;
   const connectedPlatformsList = Object.entries(connections.platforms).filter(([, v]) => Boolean(v));
-  const connectedCount = connectedPlatformsList.length;
+  const connectedCount = connections.accounts.length || connectedPlatformsList.length;
 
   // Group calendar slots by scheduled_date for Month Grid view
   const slotsByDate = useMemo(() => {
@@ -2818,54 +2821,51 @@ export default function AdminSocialStudio() {
                         <p className="text-[11px] text-text-muted">Feed Posts, Reels & Carousels</p>
                       </div>
                     </div>
-                    <Pill tone={connections.platforms.instagram ? 'green' : 'amber'}>
-                      {connections.platforms.instagram ? 'Active' : 'Offline'}
+                    <Pill tone={connections.accounts.some(account => account.platform === 'instagram') ? 'green' : 'amber'}>
+                      {connections.accounts.filter(account => account.platform === 'instagram').length || 'Offline'}
                     </Pill>
                   </div>
 
-                  <div className="mt-4 space-y-1.5 text-xs">
-                    <div className="flex justify-between text-text-muted">
-                      <span>Connected Profile:</span>
-                      <span className="font-mono font-bold text-white">
-                        {connections.platforms.instagram ? `@${connections.platforms.instagram.username}` : 'Not connected'}
-                      </span>
-                    </div>
-                    {connections.platforms.instagram?.displayName && (
-                      <div className="flex justify-between text-text-muted">
-                        <span>Account Name:</span>
-                        <span className="font-bold text-text-secondary">{connections.platforms.instagram.displayName}</span>
+                  <div className="mt-4 space-y-2 text-xs">
+                    {connections.accounts.filter(account => account.platform === 'instagram').map(account => (
+                      <div key={account.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/10 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-mono font-bold text-white">@{account.username}</p>
+                          <p className="truncate text-[10px] text-text-muted">{account.displayName || 'Instagram account'}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => disconnectAccount('instagram', account.id, account.username)}
+                          disabled={connections.connecting}
+                          className="shrink-0 rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+                        >
+                          Disconnect
+                        </button>
                       </div>
+                    ))}
+                    {!connections.accounts.some(account => account.platform === 'instagram') && (
+                      <p className="text-text-muted">No Instagram account connected.</p>
                     )}
                   </div>
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
-                  {connections.platforms.instagram && (
-                    <button
-                      type="button"
-                      onClick={() => disconnectAccount('instagram')}
-                      disabled={connections.connecting}
-                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 disabled:opacity-50"
-                    >
-                      Disconnect
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={connectMeta}
                     disabled={connections.connecting}
                     className="rounded-xl bg-[#E1306C] px-4 py-1.5 text-xs font-black text-white hover:opacity-90 disabled:opacity-50 shadow-md"
                   >
-                    ⚡ Connect via Meta
+                    ⚡ Connect another via Meta
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setManualConnectPlatform('instagram');
                       setManualFormData({
-                        username: connections.platforms.instagram?.username || 'muvidb_',
-                        displayName: connections.platforms.instagram?.displayName || 'MuviDB Instagram',
-                        externalAccountId: connections.platforms.instagram?.externalAccountId || 'muvidb_ig_id',
+                        username: '',
+                        displayName: '',
+                        externalAccountId: '',
                         accessToken: '',
                       });
                     }}

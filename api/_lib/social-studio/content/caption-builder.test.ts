@@ -11,6 +11,26 @@ import { SOCIAL_PLATFORMS } from '../domain/platform-types';
 
 const CAPTURED_AT = '2026-07-30T21:00:00.000Z';
 
+it('uses platform-specific handles and retains crew without social handles', () => {
+  const snapshot = buildUpcomingMovieSnapshot({ capturedAt: CAPTURED_AT,
+    film: { id: 'film', title: 'Example', synopsis: 'Two sisters return home to settle an inheritance.', youtube_watch_url: 'https://youtube.com/watch?v=abc' },
+    credits: [
+      { role: 'actor', people: { id: 'one', name: 'Actor One', instagram_url: '@actor.ig', tiktok_url: 'https://www.tiktok.com/@actor.tt' } },
+      { role: 'director', people: { id: 'two', name: 'Director Two' } },
+    ],
+  });
+  const instagram = buildVariantContent({ snapshot, platform: 'instagram' }).caption;
+  const tiktok = buildVariantContent({ snapshot, platform: 'tiktok' }).caption;
+  const facebook = buildVariantContent({ snapshot, platform: 'facebook' }).caption;
+  expect(instagram).toContain('@actor.ig');
+  expect(tiktok).toContain('@actor.tt');
+  expect(tiktok).not.toContain('@actor.ig');
+  expect(facebook).toContain('Actor One');
+  expect(facebook).not.toContain('@actor.ig');
+  expect(instagram).toContain('Director Two');
+  expect(instagram).toContain('inheritance');
+});
+
 const actorSnapshot = buildActorSpotlightSnapshot({
   capturedAt: CAPTURED_AT,
   person: {

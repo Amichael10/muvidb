@@ -23,14 +23,16 @@ export type SnapshotCastMember = {
   name: string;
   handle: string | null;
   character: string | null;
+  tiktokHandle?: string | null;
 };
 
 export type SnapshotCreditedPerson = {
   personId: string;
   name: string;
-  instagramHandle: string;
+  instagramHandle: string | null;
   role: string;
   character: string | null;
+  tiktokHandle?: string | null;
 };
 
 export type ActorSpotlightSnapshot = {
@@ -429,6 +431,7 @@ export function buildUpcomingMovieSnapshot(input: {
       personId: String(credit.people.id),
       name: String(text(credit.people.name)),
       handle: extractInstagramHandle(credit.people),
+      tiktokHandle: extractTikTokHandle(credit.people.tiktok_url),
       character: text(credit.character_name),
     }))
     .slice(0, limit);
@@ -439,10 +442,10 @@ export function buildUpcomingMovieSnapshot(input: {
       personId: String(credit.people.id),
       name: String(text(credit.people.name)),
       instagramHandle: extractInstagramHandle(credit.people),
+      tiktokHandle: extractTikTokHandle(credit.people.tiktok_url),
       role: String(text(credit.role) || 'actor').toLowerCase(),
       character: text(credit.character_name),
-    }))
-    .filter((credit): credit is SnapshotCreditedPerson => Boolean(credit.instagramHandle));
+    }));
 
   const liked = input.film.liked_percent;
   const likedPercent = liked === null || liked === undefined ? null : integer(liked);
@@ -547,4 +550,10 @@ export function collectSnapshotWarnings(snapshot: SocialSourceSnapshot): string[
   if (!snapshot.releaseDate) warnings.push('Film has no release_date.');
 
   return warnings;
+}
+
+function extractTikTokHandle(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const match = value.trim().match(/^(?:https?:\/\/(?:www\.)?tiktok\.com\/)?@([a-zA-Z0-9._]+)\/?(?:\?.*)?$/);
+  return match ? `@${match[1]}` : null;
 }
