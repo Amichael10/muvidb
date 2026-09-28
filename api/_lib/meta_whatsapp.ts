@@ -150,6 +150,24 @@ export async function sendMetaWhatsAppTemplate(
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok || data.error) {
+      // If error is because template button has static URL and does not accept parameters, retry without button component
+      if (data.error?.code === 132018 && components.some(c => c.type === 'button')) {
+        const withoutButton = components.filter(c => c.type !== 'button');
+        payload.template.components = withoutButton.length > 0 ? withoutButton : undefined;
+        const retryRes = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        const retryData = await retryRes.json().catch(() => ({}));
+        if (retryRes.ok && !retryData.error) {
+          return { ok: true, messageId: retryData.messages?.[0]?.id, details: retryData };
+        }
+      }
+
       const errMsg = data.error?.message || `HTTP ${res.status}: ${res.statusText}`;
       console.error('[WhatsApp Cloud API] Error:', errMsg, data);
       return { ok: false, error: errMsg, details: data.error };

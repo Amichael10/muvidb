@@ -187,7 +187,6 @@ export async function dispatchMovieWhatsAppAlerts(
       templateName: process.env.WHATSAPP_MOVIE_ALERT_TEMPLATE || 'movie_release_alert',
       headerImageUrl: poster,
       bodyParameters: [actorsSummary, title, platformLabel, filmUrl],
-      buttonUrlPayload: slug || filmId,
     });
 
     if (sendRes.ok) {
