@@ -750,10 +750,10 @@ Summary: ${result.verdictMessage}
           <div className="rounded-xl border border-border bg-surface p-5 space-y-2">
             <div className="flex items-center gap-2 text-text-primary font-bold text-sm font-heading">
               <Icon icon="solar:ticket-linear" className="text-brand" width="18" />
-              <span>Cinema & Distribution Registry</span>
+              <span>NFVCB & Cinema Registry</span>
             </div>
             <p className="text-xs text-text-muted leading-relaxed">
-              If your movie is heading to Nigerian cinemas or major streaming platforms, exhibitors and distributors require distinct title verification to prevent consumer confusion.
+              If your movie is heading to Nigerian cinemas, exhibitors and the NFVCB require distinct title verification to prevent consumer confusion.
             </p>
           </div>
 
