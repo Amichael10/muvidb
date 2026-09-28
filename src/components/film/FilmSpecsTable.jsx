@@ -65,7 +65,6 @@ export default function FilmSpecsTable({
           <span className="bg-brand/10 border border-brand/30 text-brand px-2 py-0.5 rounded text-xs font-black">
             {film.nfvcb_rating}
           </span>
-          <span className="text-text-muted text-xs font-normal">NFVCB Classification</span>
         </span>
       ) : null,
     },

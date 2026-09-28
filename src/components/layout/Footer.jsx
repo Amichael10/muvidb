@@ -34,7 +34,7 @@ const footerGroups = [
       { label: 'MuviDB Pro', comingSoon: true },
       { label: 'Add a Film', to: '/submit/film' },
       { label: 'Contribute', to: '/submit' },
-      { label: 'Film Classification', to: '/classification' },
+      { label: 'Age Ratings', to: '/classification' },
       { label: 'Careers', to: '/careers' },
       { label: 'Contact', to: '/contact' },
       { label: 'Sign In', to: '/login', guestOnly: true },

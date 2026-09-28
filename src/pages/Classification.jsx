@@ -121,7 +121,7 @@ function RestrictionTrack({ index, accent }) {
 
 export default function Classification() {
   useEffect(() => {
-    document.title = 'Film Classification (NFVCB) | MuviDB';
+    document.title = 'Content & Age Ratings | MuviDB';
     window.scrollTo(0, 0);
   }, []);
 
@@ -142,19 +142,18 @@ export default function Classification() {
           <Sprockets className="mb-10 text-text-primary" />
 
           <p className="text-[11px] font-black uppercase tracking-[0.42em] text-brand">
-            National Film and Video Censors Board
+            Content Advisory & Age Guide
           </p>
 
           <h1 className="mt-5 max-w-3xl font-heading text-5xl font-black leading-[0.95] tracking-tighter md:text-7xl">
-            How Nigerian films
+            Film & TV
             <br />
-            are <span className="text-brand">classified</span>
+            Age <span className="text-brand">Ratings</span>
           </h1>
 
           <p className="mt-7 max-w-2xl text-lg leading-relaxed text-text-muted">
-            Seven official symbols, ordered from open to everyone through to restricted exhibition.
-            Every film on MuviDB carries the classification it was given — or none, where it has not
-            been classified.
+            Age ratings help audiences and families make informed viewing decisions.
+            Ratings on MuviDB provide guidance ranging from open general viewing to mature themes.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center gap-2.5">
@@ -243,25 +242,9 @@ export default function Classification() {
             About these classifications
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-muted">
-            Classification in Nigeria is set by the National Film and Video Censors Board. The
-            symbols and their definitions above are the Board&apos;s own. MuviDB displays a
-            film&apos;s classification where one has been assigned; a missing rating means the title
-            has not been classified, not that it is unrestricted.
+            Age ratings displayed on MuviDB are intended solely as consumer guidance for audiences,
+            parents, and viewers to help evaluate content appropriateness before watching.
           </p>
-          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-muted">
-            Some older records in our catalogue carry <strong className="text-text-primary">PG-13</strong>,
-            which is an American rating rather than a Nigerian one. Those are being mapped onto the
-            scale above.
-          </p>
-          <a
-            href="https://nfvcb.gov.ng/classification"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-brand hover:underline"
-          >
-            Read the official guidance at nfvcb.gov.ng
-            <Icon icon="solar:arrow-right-up-linear" width="15" />
-          </a>
         </section>
 
         <Sprockets className="mt-14 justify-center text-text-primary" />
