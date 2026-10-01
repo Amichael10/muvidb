@@ -398,6 +398,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     command.extend(["-headers", header_str])
                 command.extend(["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
                 command.extend(["-ss", str(start), "-i", direct_audio_url])
+                command.extend(["-map", "0:v:0", "-map", "1:a:0?"])
             command.extend([
                 "-t", str(duration),
                 "-sn",
@@ -408,10 +409,10 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 "-movflags", "+faststart", str(final_path)
             ])
             try:
-                rendered = subprocess.run(command, capture_output=True, text=True, timeout=90)
+                rendered = subprocess.run(command, capture_output=True, text=True, timeout=35)
             except subprocess.TimeoutExpired:
                 rendered = None
-                print("[Clipper] Direct stream timed out; falling back to a local download.")
+                print("[Clipper] Direct stream timed out; falling back to range download.")
             if rendered is not None and (rendered.returncode != 0 or not final_path.exists()):
                 print("[Clipper] Direct stream ffmpeg error, falling back to temp file:", rendered.stderr)
 

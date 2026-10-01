@@ -999,7 +999,7 @@ export default function AdminSocialStudio() {
         .select(`
           id,title,release_date,year,synopsis,genres,trailer_youtube_id,trailer_external_url,youtube_watch_url,streaming_links,release_type,is_in_cinemas,
           credits(
-            id,role,job,billing_order,character_name,
+            id,role,billing_order,character_name,
             people(id,name,instagram_url,twitter_url,slug)
           )
         `)
@@ -1049,16 +1049,16 @@ export default function AdminSocialStudio() {
     
     const rawCredits = asRelationArray(film.credits);
     const cast = rawCredits
-      .filter(c => (c.role === 'cast' || c.job === 'Actor' || !c.role) && c.people?.name)
+      .filter(c => (c.role === 'cast' || c.role === 'actor' || !c.role) && c.people?.name)
       .sort((a, b) => (a.billing_order || 99) - (b.billing_order || 99))
       .map(c => ({ name: c.people.name, instagram_handle: extractSocialHandle(c.people) }));
     
     const directors = rawCredits
-      .filter(c => (c.job?.toLowerCase().includes('director') || c.role === 'director') && c.people?.name)
+      .filter(c => (c.role === 'director' || (c.role && String(c.role).toLowerCase().includes('director'))) && c.people?.name)
       .map(c => ({ name: c.people.name, instagram_handle: extractSocialHandle(c.people) }));
 
     const producers = rawCredits
-      .filter(c => (c.job?.toLowerCase().includes('producer') || c.role === 'producer') && c.people?.name)
+      .filter(c => (c.role === 'producer' || (c.role && String(c.role).toLowerCase().includes('producer'))) && c.people?.name)
       .map(c => ({ name: c.people.name, instagram_handle: extractSocialHandle(c.people) }));
 
     let sourceMetadata = {
