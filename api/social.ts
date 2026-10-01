@@ -725,6 +725,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(await refreshStreamingPoster(req.body.contentItemId, req.body.refresh === true));
       }
 
+      if (task === 'sync_queue') {
+        await requireSocialStudioAdmin(req);
+        const { syncAllScheduledContentItems } = await import('./_lib/social_studio.js');
+        const result = await syncAllScheduledContentItems();
+        return res.status(200).json(result);
+      }
+
+      if (task === 'sync_item') {
+        await requireSocialStudioAdmin(req);
+        const { contentItemId, force } = req.body || {};
+        if (typeof contentItemId !== 'string' || !contentItemId) {
+          return res.status(400).json({ error: 'contentItemId is required' });
+        }
+        const { syncContentItemWithSource } = await import('./_lib/social_studio.js');
+        const result = await syncContentItemWithSource(contentItemId, { force: force === true });
+        return res.status(200).json(result);
+      }
+
       if (task === 'create_editor_video_draft') {
         const actor = await requireSocialStudioAdmin(req);
         const { title, publicUrl, storagePath, mimeType, format, fileSizeBytes, width, height, captions, platforms, assets } = req.body || {};

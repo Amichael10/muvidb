@@ -4,7 +4,8 @@
  */
 import { supabase } from './supabase.js';
 import { sendTelegramMessage, telegramConfigured } from './telegram.js';
-import { ytGet, parseDuration } from './yt_service.js';
+import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
+import { curateYouTubeTitle } from './youtube_title_policy.js';
 
 const FILM_MIN_SEC = 1800;
 
@@ -84,29 +85,128 @@ async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate, sour
   const mins = formatDuration(video.duration_seconds || 0);
   const published = video.published_at ? new Date(video.published_at).toISOString().slice(0, 16).replace('T', ' ') : '';
 
+  // 1. Curate and clean title
+  const titleDecision = curateYouTubeTitle(video.title);
+  const displayTitle = titleDecision.action !== 'skip' ? cleanTitle(titleDecision.title) : video.title;
+
+  // 2. Real-time auto-import into films and channel_videos
+  let filmId: string | null = null;
+  let draftId: string | null = null;
+
+  try {
+    const { data: existingFilm } = await supabase
+      .from('films')
+      .select('id, title, poster_url')
+      .eq('source_video_id', video.video_id)
+      .maybeSingle();
+
+    if (existingFilm) {
+      filmId = existingFilm.id;
+    } else if (titleDecision.action !== 'skip') {
+      const vidDate = video.published_at ? new Date(video.published_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+      const vidCreated = video.published_at ? new Date(video.published_at).toISOString() : new Date().toISOString();
+      const vidYear = video.published_at ? new Date(video.published_at).getFullYear() : new Date().getFullYear();
+
+      const { data: insertedFilm, error: filmErr } = await supabase
+        .from('films')
+        .insert({
+          title: displayTitle,
+          original_title: titleDecision.action === 'clean' ? titleDecision.originalTitle : null,
+          year: vidYear,
+          release_date: vidDate,
+          created_at: vidCreated,
+          release_type: 'youtube',
+          source: 'youtube',
+          source_video_id: video.video_id,
+          youtube_watch_url: url,
+          trailer_youtube_id: video.video_id,
+          poster_url: video.thumbnail_url,
+          backdrop_url: video.thumbnail_url,
+          runtime_minutes: Math.round((video.duration_seconds || 0) / 60),
+          needs_review: true,
+          status: 'released',
+          content_type: 'movie',
+        })
+        .select('id, title')
+        .maybeSingle();
+
+      if (filmErr) {
+        console.warn('[youtube_upload_notify] film auto-insert warning:', filmErr.message);
+      }
+      filmId = insertedFilm?.id || null;
+    }
+
+    // Link channel_videos
+    await supabase.from('channel_videos').upsert({
+      channel_id: channel.id,
+      video_id: video.video_id,
+      title: video.title,
+      duration_seconds: video.duration_seconds,
+      published_at: video.published_at,
+      film_id: filmId,
+      match_status: filmId ? 'auto' : (titleDecision.action === 'skip' ? 'rejected' : 'unmatched'),
+      is_hidden: titleDecision.action === 'skip',
+    }, { onConflict: 'channel_id,video_id' });
+
+    // 3. Auto-generate Social Studio Draft
+    if (filmId) {
+      try {
+        const { generateSocialDraft } = await import('./social_studio.js');
+        const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
+        const draft = await generateSocialDraft(
+          {
+            contentType: 'where_to_watch',
+            sourceEntityId: filmId,
+            templateSlug: 'now-showing-cinemas-v1',
+            platforms: ['instagram', 'facebook', 'tiktok'],
+            skipAssets: true,
+          },
+          systemActor,
+        );
+        draftId = draft?.id || null;
+      } catch (err: any) {
+        console.warn('[youtube_upload_notify] Social draft generation skipped:', err?.message || err);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[youtube_upload_notify] Instant drop processing error:', err?.message || err);
+  }
+
   const message = [
-    '🎬 New YouTube upload',
-    `Channel: ${channel.name}${channel.channel_handle ? ` (@${String(channel.channel_handle).replace(/^@/, '')})` : ''}`,
-    `Title: ${video.title}`,
-    `Length: ${mins}${published ? ` · ${published} UTC` : ''}`,
+    '🎬 *New YouTube Film Dropped!*',
+    `📺 *Channel:* ${channel.name}${channel.channel_handle ? ` (@${String(channel.channel_handle).replace(/^@/, '')})` : ''}`,
+    `🏷️ *Title:* ${displayTitle}`,
+    `⏱️ *Length:* ${mins}${published ? ` · ${published} UTC` : ''}`,
     url,
     '',
-    'Auto-import runs on the next YouTube sync unless you hide it below.',
+    draftId
+      ? '✨ *Social Studio Draft Ready*\n💡 *Tip:* To set an HD portrait poster, just *reply to this message with a photo*, or tap the button below.'
+      : '✅ Film imported to database catalogue.',
   ].join('\n');
+
+  const inlineKeyboard: any[][] = [];
+  if (draftId && filmId) {
+    inlineKeyboard.push([
+      { text: '📸 Set Portrait Poster (Send Photo)', callback_data: `prompt_poster:${draftId}:${filmId}` },
+    ]);
+    inlineKeyboard.push([
+      { text: '📅 Slot into Today\'s Queue', callback_data: `slot_yt:${draftId}` },
+      { text: '🚀 Publish Now', callback_data: `pub_yt:${draftId}` },
+    ]);
+    inlineKeyboard.push([
+      { text: '🎨 Open in Social Studio', url: 'https://muvidb.com/admin/social-studio' },
+    ]);
+  }
+  inlineKeyboard.push([
+    { text: '▶ Watch Video', url },
+    { text: '🙈 Skip / Hide', callback_data: `hide_yt:${channel.id}:${video.video_id}` },
+  ]);
 
   const sent = await sendTelegramMessage({
     text: message,
     disablePreview: false,
     replyMarkup: {
-      inline_keyboard: [
-        [
-          { text: '▶ Open', url },
-          {
-            text: '🙈 Hide (skip import)',
-            callback_data: `hide_yt:${channel.id}:${video.video_id}`,
-          },
-        ],
-      ],
+      inline_keyboard: inlineKeyboard,
     },
   });
 
@@ -117,7 +217,7 @@ async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate, sour
   }
 
   await markNotified(channel.id, video);
-  return { ok: true };
+  return { ok: true, filmId, draftId };
 }
 
 /** Notify for uploads not yet in DB buffer and not yet alerted. */

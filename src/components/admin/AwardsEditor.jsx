@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { supabase } from '../../lib/supabase';
 import { AWARD_ORGS } from '../../lib/awards';
-import { getCategoriesForOrg } from '../../lib/awardsSync';
+import { getCategoriesForOrg, getCraftRolesForCategory } from '../../lib/awardsSync';
 
 /**
  * Awards & nominations editor for the jsonb `awards` column, shared by the
@@ -11,7 +11,7 @@ import { getCategoriesForOrg } from '../../lib/awardsSync';
  * Person awards can soft-link to a film via `film_id` (poster + route on the
  * public person page). Film awards store recipient name strings.
  */
-export default function AwardsEditor({ value, onChange, variant }) {
+export default function AwardsEditor({ value, onChange, variant, filmCredits }) {
   const awards = Array.isArray(value) ? value : [];
 
   const blank = {
@@ -29,6 +29,44 @@ export default function AwardsEditor({ value, onChange, variant }) {
     onChange(next);
   };
 
+  const autoLinkCrew = () => {
+    if (!Array.isArray(filmCredits) || filmCredits.length === 0) return;
+    let modified = false;
+    const next = awards.map((award) => {
+      const targetRoles = getCraftRolesForCategory(award.category || award.title || '');
+      if (targetRoles.length === 0) return award;
+
+      const matching = filmCredits.filter((c) => {
+        const r = (c.role || '').toLowerCase().trim();
+        return targetRoles.some((target) => r === target || r.includes(target));
+      });
+
+      if (matching.length === 0) return award;
+
+      const existingRecipients = Array.isArray(award.recipients) ? [...award.recipients] : [];
+      let awardChanged = false;
+
+      for (const m of matching) {
+        const name = (m.name || m.person?.name || '').trim();
+        if (!name) continue;
+        const exists = existingRecipients.some(
+          (r) => r.toLowerCase().trim() === name.toLowerCase()
+        );
+        if (!exists) {
+          existingRecipients.push(name);
+          awardChanged = true;
+          modified = true;
+        }
+      }
+
+      return awardChanged ? { ...award, recipients: existingRecipients } : award;
+    });
+
+    if (modified) {
+      onChange(next);
+    }
+  };
+
   return (
     <section className="space-y-6">
       <div className="flex items-center justify-between pb-2 border-b border-border">
@@ -41,13 +79,25 @@ export default function AwardsEditor({ value, onChange, variant }) {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => onChange([...awards, blank])}
-          className="flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
-        >
-          <Icon icon="solar:add-circle-linear" width="16" /> Add award
-        </button>
+        <div className="flex items-center gap-3">
+          {variant === 'film' && Array.isArray(filmCredits) && filmCredits.length > 0 && awards.length > 0 && (
+            <button
+              type="button"
+              onClick={autoLinkCrew}
+              className="flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors"
+              title="Automatically match craft awards (e.g. Production Design, Costume, Sound, Cinematography) to credited crew members"
+            >
+              <Icon icon="solar:magic-stick-3-bold" width="15" /> Auto-link crew
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onChange([...awards, blank])}
+            className="flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
+          >
+            <Icon icon="solar:add-circle-linear" width="16" /> Add award
+          </button>
+        </div>
       </div>
 
       {awards.length === 0 ? (

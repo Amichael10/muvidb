@@ -502,17 +502,39 @@ export async function savePlatformConnection(input: {
 
       const pages = accountsRes?.data || [];
       if (pages.length > 0) {
-        const matchedPage = pages.find((p: any) => String(p.id) === String(finalAccountId)) || pages[0];
-        if (input.platform === 'facebook' && matchedPage.access_token) {
-          finalToken = matchedPage.access_token;
-          finalAccountId = String(matchedPage.id);
-          finalDisplayName = matchedPage.name || finalDisplayName;
-          finalExpiresAt = null; // Permanent Page token never expires
+        const cleanInputUsername = String(input.username || '').replace(/^@/, '').toLowerCase().trim();
+        let matchedPage: any = null;
+        let matchedIg: any = null;
+
+        if (input.platform === 'facebook') {
+          matchedPage = pages.find((p: any) => String(p.id) === String(finalAccountId) || (p.name && p.name.toLowerCase().trim() === cleanInputUsername)) || pages[0];
+          if (matchedPage?.access_token) {
+            finalToken = matchedPage.access_token;
+            finalAccountId = String(matchedPage.id);
+            finalDisplayName = matchedPage.name || finalDisplayName;
+            finalExpiresAt = null; // Permanent Page token never expires
+          }
         } else if (input.platform === 'instagram') {
-          const matchedIg = pages.find((p: any) => p.instagram_business_account?.id)?.instagram_business_account;
-          if (matchedIg && matchedPage.access_token) {
+          // Look for the specific page that owns this Instagram account
+          for (const p of pages) {
+            const ig = p.instagram_business_account;
+            if (!ig) continue;
+            if (String(ig.id) === String(finalAccountId) || (ig.username && String(ig.username).replace(/^@/, '').toLowerCase().trim() === cleanInputUsername)) {
+              matchedPage = p;
+              matchedIg = ig;
+              break;
+            }
+          }
+          // If not found yet and only one page exists with an IG account
+          if (!matchedIg && pages.length === 1 && pages[0].instagram_business_account) {
+            matchedPage = pages[0];
+            matchedIg = pages[0].instagram_business_account;
+          }
+
+          if (matchedIg && matchedPage?.access_token) {
             finalToken = matchedPage.access_token;
             finalAccountId = String(matchedIg.id);
+            finalDisplayName = matchedIg.name || matchedIg.username || finalDisplayName;
             finalExpiresAt = null; // Page token used for Instagram publishing never expires
           }
         }
@@ -587,6 +609,7 @@ export async function createMetaAuthorizationUrl(req: VercelRequest, actor: Soci
   url.searchParams.set('redirect_uri', redirectUri);
   url.searchParams.set('scope', META_SCOPES.join(','));
   url.searchParams.set('response_type', 'code');
+  url.searchParams.set('auth_type', 'rerequest');
   url.searchParams.set('state', state);
   return url.toString();
 }

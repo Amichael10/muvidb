@@ -216,15 +216,22 @@ export default function AdminAI() {
           count = 0;
         }
       } else if (action === 'UPDATE_TITLE') {
-        const { data, error } = await supabase.from('films').update({
-          title: item.new_title
-        }).eq('id', item.id).select();
+        const updatePayload = {
+          title: item.new_title,
+          title_locked: true
+        };
+        if (item.content_type) updatePayload.content_type = item.content_type;
+        if (item.episode_number !== undefined && item.episode_number !== null) updatePayload.episode_number = item.episode_number;
+        if (item.season_number !== undefined && item.season_number !== null) updatePayload.season_number = item.season_number;
+
+        const { data, error } = await supabase.from('films').update(updatePayload).eq('id', item.id).select();
         dbError = error;
         count = data?.length || 0;
       } else if (action === 'APPLY_CAST') {
-        // 1. Update the film title
+        // 1. Update the film title and lock it
         const { error: titleErr } = await supabase.from('films').update({
-          title: item.new_title
+          title: item.new_title,
+          title_locked: true
         }).eq('id', item.id);
         if (titleErr) throw titleErr;
         addLog(`Title updated: "${item.old_title}" → "${item.new_title}"`, 'success');
@@ -665,6 +672,40 @@ export default function AdminAI() {
                         </button>
                       )}
 
+                      {activeTask === 'cleanup_titles' && results.length > 0 && (
+                        <button 
+                          onClick={async () => {
+                            const confirmApply = window.confirm(`Apply and lock clean titles for all ${results.length} movies on this page?`);
+                            if (!confirmApply) return;
+                            
+                            let successCount = 0;
+                            for (const item of [...results]) {
+                              try {
+                                const updatePayload = {
+                                  title: item.new_title,
+                                  title_locked: true
+                                };
+                                if (item.content_type) updatePayload.content_type = item.content_type;
+                                if (item.episode_number !== undefined && item.episode_number !== null) updatePayload.episode_number = item.episode_number;
+                                if (item.season_number !== undefined && item.season_number !== null) updatePayload.season_number = item.season_number;
+
+                                const { error } = await supabase.from('films').update(updatePayload).eq('id', item.id);
+                                if (!error) {
+                                  successCount++;
+                                  setResults(prev => prev ? prev.filter(i => i !== item) : null);
+                                }
+                              } catch (err) {
+                                console.error("Batch update title error:", err);
+                              }
+                            }
+                            toast.success(`Successfully applied and locked ${successCount} clean titles.`);
+                          }}
+                          className="px-4 py-1.5 bg-brand text-on-brand rounded-lg text-xs font-black shadow-lg hover:scale-105 transition-all"
+                        >
+                          APPLY ALL TITLES
+                        </button>
+                      )}
+
                       <button 
                         onClick={() => setResults(null)}
                         className="text-text-muted hover:text-red-500 transition-colors font-bold text-xs flex items-center gap-1"
@@ -786,12 +827,24 @@ function ResultItem({ item, task, onAction }) {
   }
 
   if (task === 'cleanup_titles') {
+    const isSeries = item.content_type === 'series' || item.episode_number != null;
+    const isPart = /\bPart\s+\d+/i.test(item.new_title) || /\(Concluding Part\)/i.test(item.new_title);
     return (
       <div className="p-6 flex items-center justify-between hover:bg-surface-2 group transition-colors border-b border-border/50">
         <div className="space-y-1 min-w-0 flex-1 pr-10">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-[10px] font-black text-red-500/50 line-through truncate max-w-[200px] block">{item.old_title}</span>
             <span className="text-xs text-text-muted">➜</span>
+            {isSeries && (
+              <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold rounded">
+                📺 Series {item.episode_number ? `Ep ${item.episode_number}` : ''}
+              </span>
+            )}
+            {isPart && (
+              <span className="px-2 py-0.5 bg-purple-500/10 text-purple-400 text-[10px] font-bold rounded">
+                🎬 Multi-Part
+              </span>
+            )}
           </div>
           <p className="text-lg font-black text-text-primary truncate">
             {item.new_title}

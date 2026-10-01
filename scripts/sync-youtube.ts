@@ -6,10 +6,12 @@ import { purgeStaleUnmappedChannelVideos, runVideosSync, refreshYouTubeViewCount
 import { runCastExtraction, runTitleCleanup } from '../api/_lib/ai_maintenance.js';
 
 async function main() {
-  console.log("Starting YouTube Sync from GitHub Actions...");
+  console.log("Checking for newly added YouTube channels to backfill...");
   try {
-    const result = await runVideosSync();
-    console.log("Sync complete:", JSON.stringify(result, null, 2));
+    // Monitored channels receive instant real-time webhook updates via WebSub.
+    // Scheduled sync only processes newly added channels that haven't been backfilled yet.
+    const result = await runVideosSync({ onlyNewChannels: true });
+    console.log("Channel backfill status:", JSON.stringify(result, null, 2));
 
     // Refresh view counts on existing YouTube films in a round-robin pass (up to 3,000 films per 8h run)
     try {
@@ -19,12 +21,12 @@ async function main() {
       console.warn("Views refresh failed:", e?.message || e);
     }
 
-    // Backstop the inline enrichment before the workflow exits. This catches
-    // recent legacy/noisy rows too and keeps title cleanup coupled to the sync
-    // instead of relying on a separate Vercel request that can time out.
-    const castResult = await runCastExtraction({ limit: 60 });
-    const titleResult = await runTitleCleanup({ limit: 150 });
-    console.log('Post-sync AI maintenance:', JSON.stringify({ castResult, titleResult }, null, 2));
+    // Only run AI title/cast maintenance if newly backfilled channels were imported
+    if (result.processed && result.processed > 0) {
+      const castResult = await runCastExtraction({ limit: 60 });
+      const titleResult = await runTitleCleanup({ limit: 150 });
+      console.log('Post-backfill AI maintenance:', JSON.stringify({ castResult, titleResult }, null, 2));
+    }
 
     // Keep the unmapped buffer from growing forever — drop signals nobody
     // mapped within 30 days. Linked rows are never touched.

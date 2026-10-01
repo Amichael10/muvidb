@@ -118,8 +118,12 @@ export type TheatrePlaySnapshot = {
   performanceTime: string | null;
   playwright: string | null;
   director: string | null;
+  producer: string | null;
+  ticketUrl: string | null;
   status: string | null;
   year: number | null;
+  topCast?: SnapshotCastMember[];
+  creditedPeople?: SnapshotCreditedPerson[];
 };
 
 /**
@@ -352,8 +356,10 @@ export function formatWatchAvailability(film: {
     nollistream: 'NolliStream',
     docuth: 'Docuth',
     ebonylife: 'EbonyLife ON Plus',
-    kava: 'Kava',
+    ebonylifeonplus: 'EbonyLife ON Plus',
+    homitv: 'HomiTV',
     circuits: 'Circuits.tv',
+    kava: 'Kava',
     netflix: 'Netflix',
     prime_video: 'Prime Video',
     prime: 'Prime Video',
@@ -364,17 +370,22 @@ export function formatWatchAvailability(film: {
     irokotv: 'iROKOtv',
   };
   const releaseType = String(film.release_type || '').trim().toLowerCase();
+  const source = String(film.source || '').trim().toLowerCase();
   const linkedPlatform = Object.keys(displayNames).find(key => Boolean(links[key]));
-  const directPlatform = releaseType && !['cinema', 'unreleased'].includes(releaseType)
+  const directPlatform = (releaseType && !['cinema', 'unreleased'].includes(releaseType) && displayNames[releaseType])
     ? releaseType
-    : linkedPlatform;
+    : (linkedPlatform || (source && displayNames[source] ? source : null));
   const releaseStr = film.release_date ? formatDateNice(film.release_date) : '';
 
   if (directPlatform && displayNames[directPlatform]) {
     const platformName = displayNames[directPlatform];
+    const linkUrl = typeof links[directPlatform] === 'string' ? links[directPlatform] : null;
     if (directPlatform === 'youtube') {
       const channelName = text(film.youtube_channel_name);
       return channelName ? `Watch on YouTube via ${channelName} 📺` : 'Watch on YouTube 📺';
+    }
+    if (linkUrl) {
+      return releaseStr ? `Streaming on ${platformName} (${linkUrl}) • ${releaseStr} 🍿` : `Streaming on ${platformName} (${linkUrl}) 🍿`;
     }
     return releaseStr ? `Streaming on ${platformName} • ${releaseStr} 🍿` : `Streaming on ${platformName} 🍿`;
   }
@@ -478,8 +489,32 @@ export function buildUpcomingMovieSnapshot(input: {
 
 export function buildTheatrePlaySnapshot(input: {
   play: Record<string, any>;
+  credits?: Record<string, any>[];
   capturedAt: string;
 }): TheatrePlaySnapshot {
+  const rawCredits = Array.isArray(input.credits) ? input.credits : [];
+  const topCast: SnapshotCastMember[] = rawCredits
+    .filter(c => (!c.role || String(c.role).toLowerCase() === 'actor' || String(c.role).toLowerCase() === 'performer') && (c.person?.name || c.person_name))
+    .map(c => ({
+      personId: String(c.person?.id || c.person_id || ''),
+      name: String(text(c.person?.name || c.person_name) || ''),
+      handle: extractInstagramHandle(c.person || {}),
+      tiktokHandle: extractTikTokHandle(c.person?.tiktok_url),
+      character: text(c.character_name),
+    }))
+    .slice(0, 6);
+
+  const creditedPeople: SnapshotCreditedPerson[] = rawCredits
+    .filter(c => c.person?.name || c.person_name)
+    .map(c => ({
+      personId: String(c.person?.id || c.person_id || ''),
+      name: String(text(c.person?.name || c.person_name) || ''),
+      instagramHandle: extractInstagramHandle(c.person || {}),
+      tiktokHandle: extractTikTokHandle(c.person?.tiktok_url),
+      role: String(text(c.role) || 'actor').toLowerCase(),
+      character: text(c.character_name),
+    }));
+
   return {
     kind: 'whats_on_stage',
     capturedAt: input.capturedAt,
@@ -497,8 +532,12 @@ export function buildTheatrePlaySnapshot(input: {
     performanceTime: text(input.play.performance_time),
     playwright: text(input.play.playwright),
     director: text(input.play.director),
+    producer: text(input.play.producer),
+    ticketUrl: text(input.play.source_url),
     status: text(input.play.status),
     year: yearFrom(input.play),
+    topCast,
+    creditedPeople,
   };
 }
 

@@ -764,9 +764,14 @@ async function summarizeFilm(data: any, res: VercelResponse) {
 
 async function cleanupTitles(res: VercelResponse) {
   // Deep scan: Prioritize titles with pipes (|) and common noise
+  // NEVER touch locked titles or episodic series entries
   const { data: films, error: dbError } = await supabase
     .from('films')
     .select('id, title')
+    .eq('title_locked', false)
+    .neq('content_type', 'series')
+    .is('series_id', null)
+    .is('episode_number', null)
     .or('title.ilike.%|%,title.ilike.%YORUBA%,title.ilike.%MOVIE%,title.ilike.%PART%,title.ilike.%2024%,title.ilike.%2025%,title.ilike.%FULL%,title.ilike.%NIGERIAN%,title.ilike.%(%,title.ilike.%[%,title.ilike.%-%,title.ilike.%LATEST%')
     .order('created_at', { ascending: false })
     .limit(40); // Reduced batch size to 40 to avoid token rate limits (429)
@@ -785,18 +790,18 @@ async function cleanupTitles(res: VercelResponse) {
 
   const prompt = `
     You are a Nollywood database editor. 
-    Clean up these movie titles by removing common YouTube marketing noise, years, and category labels.
+    Clean up these movie and series titles according to strict standard conventions:
     
     Rules:
-    1. EXTRACT ONLY the actual movie title. 
-    2. DISCARD all marketing buzzwords: "LATEST", "YORUBA MOVIE", "NIGERIAN MOVIE", "2024", "2025", "FULL MOVIE", "HD", "APA", "PART 1", etc.
-    3. DISCARD all actor/cast lists separated by |, /, or hyphens.
-    4. Proper Case: Convert ALL CAPS to Proper Case (e.g., "NKAN ASIRI" -> "Nkan Asiri").
-    5. Be Aggressive: If a title has noise at the start (e.g., "YORUBA MOVIES 2025 LATEST: TITANIC"), remove the noise.
-    6. CRITICAL (NO COMPROMISE): If the title contains a pipe (|), YOU MUST remove the pipe and everything after it.
-    7. NO REPEATS: If the output title is the same as the input title, you have failed the task. Every title in this list is MESSY. Clean it.
+    1. MULTI-PART MOVIES: Standardize to "Title Part X" (e.g., "Koleoso Part 1", "Koleoso Part 2", "Sound of Ikoro Part 1 & 2", "Movie (Concluding Part)"). NEVER discard "Part 1", "Part 2", "Part 1 & 2", or "Concluding Part"!
+    2. SERIES EPISODES: Standardize to "Series Title (Episode Subtitle) Ep X" (e.g., "Saamu Alajo (Alagbado) Ep 267"). If there is no episode subtitle, format as "Series Title Ep X".
+    3. STANDALONE MOVIES: Extract the actual movie title in Title Case.
+    4. DISCARD MARKETING NOISE: Remove marketing buzzwords: "LATEST", "YORUBA MOVIE", "NIGERIAN MOVIE", "2024", "2025", "2026", "FULL MOVIE", "HD", "APA", etc. (Do NOT remove "Part 1", "Part 2", or "Ep X").
+    5. DISCARD ACTORS / CHANNELS: Discard actor/cast lists separated by |, /, or hyphens.
+    6. CRITICAL: If the title contains a pipe (|), remove the pipe and everything after it.
+    7. Convert ALL CAPS to Proper Title Case.
     
-    Return ONLY JSON: [{"id": "...", "old_title": "...", "new_title": "...", "type": "title_cleanup"}]
+    Return ONLY JSON: [{"id": "...", "old_title": "...", "new_title": "...", "content_type": "movie"|"series", "episode_number": number|null, "season_number": number|null, "type": "title_cleanup"}]
     
     Titles to clean: ${JSON.stringify(films)}
   `;
@@ -816,10 +821,14 @@ async function cleanupTitles(res: VercelResponse) {
 }
 
 async function extractCastFromTitles(res: VercelResponse) {
-  // Find films whose titles likely contain embedded cast names
+  // Find films whose titles likely contain embedded cast names (excluding locked titles and series episodes)
   const { data: films, error: dbError } = await supabase
     .from('films')
     .select('id, title')
+    .eq('title_locked', false)
+    .neq('content_type', 'series')
+    .is('series_id', null)
+    .is('episode_number', null)
     .or('title.ilike.%starring%,title.ilike.%feat%,title.ilike.%ft.%,title.ilike.%ft %')
     .order('created_at', { ascending: false })
     .limit(30);
@@ -833,6 +842,10 @@ async function extractCastFromTitles(res: VercelResponse) {
   const { data: pipeFilms } = await supabase
     .from('films')
     .select('id, title')
+    .eq('title_locked', false)
+    .neq('content_type', 'series')
+    .is('series_id', null)
+    .is('episode_number', null)
     .ilike('title', '%|%')
     .order('created_at', { ascending: false })
     .limit(20);
@@ -1024,17 +1037,25 @@ async function polishTitle(data: any, res: VercelResponse) {
   if (!title) return res.status(400).json({ error: 'Title is required' });
 
   const prompt = `
+    You are a Nollywood database editor.
+    Clean and polish this title according to strict standards:
+
     Rules:
-    1. EXTRACT ONLY the actual movie title.
-    2. DISCARD all marketing buzzwords (LATEST, 2024, YORUBA MOVIE, etc.)
-    3. DISCARD all actor names or cast lists separated by |, /, or hyphens.
-    4. Proper Case: Convert ALL CAPS to Proper Case.
-    5. Return ONLY the cleaned title string.
+    1. MULTI-PART MOVIES: Standardize to "Title Part X" (e.g. "Koleoso Part 1", "Koleoso Part 2", "Sound of Ikoro Part 1 & 2", "Movie (Concluding Part)"). NEVER discard "Part 1", "Part 2", or "Concluding Part"!
+    2. SERIES EPISODES: Standardize to "Series Title (Episode Subtitle) Ep X" (e.g. "Saamu Alajo (Alagbado) Ep 267"). If no subtitle, format as "Series Title Ep X". NEVER collapse an episode to just the series name!
+    3. STANDALONE MOVIES: Extract the actual movie title in Title Case.
+    4. DISCARD MARKETING BUZZWORDS: Discard "LATEST", "2024", "2025", "2026", "YORUBA MOVIE", "NIGERIAN MOVIE", "FULL MOVIE", "HD", etc.
+    5. DISCARD ACTORS: Discard all actor names or cast lists separated by |, /, or hyphens.
+    6. Proper Title Case: Convert ALL CAPS to Proper Title Case.
+    7. Return ONLY the cleaned title string.
     
     Examples:
     - "LATEST YORUBA MOVIE 2024 - NKAN ASIRI" -> "Nkan Asiri"
-    - "NKAN ASIRI PART 1" -> "Nkan Asiri"
+    - "NKAN ASIRI PART 1" -> "Nkan Asiri Part 1"
+    - "KOLEOSO Pt 2 - Latest Yoruba Movie 2025 Drama Iteledicon" -> "Koleoso Part 2"
     - "ALAKO Latest Yoruba Movie 2024 | MIDE MARTINS | DAMILOLA OMOTOSO" -> "Alako"
+    - "SAAMU ALAJO (ALAGBADO) Latest 2026 Yoruba Comedy Series EP 267/ Odunlade Adekola, Apa" -> "Saamu Alajo (Alagbado) Ep 267"
+    - "Saamu Alajo Latest 2023 Yoruba Comedy Series EP 130" -> "Saamu Alajo Ep 130"
     
     Title to clean: "${title}"
   `;

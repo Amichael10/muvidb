@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
 import { formatViewCount } from '../../utils/youtube';
+import { parseTitleMetadata } from '../../utils/titleCleaner';
 import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
 
@@ -185,7 +186,7 @@ function EditFilmModal({ film, onSave, onClose }) {
     setSaving(true);
     const { error: err } = await supabase
       .from('films')
-      .update({ ...form, year: form.year ? Number(form.year) : null })
+      .update({ ...form, year: form.year ? Number(form.year) : null, title_locked: true })
       .eq('id', film.id);
     setSaving(false);
     if (err) { toast.error(err.message); return; }
@@ -702,12 +703,17 @@ export default function AdminYouTubeVideos() {
 
   const createFilmFromVideo = async (video) => {
     const targetReleaseType = video.channels?.adapter === 'kava' ? 'kava' : 'youtube';
+    const parsed = parseTitleMetadata(video.title);
 
     // 1. Create the film
     const { data: newFilm, error: fErr } = await supabase
       .from('films')
       .insert({
-        title: video.title,
+        title: parsed.title || video.title,
+        content_type: parsed.content_type || 'movie',
+        episode_number: parsed.episode_number,
+        season_number: parsed.season_number,
+        title_locked: true,
         release_type: targetReleaseType,
         needs_review: true,
         synopsis: video.description || 'Imported. Please update description.',

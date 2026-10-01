@@ -393,16 +393,167 @@ export async function syncPersonAwardsToFilms(personId, personName, personAwards
 }
 
 /**
- * Sync film awards to recipient people.
- * Called after saving a film in AdminFilms.
+ * Determine matching craft crew roles for a given award category.
+ */
+export function getCraftRolesForCategory(category) {
+  const cat = (category || '').toLowerCase().trim();
+  if (!cat) return [];
+
+  if (
+    cat.includes('production design') ||
+    cat.includes('art direct') ||
+    cat.includes('set design') ||
+    cat.includes('art and design')
+  ) {
+    return ['production designer', 'art director', 'set designer', 'production design', 'art direction'];
+  }
+  if (cat.includes('costume') || cat.includes('costumier') || cat.includes('wardrobe')) {
+    return ['costume designer', 'costume', 'costumier', 'wardrobe'];
+  }
+  if (
+    cat.includes('cinematograph') ||
+    cat.includes('director of photography') ||
+    /\bdop\b/.test(cat) ||
+    cat.includes('camera operator')
+  ) {
+    return ['cinematographer', 'director of photography', 'dop', 'camera operator'];
+  }
+  if (
+    cat.includes('sound design') ||
+    cat.includes('sound edit') ||
+    cat.includes('sound record') ||
+    cat.includes('soundtrack') ||
+    (cat.includes('sound') && !cat.includes('surround'))
+  ) {
+    return ['sound designer', 'sound editor', 'sound recordist', 'sound', 'composer', 'sound mixer'];
+  }
+  if (
+    (cat.includes('picture edit') ||
+      cat.includes('film edit') ||
+      cat.includes('editing') ||
+      cat.includes('editor')) &&
+    !cat.includes('sound editor')
+  ) {
+    return ['editor', 'film editor', 'picture editor', 'editing'];
+  }
+  if (cat.includes('makeup') || cat.includes('make-up') || cat.includes('hairstyl') || cat.includes('hair')) {
+    return ['makeup artist', 'makeup', 'hair & makeup', 'hairstylist'];
+  }
+  if (cat.includes('visual effects') || /\bvfx\b/.test(cat) || cat.includes('special effects')) {
+    return ['visual effects', 'vfx', 'special effects', 'crew'];
+  }
+  if (
+    cat.includes('original score') ||
+    cat.includes('music score') ||
+    cat.includes('soundtrack') ||
+    cat.includes('composer')
+  ) {
+    return ['composer', 'music'];
+  }
+  if (
+    (cat.includes('director') || cat.includes('directing')) &&
+    !cat.includes('art direct') &&
+    !cat.includes('director of photography')
+  ) {
+    return ['director'];
+  }
+  if (cat.includes('screenplay') || cat.includes('writer') || cat.includes('writing') || cat.includes('script')) {
+    return ['writer', 'screenplay', 'screenwriter'];
+  }
+
+  return [];
+}
+
+/**
+ * Sync film awards to recipient people and automatically associate craft
+ * awards (e.g. Best Production Design, Costume, Sound, Cinematography, Editing)
+ * with the corresponding credited crew on the film.
+ *
+ * Called after saving a film in AdminFilms or during batch reconciliation.
  */
 export async function syncFilmAwardsToPeople(filmId, filmTitle, filmAwards) {
   if (!filmId || !filmTitle || !Array.isArray(filmAwards)) return;
 
-  for (const award of filmAwards) {
-    const recipients = Array.isArray(award.recipients) ? award.recipients.filter(Boolean) : [];
-    if (!recipients.length) continue;
+  // 1. Fetch credits for the film to enable automatic crew association for craft awards
+  let filmCredits = [];
+  try {
+    const { data: creditsData } = await supabase
+      .from('credits')
+      .select('id, role, character_name, person:people(id, name, awards)')
+      .eq('film_id', filmId);
+    if (Array.isArray(creditsData)) {
+      filmCredits = creditsData;
+    }
+  } catch (err) {
+    console.warn('Could not fetch film credits for craft award sync:', err);
+  }
 
+  let filmAwardsModified = false;
+  const nextFilmAwards = [...filmAwards];
+
+  for (let idx = 0; idx < nextFilmAwards.length; idx++) {
+    const award = { ...nextFilmAwards[idx] };
+    const recipients = Array.isArray(award.recipients) ? [...award.recipients].filter(Boolean) : [];
+    const targetRoles = getCraftRolesForCategory(award.category || award.title || '');
+
+    // Auto-associate craft awards with matching crew members if recipients list is missing them
+    if (targetRoles.length > 0 && filmCredits.length > 0) {
+      const matchingCrew = filmCredits.filter((c) => {
+        const r = (c.role || '').toLowerCase().trim();
+        return targetRoles.some((target) => r === target || r.includes(target));
+      });
+
+      for (const crew of matchingCrew) {
+        if (!crew.person?.name) continue;
+        const crewName = crew.person.name.trim();
+
+        // Add crew member to award.recipients if not already listed
+        const alreadyInRecipients = recipients.some(
+          (rec) => rec.toLowerCase().trim() === crewName.toLowerCase()
+        );
+        if (!alreadyInRecipients) {
+          recipients.push(crewName);
+          filmAwardsModified = true;
+        }
+
+        // Ensure the award is synced to this crew member's profile
+        try {
+          const personAwards = Array.isArray(crew.person.awards) ? [...crew.person.awards] : [];
+          const matchIdx = personAwards.findIndex((pa) => isSameAward(pa, award));
+
+          if (matchIdx >= 0) {
+            const existing = { ...personAwards[matchIdx] };
+            personAwards[matchIdx] = {
+              ...existing,
+              work: filmTitle,
+              film_id: filmId,
+              won: award.won === true ? true : existing.won,
+            };
+          } else {
+            personAwards.push({
+              organization: (award.organization || '').trim() || 'AMVCA',
+              year: award.year ? parseInt(award.year, 10) : null,
+              season: award.season ? parseInt(award.season, 10) : null,
+              category: (award.category || award.title || '').trim() || null,
+              work: filmTitle,
+              film_id: filmId,
+              won: award.won === true,
+            });
+          }
+
+          await supabase.from('people').update({ awards: personAwards }).eq('id', crew.person.id);
+        } catch (err) {
+          console.warn('Error syncing craft award to crew person:', crewName, err);
+        }
+      }
+    }
+
+    if (recipients.length !== (award.recipients || []).length) {
+      award.recipients = recipients;
+      nextFilmAwards[idx] = award;
+    }
+
+    // Process all named recipients
     for (const recipient of recipients) {
       const cleanName = recipient.trim();
       if (!cleanName) continue;
@@ -433,7 +584,7 @@ export async function syncFilmAwardsToPeople(filmId, filmTitle, filmAwards) {
             organization: (award.organization || '').trim() || 'AMVCA',
             year: award.year ? parseInt(award.year, 10) : null,
             season: award.season ? parseInt(award.season, 10) : null,
-            category: (award.category || '').trim() || null,
+            category: (award.category || award.title || '').trim() || null,
             work: filmTitle,
             film_id: filmId,
             won: award.won === true,
@@ -446,4 +597,46 @@ export async function syncFilmAwardsToPeople(filmId, filmTitle, filmAwards) {
       }
     }
   }
+
+  // If any craft awards had recipients populated from crew, update the film record
+  if (filmAwardsModified) {
+    try {
+      await supabase.from('films').update({ awards: nextFilmAwards }).eq('id', filmId);
+    } catch (updateErr) {
+      console.warn('Error updating film awards with matched crew recipients:', updateErr);
+    }
+  }
+}
+
+/**
+ * Reconcile craft awards across all films in the database.
+ * Matches unassigned or empty-recipient craft awards to credited crew members.
+ */
+export async function reconcileAllFilmCraftAwards(onProgress) {
+  const { data: films, error } = await supabase
+    .from('films')
+    .select('id, title, awards')
+    .not('awards', 'is', null);
+
+  if (error || !films) {
+    console.error('Failed to load films for craft award reconciliation:', error);
+    return { success: false, error };
+  }
+
+  const eligibleFilms = films.filter((f) => Array.isArray(f.awards) && f.awards.length > 0);
+  let processed = 0;
+
+  for (const film of eligibleFilms) {
+    try {
+      await syncFilmAwardsToPeople(film.id, film.title, film.awards);
+      processed++;
+      if (typeof onProgress === 'function') {
+        onProgress(processed, eligibleFilms.length, film.title);
+      }
+    } catch (err) {
+      console.warn('Error reconciling craft awards for film:', film.title, err);
+    }
+  }
+
+  return { success: true, processed, total: eligibleFilms.length };
 }

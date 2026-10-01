@@ -519,19 +519,52 @@ class SupabaseSync:
                 return pid
         return ""
     def link_credit(self, film_id: str, person_id: str, role: str, char_name: str = "", order: int = 0):
-        # Check for existing
-        q = f"{self.url}/rest/v1/credits?film_id=eq.{film_id}&person_id=eq.{person_id}&role=eq.{role}"
-        if char_name: q += f"&character_name=eq.{char_name}"
-        
+        # RULE: If harvester or prior sync already enriched this movie and the same person appeared
+        # again during local OCR, REPLACE / UPDATE their credit in-place instead of adding them afresh.
+        q = f"{self.url}/rest/v1/credits?film_id=eq.{film_id}&person_id=eq.{person_id}"
         check = requests.get(q, headers=self.headers)
         if check.status_code == 200 and check.json():
-            return # Already linked
+            existing_credits = check.json()
+            is_actor = role.lower() in ("actor", "cast")
+            matching_credit = None
+
+            for ec in existing_credits:
+                ec_role = (ec.get("role") or "").lower()
+                if is_actor and ec_role in ("actor", "cast"):
+                    matching_credit = ec
+                    break
+                elif not is_actor and ec_role == role.lower():
+                    matching_credit = ec
+                    break
+
+            if matching_credit:
+                credit_id = matching_credit.get("id")
+                patch_payload = {}
+                if char_name and char_name.strip() and matching_credit.get("character_name") != char_name.strip():
+                    patch_payload["character_name"] = char_name.strip()
+                if role and matching_credit.get("role") != role:
+                    patch_payload["role"] = role
+                if order > 0 and matching_credit.get("billing_order") != order:
+                    patch_payload["billing_order"] = order
+
+                if patch_payload and credit_id:
+                    requests.patch(f"{self.url}/rest/v1/credits?id=eq.{credit_id}", headers=self.headers, json=patch_payload)
+                    print(f"    🔄 Replaced/updated existing credit for person #{person_id[:8]} ({role}) in-place")
+                return
+
+            if is_actor and any((ec.get("role") or "").lower() in ("actor", "cast") for ec in existing_credits):
+                ec = next(ec for ec in existing_credits if (ec.get("role") or "").lower() in ("actor", "cast"))
+                credit_id = ec.get("id")
+                if char_name and char_name.strip() and credit_id:
+                    requests.patch(f"{self.url}/rest/v1/credits?id=eq.{credit_id}", headers=self.headers, json={"character_name": char_name.strip()})
+                    print(f"    🔄 Updated character for existing actor #{person_id[:8]} in-place")
+                return
 
         payload = {
             "film_id": film_id,
             "person_id": person_id,
             "role": role,
-            "character_name": char_name,
+            "character_name": char_name.strip() if char_name else None,
             "billing_order": order
         }
         requests.post(f"{self.url}/rest/v1/credits", headers=self.headers, json=payload)

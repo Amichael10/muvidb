@@ -658,6 +658,10 @@ async function main() {
     let query = supabase
       .from('films')
       .select('id, title, slug, synopsis, source, created_at')
+      .eq('title_locked', false)
+      .neq('content_type', 'series')
+      .is('series_id', null)
+      .is('episode_number', null)
       .order('created_at', { ascending: false })
       .range(filmPage * PAGE_SIZE, (filmPage + 1) * PAGE_SIZE - 1);
 

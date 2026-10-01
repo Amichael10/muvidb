@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { authHeaders } from '../../lib/apiAuth';
 import { uploadAdminSocialMedia } from '../../lib/imageUpload';
 import { supabase } from '../../lib/supabase';
+import FilmSearchCombobox from './FilmSearchCombobox';
 
 const PLATFORM_CONFIGS = [
   {
@@ -269,6 +270,11 @@ export default function UniversalSocialComposer({
   // AI assistant loading
   const [generatingAI, setGeneratingAI] = useState(false);
 
+  // Movie anchor for Ensemble AI Tagging
+  const [selectedMovieForCaption, setSelectedMovieForCaption] = useState(null);
+  const [isGeneratingEnsembleCaption, setIsGeneratingEnsembleCaption] = useState(false);
+  const [ensembleInfo, setEnsembleInfo] = useState(null);
+
   // Reactive sync if initialData changes while mounted
   useEffect(() => {
     if (parsed) {
@@ -443,6 +449,164 @@ export default function UniversalSocialComposer({
     }
   };
 
+  // Select a film to query its full ensemble cast and verified Instagram handles
+  const handleSelectMovieForEnsemble = async (filmId, filmObj) => {
+    if (!filmId) {
+      setSelectedMovieForCaption(null);
+      setEnsembleInfo(null);
+      return;
+    }
+    try {
+      const { data: fullFilm, error } = await supabase
+        .from('films')
+        .select(`
+          id, title, year, synopsis, genres, youtube_watch_url, youtube_channel_name,
+          credits (
+            role,
+            character_name,
+            billing_order,
+            people (
+              id,
+              name,
+              instagram_url,
+              twitter_url
+            )
+          )
+        `)
+        .eq('id', filmId)
+        .maybeSingle();
+
+      if (error || !fullFilm) {
+        toast.error('Could not load movie credits');
+        return;
+      }
+
+      setSelectedMovieForCaption(fullFilm);
+
+      const credits = Array.isArray(fullFilm.credits) ? fullFilm.credits : [];
+      const castCredits = credits.filter(c => {
+        const r = (c.role || '').toLowerCase();
+        return r.includes('actor') || r.includes('cast') || r.includes('lead') || r.includes('supporting');
+      });
+      const withInstagram = credits.filter(c => c.people?.instagram_url);
+
+      setEnsembleInfo({
+        totalCredits: credits.length,
+        castCount: castCredits.length,
+        withInstagramCount: withInstagram.length,
+        credits,
+      });
+
+      if (!title) {
+        setTitle(`${fullFilm.title}${fullFilm.year ? ` (${fullFilm.year})` : ''}`);
+      }
+    } catch (err) {
+      console.error('Error fetching film for ensemble caption:', err);
+      toast.error('Failed to load film credits');
+    }
+  };
+
+  // Generate AI caption tagging the ensemble cast and crew with @Instagram usernames
+  const handleGenerateEnsembleCaption = async () => {
+    if (!selectedMovieForCaption) {
+      toast.error('Select a movie first');
+      return;
+    }
+    setIsGeneratingEnsembleCaption(true);
+    try {
+      const film = selectedMovieForCaption;
+      const credits = ensembleInfo?.credits || film.credits || [];
+
+      const cleanHandle = (raw) => {
+        if (!raw || typeof raw !== 'string') return '';
+        let h = raw.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '');
+        h = h.split('/')[0].split('?')[0].replace(/[@#]/g, '').trim();
+        return h && /^[a-zA-Z0-9._]+$/.test(h) ? `@${h}` : '';
+      };
+
+      const topCast = credits
+        .filter(c => {
+          const r = (c.role || '').toLowerCase();
+          return r === 'actor' || r === 'lead' || r === 'supporting' || r.includes('cast');
+        })
+        .map(c => ({
+          name: c.people?.name || 'Cast Member',
+          character: c.character_name || '',
+          handle: cleanHandle(c.people?.instagram_url),
+          instagramHandle: cleanHandle(c.people?.instagram_url),
+        }));
+
+      const directors = credits
+        .filter(c => (c.role || '').toLowerCase() === 'director')
+        .map(c => ({
+          name: c.people?.name || 'Director',
+          handle: cleanHandle(c.people?.instagram_url),
+          instagramHandle: cleanHandle(c.people?.instagram_url),
+        }));
+
+      const creditedPeople = credits
+        .filter(c => c.people?.name)
+        .map(c => ({
+          name: c.people?.name,
+          role: c.role,
+          character: c.character_name,
+          handle: cleanHandle(c.people?.instagram_url),
+          instagramHandle: cleanHandle(c.people?.instagram_url),
+        }));
+
+      const res = await fetch('/api/social?task=ai_generate_copy', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candidate: {
+            id: film.id,
+            type: 'movie',
+            name: film.title,
+            subtext: film.synopsis,
+            data: {
+              title: film.title,
+              year: film.year,
+              synopsis: film.synopsis,
+              directors,
+              topCast,
+              creditedPeople,
+              youtubeChannelName: film.youtube_channel_name,
+            },
+          },
+          angle: 'dynamic_story',
+          preferredProvider: 'gemini',
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to generate ensemble caption');
+
+      const generatedInstagram = data.instagram || data.variations?.[0]?.captions?.instagram;
+      if (generatedInstagram) {
+        setUniversalCaption(generatedInstagram);
+
+        const primary = data.variations?.[0]?.captions || data;
+        const newPlatformCaptions = {};
+        if (primary.threads) newPlatformCaptions.threads = primary.threads;
+        if (primary.tiktok) newPlatformCaptions.tiktok = primary.tiktok;
+        if (primary.facebook) newPlatformCaptions.facebook = primary.facebook;
+        if (primary.instagram) newPlatformCaptions.instagram = primary.instagram;
+        if (primary.threads) newPlatformCaptions.x = primary.threads.slice(0, 275);
+        setPlatformCaptions(prev => ({ ...prev, ...newPlatformCaptions }));
+
+        const handleCount = creditedPeople.filter(p => p.handle).length;
+        toast.success(`✨ Generated caption with ${handleCount} ensemble @handles tagged!`);
+      } else {
+        throw new Error('No caption returned from AI generator');
+      }
+    } catch (err) {
+      console.error('Ensemble caption generation error:', err);
+      toast.error(err.message || 'Could not generate ensemble caption');
+    } finally {
+      setIsGeneratingEnsembleCaption(false);
+    }
+  };
+
   // Quick schedule presets
   const applySchedulePreset = (offsetMinutes, timeStr = null) => {
     const d = new Date();
@@ -509,6 +673,13 @@ export default function UniversalSocialComposer({
         mediaAssets,
         scheduledFor: finalSchedule,
         status: finalStatus,
+        sourceEntityId: selectedMovieForCaption?.id || undefined,
+        sourceType: selectedMovieForCaption ? 'film' : undefined,
+        sourceSnapshot: selectedMovieForCaption ? {
+          filmId: selectedMovieForCaption.id,
+          title: selectedMovieForCaption.title,
+          year: selectedMovieForCaption.year,
+        } : undefined,
       };
 
       const res = await fetch('/api/social?task=create_post', {
@@ -810,6 +981,68 @@ export default function UniversalSocialComposer({
                 )}
                 <span>AI Adapt Per Platform</span>
               </button>
+            </div>
+
+            {/* Movie Anchor for Ensemble Cast Tagging & AI Caption Generation */}
+            <div className="rounded-xl border border-white/10 bg-surface-2/70 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                  <Icon icon="solar:clapperboard-play-linear" className="text-primary" width="14" />
+                  Link Movie for AI Ensemble & Cast @Handles (Optional)
+                </span>
+                {selectedMovieForCaption && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMovieForCaption(null);
+                      setEnsembleInfo(null);
+                    }}
+                    className="text-[11px] font-bold text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    Clear Film
+                  </button>
+                )}
+              </div>
+
+              <FilmSearchCombobox
+                value={selectedMovieForCaption?.id || ''}
+                onChange={handleSelectMovieForEnsemble}
+                placeholder="Search film by title to load cast & crew @Instagram usernames…"
+              />
+
+              {selectedMovieForCaption && (
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-white/10">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-bold text-white">
+                      {selectedMovieForCaption.title} {selectedMovieForCaption.year ? `(${selectedMovieForCaption.year})` : ''}
+                    </span>
+                    {ensembleInfo && (
+                      <span className="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
+                        👥 {ensembleInfo.totalCredits} credits ({ensembleInfo.withInstagramCount} @handles)
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateEnsembleCaption}
+                    disabled={isGeneratingEnsembleCaption}
+                    className="px-3.5 py-1.5 text-xs font-black rounded-lg bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 text-white shadow-md shadow-pink-500/20 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                  >
+                    {isGeneratingEnsembleCaption ? (
+                      <>
+                        <Icon icon="solar:spinner-line-duotone" className="animate-spin" width="14" />
+                        <span>Generating Caption with Cast @Tags…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Icon icon="solar:magic-stick-3-bold" width="14" />
+                        <span>✨ Generate Caption with Ensemble @Handles</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>

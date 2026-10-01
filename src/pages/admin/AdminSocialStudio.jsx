@@ -458,7 +458,7 @@ export default function AdminSocialStudio() {
   const [calendarSlots, setCalendarSlots] = useState([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [seedingCalendar, setSeedingCalendar] = useState(false);
-  const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', jobs: [] });
+  const [videoAutopilot, setVideoAutopilot] = useState({ running: false, message: '', progress: 0, jobs: [] });
   const [videoPlan, setVideoPlan] = useState({
     days: 7,
     startDate: new Date().toISOString().slice(0, 10),
@@ -1210,14 +1210,24 @@ export default function AdminSocialStudio() {
     const rowsToProcess = targetRows ? (Array.isArray(targetRows) ? targetRows : [targetRows]) : videoRows;
     const validRows = rowsToProcess.filter(row => row.filmId && row.date && row.time);
     if (!validRows.length) return toast.error('Add at least one video row with a film, date, and time.');
-    setVideoAutopilot({ running: true, message: `Preparing ${validRows.length} planned video item${validRows.length === 1 ? '' : 's'}…`, jobs: [] });
+    if (clipperStatus !== 'running') {
+      return toast.error('The local desktop clipper is offline. Please click "Start Clipper" in the header and try again.');
+    }
+    setVideoAutopilot({ running: true, message: `Preparing ${validRows.length} planned video item${validRows.length === 1 ? '' : 's'}…`, progress: 10, jobs: [] });
     try {
       let created = 0;
       const processedIds = [];
       for (const row of validRows) {
         const film = await resolveFilmForRow(row);
-        if (!film) continue;
+        if (!film) {
+          toast.error(`Could not resolve film for row.`);
+          continue;
+        }
         let sourceUrl = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : film.trailer_external_url);
+        if (!sourceUrl) {
+          toast.error(`"${film.title}" does not have a YouTube watch URL or trailer linked. Skipping.`);
+          continue;
+        }
         let start = parseTimestampToSeconds(row.start);
         let end = parseTimestampToSeconds(row.end);
         let caption = row.caption || '';
@@ -1228,6 +1238,7 @@ export default function AdminSocialStudio() {
           setVideoAutopilot(prev => ({
             ...prev,
             message: `Selecting highlight moment & generating copy for ${film.title}…`,
+            progress: 20,
           }));
           try {
             const res = await resolveMetadataAndRecommendation(row, film);
@@ -1257,6 +1268,12 @@ export default function AdminSocialStudio() {
           title: film.title,
         }));
 
+        setVideoAutopilot(prev => ({
+          ...prev,
+          message: `Sending ${formats.length} format render jobs to desktop clipper…`,
+          progress: 30,
+        }));
+
         const batchResponse = await fetch('http://127.0.0.1:4317/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1276,11 +1293,18 @@ export default function AdminSocialStudio() {
             status = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(status.detail || 'Video render failed.');
             if (status.success) break;
+            const stepProgress = Math.min(80, Math.max(35, status.progress || 35));
             setVideoAutopilot(prev => ({
               ...prev,
               message: `Rendering ${film.title} (${targetFormat})… ${status.progress || 0}%`,
+              progress: stepProgress,
             }));
           }
+          setVideoAutopilot(prev => ({
+            ...prev,
+            message: `Preparing upload session for ${film.title} (${targetFormat})…`,
+            progress: 82,
+          }));
           const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', {
             method: 'POST',
             headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
@@ -1288,6 +1312,12 @@ export default function AdminSocialStudio() {
           });
           const session = await sessionResponse.json().catch(() => ({}));
           if (!sessionResponse.ok) throw new Error(session.error || 'Could not prepare video storage.');
+
+          setVideoAutopilot(prev => ({
+            ...prev,
+            message: `Uploading rendered ${targetFormat} video to storage…`,
+            progress: 88,
+          }));
 
           let uploadSuccessful = false;
           try {
@@ -1331,6 +1361,11 @@ export default function AdminSocialStudio() {
 
         if (renderedAssets.length > 0) {
           const primaryAsset = renderedAssets[0];
+          setVideoAutopilot(prev => ({
+            ...prev,
+            message: action === 'publish' ? `Publishing ${film.title} live…` : action === 'schedule' ? `Scheduling ${film.title}…` : `Saving ${film.title} draft…`,
+            progress: 95,
+          }));
           const draftResponse = await fetch('/api/social?task=create_editor_video_draft', {
             method: 'POST',
             headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
@@ -1376,17 +1411,30 @@ export default function AdminSocialStudio() {
         }
       }
 
+      if (created === 0) {
+        setVideoAutopilot({ running: false, message: 'No video clips were rendered.', progress: 0, jobs: [] });
+        return toast.error('No video clips were rendered. Please verify the trailer links and desktop clipper status.');
+      }
+
       // Remove completed rows from the video plan list
       if (processedIds.length > 0) {
         setVideoRows(prev => prev.filter(r => !processedIds.includes(r.id)));
       }
 
-      setVideoAutopilot({ running: false, message: `Prepared ${created} video draft${created === 1 ? '' : 's'}.`, jobs: [] });
+      setVideoAutopilot({ running: false, message: `Completed ${created} video item${created === 1 ? '' : 's'}.`, progress: 100, jobs: [] });
       await refreshAll();
-      setActiveTab('drafts');
-      toast.success(`✨ Video clip saved to drafts! Removed from video plan.`);
+      if (action === 'schedule') {
+        setActiveTab('calendar');
+        toast.success(`🚀 ${created} video clip(s) rendered and scheduled!`);
+      } else if (action === 'publish') {
+        setActiveTab('history');
+        toast.success(`🚀 ${created} video clip(s) published now!`);
+      } else {
+        setActiveTab('drafts');
+        toast.success(`✨ ${created} video clip(s) rendered and saved to drafts!`);
+      }
     } catch (err) {
-      setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Custom video plan failed.' }));
+      setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Custom video plan failed.', progress: 0 }));
       toast.error(err.message || 'Custom video plan failed.');
     }
   };
@@ -1509,6 +1557,58 @@ export default function AdminSocialStudio() {
       refreshAll();
     } catch (err) {
       toast.error(err.message || 'Review action failed');
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const [syncingQueue, setSyncingQueue] = useState(false);
+
+  const runSyncQueue = async () => {
+    setSyncingQueue(true);
+    const toastId = toast.loading('Checking queue against live database updates (synopsis, images, cast/crew)...');
+    try {
+      const res = await fetch('/api/social?task=sync_queue', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      if (data.updated > 0) {
+        toast.success(`✨ Recognized changes and updated ${data.updated} queued post(s)!`, { id: toastId });
+      } else {
+        toast.success(`All ${data.scanned || 0} queued posts match the latest database records.`, { id: toastId });
+      }
+      await refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Failed to sync queue with database', { id: toastId });
+    } finally {
+      setSyncingQueue(false);
+    }
+  };
+
+  const runSyncItem = async (contentItemId) => {
+    setReviewingId(contentItemId);
+    const toastId = toast.loading('Re-checking source movie/play details...');
+    try {
+      const res = await fetch('/api/social?task=sync_item', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      if (data.updated) {
+        toast.success(`Updated post with fresh ${data.changes.join(', ')} from database!`, { id: toastId });
+      } else {
+        toast.success('Post is already matching the current database record.', { id: toastId });
+      }
+      await refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Failed to sync post with database', { id: toastId });
     } finally {
       setReviewingId(null);
     }
@@ -2463,8 +2563,20 @@ export default function AdminSocialStudio() {
               </div>
             </div>
 
-            {/* Filter Pills */}
-            <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-surface-2 p-1">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={runSyncQueue}
+                disabled={syncingQueue}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs font-bold text-sky-400 hover:bg-sky-500/20 active:scale-95 transition-all shadow-sm"
+                title="Scan database for changes to synopsis, poster images, cast or crew in all queued posts"
+              >
+                <Icon icon={syncingQueue ? 'solar:spinner-linear' : 'solar:refresh-circle-bold'} className={syncingQueue ? 'animate-spin' : ''} width="16" />
+                <span>Sync with DB</span>
+              </button>
+
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-surface-2 p-1">
               {[
                 { key: 'all', label: 'All' },
                 { key: 'scheduled', label: 'Scheduled' },
@@ -2486,6 +2598,7 @@ export default function AdminSocialStudio() {
               ))}
             </div>
           </div>
+        </div>
 
           {draftsLoading ? (
             <div className="rounded-2xl border border-white/10 bg-surface p-16 text-center shadow-xl">
@@ -2707,6 +2820,16 @@ export default function AdminSocialStudio() {
                             >
                               <Icon icon={reviewingId === item.id ? 'solar:spinner-linear' : 'solar:play-bold'} className={reviewingId === item.id ? 'animate-spin' : ''} width="14" />
                               <span>Publish Now</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => runSyncItem(item.id)}
+                              disabled={reviewingId === item.id}
+                              className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-surface-2 px-2.5 py-1.5 text-xs font-bold text-text-muted hover:text-white hover:bg-white/5 transition-all"
+                              title="Check if film/play synopsis, image, or cast has changed in the database"
+                            >
+                              <Icon icon={reviewingId === item.id ? 'solar:spinner-linear' : 'solar:refresh-linear'} className={reviewingId === item.id ? 'animate-spin' : ''} width="13" />
+                              <span>Sync DB</span>
                             </button>
                             <button
                               type="button"
@@ -3422,6 +3545,48 @@ export default function AdminSocialStudio() {
               </button>
             </div>
 
+            {/* Live Progress Banner when desktop clipper is actively rendering */}
+            {videoAutopilot.running && (
+              <div className="mt-4 rounded-xl border border-brand/40 bg-brand/10 p-4 shadow-lg shadow-brand/10 transition-all animate-fadeIn">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white shadow-md shadow-brand/30 animate-pulse">
+                      <Icon icon="solar:clapperboard-play-bold" width="22" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-white">
+                          Desktop FFmpeg Clipper In Progress
+                        </h4>
+                        <span className="rounded-full bg-brand/30 border border-brand/50 px-2 py-0.5 text-[10px] font-bold text-brand-light flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-brand animate-ping" />
+                          Live
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs font-medium text-white/90">
+                        {videoAutopilot.message || 'Preparing video stream and cutting clips…'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-mono font-black text-brand-light">
+                      {videoAutopilot.progress ? `${videoAutopilot.progress}%` : 'Processing…'}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full bg-gradient-to-r from-brand to-violet-500 transition-all duration-300 rounded-full"
+                    style={{ width: `${Math.max(6, videoAutopilot.progress || 20)}%` }}
+                  />
+                </div>
+                <div className="mt-2.5 flex items-center justify-between text-[11px] text-text-muted">
+                  <span>Stream Slicing & FFmpeg Resize</span>
+                  <span>Direct R2 Storage Upload</span>
+                </div>
+              </div>
+            )}
+
             <div className="mt-4 space-y-3">
               {videoRows.map((row, index) => (
                 <div key={row.id} className="rounded-xl border border-white/10 bg-surface-2 p-4 space-y-3">
@@ -3680,7 +3845,7 @@ export default function AdminSocialStudio() {
                         <span className="text-amber-300/80">Select a film to enable rendering</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => prepareCustomVideoPlan('draft', row)}
@@ -3689,6 +3854,26 @@ export default function AdminSocialStudio() {
                       >
                         <Icon icon="solar:clapperboard-play-bold" width="14" />
                         <span>Render This Clip (Draft)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => prepareCustomVideoPlan('schedule', row)}
+                        disabled={videoAutopilot.running || clipperStatus !== 'running' || !row.filmId}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-amber-400/40 bg-amber-500/15 px-3.5 text-xs font-bold text-amber-300 shadow-sm transition-all hover:bg-amber-500/25 disabled:opacity-50"
+                      >
+                        <Icon icon="solar:calendar-date-bold" width="14" />
+                        <span>Render & Schedule</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => prepareCustomVideoPlan('publish', row)}
+                        disabled={videoAutopilot.running || clipperStatus !== 'running' || !row.filmId}
+                        className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3.5 text-xs font-bold text-emerald-300 shadow-sm transition-all hover:bg-emerald-500/25 disabled:opacity-50"
+                      >
+                        <Icon icon="solar:send-square-bold" width="14" />
+                        <span>Post Now</span>
                       </button>
                     </div>
                   </div>

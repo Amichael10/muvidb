@@ -321,14 +321,6 @@ export default function AdminCreditHarvest() {
       const existing = await fetchFilmCandidateRows(group.film.id);
       let target = existing.find(row => row.id === targetId);
       const cleanReading = { ...reading, film_id: group.film.id, credit_type: creditType(reading.credit_type) };
-      // Re-check before insertion: re-running a screenshot cannot append an exact repeat.
-      if (targetId === '__new__') target = existing.find(row => candidateKey(row) === candidateKey(cleanReading));
-      if (target && target.status !== 'pending') throw new Error(`This credit is already ${target.status}. It has not been changed.`);
-      if (targetId !== '__new__' && !target) throw new Error('The selected row no longer exists. Compare again.');
-      const repeats = existing.filter(row => duplicateIds.includes(row.id) && row.id !== target?.id);
-      if (repeats.some(row => row.status !== 'pending' || creditType(row.credit_type) !== cleanReading.credit_type)) throw new Error('Only pending credits of the same type can be merged.');
-      if (repeats.some(row => row.matched_person_id && target?.matched_person_id && row.matched_person_id !== target.matched_person_id)) throw new Error('These rows link to different people. Correct their profile links before merging.');
-      
       let matchedPersonId = target?.matched_person_id || null;
       let matchedPersonObj = target?.people || null;
 
@@ -338,6 +330,54 @@ export default function AdminCreditHarvest() {
           matchedPersonId = foundId;
           const { data: pData } = await supabase.from('people').select('id, name, photo_url').eq('id', foundId).maybeSingle();
           if (pData) matchedPersonObj = pData;
+        }
+      }
+
+      // RULE: If harvester or prior extraction already enriched this person, REPLACE them in-place instead of adding afresh
+      if (!target || targetId === '__new__') {
+        if (matchedPersonId) {
+          target = existing.find(row => row.status === 'pending' && row.matched_person_id === matchedPersonId && creditType(row.credit_type) === cleanReading.credit_type);
+        }
+        if (!target) {
+          target = existing.find(row => candidateKey(row) === candidateKey(cleanReading));
+        }
+        if (!target) {
+          target = existing.find(row => row.status === 'pending' && creditType(row.credit_type) === cleanReading.credit_type && (
+            creditNameKey(row.raw_name) === creditNameKey(cleanReading.raw_name) ||
+            namesLookSame(row.raw_name, cleanReading.raw_name) ||
+            namesNearMatch(row.raw_name, cleanReading.raw_name)
+          ));
+        }
+      }
+
+      if (target && target.status !== 'pending') throw new Error(`This credit is already ${target.status}. It has not been changed.`);
+      const repeats = existing.filter(row => duplicateIds.includes(row.id) && row.id !== target?.id);
+      if (repeats.some(row => row.status !== 'pending' || creditType(row.credit_type) !== cleanReading.credit_type)) throw new Error('Only pending credits of the same type can be merged.');
+      if (repeats.some(row => row.matched_person_id && target?.matched_person_id && row.matched_person_id !== target.matched_person_id)) throw new Error('These rows link to different people. Correct their profile links before merging.');
+
+      // Check if person is already in live credits table from automated harvester; update in-place
+      if (matchedPersonId) {
+        const { data: liveCredit } = await supabase
+          .from('credits')
+          .select('id, character_name, role')
+          .eq('film_id', group.film.id)
+          .eq('person_id', matchedPersonId)
+          .maybeSingle();
+
+        if (liveCredit) {
+          const livePatch = {};
+          if (cleanReading.role_or_character && (!liveCredit.character_name || liveCredit.character_name.toLowerCase() === 'actor')) {
+            livePatch.character_name = cleanReading.role_or_character;
+          }
+          if (Object.keys(livePatch).length > 0) {
+            await supabase.from('credits').update(livePatch).eq('id', liveCredit.id);
+          }
+          if (target && target.status === 'pending') {
+            await supabase.from('credit_candidates').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', target.id);
+            setGroups(curr => curr.map(item => item.film.id === group.film.id ? { ...item, candidates: item.candidates.filter(c => c.id !== target.id) } : item));
+          }
+          if (!quiet) toast.success(`Replaced and updated live credit for ${cleanReading.raw_name} in-place.`);
+          return true;
         }
       }
 

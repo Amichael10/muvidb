@@ -60,6 +60,14 @@ export function scoreCandidateMatch(candidate, reading) {
   const cFold = foldPersonText(candidate.raw_name);
   const rFold = foldPersonText(reading.raw_name);
 
+  // Exact profile match (same matched_person_id)
+  const candidatePersonId = candidate.matched_person_id || candidate.people?.id;
+  const readingPersonId = reading.matched_person_id || reading.person_id;
+  if (candidatePersonId && readingPersonId && candidatePersonId === readingPersonId) {
+    const roleMatch = creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character);
+    return roleMatch ? 1.0 : 0.96;
+  }
+
   // Exact match
   if (cName && cName === rName) {
     const roleMatch = creditTextKey(candidate.role_or_character) === creditTextKey(reading.role_or_character);

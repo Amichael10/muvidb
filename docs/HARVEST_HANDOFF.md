@@ -198,3 +198,7 @@ See `docs/WORK_LOG.md` for those.
    check `ffprobe`, check the actual frames.
 3. The migrations are on a **shared** Supabase DB — additive changes are fine, destructive
    ones need explicit go-ahead.
+4. **Local OCR & Harvester In-Place Reconciliation Rule:**
+   If doing local OCR for a movie that the harvester (or a prior pass) already enriched and the same people appear again, **do NOT add them afresh as duplicate credits or candidates.**
+   Instead, look up existing credits/candidates for that film by `person_id` / `matched_person_id` / fuzzy name match, and **replace / update the people in-place** (e.g. enriching character names or roles while guaranteeing zero duplicate actor rows per film).
+

@@ -79,37 +79,88 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export function buildMovieHook(tagline: string | null, synopsis: string | null, title: string): string {
-  const parts: string[] = [];
-
+export function buildViralNarrative(
+  tagline: string | null,
+  synopsis: string | null,
+  title: string,
+  isComingSoon: boolean
+): { hookText: string; debateQuestion: string } {
   const usableTagline = firstUsableCopy(tagline);
-  if (usableTagline) {
-    parts.push(usableTagline);
-  }
-
   const usableSynopsis = firstUsableCopy(synopsis);
-  if (usableSynopsis) {
-    const clean = usableSynopsis
-      .replace(new RegExp(`^${escapeRegex(title)}\\s*(\\([^)]*\\))?\\s*(is a [^.]+film that\\s*)?(follows|revolves around|tells the story of|centers on|chronicles)\\s+`, 'i'), '')
-      .replace(/^(This movie|This film|The story)\s+(follows|revolves around|tells the story of|centers on|is about)\s+/i, '')
-      .trim();
 
-    const capitalized = clean.charAt(0).toUpperCase() + clean.slice(1);
-    const sentences = capitalized
-      .split(/(?<=[.!?])\s+/)
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    if (sentences.length > 0) {
-      if (!usableTagline) {
-        parts.push(sentences.slice(0, 2).join(' '));
-      } else if (sentences[0] && !usableTagline.includes(sentences[0])) {
-        parts.push(sentences[0]);
-      }
-    }
+  if (usableTagline && usableTagline.length <= 140) {
+    const question = deriveDebateQuestion(usableTagline + ' ' + (usableSynopsis || ''), isComingSoon);
+    return { hookText: usableTagline, debateQuestion: question };
   }
 
-  return parts.filter(Boolean).join('\n\n');
+  if (!usableSynopsis) {
+    return {
+      hookText: '',
+      debateQuestion: isComingSoon
+        ? 'Are you seated for this one? Drop a 🍿 if this is on your watchlist! 👇'
+        : 'Have you watched this yet? Drop your ratings and honest thoughts below! 👇',
+    };
+  }
+
+  // Clean raw boilerplate
+  const clean = usableSynopsis
+    .replace(new RegExp(`^${escapeRegex(title)}\\s*(\\([^)]*\\))?\\s*(is a [^.]+film that\\s*)?(follows|revolves around|tells the story of|centers on|chronicles)\\s+`, 'i'), '')
+    .replace(/^(This movie|This film|The story|An upcoming production that|A powerful story that)\s+(follows|revolves around|tells the story of|centers on|is about)\s+/i, '')
+    .trim();
+
+  // If already short or teaser-like (e.g. <= 130 chars or already phrased as a question)
+  const isAlreadyShortTeaser = clean.length <= 130 || clean.includes('?') || /^(what|how|can|would|when|why)\b/i.test(clean);
+  if (isAlreadyShortTeaser) {
+    const question = deriveDebateQuestion(clean, isComingSoon);
+    return { hookText: clean.charAt(0).toUpperCase() + clean.slice(1), debateQuestion: question };
+  }
+
+  // Generate punchy 2-sentence teaser without clunky narrative bulk
+  const sentences = clean
+    .split(/(?<=[.!?])\s+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const teaserBody = (sentences.length > 2 ? sentences.slice(0, 2) : sentences).join(' ');
+  const capitalized = teaserBody.charAt(0).toUpperCase() + teaserBody.slice(1);
+  const question = deriveDebateQuestion(clean, isComingSoon);
+
+  return { hookText: capitalized, debateQuestion: question };
+}
+
+function deriveDebateQuestion(text: string, isComingSoon: boolean): string {
+  const lower = text.toLowerCase();
+
+  if (/royal|prince|king|palace|throne|monarch/i.test(lower) && /outcast|love|marry|fianc/i.test(lower)) {
+    return 'If your family gave you an ultimatum between royal inheritance and true love, which one are you picking?';
+  }
+  if (/betray|deceit|lies|backstab|secret/i.test(lower)) {
+    return 'Can trust ever truly be rebuilt once someone you love betrays you?';
+  }
+  if (/revenge|vengeance|payback|retribution/i.test(lower)) {
+    return 'When pushed to the absolute edge, how far is too far for revenge?';
+  }
+  if (/money|greed|wealth|inherit|heir|property/i.test(lower)) {
+    return 'Does money expose who people truly are, or does it change them?';
+  }
+  if (/crime|cop|detective|underworld|gang|cartel/i.test(lower)) {
+    return 'In a world where one wrong move could cost your life, who can you really trust?';
+  }
+  if (/marriage|husband|wife|affair|cheat|infidelity/i.test(lower)) {
+    return 'What is the one thing you could never forgive in a relationship?';
+  }
+  if (/mother|father|family|daughter|son|brother|sister/i.test(lower)) {
+    return 'How far should family loyalty go when someone crosses the line?';
+  }
+
+  return isComingSoon
+    ? 'Are you adding this to your watchlist? Tell us what you think of the premise below! 👇'
+    : 'If you were in their shoes, what would your next move be? Sound off below! 👇';
+}
+
+export function buildMovieHook(tagline: string | null, synopsis: string | null, title: string): string {
+  const { hookText } = buildViralNarrative(tagline, synopsis, title, false);
+  return hookText;
 }
 
 function formatCastList(cast: SnapshotCastMember[], platform: SocialPlatform): string {
@@ -118,10 +169,20 @@ function formatCastList(cast: SnapshotCastMember[], platform: SocialPlatform): s
   return `Starring:\n${handlesOrNames.join('\n')}`;
 }
 
-function formatCrewList(credits: SnapshotCreditedPerson[], platform: SocialPlatform): string {
+function formatCrewList(credits: SnapshotCreditedPerson[], platform: SocialPlatform, maxCrew = 5): string {
   const crew = credits.filter(credit => credit.role !== 'actor');
   if (!crew.length) return '';
-  return `Crew:\n${crew.map(credit => `${credit.role.replace(/_/g, ' ')} — ${(platform === 'instagram' ? credit.instagramHandle : platform === 'tiktok' ? credit.tiktokHandle : null) || credit.name}`).join('\n')}`;
+  const prioritizedRoles = ['director', 'producer', 'writer', 'screenplay', 'cinematographer', 'director_of_photography', 'editor', 'sound', 'composer'];
+  const sortedCrew = [...crew].sort((a, b) => {
+    const aIdx = prioritizedRoles.indexOf(a.role.toLowerCase());
+    const bIdx = prioritizedRoles.indexOf(b.role.toLowerCase());
+    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+    if (aIdx !== -1) return -1;
+    if (bIdx !== -1) return 1;
+    return 0;
+  });
+  const picked = sortedCrew.slice(0, maxCrew);
+  return `Crew:\n${picked.map(credit => `${credit.role.replace(/_/g, ' ')} — ${(platform === 'instagram' ? credit.instagramHandle : platform === 'tiktok' ? credit.tiktokHandle : null) || credit.name}`).join('\n')}`;
 }
 
 function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
@@ -169,37 +230,36 @@ function movieBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlatform): s
   lines.push(
     snapshot.comingSoon
       ? `New Look at ${snapshot.title}${yearSuffix} 🎬`
-      : `${snapshot.title}${yearSuffix}`
+      : `${snapshot.title}${yearSuffix} 🎬`
   );
 
-  // 2. Watch Platform / Release Date line
+  // 2. Watch Platform / Where to Watch line
   if (snapshot.watchAvailability) {
-    lines.push(snapshot.watchAvailability);
+    lines.push(snapshot.watchAvailability.startsWith('Where to Watch') ? snapshot.watchAvailability : `Where to Watch: ${snapshot.watchAvailability}`);
   } else if (snapshot.releaseDate) {
     lines.push(snapshot.comingSoon ? `Coming Soon • ${snapshot.releaseDate} 🍿` : `Released ${snapshot.releaseDate} 🍿`);
   }
 
-  // 3. Punchy narrative teaser / hook (NOT dry textbook synopsis!)
-  const hook = buildMovieHook(snapshot.tagline, snapshot.synopsis, snapshot.title);
-  if (hook) {
-    lines.push(hook);
+  // 3. Punchy narrative teaser / viral hook (NOT dry textbook synopsis!)
+  const { hookText, debateQuestion } = buildViralNarrative(snapshot.tagline, snapshot.synopsis, snapshot.title, Boolean(snapshot.comingSoon));
+  if (hookText) {
+    lines.push(hookText);
   }
 
-  // 4. Starring line-by-line with direct @handles
-  const castBlock = formatCastList(snapshot.topCast, platform);
+  // 4. Starring line-by-line with direct @handles (5-6 cast members)
+  const castBlock = formatCastList(snapshot.topCast.slice(0, 6), platform);
   if (castBlock) {
     lines.push(castBlock);
   }
 
-  const crewBlock = formatCrewList(snapshot.creditedPeople || [], platform);
+  // 5. Crew line-by-line (4-5 main crew)
+  const crewBlock = formatCrewList(snapshot.creditedPeople || [], platform, 5);
   if (crewBlock) {
     lines.push(crewBlock);
   }
 
-  // 5. High-engagement question CTA to spark comments
-  const cta = snapshot.comingSoon
-    ? 'Are you seated for this one? Drop a 🍿 if this is on your watchlist! 👇'
-    : 'Have you watched this yet? Drop your ratings and thoughts below! 👇';
+  // 6. High-engagement question CTA to spark comments
+  const cta = debateQuestion.endsWith('👇') ? debateQuestion : `${debateQuestion} Drop your thoughts below! 👇`;
   lines.push(cta);
 
   return lines;
@@ -216,21 +276,65 @@ function criticsBody(snapshot: UpcomingMovieSnapshot): string[] {
   ];
 }
 
-function theatreBody(snapshot: TheatrePlaySnapshot): string[] {
+function theatreBody(snapshot: TheatrePlaySnapshot, platform: SocialPlatform = 'instagram'): string[] {
   const lines: string[] = [];
-  const location = [snapshot.venue, snapshot.city].filter(Boolean).join(', ');
-  lines.push(`${snapshot.title} is on stage 🎭`);
-  if (location) lines.push(location);
+  const location = [snapshot.venue, snapshot.city].filter(Boolean).join(', ') || 'Venue TBA';
+  
+  // 1. Title Header
+  lines.push(`${snapshot.title} 🎭 (Upcoming Live Stage Production)`);
+
+  // 2. Time & Date & Venue
+  const dateParts: string[] = [];
   if (snapshot.runStartDate || snapshot.runEndDate) {
     const start = snapshot.runStartDate || '';
-    const end = snapshot.runEndDate && snapshot.runEndDate !== snapshot.runStartDate ? ` - ${snapshot.runEndDate}` : '';
-    lines.push(`${start}${end}${snapshot.performanceTime ? ` • ${snapshot.performanceTime}` : ''}`);
-  } else if (snapshot.performanceTime) {
-    lines.push(snapshot.performanceTime);
+    const end = snapshot.runEndDate && snapshot.runEndDate !== snapshot.runStartDate ? ` – ${snapshot.runEndDate}` : '';
+    dateParts.push(`📅 Dates: ${start}${end}`);
   }
-  const synopsis = firstUsableCopy(snapshot.synopsis);
-  if (synopsis) lines.push(synopsis);
-  lines.push('Are you seated for this one? Save it and tell us who you are going with.');
+  if (snapshot.performanceTime) {
+    dateParts.push(`⏰ Time: ${snapshot.performanceTime}`);
+  }
+  dateParts.push(`📍 Venue: ${location}`);
+  lines.push(dateParts.join('\n'));
+
+  // 3. Punchy Viral Stage Hook
+  const { hookText, debateQuestion } = buildViralNarrative(null, snapshot.synopsis, snapshot.title, true);
+  if (hookText) {
+    lines.push(hookText);
+  }
+
+  // 4. Cast (5-6 cast if available)
+  if (snapshot.topCast && snapshot.topCast.length > 0) {
+    const castBlock = formatCastList(snapshot.topCast.slice(0, 6), platform);
+    if (castBlock) lines.push(castBlock);
+  }
+
+  // 5. Crew (Playwright, Director, Producer, or stage crew)
+  const crewLines: string[] = [];
+  if (snapshot.playwright) crewLines.push(`Playwright — ${snapshot.playwright}`);
+  if (snapshot.director) crewLines.push(`Director — ${snapshot.director}`);
+  if (snapshot.producer) crewLines.push(`Producer — ${snapshot.producer}`);
+  if (snapshot.creditedPeople && snapshot.creditedPeople.length > 0) {
+    const otherCrew = snapshot.creditedPeople.filter(c => c.role !== 'actor' && c.name !== snapshot.director && c.name !== snapshot.playwright && c.name !== snapshot.producer);
+    for (const c of otherCrew.slice(0, 3)) {
+      crewLines.push(`${c.role.replace(/_/g, ' ')} — ${(platform === 'instagram' ? c.instagramHandle : platform === 'tiktok' ? c.tiktokHandle : null) || c.name}`);
+    }
+  }
+  if (crewLines.length > 0) {
+    lines.push(`Crew:\n${crewLines.slice(0, 5).join('\n')}`);
+  }
+
+  // 6. Where to purchase tickets
+  const ticketLine = snapshot.ticketUrl
+    ? `🎟️ Where to Purchase Tickets:\nGet tickets here: ${snapshot.ticketUrl}`
+    : '🎟️ Where to Purchase Tickets:\nTickets available via link in bio / visit MuviDB';
+  lines.push(ticketLine);
+
+  // 7. CTA
+  const cta = debateQuestion.includes('seated') || debateQuestion.includes('ticket')
+    ? debateQuestion
+    : `${debateQuestion} Save the date and tell us who you are going with! 👇`;
+  lines.push(cta);
+
   return lines;
 }
 
@@ -287,7 +391,7 @@ export function buildVariantContent(input: {
       : input.snapshot.kind === 'actor_spotlight'
         ? actorBody(input.snapshot)
         : input.snapshot.kind === 'whats_on_stage'
-          ? theatreBody(input.snapshot)
+          ? theatreBody(input.snapshot, input.platform)
           : input.snapshot.kind === 'upcoming_movie' && input.snapshot.criticReview
             ? criticsBody(input.snapshot)
             : movieBody(input.snapshot, input.platform);

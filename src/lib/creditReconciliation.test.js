@@ -59,10 +59,15 @@ describe('credit reconciliation', () => {
     expect(comparison.targetId).toBe('10');
     expect(comparison.isCorrection).toBe(true);
   });
-  it('matches token order permutations (e.g. Lateef Adedimeji -> Adedimeji Lateef)', () => {
-    const existing = [row('20', 'Lateef Adedimeji', 'Lawyer')];
-    const [comparison] = compareScreenshotCredits(existing, [{ name: 'Adedimeji Lateef', role_or_character: 'Lawyer' }], 'actor');
-    expect(comparison.targetId).toBe('20');
+  it('matches candidates by matched_person_id and replaces them correctly', () => {
+    const existing = [row('30', 'Odunlade Adek', 'Doctor', { matched_person_id: 'person-123' })];
+    const [comparison] = compareScreenshotCredits(
+      existing,
+      [{ name: 'Odunlade Adekola', role_or_character: 'Doctor', matched_person_id: 'person-123' }],
+      'actor'
+    );
+    expect(comparison.targetId).toBe('30');
+    expect(comparison.targetCandidate.id).toBe('30');
   });
 });
 

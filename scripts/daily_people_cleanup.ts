@@ -8,8 +8,41 @@ const PROTECTED_NAMES = new Set([
   'sound sultan', 'officer woos', 'mr macaroni', 'debo adedayo', 'adebowale debo adedayo mr macaroni',
   'bimbo ademoye', 'femi adebayo', 'odunlade adekola', 'mercy aigbe', 'toyin abraham',
   'funke akindele', 'yemi elesho', 'yemi elesho booda nuru', 'chinedu ozuruigbo aba marley',
-  'olaide ayodele abraham cross', 'oyebade adebimpe adedimeji ayanfe'
+  'olaide ayodele abraham cross', 'oyebade adebimpe adedimeji ayanfe',
+  'eniola ajao', 'eniola alao', 'eniola alão', 'captain eniola', 'captain eniola alao'
 ]);
+
+// Explicit pairs of distinct individuals that must NEVER be merged
+const DO_NOT_MERGE_PAIRS = new Set([
+  'eniola ajao:eniola alao',
+  'eniola alao:eniola ajao',
+  'eniola ajao:eniola alão',
+  'eniola alão:eniola ajao',
+  'captain eniola:eniola ajao',
+  'eniola ajao:captain eniola',
+  'captain eniola alao:eniola ajao',
+  'eniola ajao:captain eniola alao',
+]);
+
+export function shouldBlockMerge(nameA: string, nameB: string): boolean {
+  const normA = normalize(nameA);
+  const normB = normalize(nameB);
+  if (!normA || !normB) return false;
+  if (DO_NOT_MERGE_PAIRS.has(`${normA}:${normB}`) || DO_NOT_MERGE_PAIRS.has(`${normB}:${normA}`)) {
+    return true;
+  }
+  // Distinct Yoruba surname collision protection (e.g. Alao vs Ajao, Alade vs Akande)
+  const wordsA = normA.split(/\s+/).filter(Boolean);
+  const wordsB = normB.split(/\s+/).filter(Boolean);
+  if (wordsA.length >= 2 && wordsB.length >= 2 && wordsA[0] === wordsB[0]) {
+    const sA = wordsA[wordsA.length - 1];
+    const sB = wordsB[wordsB.length - 1];
+    if ((sA === 'alao' && sB === 'ajao') || (sA === 'ajao' && sB === 'alao')) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // Non-person noise, LLM refusals, headers, role placeholders, and corporate/vendor entities to PURGE
 const GARBAGE_NAME_EXACT = new Set([
@@ -197,6 +230,7 @@ function levenshteinSimilarity(a: string, b: string): number {
 }
 
 function isDuplicateOnSameFilm(nameA: string, nameB: string): boolean {
+  if (shouldBlockMerge(nameA, nameB)) return false;
   const normA = normalize(nameA);
   const normB = normalize(nameB);
   if (!normA || !normB) return false;
@@ -333,6 +367,7 @@ export async function runDailyPeopleCleanup(options: { deep?: boolean } = {}) {
         const canonicalTarget = NOLLYWOOD_ALIASES[rawNorm] || KNOWN_NAME_TYPOS[rawNorm];
 
         if (canonicalTarget) {
+          if (shouldBlockMerge(ap.name, canonicalTarget)) continue;
           const canonical = allPeople
             .filter(p => p.id !== ap.id && p.name.trim().toLowerCase() === canonicalTarget.toLowerCase())
             .sort((a, b) => ((b.photo_url ? 10 : 0) + (b.film_count || 0)) - ((a.photo_url ? 10 : 0) + (a.film_count || 0)))[0];
@@ -381,6 +416,7 @@ export async function runDailyPeopleCleanup(options: { deep?: boolean } = {}) {
           const primary = group[0];
           for (let i = 1; i < group.length; i++) {
             const dupe = group[i];
+            if (shouldBlockMerge(dupe.name, primary.name)) continue;
             log(`👥 Consolidating duplicate profile: "${dupe.name}" (${dupe.film_count || 0} films) -> "${primary.name}" (${primary.film_count || 0} films)`);
             await mergePersonCredits(dupe.id, primary.id);
             processedIds.add(dupe.id);
@@ -623,6 +659,7 @@ export async function runDailyPeopleCleanup(options: { deep?: boolean } = {}) {
         const p1 = peopleMap.get(idA);
         const p2 = peopleMap.get(idB);
         if (!p1 || !p2) continue;
+        if (shouldBlockMerge(p1.name, p2.name)) continue;
 
         const norm1 = normalize(p1.name);
         const norm2 = normalize(p2.name);

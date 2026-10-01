@@ -12,12 +12,22 @@ export async function resolveDestinationConnection(destinationId: string | null,
     await getPlatformPublishingCredentials(platform, data.id);
     return data.id;
   }
-  if (contentType === 'where_to_watch' && platform !== 'instagram') {
+  if ((contentType === 'where_to_watch' || contentType === 'whats_on_stage') && platform !== 'instagram') {
     const { data: main, error } = await supabase.from('content_destinations').select('id').eq('slug', 'main-muvidb').single();
     if (error) throw error;
     destinationId = main.id;
   }
-  if (!destinationId) return (await getPlatformPublishingCredentials(platform)).connection.id;
+  if (!destinationId) {
+    if (platform === 'facebook') {
+      const { data: fbConn } = await supabase.from('social_connections').select('id')
+        .eq('platform', 'facebook').eq('status', 'connected').or('display_name.ilike.%muvidb%,username.ilike.%muvidb%').maybeSingle();
+      if (fbConn) {
+        await getPlatformPublishingCredentials(platform, fbConn.id);
+        return fbConn.id;
+      }
+    }
+    return (await getPlatformPublishingCredentials(platform)).connection.id;
+  }
   const { data, error } = await supabase.from('content_destination_platforms')
     .select('social_connection_id').eq('destination_id', destinationId).eq('platform', platform).eq('enabled', true).maybeSingle();
   if (error) throw error;

@@ -1,92 +1,12 @@
-
 /**
- * Shared YouTube API utilities for muvidb sync tasks.
+ * Unified Title Cleaner & Metadata Parser
+ * Standardizes:
+ * - Multi-part movies: "Title Part X", "Title Part 1 & 2", "Title (Concluding Part)"
+ * - Episodic series: "Series Title (Episode Subtitle) Ep X", "Series Title Ep X", "Series Title S2 Ep 5"
+ * - Standalone titles: Clean Title Case without marketing buzzwords or cast strings
  */
 
-const YT_BASE = 'https://www.googleapis.com/youtube/v3';
-
-// Collect every configured YouTube API key. Supports a comma-separated list in
-// YOUTUBE_API_KEY and numbered fallbacks (YOUTUBE_API_KEY_2 … _10). Each key
-// carries its own daily quota, so rotating across them multiplies the ceiling.
-function collectYtKeys(): string[] {
-  const raw: (string | undefined)[] = [
-    process.env.YOUTUBE_API_KEY,
-    process.env.VITE_YOUTUBE_API_KEY,
-  ];
-  for (let i = 2; i <= 10; i++) raw.push(process.env[`YOUTUBE_API_KEY_${i}`]);
-  return [
-    ...new Set(
-      raw.filter(Boolean).flatMap((k) => k!.split(',')).map((k) => k.trim()).filter(Boolean)
-    ),
-  ];
-}
-
-let ytKeyIdx = 0; // persists across calls so we stay on a working key
-
-// A key is "dead" (rotate to the next one) when it's quota-exhausted (403) OR
-// rejected as invalid (400). Both mean this key can't serve the request, so we
-// should fall through to the next configured key — restoring the old
-// `YOUTUBE_API_KEY || VITE_YOUTUBE_API_KEY` fallback behaviour.
-function isDeadKeyError(status: number, body: string): boolean {
-  if (status === 403 && /quotaExceeded|dailyLimitExceeded|rateLimitExceeded|userRateLimitExceeded/i.test(body)) return true;
-  if (status === 400 && /API key not valid|API_KEY_INVALID|keyInvalid/i.test(body)) return true;
-  return false;
-}
-
-/**
- * Generic YouTube API fetcher with automatic key rotation. Rotates to the next
- * configured key when the current one is quota-exhausted or invalid.
- */
-export async function ytGet(endpoint: string, params: Record<string, string>): Promise<any> {
-  const keys = collectYtKeys();
-  if (!keys.length) throw new Error('No YouTube API key configured (YOUTUBE_API_KEY)');
-
-  let lastDetail = '';
-  // Try each key at most once per call, starting from the current one.
-  for (let attempt = 0; attempt < keys.length; attempt++) {
-    const key = keys[ytKeyIdx % keys.length];
-    const url = new URL(`${YT_BASE}/${endpoint}`);
-    Object.entries({ ...params, key }).forEach(([k, v]) => url.searchParams.set(k, v));
-
-    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(30000) });
-    if (res.ok) return res.json();
-
-    const body = await res.text();
-    let detail = body;
-    try { detail = JSON.parse(body).error?.message || body; } catch (e) {}
-
-    if (isDeadKeyError(res.status, body) && keys.length > 1) {
-      console.warn(`[ytGet] key #${(ytKeyIdx % keys.length) + 1}/${keys.length} unusable (${res.status}), rotating…`);
-      ytKeyIdx = (ytKeyIdx + 1) % keys.length;
-      lastDetail = detail;
-      continue; // retry with the next key
-    }
-    // Genuine request error (404/bad params/etc.) — fail fast, rotating won't help.
-    throw new Error(`YouTube /${endpoint} ${res.status}: ${detail}`);
-  }
-  throw new Error(`All ${keys.length} YouTube API key(s) exhausted or invalid. Last error: ${lastDetail}`);
-}
-
-/**
- * Parses ISO 8601 duration (e.g. PT1H2M10S) to seconds
- */
-export function parseDuration(iso: string): number {
-  const h = parseInt(iso.match(/(\d+)H/)?.[1] ?? '0');
-  const m = parseInt(iso.match(/(\d+)M/)?.[1] ?? '0');
-  const s = parseInt(iso.match(/(\d+)S/)?.[1] ?? '0');
-  return h * 3600 + m * 60 + s;
-}
-
-export interface ParsedTitleMetadata {
-  title: string;
-  content_type: 'movie' | 'series';
-  episode_number: number | null;
-  season_number: number | null;
-  is_part: boolean;
-  part_number: number | null;
-}
-
-function toTitleCaseWord(w: string, i: number, allWords: string[]): string {
+function toTitleCaseWord(w, i, allWords) {
   const upper = w.toUpperCase();
   const minorWords = ['A', 'AN', 'THE', 'AND', 'BUT', 'OR', 'FOR', 'NOR', 'ON', 'AT', 'TO', 'BY', 'OF', 'IN', 'WITH', 'FROM', 'AS'];
   const preservedAcronyms = ['EP', 'EPS', 'EPISODE', 'SEASON', 'PART', 'PT', 'VOL', 'VOLUME', 'HD', 'UK', 'USA', 'NG', 'TV', 'VIP', 'FBI', 'BBC'];
@@ -103,17 +23,13 @@ function toTitleCaseWord(w: string, i: number, allWords: string[]): string {
   return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 }
 
-export function formatTitleCase(str: string): string {
+export function formatTitleCase(str) {
   if (!str) return '';
   const words = str.trim().split(/\s+/);
   return words.map((w, i) => toTitleCaseWord(w, i, words)).join(' ');
 }
 
-/**
- * Parses raw title and extracts clean title, series/movie content_type,
- * episode_number, season_number, and part metadata.
- */
-export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
+export function parseTitleMetadata(raw) {
   if (!raw) {
     return {
       title: '',
@@ -132,9 +48,9 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
     .replace(/\s+/g, ' ');
 
   // 1. Season info (e.g., SEASON 1, S2, S02E05)
-  let seasonNumber: number | null = null;
+  let seasonNumber = null;
   const sPatternMatch = str.match(/\bS(\d{1,2})E(\d{1,3})\b/i);
-  let sPatternEp: number | null = null;
+  let sPatternEp = null;
   if (sPatternMatch) {
     seasonNumber = parseInt(sPatternMatch[1], 10);
     sPatternEp = parseInt(sPatternMatch[2], 10);
@@ -146,7 +62,7 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
   }
 
   // 2. Episode info (EP 1, EPISODE 267, etc.)
-  let episodeNumber: number | null = sPatternEp;
+  let episodeNumber = sPatternEp;
   if (episodeNumber == null) {
     const epMatch = str.match(/\b(?:EPISODE|EPS|EP\.|EP|E)\s*(\d+)\b/i);
     if (epMatch) {
@@ -156,8 +72,8 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
 
   // 3. Part info (Movies with parts: PART 1, PT 2, PART 1 & 2, CONCLUDING PART)
   let isPart = false;
-  let partStr: string | null = null;
-  let partNumber: number | null = null;
+  let partStr = null;
+  let partNumber = null;
 
   const comboPartMatch = str.match(/\b(?:PART|PT\.?)\s*(\d+)\s*(?:&|AND|\+)\s*(?:PART|PT\.?)?\s*(\d+)\b/i);
   if (comboPartMatch) {
@@ -179,7 +95,7 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
   }
 
   // 4. Episode Subtitle in parentheses e.g. "SAAMU ALAJO (ALAGBADO) Latest 2026 EP 267"
-  let episodeSubtitle: string | null = null;
+  let episodeSubtitle = null;
   const parenMatch = str.match(/\(([^)]+)\)/);
   if (parenMatch) {
     const inner = parenMatch[1].trim();
@@ -263,6 +179,7 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
   }
 
   return {
+    raw,
     title: finalTitle || formatTitleCase(str),
     content_type: contentType,
     season_number: isSeries ? (seasonNumber || 1) : null,
@@ -272,11 +189,7 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
   };
 }
 
-/**
- * Advanced title cleaning for YouTube video titles
- * Standardizes multi-part movies ("Title Part X") and episodic series ("Series (Subtitle) Ep X").
- */
-export function cleanTitle(raw: string): string {
+export function cleanTitle(raw) {
   if (!raw) return raw;
   const parsed = parseTitleMetadata(raw);
   return parsed.title;

@@ -11,9 +11,14 @@ export async function runCastExtraction(options: { limit?: number } = {}) {
   const selectorLimit = Math.ceil(totalLimit / 3);
   
   // Find films whose titles likely contain embedded cast names
+  // Strictly skip locked titles and series episodes so episode subtitles are never collapsed
   const { data: starringFilms } = await supabase
     .from('films')
     .select('id, title')
+    .eq('title_locked', false)
+    .neq('content_type', 'series')
+    .is('series_id', null)
+    .is('episode_number', null)
     .or('title.ilike.%starring%,title.ilike.%feat%,title.ilike.%ft.%,title.ilike.%ft %')
     .order('created_at', { ascending: false })
     .limit(selectorLimit);
@@ -21,6 +26,10 @@ export async function runCastExtraction(options: { limit?: number } = {}) {
   const { data: pipeFilms } = await supabase
     .from('films')
     .select('id, title')
+    .eq('title_locked', false)
+    .neq('content_type', 'series')
+    .is('series_id', null)
+    .is('episode_number', null)
     .ilike('title', '%|%')
     .order('created_at', { ascending: false })
     .limit(selectorLimit);
@@ -33,6 +42,10 @@ export async function runCastExtraction(options: { limit?: number } = {}) {
   const { data: bracketFilms } = await supabase
     .from('films')
     .select('id, title')
+    .eq('title_locked', false)
+    .neq('content_type', 'series')
+    .is('series_id', null)
+    .is('episode_number', null)
     .like('title', '%(%')
     .like('title', '%,%')
     .order('created_at', { ascending: false })
@@ -209,6 +222,7 @@ export async function runTitleCleanup(options: { limit?: number } = {}) {
     .select('id, title')
     .eq('title_locked', false)
     .neq('content_type', 'series')
+    .is('series_id', null)
     .is('episode_number', null)
     .or('title.ilike.%|%,title.ilike.%YORUBA%,title.ilike.%MOVIE%,title.ilike.%PART%,title.ilike.%2024%,title.ilike.%2025%,title.ilike.%FULL%,title.ilike.%NIGERIAN%,title.ilike.%(%,title.ilike.%[%,title.ilike.%-%,title.ilike.%LATEST%')
     .order('created_at', { ascending: false })
@@ -222,16 +236,18 @@ export async function runTitleCleanup(options: { limit?: number } = {}) {
 
   const buildTitlePrompt = (films: { id: string; title: string }[]) => `
     You are a Nollywood database editor. 
-    Clean up these movie titles by removing common YouTube marketing noise, years, and category labels.
+    Clean up these movie titles according to strict standard conventions:
     
     Rules:
-    1. EXTRACT ONLY the actual movie title. 
-    2. DISCARD all marketing buzzwords: "LATEST", "YORUBA MOVIE", "NIGERIAN MOVIE", "2024", "2025", "FULL MOVIE", "HD", "APA", "PART 1", etc.
-    3. DISCARD all actor/cast lists separated by |, /, or hyphens.
-    4. Proper Case: Convert ALL CAPS to Proper Case.
-    5. If the title contains a pipe (|), remove the pipe and everything after it.
+    1. MULTI-PART MOVIES: Standardize to "Title Part X" (e.g., "Koleoso Part 1", "Koleoso Part 2", "Sound of Ikoro Part 1 & 2", "Movie (Concluding Part)"). NEVER discard "Part 1", "Part 2", "Part 1 & 2", or "Concluding Part"!
+    2. SERIES EPISODES: Standardize to "Series Title (Episode Subtitle) Ep X" (e.g., "Saamu Alajo (Alagbado) Ep 267"). If no episode subtitle, format as "Series Title Ep X".
+    3. STANDALONE MOVIES: Extract the actual movie title in Title Case.
+    4. DISCARD MARKETING BUZZWORDS: Remove marketing buzzwords: "LATEST", "YORUBA MOVIE", "NIGERIAN MOVIE", "2024", "2025", "2026", "FULL MOVIE", "HD", "APA", etc. (Do NOT remove "Part 1", "Part 2", or "Ep X").
+    5. DISCARD ACTORS / CHANNELS: Discard actor/cast lists separated by |, /, or hyphens.
+    6. CRITICAL: If the title contains a pipe (|), remove the pipe and everything after it.
+    7. Convert ALL CAPS to Proper Title Case.
     
-    Return ONLY JSON: [{"id": "...", "old_title": "...", "new_title": "..."}]
+    Return ONLY JSON: [{"id": "...", "old_title": "...", "new_title": "...", "content_type": "movie"|"series", "episode_number": number|null, "season_number": number|null}]
     
     Titles to clean: ${JSON.stringify(films)}
   `;
@@ -251,9 +267,13 @@ export async function runTitleCleanup(options: { limit?: number } = {}) {
         && f.old_title.trim() !== f.new_title.trim()
       );
       const updateResults = await Promise.all(
-        batchChanges.map((item: any) =>
-          supabase.from('films').update({ title: item.new_title.trim() }).eq('id', item.id).eq('title_locked', false)
-        )
+        batchChanges.map((item: any) => {
+          const payload: any = { title: item.new_title.trim() };
+          if (item.content_type) payload.content_type = item.content_type;
+          if (item.episode_number !== undefined && item.episode_number !== null) payload.episode_number = item.episode_number;
+          if (item.season_number !== undefined && item.season_number !== null) payload.season_number = item.season_number;
+          return supabase.from('films').update(payload).eq('id', item.id).eq('title_locked', false);
+        })
       );
       titlesApplied += updateResults.filter((res: any) => !res.error).length;
       titleChanges.push(...batchChanges);

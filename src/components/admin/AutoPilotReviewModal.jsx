@@ -388,6 +388,10 @@ export default function AutoPilotReviewModal({
       toast.error('Please select at least one publishing channel.');
       return;
     }
+    if (customImageUrl && (customImageUrl.includes('youtube.com') || customImageUrl.includes('youtu.be')) && !customImageUrl.endsWith('.mp4')) {
+      toast.error('Cannot schedule unrendered YouTube embed. Open "YouTube / Clip Studio" and click "Start Clipping (Render MP4)" to render the video first.');
+      return;
+    }
 
     setApproving(true);
     try {
@@ -700,13 +704,21 @@ export default function AutoPilotReviewModal({
               onOpenVideoStudio={() => setVideoStudioOpen(true)}
             >
               {customImageUrl ? (
-                customImageUrl.endsWith('.mp4') ? (
+                /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(customImageUrl) ? (
                   <video
                     src={customImageUrl}
                     controls
                     muted
                     playsInline
                     className="h-full w-full object-contain"
+                  />
+                ) : (customImageUrl.includes('youtube.com/embed') || customImageUrl.includes('youtu.be')) ? (
+                  <iframe
+                    src={customImageUrl}
+                    title="YouTube Embed Preview"
+                    className="h-full w-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
                   />
                 ) : (
                   <img
@@ -727,11 +739,28 @@ export default function AutoPilotReviewModal({
                 </div>
               )}
             </SocialCanvasViewport>
-            {customImageUrl && (
-              <p className="text-center text-[11px] text-emerald-400">
-                MuviDB will publish this media asset exactly as framed.
+            {customImageUrl && (customImageUrl.includes('youtube.com') || customImageUrl.includes('youtu.be')) && !customImageUrl.endsWith('.mp4') ? (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 space-y-2">
+                <div className="flex items-start gap-2">
+                  <Icon icon="solar:danger-triangle-bold" width="18" className="shrink-0 text-amber-400 mt-0.5" />
+                  <p className="leading-relaxed">
+                    <strong>⚠️ YouTube Preview Embed Only:</strong> This video clip has not been sliced into a real MP4 file yet. Social platforms require an MP4 video file to publish Reels or TikToks.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVideoStudioOpen(true)}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-brand to-amber-500 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-md hover:opacity-90 transition-all"
+                >
+                  <Icon icon="solar:clapperboard-edit-bold" width="16" />
+                  <span>🚀 Open Clip Studio & Click &ldquo;Start Clipping (Render MP4)&rdquo;</span>
+                </button>
+              </div>
+            ) : customImageUrl ? (
+              <p className="text-center text-[11px] text-emerald-400 font-semibold">
+                ✓ MuviDB will publish this verified media asset ({customImageUrl.endsWith('.mp4') ? 'Rendered MP4' : 'Poster Artwork'}).
               </p>
-            )}
+            ) : null}
           </div>
 
           {/* Right: AI Editorial Copywriting & Schedule Controls */}
@@ -1028,10 +1057,15 @@ export default function AutoPilotReviewModal({
         initialTitle={candidate?.name || ''}
         onImportToCanvas={(videoData) => {
           setCustomImageUrl(videoData.url);
-          toast.success(`${videoData.mode === 'clip' ? 'Trimmed clip' : 'Whole video'} imported into review canvas!`);
+          if (videoData.mode === 'clip') {
+            toast('👁️ Preview embed loaded. Note: Click "Start Clipping (Render MP4)" to export real video for social posting.', { icon: 'ℹ️', duration: 6000 });
+          } else {
+            toast.success('Whole video preview loaded!');
+          }
         }}
         onAttachRenderedVideo={(clipAsset) => {
           setCustomImageUrl(clipAsset.public_url || clipAsset.url);
+          toast.success('🎉 Rendered MP4 video clip attached! Ready for publishing.');
         }}
       />
     </div>

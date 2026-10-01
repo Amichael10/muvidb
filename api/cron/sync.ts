@@ -138,7 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'classify_film_kinds': result = await classifyFilmKinds({ limit: 100 }); break;
       case 'purge_stale_buffer': result = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 }); break;
       case 'theatre_status_sweep': result = await sweepAndUpdatePlayStatuses(); break;
-      case 'youtube_watch':        result = await runYouTubeUploadWatch(); break;
+      case 'youtube_watch':        return res.status(200).json({ task: 'youtube_watch', status: 'retired', message: 'Replaced by real-time WebSub webhook.' });
       case 'views':                result = await refreshYouTubeViewCounts({ maxBatches: 5 }); break;
       case 'comments': {
         const { runCommentMining } = await import('../_lib/comment_reviews.js');

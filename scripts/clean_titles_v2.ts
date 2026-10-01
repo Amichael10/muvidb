@@ -417,7 +417,8 @@ async function main() {
         let { error: updateErr } = await supabase
           .from('films')
           .update({ title: t, slug: newSlug })
-          .eq('id', film.id);
+          .eq('id', film.id)
+          .eq('title_locked', false);
 
         if (updateErr?.message?.includes('films_slug_key')) {
           slugCollisions++;
@@ -425,7 +426,8 @@ async function main() {
           const { error: retryErr } = await supabase
             .from('films')
             .update({ title: t, slug: newSlug })
-            .eq('id', film.id);
+            .eq('id', film.id)
+            .eq('title_locked', false);
           if (!retryErr) updateErr = null;
         }
 
@@ -476,7 +478,13 @@ async function main() {
     for (let i = 0; i < idArray.length; i += PAGE_SIZE) {
       const chunk = idArray.slice(i, i + PAGE_SIZE);
       const { data: films, error } = await supabase
-        .from('films').select('id, title, slug').in('id', chunk);
+        .from('films')
+        .select('id, title, slug')
+        .eq('title_locked', false)
+        .neq('content_type', 'series')
+        .is('series_id', null)
+        .is('episode_number', null)
+        .in('id', chunk);
       if (error) { console.error('Fetch error (pass 1):', error.message); continue; }
       if (films?.length) await processBatch(films);
     }
@@ -490,6 +498,10 @@ async function main() {
     let query = supabase
       .from('films')
       .select('id, title, slug')
+      .eq('title_locked', false)
+      .neq('content_type', 'series')
+      .is('series_id', null)
+      .is('episode_number', null)
       .eq('source', 'youtube')
       .range(filmPage * PAGE_SIZE, (filmPage + 1) * PAGE_SIZE - 1)
       .order('created_at', { ascending: true });
@@ -515,6 +527,10 @@ async function main() {
     const { data: films, error } = await supabase
       .from('films')
       .select('id, title, slug')
+      .eq('title_locked', false)
+      .neq('content_type', 'series')
+      .is('series_id', null)
+      .is('episode_number', null)
       .or('source.neq.youtube,source.is.null')
       .range(filmPage * PAGE_SIZE, (filmPage + 1) * PAGE_SIZE - 1)
       .order('created_at', { ascending: true });

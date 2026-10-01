@@ -257,7 +257,7 @@ export async function runShowtimesSync() {
 /**
  * Syncs latest videos from YouTube channels and auto-promotes long videos to films
  */
-export async function runVideosSync(options: { channelId?: string; force?: boolean; maxPages?: number } = {}) {
+export async function runVideosSync(options: { channelId?: string; force?: boolean; maxPages?: number; onlyNewChannels?: boolean } = {}) {
   // Only fetch channels that (a) are enabled for sync and (b) haven't been
   // fetched in the last 3.5 hours. Admins can pause a channel via the
   // sync_enabled toggle to keep the daily sync from pulling its videos.
@@ -275,6 +275,8 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
       .eq('sync_enabled', true);
     if (options.channelId) {
       query = query.eq('id', options.channelId);
+    } else if (options.onlyNewChannels) {
+      query = query.is('videos_last_fetched_at', null);
     } else if (!options.force) {
       query = query.or('videos_last_fetched_at.is.null,videos_last_fetched_at.lt.' + staleCutoff);
     }
@@ -286,9 +288,14 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
     if (data.length < PAGE) break;
   }
 
-  if (channels.length === 0) return { message: 'No channels need syncing right now' };
+  if (channels.length === 0) {
+    const msg = options.onlyNewChannels
+      ? 'No new channels to backfill. Monitored channels receive real-time webhook updates.'
+      : 'No channels need syncing right now';
+    return { message: msg, processed: 0 };
+  }
 
-  console.log(`[runVideosSync] Starting sync for ${channels.length} channels`);
+  console.log(`[runVideosSync] Starting sync for ${channels.length} channels (onlyNewChannels=${Boolean(options.onlyNewChannels)})`);
   let totalUpserted = 0;
   let channelsProcessed = 0;
   let filmsCreated = 0;
@@ -433,19 +440,6 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
       const shortInBatch = videoRows.filter((row: any) => !isFilmLengthDuration(row.duration_seconds));
       shortSkipped += shortInBatch.length;
       const filmLengthRows = videoRows.filter((row: any) => isFilmLengthDuration(row.duration_seconds));
-
-      // Telegram alert for brand-new film-length uploads (before auto-import).
-      const brandNewUploads = filmLengthRows.filter((row: any) => !storedByVideo.has(row.video_id));
-      if (brandNewUploads.length > 0) {
-        try {
-          const alertRes = await notifyYouTubeUploads(ch, brandNewUploads);
-          if (alertRes.notified > 0) {
-            console.log(`[runVideosSync] Telegram alerted ${alertRes.notified} new upload(s) for ${ch.name}`);
-          }
-        } catch (e: any) {
-          console.warn(`[runVideosSync] youtube upload notify failed for ${ch.name}:`, e?.message || e);
-        }
-      }
 
       if (filmLengthRows.length > 0) {
         // Strip the _description helper — it's not a channel_videos column and
@@ -657,6 +651,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                         original_title: titlePolicy.originalTitle,
                         year: vidYear,
                         release_date: vidDate,
+                        created_at: v.published_at ? new Date(v.published_at).toISOString() : new Date().toISOString(),
                         release_type: 'youtube',
                         source: 'youtube',
                         content_type: 'series',
@@ -688,6 +683,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                     original_title: titlePolicy.originalTitle,
                     year: vidYear,
                     release_date: vidDate,
+                    created_at: v.published_at ? new Date(v.published_at).toISOString() : new Date().toISOString(),
                     release_type: 'youtube',
                     source: 'youtube',
                     source_video_id: v.video_id,
@@ -736,6 +732,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                       original_title: titlePolicy.originalTitle,
                       year: vidYear,
                       release_date: vidDate,
+                      created_at: v.published_at ? new Date(v.published_at).toISOString() : new Date().toISOString(),
                       release_type: 'youtube',
                       source: 'youtube',
                       source_video_id: v.video_id,

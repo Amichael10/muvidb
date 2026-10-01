@@ -4,19 +4,15 @@ on:
   schedule:
     # Renew expiring WebSub leases once daily, away from the top of the hour.
     - cron: '17 4 * * *'
-    # Safety reconciliation catches any push notification Google could not deliver.
-    - cron: '37 */6 * * *'
   workflow_dispatch:
     inputs:
       task:
         description: Maintenance task to run
         required: true
-        default: all
+        default: renew
         type: choice
         options:
-          - all
           - renew
-          - reconcile
 
 concurrency:
   group: youtube-upload-notification-maintenance
@@ -43,7 +39,6 @@ jobs:
           fi
 
       - name: Renew WebSub subscriptions
-        if: github.event.schedule == '17 4 * * *' || github.event.inputs.task == 'all' || github.event.inputs.task == 'renew'
         shell: bash
         run: |
           response="$(curl --silent --show-error --fail-with-body \
@@ -60,18 +55,4 @@ jobs:
             else
               echo "::warning::$failed out of $total YouTube WebSub subscription request(s) failed."
             fi
-          fi
-
-      - name: Reconcile recent uploads
-        if: github.event.schedule == '37 */6 * * *' || github.event.inputs.task == 'all' || github.event.inputs.task == 'reconcile'
-        shell: bash
-        run: |
-          response="$(curl --silent --show-error --fail-with-body \
-            --retry 2 --retry-delay 2 --retry-all-errors --max-time 240 \
-            -H "x-cron-secret: $CRON_SECRET" \
-            "$BASE_URL/api/cron/sync?task=youtube_watch")"
-          echo "$response" | jq .
-          if [ "$(echo "$response" | jq -r '.ok // true')" != "true" ]; then
-            echo "::error::YouTube reconciliation reported a failure."
-            exit 1
           fi

@@ -387,7 +387,7 @@ export default function SocialVideoClipModal({
         formattedEnd: formatSecondsToTimecode(endTime),
         title: `${videoTitle || 'Clip'} (${formatSecondsToTimecode(startTime)} - ${formatSecondsToTimecode(endTime)})`,
       });
-      toast.success(`Trimmed loop preview sent to canvas!`);
+      toast('👁️ Trimmed preview loop sent to canvas. Note: Click "Start Clipping (Render MP4)" to export real video for social posting.', { icon: 'ℹ️', duration: 5000 });
       onClose();
     }
   };
@@ -968,11 +968,11 @@ export default function SocialVideoClipModal({
                     type="button"
                     onClick={() => handleApplyPreviewToCanvas('clip')}
                     disabled={!videoUrl || clipDuration <= 0}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/40 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white hover:bg-white/10 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-black/40 px-3.5 py-2 text-xs font-bold text-white/80 hover:bg-white/10 hover:text-white disabled:opacity-50"
                     title="Embeds iframe preview loop into composer without downloading or rendering MP4"
                   >
                     <Icon icon="solar:eye-bold" width="14" />
-                    <span>Preview in Canvas</span>
+                    <span>👁️ Preview Embed Only</span>
                   </button>
 
                   {/* Primary Cut, Crop & Attach MP4 Video Button */}
@@ -980,11 +980,11 @@ export default function SocialVideoClipModal({
                     type="button"
                     onClick={handleRenderAndAttachClip}
                     disabled={!videoUrl || clipDuration <= 0 || isRendering}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-amber-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 disabled:opacity-50 shadow-lg"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand via-amber-500 to-emerald-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-95 disabled:opacity-50 shadow-lg shadow-brand/20 active:scale-95 transition-all"
                     title="Downloads source, cuts with local FFmpeg, crops to ratio, uploads to storage, and attaches real MP4 to draft"
                   >
                     <Icon icon="solar:clapperboard-edit-bold" width="16" />
-                    <span>🎬 Cut, Crop & Attach MP4 Video</span>
+                    <span>🚀 Start Clipping (Render MP4)</span>
                   </button>
                 </div>
               </div>
@@ -1106,19 +1106,19 @@ export default function SocialVideoClipModal({
                   <button
                     type="button"
                     onClick={() => handleApplyPreviewToCanvas('whole')}
-                    className="rounded-xl border border-white/20 bg-black/40 px-4 py-2.5 text-xs font-black uppercase text-white hover:bg-white/10"
+                    className="rounded-xl border border-white/20 bg-black/40 px-4 py-2.5 text-xs font-bold text-white/80 hover:bg-white/10 hover:text-white"
                     title="Embeds whole video iframe preview into composer without downloading or rendering MP4"
                   >
-                    Preview in Canvas
+                    👁️ Preview Embed Only
                   </button>
                   <button
                     type="button"
                     onClick={handleRenderAndAttachClip}
                     disabled={!videoUrl || isRendering}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand to-amber-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 shadow-lg"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand via-amber-500 to-emerald-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-95 shadow-lg shadow-brand/20 active:scale-95 transition-all"
                   >
                     <Icon icon="solar:clapperboard-edit-bold" width="16" />
-                    <span>🎬 Render & Attach Full Video</span>
+                    <span>🚀 Render & Attach Full MP4 Video</span>
                   </button>
                 </div>
               </div>

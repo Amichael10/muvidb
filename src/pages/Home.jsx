@@ -339,7 +339,7 @@ export default function Home() {
   };
 
   const fetchNewReleases = async () => {
-    // New Releases = newly added movies of year 2026, newest first.
+    // New Releases = newly added movies of year 2026, newest by release date first.
     const { data, error } = await supabase
       .from('films')
       .select(`
@@ -352,6 +352,7 @@ export default function Home() {
       .eq('content_type', 'movie')
       .eq('year', 2026)
       .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+      .order('release_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -392,7 +393,9 @@ export default function Home() {
     const orderedQueue = [...(queued || [])].sort((a, b) => {
       if (a.platform !== b.platform) return a.platform.localeCompare(b.platform);
       if (a.display_order !== b.display_order) return a.display_order - b.display_order;
-      return new Date(b.film?.created_at || b.queue_created_at) - new Date(a.film?.created_at || a.queue_created_at);
+      const dateA = new Date(a.film?.release_date || a.film?.created_at || a.queue_created_at).getTime();
+      const dateB = new Date(b.film?.release_date || b.film?.created_at || b.queue_created_at).getTime();
+      return dateB - dateA;
     });
 
     orderedQueue.forEach(row => {
@@ -408,6 +411,7 @@ export default function Home() {
         .select(cols)
         .or(platformFilter(id))
         .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+        .order('release_date', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(10);
       map[id] = (data || []).map(withGenres).slice(0, 10);

@@ -49,6 +49,8 @@ export default function CriticReviewsSection({ filmId, playId, user, filmSlug = 
     }
   };
 
+  const [filter, setFilter] = useState('all');
+
   if (loading) {
     return null;
   }
@@ -57,8 +59,6 @@ export default function CriticReviewsSection({ filmId, playId, user, filmSlug = 
   if (reviews.length === 0 && !isAdmin) {
     return null;
   }
-
-  const [filter, setFilter] = useState('all');
 
   const filteredReviews = reviews.filter((rev) => {
     if (filter === 'featured') return rev.is_featured;

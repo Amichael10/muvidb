@@ -358,6 +358,13 @@ export async function publishContentItemNow(input: { contentItemId: string }, ac
     throw httpError(409, `Content item is already ${item.status}`);
   }
 
+  // Reconcile with latest database source first before publishing
+  try {
+    await syncContentItemWithSource(input.contentItemId);
+  } catch (syncErr: any) {
+    console.warn(`[publishContentItemNow] Sync before publish warning for ${input.contentItemId}:`, syncErr?.message);
+  }
+
   // 1. If scheduled, cancel the existing schedule first so unstarted jobs are cancelled and item is approved
   if (item.status === 'scheduled') {
     await cancelContentSchedule({ contentItemId: input.contentItemId }, actor);
@@ -692,7 +699,7 @@ async function processJob(job: any, lockedBy: string, now: Date) {
 
   const { data: contentItem, error: contentError } = await supabase
     .from('social_content_items')
-    .select('id,status,source_snapshot,destination_id,content_type')
+    .select('id,status,source_snapshot,destination_id,content_type,source_entity_type,source_entity_id')
     .eq('id', variant.content_item_id)
     .single();
   if (contentError) throw contentError;
@@ -714,6 +721,31 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       .eq('id', job.id)
       .eq('status', 'processing');
     return { jobId: job.id, status: 'skipped', reason: 'schedule_no_longer_active' };
+  }
+
+  // ── Source Reconciliation Check Before Publishing ──
+  // If the movie or play details (synopsis, poster image, cast/crew, streaming links, etc.)
+  // have been modified in the database while waiting in the queue, sync and recognize it now.
+  try {
+    const syncResult = await syncContentItemWithSource(contentItem.id);
+    if (syncResult.updated) {
+      console.log(`[processJob] Reconciled queue item ${contentItem.id} with source changes:`, syncResult.changes);
+      const { data: reloadedVariant } = await supabase
+        .from('social_platform_variants')
+        .select('*')
+        .eq('id', job.platform_variant_id)
+        .single();
+      if (reloadedVariant) Object.assign(variant, reloadedVariant);
+
+      const { data: reloadedItem } = await supabase
+        .from('social_content_items')
+        .select('id,status,source_snapshot,destination_id,content_type,source_entity_type,source_entity_id')
+        .eq('id', contentItem.id)
+        .single();
+      if (reloadedItem) Object.assign(contentItem, reloadedItem);
+    }
+  } catch (syncErr: any) {
+    console.warn(`[processJob] Source reconciliation warning for ${contentItem.id}:`, syncErr?.message);
   }
 
   let assetUrl: string | null = null;
@@ -1198,14 +1230,20 @@ function watchlistPickFrom(snapshot: Awaited<ReturnType<typeof loadUpcomingMovie
 async function loadPlaySource(playId: string, capturedAt: string) {
   const { data: play, error } = await supabase
     .from('plays')
-    .select('id,title,slug,poster_url,backdrop_url,year,venue,city,country,run_start_date,run_end_date,performance_time,synopsis,playwright,director,status')
+    .select('id,title,slug,poster_url,year,venue,city,country,run_start_date,run_end_date,performance_time,synopsis,playwright,director,producer,source_url,status')
     .eq('id', playId)
     .maybeSingle();
 
   if (error) throw error;
   if (!play) throw httpError(404, 'Theatre play not found');
 
-  return buildTheatrePlaySnapshot({ play, capturedAt });
+  const { data: credits } = await supabase
+    .from('stage_credits')
+    .select('id,role,character_name,billing_order,person:people(id,name,slug,photo_url,instagram_url,tiktok_url)')
+    .eq('play_id', playId)
+    .order('billing_order', { ascending: true, nullsFirst: false });
+
+  return buildTheatrePlaySnapshot({ play, credits: credits || [], capturedAt });
 }
 
 function getAssetBucket(): string {
@@ -1246,6 +1284,299 @@ async function storePosterAsset(contentItemId: string, poster: Awaited<ReturnTyp
   }, { onConflict: 'content_item_id,format' }).select('id').single();
   if (error) throw error;
   return { rows: [{ id: data.id, format: 'portrait_4_5', publicUrl: url.publicUrl, width: poster.width, height: poster.height }] };
+}
+
+function normSync(val: unknown): string {
+  return typeof val === 'string' ? val.trim() : '';
+}
+
+/**
+ * Reconcile a queued or scheduled social post with live database changes in the source movie/play.
+ * Automatically recognizes edits to synopsis, poster URL/image, cast, crew, title, watch links, etc.
+ */
+export async function syncContentItemWithSource(
+  contentItemId: string,
+  options: { force?: boolean } = {}
+): Promise<{
+  updated: boolean;
+  changes: string[];
+  contentItem?: any;
+}> {
+  const { data: item, error: itemError } = await supabase
+    .from('social_content_items')
+    .select('id,status,content_type,source_entity_type,source_entity_id,source_snapshot,title,destination_id')
+    .eq('id', contentItemId)
+    .maybeSingle();
+
+  if (itemError) throw itemError;
+  if (!item || !item.source_entity_id) {
+    return { updated: false, changes: [] };
+  }
+
+  // Already published posts are locked historical records unless forced
+  if (item.status === 'published' && !options.force) {
+    return { updated: false, changes: [] };
+  }
+
+  const oldSnapshot = (item.source_snapshot || {}) as Record<string, any>;
+  const capturedAt = new Date().toISOString();
+  let freshSnapshot: any = null;
+
+  try {
+    if (
+      item.source_entity_type === 'film' ||
+      ['where_to_watch', 'upcoming_movie', 'critics_say'].includes(item.content_type)
+    ) {
+      freshSnapshot = await loadUpcomingMovieSource(item.source_entity_id, capturedAt);
+      if (oldSnapshot.criticReview && !freshSnapshot.criticReview) {
+        freshSnapshot.criticReview = oldSnapshot.criticReview;
+      }
+    } else if (
+      item.source_entity_type === 'play' ||
+      item.content_type === 'whats_on_stage'
+    ) {
+      freshSnapshot = await loadPlaySource(item.source_entity_id, capturedAt);
+    } else if (
+      item.source_entity_type === 'person' ||
+      ['actor_spotlight', 'birthday_spotlight'].includes(item.content_type)
+    ) {
+      freshSnapshot = await loadPersonSource(item.source_entity_id, capturedAt, item.content_type);
+    }
+  } catch (err: any) {
+    console.warn(`[syncContentItemWithSource] Could not load fresh source for ${contentItemId}:`, err?.message);
+    return { updated: false, changes: [] };
+  }
+
+  if (!freshSnapshot) {
+    return { updated: false, changes: [] };
+  }
+
+  const changes: string[] = [];
+
+  // 1. Synopsis check
+  if (normSync(freshSnapshot.synopsis) !== normSync(oldSnapshot.synopsis)) {
+    changes.push('synopsis');
+  }
+
+  // 2. Poster check
+  if (normSync(freshSnapshot.posterUrl) !== normSync(oldSnapshot.posterUrl)) {
+    changes.push('poster');
+  }
+
+  // 3. Backdrop check
+  if (normSync(freshSnapshot.backdropUrl) !== normSync(oldSnapshot.backdropUrl)) {
+    changes.push('backdrop');
+  }
+
+  // 4. Title check
+  if (normSync(freshSnapshot.title) !== normSync(oldSnapshot.title)) {
+    changes.push('title');
+  }
+
+  // 5. Tagline check
+  if (normSync(freshSnapshot.tagline) !== normSync(oldSnapshot.tagline)) {
+    changes.push('tagline');
+  }
+
+  // 6. Watch availability & release date
+  if (
+    normSync(freshSnapshot.watchAvailability) !== normSync(oldSnapshot.watchAvailability) ||
+    normSync(freshSnapshot.releaseDate) !== normSync(oldSnapshot.releaseDate)
+  ) {
+    changes.push('watch_availability');
+  }
+
+  // 7. Cast changes (actors, character names, handles)
+  const freshCastKey = JSON.stringify(
+    (freshSnapshot.topCast || []).map((c: any) => ({
+      name: normSync(c.name),
+      handle: normSync(c.handle),
+      tiktokHandle: normSync(c.tiktokHandle),
+      character: normSync(c.character),
+    }))
+  );
+  const oldCastKey = JSON.stringify(
+    (oldSnapshot.topCast || []).map((c: any) => ({
+      name: normSync(c.name),
+      handle: normSync(c.handle),
+      tiktokHandle: normSync(c.tiktokHandle),
+      character: normSync(c.character),
+    }))
+  );
+  if (freshCastKey !== oldCastKey) {
+    changes.push('cast');
+  }
+
+  // 8. Crew changes (directors, producers, playwrights, handles)
+  const freshCrewKey = JSON.stringify(
+    (freshSnapshot.creditedPeople || []).map((c: any) => ({
+      name: normSync(c.name),
+      role: normSync(c.role),
+      handle: normSync(c.instagramHandle || c.tiktokHandle),
+    }))
+  );
+  const oldCrewKey = JSON.stringify(
+    (oldSnapshot.creditedPeople || []).map((c: any) => ({
+      name: normSync(c.name),
+      role: normSync(c.role),
+      handle: normSync(c.instagramHandle || c.tiktokHandle),
+    }))
+  );
+  if (freshCrewKey !== oldCrewKey) {
+    changes.push('crew');
+  }
+
+  // 9. Play-specific checks (venue, city, ticketUrl, performanceTime, run dates)
+  if (freshSnapshot.kind === 'whats_on_stage') {
+    if (normSync(freshSnapshot.ticketUrl) !== normSync(oldSnapshot.ticketUrl)) changes.push('ticket_url');
+    if (normSync(freshSnapshot.venue) !== normSync(oldSnapshot.venue)) changes.push('venue');
+    if (normSync(freshSnapshot.city) !== normSync(oldSnapshot.city)) changes.push('city');
+    if (freshSnapshot.runStartDate !== oldSnapshot.runStartDate || freshSnapshot.runEndDate !== oldSnapshot.runEndDate) {
+      changes.push('run_dates');
+    }
+    if (normSync(freshSnapshot.performanceTime) !== normSync(oldSnapshot.performanceTime)) changes.push('performance_time');
+    if (
+      normSync(freshSnapshot.playwright) !== normSync(oldSnapshot.playwright) ||
+      normSync(freshSnapshot.director) !== normSync(oldSnapshot.director) ||
+      normSync(freshSnapshot.producer) !== normSync(oldSnapshot.producer)
+    ) {
+      changes.push('theatre_creators');
+    }
+  }
+
+  // 10. Person-specific checks
+  if (freshSnapshot.kind === 'actor_spotlight' || freshSnapshot.kind === 'birthday_spotlight') {
+    if (normSync(freshSnapshot.bio) !== normSync(oldSnapshot.bio)) changes.push('bio');
+    if (normSync(freshSnapshot.handle) !== normSync(oldSnapshot.handle)) changes.push('handle');
+    if (normSync(freshSnapshot.photoUrl) !== normSync(oldSnapshot.photoUrl)) changes.push('poster');
+  }
+
+  if (!changes.length && !options.force) {
+    return { updated: false, changes: [] };
+  }
+
+  // If poster image URL changed (or force), fetch, prepare, and store new asset
+  let newAssetId: string | null = null;
+  let newAssetUrl: string | null = null;
+  const posterUrlToFetch = freshSnapshot.posterUrl || (freshSnapshot as any).photoUrl;
+
+  if ((changes.includes('poster') || options.force) && posterUrlToFetch) {
+    try {
+      const isStage = freshSnapshot.kind === 'whats_on_stage';
+      const rawImage = await downloadSocialImage(posterUrlToFetch);
+      const poster = await preparePoster(rawImage, isStage);
+      const assetResult = await storePosterAsset(item.id, poster, posterUrlToFetch);
+      newAssetId = assetResult.rows[0]?.id || null;
+      newAssetUrl = assetResult.rows[0]?.publicUrl || null;
+    } catch (assetErr: any) {
+      console.warn(`[syncContentItemWithSource] Failed to refresh poster asset for ${contentItemId}:`, assetErr?.message);
+    }
+  }
+
+  // Fetch variants to update copy and asset pointers
+  const { data: variants, error: varError } = await supabase
+    .from('social_platform_variants')
+    .select('id,platform,caption,title,hashtags,selected_asset_id,platform_options,status')
+    .eq('content_item_id', item.id);
+
+  if (varError) throw varError;
+
+  for (const variant of variants || []) {
+    const freshContent = buildVariantContent({
+      snapshot: freshSnapshot,
+      platform: variant.platform as SocialPlatform,
+    });
+
+    const variantUpdates: Record<string, any> = {
+      caption: freshContent.caption,
+      title: freshContent.title,
+      hashtags: freshContent.hashtags,
+    };
+
+    if (newAssetId) {
+      variantUpdates.selected_asset_id = newAssetId;
+      variantUpdates.platform_options = {
+        ...(variant.platform_options || {}),
+        poster_only: true,
+        poster_source_url: posterUrlToFetch,
+        asset_url: newAssetUrl || variant.platform_options?.asset_url,
+      };
+    }
+
+    await supabase
+      .from('social_platform_variants')
+      .update(variantUpdates)
+      .eq('id', variant.id);
+  }
+
+  // Update item title if title changed
+  let updatedTitle = item.title;
+  if (changes.includes('title')) {
+    if (freshSnapshot.kind === 'whats_on_stage') {
+      updatedTitle = `What's On Stage — ${freshSnapshot.title}`;
+    } else if (item.content_type === 'where_to_watch') {
+      updatedTitle = `Streaming Alert — ${freshSnapshot.title}`;
+    } else {
+      updatedTitle = `${freshSnapshot.title}`;
+    }
+  }
+
+  // Update social_content_items row
+  const { error: updateError } = await supabase
+    .from('social_content_items')
+    .update({
+      source_snapshot: freshSnapshot,
+      title: updatedTitle,
+    })
+    .eq('id', item.id);
+
+  if (updateError) throw updateError;
+
+  await insertSocialEvent({
+    contentItemId: item.id,
+    eventType: 'source_synced',
+    eventData: {
+      changes,
+      sourceEntityType: item.source_entity_type,
+      sourceEntityId: item.source_entity_id,
+    },
+  });
+
+  return {
+    updated: true,
+    changes,
+    contentItem: { ...item, source_snapshot: freshSnapshot, title: updatedTitle },
+  };
+}
+
+export async function syncAllScheduledContentItems(statuses: string[] = ['scheduled', 'draft', 'ready_for_review', 'approved']): Promise<{
+  scanned: number;
+  updated: number;
+  details: Array<{ contentItemId: string; title: string; changes: string[] }>;
+}> {
+  const { data: items, error } = await supabase
+    .from('social_content_items')
+    .select('id, title, status')
+    .in('status', statuses)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  const details = [];
+  let updatedCount = 0;
+
+  for (const item of items || []) {
+    try {
+      const res = await syncContentItemWithSource(item.id);
+      if (res.updated) {
+        updatedCount++;
+        details.push({ contentItemId: item.id, title: item.title, changes: res.changes });
+      }
+    } catch (err: any) {
+      console.warn(`[syncAllScheduledContentItems] Failed to sync ${item.id}:`, err?.message);
+    }
+  }
+
+  return { scanned: (items || []).length, updated: updatedCount, details };
 }
 
 export async function refreshStreamingPoster(contentItemId: string, refresh: boolean) {
@@ -1453,9 +1784,10 @@ export async function generateSocialDraft(
     };
   }
 
-  const posterOnly = input.contentType === 'where_to_watch' && !input.skipAssets;
-  const poster = posterOnly && snapshot.kind === 'upcoming_movie'
-    ? await preparePoster(await downloadSocialImage(snapshot.posterUrl || '')) : null;
+  const posterOnly = (input.contentType === 'where_to_watch' || input.contentType === 'whats_on_stage') && !input.skipAssets;
+  const isStage = snapshot.kind === 'whats_on_stage';
+  const poster = posterOnly && (snapshot.kind === 'upcoming_movie' || isStage)
+    ? await preparePoster(await downloadSocialImage(snapshot.posterUrl || ''), isStage) : null;
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
     snapshot.kind === 'actor_spotlight'

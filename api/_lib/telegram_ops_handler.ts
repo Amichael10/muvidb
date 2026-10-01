@@ -215,6 +215,310 @@ async function handleCommand(chatId: string | number, text: string) {
   await reply(chatId, `Unknown command. ${helpText()}`);
 }
 
+interface WizardFieldDef {
+  key: string;
+  label: string;
+  prompt: string;
+  required?: boolean;
+}
+
+const WIZARD_SCHEMAS: Record<string, { name: string; icon: string; fields: WizardFieldDef[] }> = {
+  play: {
+    name: 'Theatre / Stage Play',
+    icon: '🎭',
+    fields: [
+      { key: 'title', label: '🏷️ Title', prompt: 'Enter the stage play title:', required: true },
+      { key: 'venue', label: '📍 Venue', prompt: 'Enter the theatre / venue (e.g. Terra Kulture, Muson Centre):' },
+      { key: 'city', label: '🌆 City', prompt: 'Enter city (e.g. Lagos, Abuja, London):' },
+      { key: 'run_start_date', label: '📅 Start Date', prompt: 'Enter run start date (YYYY-MM-DD):' },
+      { key: 'run_end_date', label: '📅 End Date', prompt: 'Enter run end date (YYYY-MM-DD):' },
+      { key: 'performance_time', label: '⏰ Time', prompt: 'Enter performance time(s) (e.g. 3:00 PM & 6:00 PM):' },
+      { key: 'source_url', label: '🎟️ Ticket Link', prompt: 'Enter ticket link or booking URL:' },
+      { key: 'playwright', label: '🎭 Playwright', prompt: 'Enter playwright / author name:' },
+      { key: 'director', label: '🎬 Director', prompt: 'Enter stage director name:' },
+      { key: 'synopsis', label: '📝 Synopsis', prompt: 'Enter brief synopsis / storyline:' },
+    ],
+  },
+  film: {
+    name: 'Film / Movie',
+    icon: '🎬',
+    fields: [
+      { key: 'title', label: '🏷️ Title', prompt: 'Enter film / movie title:', required: true },
+      { key: 'year', label: '📅 Year', prompt: 'Enter release year (e.g. 2026):' },
+      { key: 'release_date', label: '📅 Release Date', prompt: 'Enter release date (YYYY-MM-DD):' },
+      { key: 'genres', label: '🎭 Genres', prompt: 'Enter genres (comma-separated, e.g. Drama, Comedy, Thriller):' },
+      { key: 'director', label: '🎬 Director', prompt: 'Enter director name:' },
+      { key: 'cast', label: '👥 Cast', prompt: 'Enter leading cast members (comma-separated):' },
+      { key: 'platform', label: '📺 Platform', prompt: 'Enter platform (e.g. YouTube, Cinema, Netflix):' },
+      { key: 'synopsis', label: '📝 Synopsis', prompt: 'Enter film synopsis:' },
+    ],
+  },
+  person: {
+    name: 'Person / Talent',
+    icon: '👤',
+    fields: [
+      { key: 'name', label: '🏷️ Full Name', prompt: 'Enter full name:', required: true },
+      { key: 'primary_role', label: '🎭 Role', prompt: 'Enter primary role (e.g. actor, director, producer):' },
+      { key: 'instagram_handle', label: '📸 Instagram', prompt: 'Enter Instagram handle (e.g. @username):' },
+      { key: 'bio', label: '📝 Bio', prompt: 'Enter biography or mini-profile:' },
+    ],
+  },
+  review: {
+    name: 'Critic Review',
+    icon: '⭐',
+    fields: [
+      { key: 'film_title', label: '🎬 Film Title', prompt: 'Enter film title being reviewed:', required: true },
+      { key: 'critic_name', label: '✍️ Critic Name', prompt: 'Enter reviewer / critic name:' },
+      { key: 'publication', label: '📰 Publication', prompt: 'Enter publication or outlet name:' },
+      { key: 'rating', label: '⭐ Rating', prompt: 'Enter rating score (e.g. 8 or 4/5):' },
+      { key: 'quote', label: '💬 Quote', prompt: 'Enter review quote / pull quote:', required: true },
+      { key: 'review_url', label: '🔗 Review Link', prompt: 'Enter link to full review:' },
+    ],
+  },
+};
+
+function buildWizardCard(kind: string, payload: Record<string, any>, meta: Record<string, any>, eventId: string) {
+  let cardText = '';
+  const inlineButtons: any[][] = [];
+
+  if (kind === 'play') {
+    cardText = [
+      '🎭 *Stage Play Details*',
+      '',
+      `🏷️ *Title:* ${payload.title || '⚠️ Missing (Required)'}`,
+      `📍 *Venue:* ${payload.venue || 'Not specified'}`,
+      `🌆 *City:* ${payload.city || 'Lagos'}`,
+      `📅 *Dates:* ${payload.run_start_date || '?'} to ${payload.run_end_date || '?'}`,
+      `⏰ *Time:* ${payload.performance_time || 'Not specified'}`,
+      `🎟️ *Ticket Link:* ${payload.source_url || meta.source_url || 'None'}`,
+      `🎬 *Director:* ${payload.director || 'None'}`,
+      `🎭 *Playwright:* ${payload.playwright || 'None'}`,
+      `📝 *Synopsis:* ${payload.synopsis ? payload.synopsis.slice(0, 160) + '…' : 'None'}`,
+      `🖼️ *Poster:* ${meta.image_url ? 'Attached ✅' : 'None'}`,
+      '',
+      '👇 *Save now, customize any field, or answer step-by-step:*',
+    ].join('\n');
+
+    inlineButtons.push([
+      { text: '✅ Save Play to DB', callback_data: `wiz_save:play:${eventId}` },
+      { text: '🎨 Save & Create Post', callback_data: `wiz_save:play_post:${eventId}` },
+    ]);
+    inlineButtons.push([
+      { text: '💬 Ask Questions Step-by-Step', callback_data: `wiz_step_start:play:${eventId}:0` },
+    ]);
+    inlineButtons.push([
+      { text: '🏷️ Title', callback_data: `wiz_edit_field:play:${eventId}:title` },
+      { text: '📍 Venue', callback_data: `wiz_edit_field:play:${eventId}:venue` },
+      { text: '📅 Dates', callback_data: `wiz_edit_field:play:${eventId}:run_start_date` },
+    ]);
+    inlineButtons.push([
+      { text: '🎟️ Ticket Link', callback_data: `wiz_edit_field:play:${eventId}:source_url` },
+      { text: '⏰ Time', callback_data: `wiz_edit_field:play:${eventId}:performance_time` },
+      { text: '📝 Synopsis', callback_data: `wiz_edit_field:play:${eventId}:synopsis` },
+    ]);
+  } else if (kind === 'film') {
+    cardText = [
+      '🎬 *Film Details*',
+      '',
+      `🏷️ *Title:* ${payload.title || '⚠️ Missing (Required)'}`,
+      `📅 *Year:* ${payload.year || new Date().getFullYear()}`,
+      `📅 *Release Date:* ${payload.release_date || 'Not specified'}`,
+      `🎭 *Genres:* ${(Array.isArray(payload.genres) ? payload.genres : [payload.genres]).filter(Boolean).join(', ') || 'Drama'}`,
+      `🎬 *Director:* ${payload.director || 'None'}`,
+      `👥 *Cast:* ${(Array.isArray(payload.cast) ? payload.cast : [payload.cast]).filter(Boolean).slice(0, 5).join(', ') || 'None'}`,
+      `📺 *Platform:* ${payload.platform || 'None'}`,
+      `📝 *Synopsis:* ${payload.synopsis ? payload.synopsis.slice(0, 160) + '…' : 'None'}`,
+      `🖼️ *Poster:* ${meta.image_url ? 'Attached ✅' : 'None'}`,
+      '',
+      '👇 *Save now, customize any field, or answer step-by-step:*',
+    ].join('\n');
+
+    inlineButtons.push([
+      { text: '✅ Save Film to DB', callback_data: `wiz_save:film:${eventId}` },
+      { text: '🎨 Save & Create Post', callback_data: `wiz_save:film_post:${eventId}` },
+    ]);
+    inlineButtons.push([
+      { text: '💬 Ask Questions Step-by-Step', callback_data: `wiz_step_start:film:${eventId}:0` },
+    ]);
+    inlineButtons.push([
+      { text: '🏷️ Title', callback_data: `wiz_edit_field:film:${eventId}:title` },
+      { text: '📅 Date / Year', callback_data: `wiz_edit_field:film:${eventId}:release_date` },
+      { text: '🎭 Genres', callback_data: `wiz_edit_field:film:${eventId}:genres` },
+    ]);
+    inlineButtons.push([
+      { text: '🎬 Director', callback_data: `wiz_edit_field:film:${eventId}:director` },
+      { text: '👥 Cast', callback_data: `wiz_edit_field:film:${eventId}:cast` },
+      { text: '📝 Synopsis', callback_data: `wiz_edit_field:film:${eventId}:synopsis` },
+    ]);
+  } else if (kind === 'person') {
+    cardText = [
+      '👤 *Person / Talent Details*',
+      '',
+      `🏷️ *Name:* ${payload.name || '⚠️ Missing (Required)'}`,
+      `🎭 *Role:* ${payload.primary_role || 'actor'}`,
+      `📸 *Instagram:* ${payload.instagram_handle ? '@' + String(payload.instagram_handle).replace(/^@/, '') : 'None'}`,
+      `📝 *Bio:* ${payload.bio ? payload.bio.slice(0, 160) + '…' : 'None'}`,
+      `🖼️ *Photo:* ${meta.image_url ? 'Attached ✅' : 'None'}`,
+      '',
+      '👇 *Save now, customize any field, or answer step-by-step:*',
+    ].join('\n');
+
+    inlineButtons.push([
+      { text: '✅ Save Person to DB', callback_data: `wiz_save:person:${eventId}` },
+      { text: '💬 Step-by-Step Questions', callback_data: `wiz_step_start:person:${eventId}:0` },
+    ]);
+    inlineButtons.push([
+      { text: '🏷️ Name', callback_data: `wiz_edit_field:person:${eventId}:name` },
+      { text: '🎭 Role', callback_data: `wiz_edit_field:person:${eventId}:primary_role` },
+      { text: '📸 Instagram', callback_data: `wiz_edit_field:person:${eventId}:instagram_handle` },
+    ]);
+  } else if (kind === 'review') {
+    cardText = [
+      '⭐ *Critic Review Details*',
+      '',
+      `🎬 *Film:* ${payload.film_title || '⚠️ Missing Film Title'}`,
+      `✍️ *Critic:* ${payload.critic_name || 'Anonymous'}`,
+      `📰 *Publication:* ${payload.publication || 'Independent'}`,
+      `⭐ *Rating:* ${payload.rating ? `${payload.rating}/${payload.rating_scale || 10}` : 'No score'}`,
+      `💬 *Quote:* "${payload.quote || '⚠️ Missing Quote'}"`,
+      `🔗 *Review Link:* ${payload.review_url || meta.source_url || 'None'}`,
+      '',
+      '👇 *Save now, customize any field, or answer step-by-step:*',
+    ].join('\n');
+
+    inlineButtons.push([
+      { text: '✅ Save Review to DB', callback_data: `wiz_save:review:${eventId}` },
+      { text: '💬 Step-by-Step Questions', callback_data: `wiz_step_start:review:${eventId}:0` },
+    ]);
+    inlineButtons.push([
+      { text: '🎬 Film Title', callback_data: `wiz_edit_field:review:${eventId}:film_title` },
+      { text: '✍️ Critic', callback_data: `wiz_edit_field:review:${eventId}:critic_name` },
+      { text: '⭐ Rating', callback_data: `wiz_edit_field:review:${eventId}:rating` },
+    ]);
+    inlineButtons.push([
+      { text: '💬 Quote', callback_data: `wiz_edit_field:review:${eventId}:quote` },
+      { text: '🔗 Link', callback_data: `wiz_edit_field:review:${eventId}:review_url` },
+    ]);
+  }
+
+  inlineButtons.push([
+    { text: '❌ Cancel', callback_data: `intake_ignore:${eventId}` },
+  ]);
+
+  return { cardText, inlineButtons };
+}
+
+async function showWizardCard(chatId: string | number, eventId: string, forcedKind?: string) {
+  const { data: event } = await supabase
+    .from('social_news_events')
+    .select('*')
+    .eq('id', eventId)
+    .maybeSingle();
+
+  if (!event) return;
+  const meta = intakeMetadata(event.metadata);
+  const kind = forcedKind || meta.extracted_kind || 'film';
+  const payload = meta.extracted_payload || {};
+
+  const { cardText, inlineButtons } = buildWizardCard(kind, payload, meta, eventId);
+
+  if (meta.image_url) {
+    await sendTelegramPhoto({
+      photo: meta.image_url,
+      caption: cardText,
+      chatId: String(chatId),
+      replyMarkup: { inline_keyboard: inlineButtons },
+    });
+  } else {
+    await sendTelegramMessage({
+      text: cardText,
+      chatId: String(chatId),
+      replyMarkup: { inline_keyboard: inlineButtons },
+    });
+  }
+}
+
+async function sendWizardStepPrompt(
+  chatId: string | number,
+  eventId: string,
+  kind: string,
+  stepIndex: number,
+  singleField: boolean = false,
+) {
+  await supabase
+    .from('social_news_events')
+    .update({ status: 'completed' })
+    .eq('event_type', 'wizard_active')
+    .eq('status', 'pending');
+
+  const schema = WIZARD_SCHEMAS[kind];
+  if (!schema) return;
+
+  if (stepIndex >= schema.fields.length) {
+    if (chatId) await reply(chatId, `🎉 *All questions completed!* Review the card below and confirm:`);
+    await showWizardCard(chatId, eventId, kind);
+    return;
+  }
+
+  const field = schema.fields[stepIndex];
+  const { data: event } = await supabase
+    .from('social_news_events')
+    .select('metadata')
+    .eq('id', eventId)
+    .maybeSingle();
+
+  const meta = intakeMetadata(event?.metadata);
+  const payload = meta.extracted_payload || {};
+  const currentVal = payload[field.key] !== undefined && payload[field.key] !== null
+    ? (Array.isArray(payload[field.key]) ? payload[field.key].join(', ') : String(payload[field.key]))
+    : '';
+
+  await supabase.from('social_news_events').insert({
+    event_type: 'wizard_active',
+    title: `Wizard: ${kind} - ${field.key}`,
+    source_type: 'telegram_bot',
+    status: 'pending',
+    metadata: {
+      action: 'wizard_step',
+      chat_id: String(chatId),
+      event_id: eventId,
+      kind,
+      step_index: stepIndex,
+      field_key: field.key,
+      single_field: singleField,
+      created_at: new Date().toISOString(),
+    },
+  });
+
+  const promptText = [
+    `❓ *${singleField ? 'Edit Field' : `Step ${stepIndex + 1}/${schema.fields.length}`}: ${field.label}*${field.required ? ' *(Required)*' : ''}`,
+    '',
+    field.prompt,
+    '',
+    `📌 *Current value:* ${currentVal ? `\`${currentVal}\`` : '_(empty)_'}`,
+    '',
+    '👉 *Reply with text to set/change it, or tap Skip to keep current value:*',
+  ].join('\n');
+
+  const buttons: any[][] = [
+    [
+      { text: '⏭️ Skip / Keep Current', callback_data: `wiz_step_skip:${eventId}:${stepIndex}:${singleField ? 'single' : 'all'}` },
+      { text: '💾 Save to DB Now', callback_data: `wiz_save:${kind}:${eventId}` },
+    ],
+    [
+      { text: '📋 View Full Card', callback_data: `wiz_show_card:${eventId}` },
+      { text: '❌ Cancel', callback_data: `intake_ignore:${eventId}` },
+    ],
+  ];
+
+  await sendTelegramMessage({
+    text: promptText,
+    chatId: String(chatId),
+    disablePreview: true,
+    replyMarkup: { inline_keyboard: buttons },
+  });
+}
+
 async function handleCallback(query: any) {
   const chatId = query?.message?.chat?.id;
   const data = String(query?.data || '');
@@ -279,6 +583,665 @@ async function handleCallback(query: any) {
           ? `Failed to hide ${videoId}: ${error.message}`
           : `🙈 Hidden ${videoId}. It will not auto-import on the next sync.`,
       );
+    }
+    return;
+  }
+
+  if (data.startsWith('slot_yt:')) {
+    const draftId = data.slice('slot_yt:'.length).trim();
+    if (!draftId) {
+      await answerTelegramCallback(callbackId, 'Invalid draft ID');
+      return;
+    }
+    await answerTelegramCallback(callbackId, 'Slotting into today’s schedule…');
+    try {
+      const { scheduleContentItem } = await import('./social_studio.js');
+      const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
+
+      const { data: item, error: fetchErr } = await supabase
+        .from('social_content_items')
+        .select('id, title, status, scheduled_for, content_type')
+        .eq('id', draftId)
+        .maybeSingle();
+
+      if (fetchErr || !item) {
+        if (chatId) await reply(chatId, `❌ Draft ${draftId} not found in Social Studio.`);
+        return;
+      }
+
+      // Check if another post is already scheduled for today
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setUTCHours(23, 59, 59, 999);
+
+      const { data: existingToday } = await supabase
+        .from('social_content_items')
+        .select('id, title, scheduled_for')
+        .eq('status', 'scheduled')
+        .gte('scheduled_for', todayStart.toISOString())
+        .lte('scheduled_for', todayEnd.toISOString())
+        .order('scheduled_for', { ascending: true });
+
+      let targetSlot = new Date();
+      // Target today at 11:00 AM WAT (10:00 UTC) or 30 mins from now if already past
+      targetSlot.setUTCHours(10, 0, 0, 0);
+      if (targetSlot.getTime() <= Date.now() + 15 * 60 * 1000) {
+        targetSlot = new Date(Date.now() + 30 * 60 * 1000);
+      }
+
+      // If an existing item is scheduled for today around this time, bump it forward by 24h
+      let bumpedTitle: string | null = null;
+      if (existingToday && existingToday.length > 0) {
+        const conflict = existingToday[0];
+        const bumpedTime = new Date(new Date(conflict.scheduled_for).getTime() + 24 * 3600 * 1000);
+        await supabase
+          .from('social_content_items')
+          .update({ scheduled_for: bumpedTime.toISOString() })
+          .eq('id', conflict.id);
+        bumpedTitle = conflict.title;
+      }
+
+      // Schedule the current draft
+      await scheduleContentItem({ contentItemId: draftId, scheduledFor: targetSlot.toISOString() }, systemActor);
+
+      if (chatId) {
+        const slotText = targetSlot.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
+        const bumpMsg = bumpedTitle ? `\n(Previous scheduled post "${bumpedTitle}" was pushed forward by 24h).` : '';
+        await reply(
+          chatId,
+          `✅ *Slotted into Today's Queue!*\n\n🎬 "${item.title}" will publish at ${slotText} WAT.${bumpMsg}\n\n💡 *Tip:* Check Social Studio if you want to replace the landscape banner with an HD portrait poster.`
+        );
+      }
+    } catch (err: any) {
+      console.error('[telegram_ops_handler] slot_yt failed:', err);
+      if (chatId) await reply(chatId, `❌ Failed to slot post: ${err?.message || err}`);
+    }
+    return;
+  }
+
+  if (data.startsWith('pub_yt:')) {
+    const draftId = data.slice('pub_yt:'.length).trim();
+    if (!draftId) {
+      await answerTelegramCallback(callbackId, 'Invalid draft ID');
+      return;
+    }
+    await answerTelegramCallback(callbackId, 'Publishing to social media…');
+    try {
+      const { publishContentItemNow } = await import('./social_studio.js');
+      const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
+
+      const { data: item } = await supabase
+        .from('social_content_items')
+        .select('id, title')
+        .eq('id', draftId)
+        .maybeSingle();
+
+      await publishContentItemNow(draftId, systemActor);
+      if (chatId) {
+        await reply(
+          chatId,
+          `🚀 *Published Live!*\n\n"${item?.title || 'YouTube Film'}" has been published to Instagram, TikTok, and Facebook.`
+        );
+      }
+    } catch (err: any) {
+      console.error('[telegram_ops_handler] pub_yt failed:', err);
+      if (chatId) await reply(chatId, `❌ Failed to publish: ${err?.message || err}`);
+    }
+    return;
+  }
+
+  if (data.startsWith('prompt_poster:')) {
+    const parts = data.slice('prompt_poster:'.length).split(':');
+    const draftId = parts[0]?.trim();
+    const filmId = parts[1]?.trim();
+    if (!filmId) {
+      await answerTelegramCallback(callbackId, 'Invalid film ID');
+      return;
+    }
+    await answerTelegramCallback(callbackId, '📸 Ready for poster photo');
+    await supabase.from('social_news_events').insert({
+      event_type: 'awaiting_poster',
+      title: 'Awaiting poster upload',
+      source_type: 'telegram_bot',
+      status: 'pending',
+      metadata: {
+        action: 'awaiting_poster',
+        chat_id: String(chatId),
+        draft_id: draftId,
+        film_id: filmId,
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    const { data: film } = await supabase.from('films').select('title').eq('id', filmId).maybeSingle();
+    if (chatId) {
+      await reply(
+        chatId,
+        `📸 *Send Portrait Poster for "${film?.title || 'Film'}":*\n\nPlease send or forward the HD portrait photo now. I will download it, attach it to the movie, and update your Social Studio draft automatically!`
+      );
+    }
+    return;
+  }
+
+  if (data.startsWith('wiz_extract:')) {
+    const parts = data.slice('wiz_extract:'.length).split(':');
+    const kind = parts[0]?.trim(); // 'play' | 'film' | 'person' | 'review'
+    const eventId = parts[1]?.trim();
+
+    const { data: event } = await supabase
+      .from('social_news_events')
+      .select('*')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (!event) {
+      await answerTelegramCallback(callbackId, 'Intake item not found');
+      return;
+    }
+
+    await answerTelegramCallback(callbackId, `Extracting ${kind} details with AI…`);
+    if (chatId) await reply(chatId, `⏳ Extracting ${kind === 'play' ? 'theatre/stage play' : kind} details from content with AI...`);
+
+    const context = [
+      `Title: ${event.title || ''}`,
+      `Description: ${event.description || ''}`,
+      `Source URL: ${event.source_url || ''}`,
+      `Account: ${event.metadata?.author_name || ''}`,
+    ].join('\n');
+
+    let prompt = '';
+    if (kind === 'play') {
+      prompt = `You are an expert Nigerian/African theatre archivist for MuviDB. Extract stage play details from this text and source:\n${context}\n\nReturn ONLY a valid JSON object matching:
+{
+  "title": string,
+  "venue": string or null,
+  "city": string (default "Lagos"),
+  "run_start_date": "YYYY-MM-DD" or null,
+  "run_end_date": "YYYY-MM-DD" or null,
+  "performance_time": string or null,
+  "source_url": string or null,
+  "playwright": string or null,
+  "director": string or null,
+  "producer": string or null,
+  "genre": string or null,
+  "synopsis": string or null
+}`;
+    } else if (kind === 'film') {
+      prompt = `You are an expert Nollywood film archivist for MuviDB. Extract film/movie details from this text and source:\n${context}\n\nReturn ONLY a valid JSON object matching:
+{
+  "title": string,
+  "year": number or null,
+  "release_date": "YYYY-MM-DD" or null,
+  "synopsis": string or null,
+  "genres": string[],
+  "runtime_minutes": number or null,
+  "director": string or null,
+  "cast": string[],
+  "platform": string or null,
+  "content_type": "movie" or "series"
+}`;
+    } else if (kind === 'person') {
+      prompt = `You are an expert biographer for Nollywood and African cinema. Extract person/talent details from this text and source:\n${context}\n\nReturn ONLY a valid JSON object matching:
+{
+  "name": string,
+  "primary_role": string,
+  "roles": string[],
+  "bio": string or null,
+  "instagram_handle": string or null,
+  "twitter_handle": string or null
+}`;
+    } else if (kind === 'review') {
+      prompt = `Extract a film critic review from this text and source:\n${context}\n\nReturn ONLY a valid JSON object matching:
+{
+  "film_title": string,
+  "critic_name": string,
+  "publication": string or null,
+  "quote": string,
+  "rating": number or null,
+  "rating_scale": number or null,
+  "review_url": string or null
+}`;
+    }
+
+    try {
+      const aiRes = await generateAIContent(prompt);
+      const payload = parseAiJson(aiRes.text || '');
+
+      const metadata = intakeMetadata(event.metadata);
+      metadata.extracted_kind = kind;
+      metadata.extracted_payload = payload;
+      await supabase.from('social_news_events').update({ metadata }).eq('id', eventId);
+
+      await showWizardCard(chatId, eventId, kind);
+    } catch (err: any) {
+      if (chatId) await reply(chatId, `❌ Failed to extract ${kind}: ${err?.message || err}`);
+    }
+    return;
+  }
+
+  if (data.startsWith('wiz_step_start:')) {
+    const parts = data.slice('wiz_step_start:'.length).split(':');
+    const kind = parts[0]?.trim();
+    const eventId = parts[1]?.trim();
+    const stepIndex = parseInt(parts[2]?.trim() || '0', 10);
+    await answerTelegramCallback(callbackId, 'Starting step-by-step questions…');
+    await sendWizardStepPrompt(chatId, eventId, kind, stepIndex, false);
+    return;
+  }
+
+  if (data.startsWith('wiz_edit_field:')) {
+    const parts = data.slice('wiz_edit_field:'.length).split(':');
+    const kind = parts[0]?.trim();
+    const eventId = parts[1]?.trim();
+    const fieldKey = parts[2]?.trim();
+    const schema = WIZARD_SCHEMAS[kind];
+    const stepIndex = schema?.fields.findIndex((f) => f.key === fieldKey) ?? -1;
+    if (stepIndex >= 0) {
+      await answerTelegramCallback(callbackId, `Editing ${fieldKey}…`);
+      await sendWizardStepPrompt(chatId, eventId, kind, stepIndex, true);
+    } else {
+      await answerTelegramCallback(callbackId, 'Field not found');
+    }
+    return;
+  }
+
+  if (data.startsWith('wiz_step_skip:')) {
+    const parts = data.slice('wiz_step_skip:'.length).split(':');
+    const eventId = parts[0]?.trim();
+    const stepIndex = parseInt(parts[1]?.trim() || '0', 10);
+    const mode = parts[2]?.trim(); // 'single' | 'all'
+
+    await answerTelegramCallback(callbackId, 'Skipped');
+    const { data: event } = await supabase.from('social_news_events').select('metadata').eq('id', eventId).maybeSingle();
+    const kind = event?.metadata?.extracted_kind || 'film';
+
+    if (mode === 'single') {
+      await showWizardCard(chatId, eventId, kind);
+    } else {
+      await sendWizardStepPrompt(chatId, eventId, kind, stepIndex + 1, false);
+    }
+    return;
+  }
+
+  if (data.startsWith('wiz_show_card:')) {
+    const eventId = data.slice('wiz_show_card:'.length).trim();
+    await answerTelegramCallback(callbackId, 'Opening card…');
+    await showWizardCard(chatId, eventId);
+    return;
+  }
+
+  if (data.startsWith('wiz_attach_yt_list:')) {
+    const eventId = data.slice('wiz_attach_yt_list:'.length).trim();
+    await answerTelegramCallback(callbackId, 'Fetching recent YouTube films…');
+
+    const { data: recentVideos } = await supabase
+      .from('channel_videos')
+      .select('film_id, title, films(id, title, poster_url)')
+      .not('film_id', 'is', null)
+      .order('published_at', { ascending: false })
+      .limit(6);
+
+    const filmsMap = new Map<string, string>();
+    for (const v of recentVideos || []) {
+      const f = (v as any).films;
+      if (f?.id && f?.title && !filmsMap.has(f.id)) {
+        filmsMap.set(f.id, f.title);
+      }
+    }
+
+    if (!filmsMap.size) {
+      // Fallback directly to recent films
+      const { data: fallbackFilms } = await supabase
+        .from('films')
+        .select('id, title')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      for (const f of fallbackFilms || []) {
+        filmsMap.set(f.id, f.title);
+      }
+    }
+
+    if (!filmsMap.size) {
+      if (chatId) await reply(chatId, '⚠️ No recent films found to attach poster to.');
+      return;
+    }
+
+    const filmButtons = Array.from(filmsMap.entries()).map(([fId, fTitle]) => [
+      { text: `🎬 ${fTitle.slice(0, 32)}`, callback_data: `wiz_attach_yt:${fId}:${eventId}` },
+    ]);
+    filmButtons.push([{ text: '❌ Cancel', callback_data: `intake_ignore:${eventId}` }]);
+
+    if (chatId) {
+      await sendTelegramMessage({
+        text: '🖼️ *Attach Forwarded Photo as HD Poster:*\n\nWhich recent YouTube film does this poster belong to?',
+        chatId: String(chatId),
+        replyMarkup: { inline_keyboard: filmButtons },
+      });
+    }
+    return;
+  }
+
+  if (data.startsWith('wiz_attach_yt:')) {
+    const parts = data.slice('wiz_attach_yt:'.length).split(':');
+    const filmId = parts[0]?.trim();
+    const eventId = parts[1]?.trim();
+
+    const { data: event } = await supabase
+      .from('social_news_events')
+      .select('metadata')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    const meta = intakeMetadata(event?.metadata);
+    let photoUrl = meta.image_url;
+    if (!photoUrl && meta.photo_file_id) {
+      photoUrl = await getTelegramFileUrl(meta.photo_file_id);
+    }
+
+    if (!photoUrl) {
+      await answerTelegramCallback(callbackId, 'Photo not found on this intake item');
+      return;
+    }
+
+    await answerTelegramCallback(callbackId, 'Attaching poster & generating assets…');
+    if (chatId) await reply(chatId, '⏳ Downloading and uploading HD portrait poster...');
+
+    try {
+      const { mirrorIfExternal } = await import('./image_mirror.js');
+      const mirroredUrl = await mirrorIfExternal(photoUrl, 'posters', `poster-${filmId}-${Date.now()}`);
+
+      await supabase
+        .from('films')
+        .update({ poster_url: mirroredUrl, backdrop_url: mirroredUrl })
+        .eq('id', filmId);
+
+      const { data: film } = await supabase.from('films').select('title').eq('id', filmId).maybeSingle();
+
+      const { data: draftItem } = await supabase
+        .from('social_content_items')
+        .select('id')
+        .eq('source_entity_id', filmId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      let targetDraftId = draftItem?.id || null;
+      if (targetDraftId) {
+        try {
+          const { refreshStreamingPoster } = await import('./social_studio.js');
+          await refreshStreamingPoster(targetDraftId, true);
+        } catch (rErr: any) {
+          console.warn('[wiz_attach_yt] refreshStreamingPoster error:', rErr?.message);
+        }
+      }
+
+      const buttons: any[][] = [];
+      if (targetDraftId) {
+        buttons.push([
+          { text: "📅 Slot into Today's Queue", callback_data: `slot_yt:${targetDraftId}` },
+          { text: '🚀 Publish Now', callback_data: `pub_yt:${targetDraftId}` },
+        ]);
+        buttons.push([
+          { text: '🎨 Open in Social Studio', url: 'https://muvidb.com/admin/social-studio' },
+        ]);
+      }
+
+      await sendTelegramPhoto({
+        photo: mirroredUrl,
+        caption: `🖼️ *HD Poster Attached Successfully!*\n\n🎬 *Film:* "${film?.title || 'Film'}"\n🎨 *Social Studio Updated:* Vertical 9:16 and 4:5 assets generated!`,
+        chatId: String(chatId),
+        replyMarkup: buttons.length ? { inline_keyboard: buttons } : undefined,
+      });
+    } catch (err: any) {
+      console.error('[wiz_attach_yt] error:', err);
+      if (chatId) await reply(chatId, `❌ Failed to attach poster: ${err?.message || err}`);
+    }
+    return;
+  }
+
+  if (data.startsWith('wiz_save:')) {
+    const parts = data.slice('wiz_save:'.length).split(':');
+    const action = parts[0]?.trim(); // 'play' | 'play_post' | 'film' | 'film_post' | 'person' | 'review'
+    const eventId = parts[1]?.trim();
+
+    const { data: event } = await supabase
+      .from('social_news_events')
+      .select('*')
+      .eq('id', eventId)
+      .maybeSingle();
+
+    if (!event || !event.metadata?.extracted_payload) {
+      await answerTelegramCallback(callbackId, 'Extracted data not found');
+      return;
+    }
+
+    const payload = event.metadata.extracted_payload;
+    const meta = event.metadata;
+    await answerTelegramCallback(callbackId, 'Saving to Database…');
+
+    const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+
+    try {
+      let photoUrl: string | null = meta.image_url || null;
+      if (photoUrl && photoUrl.includes('telegram.org')) {
+        const { mirrorIfExternal } = await import('./image_mirror.js');
+        photoUrl = await mirrorIfExternal(photoUrl, 'posters', `intake-${Date.now()}`);
+      }
+
+      if (action === 'play' || action === 'play_post') {
+        const playSlug = (payload.title || `play-${Date.now()}`)
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 80);
+
+        const { data: newPlay, error } = await supabase
+          .from('plays')
+          .insert({
+            title: payload.title,
+            slug: playSlug,
+            venue: payload.venue,
+            city: payload.city || 'Lagos',
+            country: 'Nigeria',
+            run_start_date: payload.run_start_date,
+            run_end_date: payload.run_end_date,
+            performance_time: payload.performance_time,
+            source_url: payload.source_url || event.source_url,
+            playwright: payload.playwright,
+            director: payload.director,
+            producer: payload.producer,
+            genre: payload.genre || 'Stage Play',
+            synopsis: payload.synopsis,
+            poster_url: photoUrl,
+            status: payload.status || 'upcoming',
+            year: payload.run_start_date ? new Date(payload.run_start_date).getFullYear() : new Date().getFullYear(),
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        let postMsg = '';
+        if (action === 'play_post') {
+          const { generateSocialDraft } = await import('./social_studio.js');
+          const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
+          await generateSocialDraft(
+            {
+              contentType: 'whats_on_stage',
+              sourceEntityId: newPlay.id,
+              templateSlug: 'on-stage-theatre-v1',
+              platforms: ['instagram', 'facebook', 'tiktok'],
+            },
+            systemActor,
+          );
+          postMsg = '\n🎨 *Social Studio Draft also created!*';
+        }
+
+        if (chatId) {
+          await sendTelegramMessage({
+            text: `✅ *Stage Play Saved to Database!*\n\n🎭 *"${newPlay.title}"* is now live.${postMsg}`,
+            chatId: String(chatId),
+            replyMarkup: {
+              inline_keyboard: [
+                [{ text: '🌐 View Stage Play', url: `${site}/stage-plays/${newPlay.slug}` }],
+                [{ text: '🎨 Open Social Studio', url: `${site}/admin/social-studio` }],
+              ],
+            },
+          });
+        }
+      } else if (action === 'film' || action === 'film_post') {
+        const filmSlug = (payload.title || `film-${Date.now()}`)
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 80);
+
+        const { data: newFilm, error } = await supabase
+          .from('films')
+          .insert({
+            title: payload.title,
+            slug: filmSlug,
+            year: payload.year || new Date().getFullYear(),
+            release_date: payload.release_date,
+            synopsis: payload.synopsis,
+            genres: payload.genres?.length ? payload.genres : null,
+            runtime_minutes: payload.runtime_minutes,
+            content_type: payload.content_type || 'movie',
+            status: 'released',
+            poster_url: photoUrl,
+            backdrop_url: photoUrl,
+            needs_review: true,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (payload.director || payload.cast?.length) {
+          const { attachCreditsBatch } = await import('./film_enrichment.js');
+          const people = [
+            ...(payload.cast || []).map((name: string) => ({ name, role: 'actor' })),
+            ...(payload.director ? [{ name: payload.director, role: 'director' }] : []),
+          ];
+          await attachCreditsBatch([{ filmId: newFilm.id, people }]);
+        }
+
+        let postMsg = '';
+        if (action === 'film_post') {
+          const { generateSocialDraft } = await import('./social_studio.js');
+          const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
+          await generateSocialDraft(
+            {
+              contentType: 'upcoming_movie',
+              sourceEntityId: newFilm.id,
+              templateSlug: 'now-showing-cinemas-v1',
+              platforms: ['instagram', 'facebook', 'tiktok'],
+            },
+            systemActor,
+          );
+          postMsg = '\n🎨 *Social Studio Draft also created!*';
+        }
+
+        if (chatId) {
+          await sendTelegramMessage({
+            text: `✅ *Film Saved to Database!*\n\n🎬 *"${newFilm.title}"* is now live.${postMsg}`,
+            chatId: String(chatId),
+            replyMarkup: {
+              inline_keyboard: [
+                [{ text: '🌐 View Film', url: `${site}/film/${newFilm.slug}` }],
+                [{ text: '🎨 Open Social Studio', url: `${site}/admin/social-studio` }],
+              ],
+            },
+          });
+        }
+      } else if (action === 'person') {
+        const personSlug = (payload.name || `person-${Date.now()}`)
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 80);
+
+        const { data: newPerson, error } = await supabase
+          .from('people')
+          .insert({
+            name: payload.name,
+            slug: personSlug,
+            primary_role: payload.primary_role || 'actor',
+            roles: payload.roles?.length ? payload.roles : [payload.primary_role || 'actor'],
+            bio: payload.bio,
+            image_url: photoUrl,
+            instagram_handle: payload.instagram_handle ? payload.instagram_handle.replace(/^@/, '') : null,
+            twitter_handle: payload.twitter_handle ? payload.twitter_handle.replace(/^@/, '') : null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (chatId) {
+          await sendTelegramMessage({
+            text: `✅ *Person Saved to Database!*\n\n👤 *"${newPerson.name}"* is now live.`,
+            chatId: String(chatId),
+            replyMarkup: {
+              inline_keyboard: [
+                [{ text: '🌐 View Person Profile', url: `${site}/person/${newPerson.slug}` }],
+              ],
+            },
+          });
+        }
+      } else if (action === 'review') {
+        let filmId: string | null = null;
+        if (payload.film_title) {
+          const { data: matchedFilm } = await supabase
+            .from('films')
+            .select('id')
+            .ilike('title', payload.film_title)
+            .limit(1)
+            .maybeSingle();
+          filmId = matchedFilm?.id || null;
+        }
+
+        const { data: newReview, error } = await supabase
+          .from('critic_reviews')
+          .insert({
+            film_id: filmId,
+            critic_name: payload.critic_name,
+            publication: payload.publication,
+            quote: payload.quote,
+            rating: payload.rating,
+            rating_scale: payload.rating_scale || 10,
+            review_url: payload.review_url || event.source_url,
+            is_featured: true,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (chatId) {
+          await sendTelegramMessage({
+            text: `✅ *Critic Review Saved to Database!*\n\n⭐ Review by *${newReview.critic_name}* on *"${payload.film_title || 'Film'}"* has been recorded.`,
+            chatId: String(chatId),
+            replyMarkup: {
+              inline_keyboard: [
+                [{ text: '📥 Open Critic Reviews', url: `${site}/admin/critic-reviews` }],
+              ],
+            },
+          });
+        }
+      }
+
+      await supabase.from('social_news_events').update({ status: 'completed' }).eq('id', eventId);
+    } catch (saveErr: any) {
+      console.error('[wiz_save] error:', saveErr);
+      if (chatId) await reply(chatId, `❌ Save failed: ${saveErr?.message || saveErr}`);
     }
     return;
   }
@@ -1093,6 +2056,155 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     : null;
   const directVideo = message.video || null;
 
+  // ── 0. Check if user is answering an active wizard question ────────────────
+  const { data: activeWizard } = await supabase
+    .from('social_news_events')
+    .select('id, metadata')
+    .eq('event_type', 'wizard_active')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeWizard?.metadata && String(activeWizard.metadata.chat_id) === String(chatId) && text) {
+    const { event_id, kind, step_index, field_key, single_field } = activeWizard.metadata;
+    await supabase.from('social_news_events').update({ status: 'completed' }).eq('id', activeWizard.id);
+
+    const { data: targetEvent } = await supabase
+      .from('social_news_events')
+      .select('id, metadata')
+      .eq('id', event_id)
+      .maybeSingle();
+
+    if (targetEvent) {
+      const targetMeta = intakeMetadata(targetEvent.metadata);
+      const payload = targetMeta.extracted_payload || {};
+
+      if (field_key === 'genres' || field_key === 'cast') {
+        payload[field_key] = text.split(/[,/]+/).map((s: string) => s.trim()).filter(Boolean);
+      } else if (field_key === 'year' || field_key === 'rating') {
+        const num = parseFloat(text.replace(/[^0-9.]/g, ''));
+        payload[field_key] = isNaN(num) ? text : num;
+      } else {
+        payload[field_key] = text;
+      }
+
+      targetMeta.extracted_payload = payload;
+      await supabase.from('social_news_events').update({ metadata: targetMeta }).eq('id', event_id);
+      await reply(chatId, `✅ Updated *${field_key}*: "${text}"`);
+
+      if (single_field) {
+        await showWizardCard(chatId, event_id, kind);
+      } else {
+        await sendWizardStepPrompt(chatId, event_id, kind, Number(step_index) + 1, false);
+      }
+      return;
+    }
+  }
+
+  // ── 1. Check if user replied with a photo to set an HD portrait poster ───────
+  let targetDraftId: string | null = null;
+  let targetFilmId: string | null = null;
+
+  const repliedKeyboard = message.reply_to_message?.reply_markup?.inline_keyboard;
+  if (repliedKeyboard) {
+    for (const row of repliedKeyboard) {
+      for (const btn of row) {
+        if (btn.callback_data?.startsWith('slot_yt:')) {
+          targetDraftId = btn.callback_data.slice('slot_yt:'.length).trim();
+        } else if (btn.callback_data?.startsWith('prompt_poster:')) {
+          const parts = btn.callback_data.slice('prompt_poster:'.length).split(':');
+          targetDraftId = parts[0]?.trim() || null;
+          targetFilmId = parts[1]?.trim() || null;
+        }
+      }
+    }
+  }
+
+  // Also check active pending poster session in social_news_events
+  if (!targetFilmId) {
+    const { data: pendingSession } = await supabase
+      .from('social_news_events')
+      .select('id, metadata')
+      .eq('event_type', 'awaiting_poster')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (pendingSession?.metadata) {
+      targetFilmId = pendingSession.metadata.film_id;
+      targetDraftId = pendingSession.metadata.draft_id;
+      await supabase.from('social_news_events').update({ status: 'completed' }).eq('id', pendingSession.id);
+    }
+  }
+
+  // If draftId is known but filmId is not yet resolved, lookup from social_content_items
+  if (targetDraftId && !targetFilmId) {
+    const { data: draftItem } = await supabase
+      .from('social_content_items')
+      .select('source_entity_id')
+      .eq('id', targetDraftId)
+      .maybeSingle();
+    targetFilmId = draftItem?.source_entity_id || null;
+  }
+
+  // If a photo was supplied in response to a poster prompt or alert reply:
+  if (photo && targetFilmId) {
+    const photoUrl = await getTelegramFileUrl(photo.file_id);
+    if (photoUrl) {
+      await reply(chatId, '⏳ Downloading and uploading HD portrait poster...');
+      try {
+        const { mirrorIfExternal } = await import('./image_mirror.js');
+        const mirroredUrl = await mirrorIfExternal(photoUrl, 'posters', `poster-${targetFilmId}-${Date.now()}`);
+
+        await supabase
+          .from('films')
+          .update({ poster_url: mirroredUrl, backdrop_url: mirroredUrl })
+          .eq('id', targetFilmId);
+
+        const { data: film } = await supabase
+          .from('films')
+          .select('title')
+          .eq('id', targetFilmId)
+          .maybeSingle();
+
+        if (targetDraftId) {
+          try {
+            const { refreshStreamingPoster } = await import('./social_studio.js');
+            await refreshStreamingPoster(targetDraftId, true);
+          } catch (rErr: any) {
+            console.warn('[handleSocialIntake] refreshStreamingPoster error:', rErr?.message);
+          }
+        }
+
+        const buttons: any[][] = [];
+        if (targetDraftId) {
+          buttons.push([
+            { text: "📅 Slot into Today's Queue", callback_data: `slot_yt:${targetDraftId}` },
+            { text: '🚀 Publish Now', callback_data: `pub_yt:${targetDraftId}` },
+          ]);
+          buttons.push([
+            { text: '🎨 Open in Social Studio', url: 'https://muvidb.com/admin/social-studio' },
+          ]);
+        }
+
+        await sendTelegramPhoto({
+          photo: mirroredUrl,
+          caption: `🖼️ *HD Poster Attached Successfully!*\n\n🎬 *Film:* "${film?.title || 'Film'}"\n🎨 *Social Studio Updated:* Vertical 9:16 and 4:5 assets generated!\n\nReady to slot or publish:`,
+          chatId: String(chatId),
+          replyMarkup: buttons.length ? { inline_keyboard: buttons } : undefined,
+        });
+        return;
+      } catch (err: any) {
+        console.error('[handleSocialIntake] Poster upload error:', err);
+        await reply(chatId, `⚠️ Failed to upload poster: ${err?.message || err}`);
+        return;
+      }
+    }
+  }
+
+  // ── 2. Standard Intake & Universal Database Wizard ─────────────────────────
   // Extract URLs safely from text, caption, or message entities
   const sourceUrl = extractUrlFromMessage(message);
 
@@ -1160,10 +2272,10 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     '',
     `📌 *Title:* ${meta.title}`,
     meta.authorName ? `👤 *Account:* ${meta.authorName}` : null,
-    snippet ? `📝 *Caption:* "${snippet}"` : null,
+    snippet ? `📝 *Content:* "${snippet}"` : null,
     sourceUrl ? `🔗 *Link:* ${sourceUrl}` : null,
     '',
-    '👇 *What would you like to do with this?*',
+    '👇 *Choose what you want to write to the Database:*',
   ]
     .filter(Boolean)
     .join('\n');
@@ -1178,13 +2290,19 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     ...(canDownloadVideo
       ? [[{ text: '▶️ Get Playable Video', callback_data: `intake_download:${newEvent.id}` }]]
       : []),
-    [{ text: '🎨 Create Editable Social Draft', callback_data: `intake_draft:${newEvent.id}` }],
+    ...(photo || meta.imageUrl
+      ? [[{ text: '🖼️ Attach Poster to YouTube Film', callback_data: `wiz_attach_yt_list:${newEvent.id}` }]]
+      : []),
     [
-      { text: '🎞 Prepare Film', callback_data: `intake_film:${newEvent.id}` },
-      { text: '📝 Add Critic Review', callback_data: `intake_review:${newEvent.id}` },
+      { text: '🎬 Create Film', callback_data: `wiz_extract:film:${newEvent.id}` },
+      { text: '🎭 Create Stage Play', callback_data: `wiz_extract:play:${newEvent.id}` },
     ],
     [
-      { text: '🎭 Extract Credits', callback_data: `intake_credits:${newEvent.id}` },
+      { text: '👤 Create Person', callback_data: `wiz_extract:person:${newEvent.id}` },
+      { text: '⭐ Add Critic Review', callback_data: `wiz_extract:review:${newEvent.id}` },
+    ],
+    [
+      { text: '📱 Create Social Post', callback_data: `intake_draft:${newEvent.id}` },
       { text: '📰 Save as News', callback_data: `intake_news:${newEvent.id}` },
     ],
     [

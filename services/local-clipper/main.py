@@ -350,6 +350,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
         }
 
         direct_stream_url = None
+        direct_audio_url = None
         direct_stream_headers = {}
         if "youtube.com" not in url and "youtu.be" not in url:
             direct_stream_url = url
@@ -357,46 +358,66 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
             try:
                 with yt_dlp.YoutubeDL(opts) as downloader:
                     info = downloader.extract_info(url, download=False)
-                    direct_stream_url = info.get("url")
-                    direct_stream_headers = info.get("http_headers") or {}
+                    rf = info.get("requested_formats")
+                    if rf and len(rf) >= 2:
+                        direct_stream_url = rf[0].get("url")
+                        direct_audio_url = rf[1].get("url")
+                        direct_stream_headers = rf[0].get("http_headers") or info.get("http_headers") or {}
+                    else:
+                        direct_stream_url = info.get("url")
+                        direct_stream_headers = info.get("http_headers") or {}
             except Exception as e:
                 print(f"[Clipper] Direct stream extract with cookies failed: {e}. Retrying unauthenticated…")
                 try:
                     clean_opts = {k: v for k, v in opts.items() if k not in ("cookiefile", "cookiesfrombrowser")}
                     with yt_dlp.YoutubeDL(clean_opts) as clean_dl:
                         info = clean_dl.extract_info(url, download=False)
-                        direct_stream_url = info.get("url")
-                        direct_stream_headers = info.get("http_headers") or {}
+                        rf = info.get("requested_formats")
+                        if rf and len(rf) >= 2:
+                            direct_stream_url = rf[0].get("url")
+                            direct_audio_url = rf[1].get("url")
+                            direct_stream_headers = rf[0].get("http_headers") or info.get("http_headers") or {}
+                        else:
+                            direct_stream_url = info.get("url")
+                            direct_stream_headers = info.get("http_headers") or {}
                 except Exception as e2:
                     print(f"[Clipper] Direct stream clean extract failed: {e2}")
 
         CLIP_JOBS[token].update({"message": "Slicing & rendering optimized clip with FFmpeg…", "progress": 40})
         
         if direct_stream_url:
-            # Fast direct stream slicing without saving whole 3GB video
-            command = [
-                "ffmpeg", "-y", "-ss", str(start),
-            ]
-            if direct_stream_headers:
-                command.extend(["-headers", "\r\n".join(f"{key}: {value}" for key, value in direct_stream_headers.items())])
-            command.extend(["-i", direct_stream_url,
+            # Fast direct stream slicing with HTTP headers & reconnect support
+            header_str = "\r\n".join(f"{key}: {value}" for key, value in direct_stream_headers.items()) if direct_stream_headers else ""
+            command = ["ffmpeg", "-y"]
+            if header_str:
+                command.extend(["-headers", header_str])
+            command.extend(["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
+            command.extend(["-ss", str(start), "-i", direct_stream_url])
+            if direct_audio_url:
+                if header_str:
+                    command.extend(["-headers", header_str])
+                command.extend(["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
+                command.extend(["-ss", str(start), "-i", direct_audio_url])
+            command.extend([
                 "-t", str(duration),
                 "-sn",
                 "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
                 "-pix_fmt", "yuv420p", "-r", "30",
                 "-c:a", "aac", "-b:a", "192k",
-                "-movflags", "+faststart", str(final_path)])
+                "-movflags", "+faststart", str(final_path)
+            ])
             try:
-                rendered = subprocess.run(command, capture_output=True, text=True, timeout=120)
-            except subprocess.TimeoutExpired as exc:
+                rendered = subprocess.run(command, capture_output=True, text=True, timeout=90)
+            except subprocess.TimeoutExpired:
                 rendered = None
                 print("[Clipper] Direct stream timed out; falling back to a local download.")
             if rendered is not None and (rendered.returncode != 0 or not final_path.exists()):
                 print("[Clipper] Direct stream ffmpeg error, falling back to temp file:", rendered.stderr)
 
-        # Fallback if direct streaming failed
+        # Fallback using yt-dlp section cutting (only downloads the exact requested range)
         if not final_path.exists() or final_path.stat().st_size == 0:
+            CLIP_JOBS[token].update({"message": f"Downloading section ({int(start)}s - {int(end)}s)…", "progress": 55})
             with tempfile.TemporaryDirectory(prefix="muvidb-clip-") as workdir:
                 raw_template = str(Path(workdir) / "source.%(ext)s")
                 fallback_opts = {
@@ -407,7 +428,9 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "writeautomaticsub": False,
                     "allsubtitles": False,
                     "embedsubtitles": False,
-                    "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+                    "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best",
+                    "download_ranges": yt_dlp.utils.download_range_func(None, [(start, end)]),
+                    "force_keyframes_at_cuts": False,
                     "extractor_args": {
                         "youtube": {
                             "player_client": ["web_safari", "web_embedded", "android", "web"]
@@ -416,14 +439,14 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "outtmpl": raw_template,
                     "merge_output_format": "mp4",
                     "retries": 3,
-                    "socket_timeout": 45,
+                    "socket_timeout": 30,
                     **cookie_options(),
                 }
                 try:
                     with yt_dlp.YoutubeDL(fallback_opts) as dl:
                         dl.download([url])
                 except Exception as dl_err:
-                    print(f"[Clipper] Fallback download with cookies failed: {dl_err}. Retrying without cookies…")
+                    print(f"[Clipper] Section download with cookies failed: {dl_err}. Retrying without cookies…")
                     clean_fallback_opts = {k: v for k, v in fallback_opts.items() if k not in ("cookiefile", "cookiesfrombrowser")}
                     with yt_dlp.YoutubeDL(clean_fallback_opts) as clean_dl:
                         clean_dl.download([url])
@@ -432,8 +455,9 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 if not candidates:
                     raise RuntimeError("YouTube did not return a usable video segment.")
 
+                CLIP_JOBS[token].update({"message": f"Cropping to {payload.aspect_ratio}…", "progress": 80})
                 cmd = [
-                    "ffmpeg", "-y", "-ss", str(start), "-i", str(candidates[0]),
+                    "ffmpeg", "-y", "-i", str(candidates[0]),
                     "-t", str(duration),
                     "-sn",
                     "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
@@ -442,7 +466,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "-c:a", "aac", "-b:a", "192k",
                     "-movflags", "+faststart", str(final_path),
                 ]
-                subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+                subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
         if not final_path.exists() or final_path.stat().st_size == 0:
             raise RuntimeError("FFmpeg could not produce the output video.")

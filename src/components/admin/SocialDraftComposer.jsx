@@ -1469,6 +1469,14 @@ export default function SocialDraftComposer({
     if (invalidCarousels.length) {
       return toast.error(`Add at least 2 saved items to: ${invalidCarousels.map(variant => variant.platform).join(', ')}`);
     }
+    const hasUnrenderedEmbed = (result.assets || []).some(a => 
+      (a.format === 'video_clip' || a.format === 'full_video') && 
+      !a.isRenderedMp4 && 
+      (a.publicUrl?.includes('youtube.com') || a.publicUrl?.includes('youtu.be'))
+    );
+    if (hasUnrenderedEmbed) {
+      return toast.error('Cannot schedule unrendered YouTube embed. Open "YouTube / Video Clip Studio" and click "Start Clipping (Render MP4)" to export the video file first.');
+    }
     let targetDate = new Date();
     if (preset === 'today_6pm') {
       targetDate.setHours(18, 0, 0, 0);
@@ -3571,6 +3579,25 @@ export default function SocialDraftComposer({
               )}
               </div>
             </div>
+
+            {/* Unrendered YouTube Embed Warning Banner */}
+            {(result?.assets || []).some(a => (a.format === 'video_clip' || a.format === 'full_video') && !a.isRenderedMp4 && (a.publicUrl?.includes('youtube.com') || a.publicUrl?.includes('youtu.be'))) && (
+              <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-300 flex flex-wrap items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-2.5">
+                  <Icon icon="solar:danger-triangle-bold" width="20" className="shrink-0 text-amber-400" />
+                  <p className="leading-relaxed">
+                    <strong>⚠️ YouTube Preview Embed Attached:</strong> This video clip has not been sliced into an MP4 file yet. Social publishing platforms (TikTok, Instagram Reels) require real MP4 videos.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVideoStudioOpen(true)}
+                  className="rounded-lg bg-gradient-to-r from-brand to-amber-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 transition-all shadow-sm"
+                >
+                  🚀 Open Clip Studio & Click &ldquo;Start Clipping (Render MP4)&rdquo;
+                </button>
+              </div>
+            )}
 
             {/* Quick Scheduling Controls */}
             <div className="mt-6 rounded-lg border border-border bg-surface p-5">
