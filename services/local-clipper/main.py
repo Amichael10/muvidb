@@ -71,7 +71,7 @@ class PrivateNetworkAccessMiddleware(BaseHTTPMiddleware):
         return response
 
 
-app.add_middleware(PrivateNetworkAccessMiddleware)
+# Add CORSMiddleware first, then PrivateNetworkAccessMiddleware so PNA wraps everything (including OPTIONS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -79,6 +79,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(PrivateNetworkAccessMiddleware)
 
 
 class ClipRequest(BaseModel):
@@ -318,16 +319,75 @@ def metadata(payload: MetadataRequest):
     }
 
 
+def has_video_stream(path: Path) -> bool:
+    """Verify that the rendered file actually contains a video stream (not just audio)."""
+    try:
+        res = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=codec_type",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(path)
+            ],
+            capture_output=True, text=True, timeout=10
+        )
+        return "video" in res.stdout.lower()
+    except Exception:
+        return path.exists() and path.stat().st_size > 100_000
+
+
 def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: Path) -> None:
-    """Fast stream-based slicing and rendering in sub-30s."""
+    """Fast stream-based slicing and rendering in sub-30s with master segment sharing."""
     start = float(payload.start_time)
     end = float(payload.end_time)
     duration = end - start
     require_dependencies()
     url = str(payload.url)
     try:
+        # Check if another format in this batch already extracted the master segment for this time range
+        import hashlib
+        master_key = hashlib.sha256(f"{url}_{int(start)}_{int(end)}".encode()).hexdigest()[:16]
+        master_segment = OUTPUT_DIR / f"master_{master_key}.mp4"
+
+        if master_segment.exists() and master_segment.stat().st_size > 100_000:
+            CLIP_JOBS[token].update({"message": f"Cropping {payload.aspect_ratio} from cached scene…", "progress": 70})
+            cmd = [
+                "ffmpeg", "-y", "-i", str(master_segment),
+                "-t", str(duration),
+                "-sn",
+                "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                "-pix_fmt", "yuv420p", "-r", "30",
+                "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart", str(final_path),
+            ]
+            subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            if final_path.exists() and final_path.stat().st_size > 50_000 and has_video_stream(final_path):
+                CLIP_JOBS[token].update({
+                    "status": "complete",
+                    "message": "Clip ready.",
+                    "progress": 100,
+                    "result": {
+                        "success": True,
+                        "token": token,
+                        "job_id": token,
+                        "download_url": f"http://127.0.0.1:{PORT}/files/{token}",
+                        "cleanup_url": f"http://127.0.0.1:{PORT}/files/{token}",
+                        "file_name": final_name,
+                        "mime_type": "video/mp4",
+                        "size_bytes": final_path.stat().st_size,
+                        "size_mb": round(final_path.stat().st_size / (1024 * 1024), 2),
+                        "duration": duration,
+                        "aspect_ratio": payload.aspect_ratio,
+                        "fit_mode": payload.fit_mode,
+                    },
+                })
+                return
+
         CLIP_JOBS[token].update({"message": "Extracting fast stream info…", "progress": 15})
         
+        # Prioritize 1080p H.264 over 4K AV1 to prevent CPU choking and timeouts
         opts = {
             "quiet": True,
             "no_warnings": True,
@@ -336,13 +396,10 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
             "writeautomaticsub": False,
             "allsubtitles": False,
             "embedsubtitles": False,
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+            "format": "bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
             "extractor_args": {
                 "youtube": {
-            # web_safari/web_embedded are less likely to trigger YouTube's
-            # signed-in bot wall than the default web client. Keep Android as
-            # a final compatible fallback for videos that expose it.
-            "player_client": ["web_safari", "web_embedded", "android", "web"]
+                    "player_client": ["web_safari", "web_embedded", "android", "web"]
                 }
             },
             "socket_timeout": 30,
@@ -383,11 +440,11 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 except Exception as e2:
                     print(f"[Clipper] Direct stream clean extract failed: {e2}")
 
-        CLIP_JOBS[token].update({"message": "Slicing & rendering optimized clip with FFmpeg…", "progress": 40})
+        CLIP_JOBS[token].update({"message": f"Slicing & rendering {payload.aspect_ratio} with FFmpeg…", "progress": 40})
         
         if direct_stream_url:
-            # Fast direct stream slicing with HTTP headers & reconnect support
-            header_str = "\r\n".join(f"{key}: {value}" for key, value in direct_stream_headers.items()) if direct_stream_headers else ""
+            # Trailing \r\n required by FFmpeg -headers option
+            header_str = "".join(f"{key}: {value}\r\n" for key, value in direct_stream_headers.items()) if direct_stream_headers else ""
             command = ["ffmpeg", "-y"]
             if header_str:
                 command.extend(["-headers", header_str])
@@ -409,15 +466,18 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 "-movflags", "+faststart", str(final_path)
             ])
             try:
-                rendered = subprocess.run(command, capture_output=True, text=True, timeout=35)
+                # Dynamic timeout based on clip duration (never hardcoded 35s)
+                stream_timeout = max(180, int(duration * 3) + 60)
+                rendered = subprocess.run(command, capture_output=True, text=True, timeout=stream_timeout)
             except subprocess.TimeoutExpired:
                 rendered = None
                 print("[Clipper] Direct stream timed out; falling back to range download.")
             if rendered is not None and (rendered.returncode != 0 or not final_path.exists()):
                 print("[Clipper] Direct stream ffmpeg error, falling back to temp file:", rendered.stderr)
 
-        # Fallback using yt-dlp section cutting (only downloads the exact requested range)
-        if not final_path.exists() or final_path.stat().st_size == 0:
+        # Fallback using yt-dlp section cutting
+        if not final_path.exists() or final_path.stat().st_size == 0 or not has_video_stream(final_path):
+            final_path.unlink(missing_ok=True)
             CLIP_JOBS[token].update({"message": f"Downloading section ({int(start)}s - {int(end)}s)…", "progress": 55})
             with tempfile.TemporaryDirectory(prefix="muvidb-clip-") as workdir:
                 raw_template = str(Path(workdir) / "source.%(ext)s")
@@ -431,7 +491,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "embedsubtitles": False,
                     "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best",
                     "download_ranges": yt_dlp.utils.download_range_func(None, [(start, end)]),
-                    "force_keyframes_at_cuts": False,
+                    "force_keyframes_at_cuts": True,
                     "extractor_args": {
                         "youtube": {
                             "player_client": ["web_safari", "web_embedded", "android", "web"]
@@ -452,13 +512,43 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     with yt_dlp.YoutubeDL(clean_fallback_opts) as clean_dl:
                         clean_dl.download([url])
 
-                candidates = list(Path(workdir).glob("source.*"))
-                if not candidates:
+                # Strictly pick actual video files, excluding .part, .ytdl, or standalone audio
+                video_candidates = [
+                    c for c in Path(workdir).glob("source.*")
+                    if c.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov", ".ts")
+                    and not c.name.endswith(".part")
+                    and not c.name.endswith(".ytdl")
+                ]
+                if not video_candidates:
+                    video_candidates = [
+                        c for c in Path(workdir).glob("*")
+                        if c.suffix.lower() in (".mp4", ".mkv", ".webm")
+                        and not c.name.endswith(".part")
+                    ]
+                if not video_candidates:
                     raise RuntimeError("YouTube did not return a usable video segment.")
 
+                source_video = sorted(video_candidates, key=lambda f: f.stat().st_size, reverse=True)[0]
+
+                # Check if downloaded file is the full video or pre-cut
+                seek_start = 0
+                try:
+                    probe_res = subprocess.run(
+                        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(source_video)],
+                        capture_output=True, text=True, timeout=10
+                    )
+                    src_dur = float(probe_res.stdout.strip())
+                    if src_dur > duration + 15:
+                        seek_start = start
+                except Exception:
+                    pass
+
                 CLIP_JOBS[token].update({"message": f"Cropping to {payload.aspect_ratio}…", "progress": 80})
-                cmd = [
-                    "ffmpeg", "-y", "-i", str(candidates[0]),
+                cmd = ["ffmpeg", "-y"]
+                if seek_start > 0:
+                    cmd.extend(["-ss", str(seek_start)])
+                cmd.extend([
+                    "-i", str(source_video),
                     "-t", str(duration),
                     "-sn",
                     "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
@@ -466,11 +556,12 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "-pix_fmt", "yuv420p", "-r", "30",
                     "-c:a", "aac", "-b:a", "192k",
                     "-movflags", "+faststart", str(final_path),
-                ]
-                subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                ])
+                subprocess.run(cmd, capture_output=True, text=True, timeout=180)
 
-        if not final_path.exists() or final_path.stat().st_size == 0:
-            raise RuntimeError("FFmpeg could not produce the output video.")
+        if not final_path.exists() or final_path.stat().st_size == 0 or not has_video_stream(final_path):
+            final_path.unlink(missing_ok=True)
+            raise RuntimeError("FFmpeg could not produce the output video with a valid video stream.")
 
         CLIP_JOBS[token].update({
             "status": "complete",
@@ -570,7 +661,10 @@ def upload_clip_to_r2(payload: UploadRequest):
         req = urllib.request.Request(
             payload.upload_url,
             data=data,
-            headers={"Content-Type": payload.content_type},
+            headers={
+                "Content-Type": payload.content_type,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            },
             method="PUT",
         )
         with urllib.request.urlopen(req, timeout=180) as resp:

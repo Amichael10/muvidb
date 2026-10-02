@@ -926,7 +926,7 @@ export default function AdminSocialStudio() {
       await fetchDrafts(true);
       toast.success(`Prepared multi-ratio video draft for ${film.title}!`);
     } catch (err) {
-      setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Daily video autopilot failed.' }));
+      setVideoAutopilot(prev => ({ ...prev, running: false, error: err.message || 'Daily video autopilot failed.', message: err.message || 'Daily video autopilot failed.' }));
       toast.error(err.message || 'Daily video autopilot failed.');
     }
   };
@@ -1435,7 +1435,7 @@ export default function AdminSocialStudio() {
         toast.success(`✨ ${created} video clip(s) rendered and saved to drafts!`);
       }
     } catch (err) {
-      setVideoAutopilot(prev => ({ ...prev, running: false, message: err.message || 'Custom video plan failed.', progress: 0 }));
+      setVideoAutopilot(prev => ({ ...prev, running: false, error: err.message || 'Custom video plan failed.', message: err.message || 'Custom video plan failed.', progress: 0 }));
       toast.error(err.message || 'Custom video plan failed.');
     }
   };
@@ -3619,6 +3619,32 @@ export default function AdminSocialStudio() {
                   <span>Stream Slicing & FFmpeg Resize</span>
                   <span>Direct R2 Storage Upload</span>
                 </div>
+              </div>
+            )}
+
+            {/* Error Banner when desktop clipper fails */}
+            {videoAutopilot.error && !videoAutopilot.running && (
+              <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 p-4 shadow-lg shadow-red-500/10 transition-all animate-fadeIn flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-400">
+                    <Icon icon="solar:danger-triangle-bold" width="22" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-red-400">
+                      Video Clipper Issue
+                    </h4>
+                    <p className="mt-0.5 text-xs font-medium text-white/90">
+                      {videoAutopilot.error}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVideoAutopilot(prev => ({ ...prev, error: null }))}
+                  className="rounded-lg border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/20 transition-all"
+                >
+                  Dismiss
+                </button>
               </div>
             )}
 
