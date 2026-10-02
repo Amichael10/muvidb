@@ -708,7 +708,7 @@ async function handleCallback(query: any) {
       event_type: 'awaiting_poster',
       title: 'Awaiting poster upload',
       source_type: 'telegram_bot',
-      status: 'pending',
+      status: 'new',
       metadata: {
         action: 'awaiting_poster',
         chat_id: String(chatId),
@@ -912,7 +912,7 @@ async function handleCallback(query: any) {
     }
 
     const filmButtons = Array.from(filmsMap.entries()).map(([fId, fTitle]) => [
-      { text: `🎬 ${fTitle.slice(0, 32)}`, callback_data: `wiz_attach_yt:${fId}:${eventId}` },
+      { text: `🎬 ${fTitle.slice(0, 32)}`, callback_data: `w_att:${fId}` },
     ]);
     filmButtons.push([{ text: '❌ Cancel', callback_data: `intake_ignore:${eventId}` }]);
 
@@ -926,10 +926,22 @@ async function handleCallback(query: any) {
     return;
   }
 
-  if (data.startsWith('wiz_attach_yt:')) {
-    const parts = data.slice('wiz_attach_yt:'.length).split(':');
+  if (data.startsWith('w_att:') || data.startsWith('wiz_attach_yt:')) {
+    const prefix = data.startsWith('w_att:') ? 'w_att:' : 'wiz_attach_yt:';
+    const parts = data.slice(prefix.length).split(':');
     const filmId = parts[0]?.trim();
-    const eventId = parts[1]?.trim();
+    let eventId = parts[1]?.trim();
+
+    if (!eventId) {
+      const { data: latestEvent } = await supabase
+        .from('social_news_events')
+        .select('id')
+        .eq('source_type', 'telegram_bot')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      eventId = latestEvent?.id;
+    }
 
     const { data: event } = await supabase
       .from('social_news_events')
@@ -2130,13 +2142,38 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     if (dItem?.source_entity_id) targetFilmId = dItem.source_entity_id;
   }
 
+  // Check if replying to the poster prompt message directly
+  if (!targetFilmId && message.reply_to_message?.text?.includes('Send Portrait Poster for "')) {
+    const match = message.reply_to_message.text.match(/Send Portrait Poster for "([^"]+)"/);
+    if (match?.[1]) {
+      const { data: matchedFilm } = await supabase
+        .from('films')
+        .select('id')
+        .ilike('title', match[1].trim())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (matchedFilm?.id) {
+        targetFilmId = matchedFilm.id;
+        const { data: dItem } = await supabase
+          .from('social_content_items')
+          .select('id')
+          .eq('source_entity_id', targetFilmId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        targetDraftId = dItem?.id || null;
+      }
+    }
+  }
+
   // Also check active pending poster session in social_news_events
   if (!targetFilmId) {
     const { data: pendingSession } = await supabase
       .from('social_news_events')
       .select('id, metadata')
       .eq('event_type', 'awaiting_poster')
-      .eq('status', 'pending')
+      .eq('status', 'new')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -2144,7 +2181,7 @@ async function handleSocialIntake(chatId: string | number, message: any) {
     if (pendingSession?.metadata) {
       targetFilmId = pendingSession.metadata.film_id;
       targetDraftId = pendingSession.metadata.draft_id;
-      await supabase.from('social_news_events').update({ status: 'completed' }).eq('id', pendingSession.id);
+      await supabase.from('social_news_events').update({ status: 'ignored' }).eq('id', pendingSession.id);
     }
   }
 
