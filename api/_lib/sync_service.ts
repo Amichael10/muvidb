@@ -11,7 +11,7 @@ import {
   isSensationalizedYouTubeTitle,
   type YouTubeTitleDecision,
 } from './youtube_title_policy.js';
-import { notifyYouTubeUploads } from './youtube_upload_notify.js';
+import { notifyYouTubeUploads, sendUploadAlert } from './youtube_upload_notify.js';
 import { syncSingleFilmRelatedAndEmbedding } from './film_related_sync.js';
 
 /** Film-length floor for channel_videos ingest + admin buffer (30 minutes). */
@@ -784,6 +784,26 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                   // Compute Cohere embeddings and More Like This relationships in real-time
                   Promise.allSettled(newlyAddedIds.map(id => syncSingleFilmRelatedAndEmbedding(id)))
                     .catch(() => {});
+
+                  // Auto-generate Social Studio draft & Telegram notification for newly added films
+                  for (const f of newInsertedFilms) {
+                    const matchedVideo = eligibleVideos.find((v: any) => v.video_id === f.source_video_id);
+                    if (matchedVideo) {
+                      sendUploadAlert(
+                        ch,
+                        {
+                          video_id: matchedVideo.video_id,
+                          title: matchedVideo.title,
+                          duration_seconds: matchedVideo.duration_seconds,
+                          published_at: matchedVideo.published_at,
+                          thumbnail_url: matchedVideo.thumbnail_url,
+                        },
+                        'sync_service',
+                      ).catch(err => {
+                        console.warn(`[runVideosSync] sendUploadAlert failed for ${f.title}:`, err?.message || err);
+                      });
+                    }
+                  }
                 }
               }
             }

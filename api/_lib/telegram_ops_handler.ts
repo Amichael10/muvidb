@@ -694,7 +694,11 @@ async function handleCallback(query: any) {
   if (data.startsWith('prompt_poster:')) {
     const parts = data.slice('prompt_poster:'.length).split(':');
     const draftId = parts[0]?.trim();
-    const filmId = parts[1]?.trim();
+    let filmId = parts[1]?.trim();
+    if (!filmId && draftId) {
+      const { data: draftItem } = await supabase.from('social_content_items').select('source_entity_id').eq('id', draftId).maybeSingle();
+      filmId = draftItem?.source_entity_id;
+    }
     if (!filmId) {
       await answerTelegramCallback(callbackId, 'Invalid film ID');
       return;
@@ -2119,6 +2123,11 @@ async function handleSocialIntake(chatId: string | number, message: any) {
         }
       }
     }
+  }
+
+  if (!targetFilmId && targetDraftId) {
+    const { data: dItem } = await supabase.from('social_content_items').select('source_entity_id').eq('id', targetDraftId).maybeSingle();
+    if (dItem?.source_entity_id) targetFilmId = dItem.source_entity_id;
   }
 
   // Also check active pending poster session in social_news_events

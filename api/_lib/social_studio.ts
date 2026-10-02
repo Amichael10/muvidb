@@ -491,7 +491,7 @@ export async function createUniversalSocialPost(input: {
       source_snapshot: snapshot,
       status: 'draft',
       generation_method: 'universal_composer',
-      created_by: actor.id,
+      created_by: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(actor?.id || '')) ? actor.id : null,
     }).select('id').single();
     if (itemError) throw itemError;
     contentItemId = contentItem.id;

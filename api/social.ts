@@ -510,6 +510,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(await updateEditorialCalendarSlot(req.body));
       }
 
+      if (task === 'copilot_chat') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { runStudioCopilotChat } = await import('./_lib/copilot/cohere_studio_copilot.js');
+        const body = parseBody(req);
+        const { message, chatHistory } = body;
+        if (!message || !String(message).trim()) {
+          return res.status(400).json({ error: 'Message is required' });
+        }
+        const result = await runStudioCopilotChat({
+          message: String(message).trim(),
+          chatHistory: Array.isArray(chatHistory) ? chatHistory : [],
+          actor,
+        });
+        return res.status(200).json(result);
+      }
+
       if (task === 'ai_generate_copy') {
         await requireSocialStudioAdmin(req);
         const { generateAICaptions } = await import('./_lib/editorial/social_copy_ai.js');

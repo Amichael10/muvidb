@@ -10,6 +10,7 @@ import UniversalSocialComposer from '../../components/admin/UniversalSocialCompo
 import AutoPilotReviewModal from '../../components/admin/AutoPilotReviewModal';
 import SocialIntakeInbox from '../../components/admin/SocialIntakeInbox';
 import FilmSearchCombobox from '../../components/admin/FilmSearchCombobox';
+import StudioCopilot from '../../components/admin/StudioCopilot';
 
 const STATUS_TONES = {
   draft: 'blue',
@@ -2047,6 +2048,22 @@ export default function AdminSocialStudio() {
       <div className="flex overflow-x-auto rounded-2xl border border-white/10 bg-surface p-1.5 shadow-sm items-center gap-1">
         <button
           type="button"
+          onClick={() => setActiveTab('copilot')}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'copilot'
+              ? 'bg-gradient-to-r from-brand to-amber-500 text-white shadow-md shadow-brand/25'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+          }`}
+        >
+          <Icon icon="solar:chat-round-line-bold" width="16" className={activeTab === 'copilot' ? 'animate-pulse text-amber-300' : 'text-brand'} />
+          <span>AI Copilot</span>
+          <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-300 border border-amber-400/30">
+            Cohere
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('composer')}
           className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
             activeTab === 'composer'
@@ -2137,6 +2154,24 @@ export default function AdminSocialStudio() {
           </button>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* AI STUDIO COPILOT (Cohere Command-R Powered)                              */}
+      {/* ========================================================================= */}
+      {activeTab === 'copilot' && (
+        <div className="space-y-4">
+          <StudioCopilot
+            onOpenDraftInComposer={(item) => {
+              openFullStudioEditor(item);
+            }}
+            onSwitchToTab={(tab) => setActiveTab(tab)}
+            onRefreshStudioData={() => {
+              fetchDrafts();
+              fetchSummary();
+            }}
+          />
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 4. TAB 1: 30-DAY AUTO-PILOT CALENDAR VIEW (SchedulePress Inspired)        */}
@@ -3940,6 +3975,21 @@ export default function AdminSocialStudio() {
           setActiveTab('composer');
         }}
       />
+
+      {/* Floating AI Copilot Trigger (Available across all tabs when not on copilot tab) */}
+      {activeTab !== 'copilot' && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            type="button"
+            onClick={() => setActiveTab('copilot')}
+            className="flex items-center gap-2.5 rounded-2xl bg-gradient-to-tr from-brand via-orange-500 to-amber-400 px-4.5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-2xl shadow-brand/40 hover:scale-105 active:scale-95 transition-all border border-white/20"
+          >
+            <Icon icon="solar:chat-round-line-bold" width="18" />
+            <span>AI Copilot</span>
+            <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

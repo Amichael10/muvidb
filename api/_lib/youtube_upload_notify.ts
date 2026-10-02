@@ -77,7 +77,7 @@ async function releaseFailedClaim(channelId: string, videoId: string, message: s
   if (error) console.warn('[youtube_upload_notify] failed claim cleanup:', message, error.message);
 }
 
-async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate, source: string) {
+export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate, source: string) {
   if (!telegramConfigured()) return { ok: false, skipped: 'telegram not configured' };
   if (!(await claimAlert(channel.id, video, source))) return { ok: false, skipped: 'already claimed' };
 
@@ -163,7 +163,7 @@ async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate, sour
           },
           systemActor,
         );
-        draftId = draft?.id || null;
+        draftId = (draft as any)?.contentItem?.id || (draft as any)?.id || null;
       } catch (err: any) {
         console.warn('[youtube_upload_notify] Social draft generation skipped:', err?.message || err);
       }
@@ -185,9 +185,9 @@ async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate, sour
   ].join('\n');
 
   const inlineKeyboard: any[][] = [];
-  if (draftId && filmId) {
+  if (draftId) {
     inlineKeyboard.push([
-      { text: '📸 Set Portrait Poster (Send Photo)', callback_data: `prompt_poster:${draftId}:${filmId}` },
+      { text: '📸 Set Portrait Poster (Send Photo)', callback_data: `prompt_poster:${draftId}` },
     ]);
     inlineKeyboard.push([
       { text: '📅 Slot into Today\'s Queue', callback_data: `slot_yt:${draftId}` },
@@ -316,7 +316,6 @@ export async function notifyYouTubeUploads(
 
   let notified = 0;
   for (const video of recentFilmLength) {
-    if (existingSet.has(video.video_id)) continue;
     if (alertedSet.has(video.video_id)) continue;
 
     const sent = await sendUploadAlert(channel, video, options.source || 'full_sync');

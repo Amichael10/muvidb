@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import { enrichMissingSynopsesConcurrent } from '../api/_lib/cohere_enrichment.js';
+import { sendUploadAlert } from '../api/_lib/youtube_upload_notify.js';
 import { runDailyPeopleCleanup } from './daily_people_cleanup';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -244,6 +245,26 @@ async function main() {
                       enrichMissingSynopsesConcurrent(newlyAddedIds).catch((e: any) =>
                         console.warn(`[continuous_youtube_sync] Cohere synopsis enrichment error:`, e.message)
                       );
+
+                      // Send Telegram notification & create Social Studio draft
+                      for (const f of newInsertedFilms) {
+                        const matchedVid = longVideos.find((v: any) => v.video_id === f.source_video_id);
+                        if (matchedVid) {
+                          sendUploadAlert(
+                            ch,
+                            {
+                              video_id: matchedVid.video_id,
+                              title: matchedVid.title,
+                              duration_seconds: matchedVid.duration_seconds,
+                              published_at: matchedVid.published_at,
+                              thumbnail_url: matchedVid.thumbnail_url,
+                            },
+                            'continuous_sync',
+                          ).catch(err => {
+                            console.warn(`[continuous_youtube_sync] sendUploadAlert failed for ${f.title}:`, err?.message || err);
+                          });
+                        }
+                      }
                     }
                   }
 

@@ -104,8 +104,16 @@ export function isAfterWebSubBaseline(publishedAt: string | null, baselineAt: st
   return Number.isFinite(published) && Number.isFinite(baseline) && published > baseline;
 }
 
+export function getWebSubCallbackToken(): string {
+  return env('YOUTUBE_WEBSUB_CALLBACK_TOKEN') || env('CRON_SECRET') || 'muvidb_youtube_websub_token';
+}
+
+export function getWebSubSecret(): string {
+  return env('YOUTUBE_WEBSUB_SECRET') || env('CRON_SECRET') || 'muvidb_youtube_websub_secret';
+}
+
 function callbackTokenIsValid(req: VercelRequest): boolean {
-  const expected = env('YOUTUBE_WEBSUB_CALLBACK_TOKEN');
+  const expected = getWebSubCallbackToken();
   const supplied = String(req.query?.token || '');
   return Boolean(expected && supplied && safeEqual(supplied, expected));
 }
@@ -116,7 +124,7 @@ function callbackUrl(): string {
     configured ||
     `${env('VITE_PUBLIC_SITE_URL') || env('PUBLIC_SITE_URL') || 'https://muvidb.com'}/api/automation?action=youtube-websub`;
   const url = new URL(base);
-  url.searchParams.set('token', env('YOUTUBE_WEBSUB_CALLBACK_TOKEN'));
+  url.searchParams.set('token', getWebSubCallbackToken());
   return url.toString();
 }
 
@@ -274,7 +282,7 @@ export async function youtubeWebSubHandler(req: VercelRequest, res: VercelRespon
   if (req.method === 'GET') return handleVerification(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const secret = env('YOUTUBE_WEBSUB_SECRET');
+  const secret = getWebSubSecret();
   if (!secret) return res.status(503).json({ error: 'YouTube WebSub is not configured' });
 
   const rawBody = await rawRequestBody(req);
@@ -300,8 +308,8 @@ async function resolveYouTubeChannelId(channel: ChannelRow): Promise<string | nu
 }
 
 async function requestSubscription(topicUrl: string): Promise<void> {
-  const secret = env('YOUTUBE_WEBSUB_SECRET');
-  const token = env('YOUTUBE_WEBSUB_CALLBACK_TOKEN');
+  const secret = getWebSubSecret();
+  const token = getWebSubCallbackToken();
   if (!secret || !token) throw new Error('YOUTUBE_WEBSUB_SECRET and YOUTUBE_WEBSUB_CALLBACK_TOKEN are required');
 
   const form = new URLSearchParams({
@@ -322,7 +330,9 @@ async function requestSubscription(topicUrl: string): Promise<void> {
 }
 
 export async function renewYouTubeWebSubSubscriptions(input: { force?: boolean } = {}) {
-  if (!env('YOUTUBE_WEBSUB_SECRET') || !env('YOUTUBE_WEBSUB_CALLBACK_TOKEN')) {
+  const secret = getWebSubSecret();
+  const token = getWebSubCallbackToken();
+  if (!secret || !token) {
     throw new Error('YouTube WebSub secrets are not configured');
   }
 
