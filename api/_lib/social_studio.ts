@@ -768,8 +768,9 @@ async function processJob(job: any, lockedBy: string, now: Date) {
     console.warn(`[processJob] Source reconciliation warning for ${contentItem.id}:`, syncErr?.message);
   }
 
+  const isCarousel = variant.platform_options?.post_format === 'carousel';
   let assetUrl: string | null = null;
-  let assetUrls: string[] = Array.isArray(variant.platform_options?.carousel_asset_urls)
+  let assetUrls: string[] = isCarousel && Array.isArray(variant.platform_options?.carousel_asset_urls)
     ? variant.platform_options.carousel_asset_urls.filter(
         (url: unknown): url is string => typeof url === 'string' && /^https:\/\//i.test(url),
       )
@@ -784,6 +785,20 @@ async function processJob(job: any, lockedBy: string, now: Date) {
     if (assetError) throw assetError;
     assetUrl = asset?.public_url || null;
   }
+
+  // If TikTok or YouTube and there is a vertical 9:16 asset in the content item, prefer it
+  if (['tiktok', 'youtube'].includes(variant.platform) && contentItem.id) {
+    const { data: verticalAsset } = await supabase
+      .from('social_assets')
+      .select('id, public_url')
+      .eq('content_item_id', contentItem.id)
+      .in('format', ['video_vertical_9_16', 'vertical_9_16'])
+      .maybeSingle();
+    if (verticalAsset?.public_url) {
+      assetUrl = verticalAsset.public_url;
+    }
+  }
+
   if (!assetUrl) {
     assetUrl = variant.platform_options?.asset_url ||
       variant.platform_options?.video_url ||
@@ -791,7 +806,7 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       variant.platform_options?.custom_asset_url ||
       null;
   }
-  if (assetUrls.length) assetUrl = assetUrls[0];
+  if (isCarousel && assetUrls.length) assetUrl = assetUrls[0];
   else if (assetUrl) assetUrls = [assetUrl];
 
   await supabase.from('social_platform_variants').update({ status: 'publishing' }).eq('id', variant.id);
