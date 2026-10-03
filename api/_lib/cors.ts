@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * the request only if it comes from our trusted domains or localhost.
  */
 export function getCorsHeaders(req: VercelRequest) {
-  const origin = req.headers.origin;
+  const origin = req?.headers?.origin || (req?.headers as any)?.Origin || '';
   let allowedOrigin = 'https://muvidb.com'; // fallback default
 
   if (origin) {

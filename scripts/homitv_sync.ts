@@ -27,6 +27,7 @@ export type HomiTvItem = {
   video_duration_seconds?: number;
   published_on?: number | string;
   presenter?: string;
+  video_rating?: string;
   is_premium?: number;
 };
 
@@ -45,6 +46,7 @@ export type NormalizedHomiTitle = {
   hlsUrl?: string | null;
   cast: string[];
   year: number | null;
+  rating: string | null;
 };
 
 type ExistingFilm = {
@@ -62,11 +64,25 @@ type ExistingFilm = {
   youtube_watch_url: string | null;
   trailer_external_url: string | null;
   year: number | null;
+  nfvcb_rating: string | null;
   needs_review: boolean | null;
 };
 
 function normalizeSourceTitle(value: string) {
   return cleanTitle(value || '').trim();
+}
+
+function normalizeNfvcbRating(raw?: string | null): string | null {
+  if (!raw) return null;
+  const clean = raw.trim().toUpperCase();
+  if (clean === '18+' || clean === '18' || clean === 'R' || clean === 'NC-17') return '18';
+  if (clean === '16+' || clean === '15+' || clean === '15') return '15';
+  if (clean === '12A' || clean === 'PG-13' || clean === '13+') return '12A';
+  if (clean === '12' || clean === '12+') return '12';
+  if (clean === 'PG') return 'PG';
+  if (clean === 'G' || clean === 'ALL' || clean === 'U') return 'G';
+  if (clean === 'RE') return 'RE';
+  return null;
 }
 
 function parseRuntime(durationStr?: string, seconds?: number): number | null {
@@ -96,7 +112,7 @@ function normalizeCast(value?: string): string[] {
   )];
 }
 
-function parseGenres(genre?: string, category?: string): string[] {
+function parseGenres(genre?: string, category?: string, tags?: any[]): string[] {
   const set = new Set<string>();
   if (genre) {
     genre.split(/[,|/]/).forEach((g) => {
@@ -108,6 +124,17 @@ function parseGenres(genre?: string, category?: string): string[] {
     category.split(/[-–—,/]/).forEach((c) => {
       const clean = c.trim();
       if (clean && !clean.toLowerCase().includes('movie')) set.add(clean);
+    });
+  }
+  if (Array.isArray(tags)) {
+    tags.forEach((t) => {
+      const name = typeof t === 'string' ? t : t?.name || t?.tag;
+      if (typeof name === 'string' && name.trim()) {
+        const clean = name.trim();
+        if (clean.length > 2 && clean.length < 25 && !clean.toLowerCase().includes('movie')) {
+          set.add(clean);
+        }
+      }
     });
   }
   return [...set];
@@ -124,14 +151,20 @@ async function fetchCatalogFromApi(): Promise<HomiTvItem[]> {
       });
       if (!res.ok) break;
       const json: any = await res.json();
-      const pageData = json?.data || [];
-      if (!Array.isArray(pageData) || pageData.length === 0) break;
-      for (const it of pageData) {
-        if (it?.slug && !items.some((x) => x.slug === it.slug)) {
-          items.push(it);
+      const homeContent = json?.response?.home_content || json?.data || [];
+      let foundAny = false;
+      if (Array.isArray(homeContent)) {
+        for (const sec of homeContent) {
+          const list = sec?.data || (Array.isArray(sec) ? sec : []);
+          for (const it of list) {
+            if (it?.slug && !items.some((x) => x.slug === it.slug)) {
+              items.push(it);
+              foundAny = true;
+            }
+          }
         }
       }
-      if (!json?.links?.next) break;
+      if (!foundAny && page > 1) break;
       page += 1;
     } catch {
       break;
@@ -140,17 +173,17 @@ async function fetchCatalogFromApi(): Promise<HomiTvItem[]> {
   return items;
 }
 
-async function fetchVideoDetails(slug: string): Promise<Partial<HomiTvItem> | null> {
+async function fetchVideoDetails(slug: string): Promise<any | null> {
   try {
     const res = await fetch(`${API_BASE}/videos/${slug}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ screen: '' }),
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return null;
     const json: any = await res.json();
-    return json?.data || null;
+    return json?.response?.video_info || json?.data?.video_info || json?.data || null;
   } catch {
     return null;
   }
@@ -347,6 +380,8 @@ async function syncTitle(title: NormalizedHomiTitle, counters: SyncCounters): Pr
         },
         synopsis: bestSynopsis,
         runtime_minutes: existing.runtime_minutes || title.runtimeMinutes,
+        year: existing.year || title.year,
+        nfvcb_rating: existing.nfvcb_rating || title.rating,
         poster_url: bestPoster,
         backdrop_url: bestBackdrop,
         trailer_external_url: bestTrailer,
@@ -394,6 +429,7 @@ async function syncTitle(title: NormalizedHomiTitle, counters: SyncCounters): Pr
         ...(title.hlsUrl ? { homitv_hls: title.hlsUrl } : {}),
       },
       year: title.year,
+      nfvcb_rating: title.rating,
       status: 'released',
       needs_review: true,
     }).select('id').single();
@@ -431,28 +467,38 @@ async function main() {
       const title = normalizeSourceTitle(item.title);
       if (!title || !item.slug) continue;
 
-      const runtime = parseRuntime(item.video_duration, item.video_duration_seconds);
-      const cast = normalizeCast(item.presenter);
-      const genres = parseGenres(item.genre_name, item.video_category_name);
-      const year = typeof item.published_on === 'number'
-        ? item.published_on
-        : (item.published_on ? parseInt(String(item.published_on), 10) || null : null);
+      let detail: any = null;
+      if (!item.video_duration_seconds || !item.published_on || !item.genre_name) {
+        detail = await fetchVideoDetails(item.slug);
+      }
+
+      const rawDuration = detail?.video_duration || item.video_duration;
+      const rawDurationSec = detail?.video_duration_seconds || item.video_duration_seconds;
+      const runtime = parseRuntime(rawDuration, rawDurationSec);
+      const cast = normalizeCast(detail?.presenter || item.presenter);
+      const genres = parseGenres(detail?.genre_name || item.genre_name, detail?.video_category_name || item.video_category_name, detail?.tags);
+      const rawYear = detail?.published_on || item.published_on;
+      const year = typeof rawYear === 'number'
+        ? rawYear
+        : (rawYear ? parseInt(String(rawYear).replace(/\D/g, ''), 10) || null : null);
+      const rating = normalizeNfvcbRating(detail?.video_rating || (item as any)?.video_rating);
 
       normalizedList.push({
         sourceId: String(item.id || item.slug),
         slug: item.slug,
         title,
-        synopsis: item.description?.trim() || null,
+        synopsis: (detail?.description || item.description)?.trim() || null,
         runtimeMinutes: runtime,
         genres,
         contentType: 'movie',
-        posterUrl: item.poster_image || item.thumbnail_image || null,
-        backdropUrl: item.thumbnail_image || item.poster_image || null,
+        posterUrl: detail?.poster_image || item.poster_image || detail?.thumbnail_image || item.thumbnail_image || null,
+        backdropUrl: detail?.thumbnail_image || item.thumbnail_image || detail?.poster_image || item.poster_image || null,
         watchUrl: `${WEB_BASE}/watch/${item.slug}`,
-        trailerUrl: item.trailer_hls_url || null,
-        hlsUrl: item.hls_playlist_url || null,
+        trailerUrl: detail?.trailer_hls_url || item.trailer_hls_url || null,
+        hlsUrl: detail?.hls_playlist_url || item.hls_playlist_url || null,
         cast,
         year,
+        rating,
       });
     }
 

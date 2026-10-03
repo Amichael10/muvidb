@@ -40,12 +40,24 @@ export default function CompanyDetail() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [isBioExpanded, setIsBioExpanded] = useState(false);
 
+  // Primary view section: 'films' | 'talents' | 'collaborators' | 'about'
+  const [primarySection, setPrimarySection] = useState('films');
+
   // View mode: 'ledger' (financial/commercial table) vs 'grid' (poster cards)
   const [viewMode, setViewMode] = useState('ledger');
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'box_office', 'youtube', 'production', 'distribution', 'top'
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('box_office'); // 'box_office', 'views', 'year-desc', 'rating-desc', 'title'
-  const [visibleCount, setVisibleCount] = useState(20);
+  const [visibleCount, setVisibleCount] = useState(48);
+
+  // Talents View State
+  const [talentSearch, setTalentSearch] = useState('');
+  const [talentDeptFilter, setTalentDeptFilter] = useState('all');
+  const [visibleTalentCount, setVisibleTalentCount] = useState(12);
+
+  // Collaborators View State
+  const [collaboratorSearch, setCollaboratorSearch] = useState('');
+  const [visibleCollabCount, setVisibleCollabCount] = useState(18);
 
   useEffect(() => {
     fetchCompany();
@@ -100,40 +112,8 @@ export default function CompanyDetail() {
       `)
       .eq('company_id', comp.id);
 
-    const { data: directProdFilms } = await supabase
-      .from('films')
-      .select(`
-        id,
-        title,
-        year,
-        poster_url,
-        backdrop_url,
-        liked_percent,
-        average_rating,
-        slug,
-        box_office_domestic,
-        box_office_worldwide,
-        box_office_opening_weekend,
-        box_office_currency,
-        budget,
-        view_count,
-        release_type,
-        film_genres (
-          genres (
-            name
-          )
-        )
-      `)
-      .eq('production_company_id', comp.id);
-
     // Merge film entries with roles
     const filmMap = new Map();
-
-    (directProdFilms || []).forEach((f) => {
-      if (f && f.id) {
-        filmMap.set(f.id, { film: f, role: 'production' });
-      }
-    });
 
     (fcLinks || []).forEach((link) => {
       if (link.films && link.films.id) {
@@ -178,6 +158,59 @@ export default function CompanyDetail() {
       }))
       .filter((p) => p && p.id);
 
+    // 4. Fetch Linked YouTube Channel(s)
+    const { data: linkedChannels } = await supabase
+      .from('channels')
+      .select('*')
+      .eq('owner_company_id', comp.id);
+    comp.linkedChannels = linkedChannels || [];
+
+    // 5. Fetch Frequent Collaborators from Credits
+    const filmIds = comp.filmsWithRole.map((f) => f.film?.id).filter(Boolean);
+    if (filmIds.length > 0) {
+      const { data: creditsData } = await supabase
+        .from('credits')
+        .select(`
+          person_id,
+          role,
+          character_name,
+          people (
+            id,
+            name,
+            slug,
+            photo_url,
+            known_for_department
+          )
+        `)
+        .in('film_id', filmIds.slice(0, 100));
+
+      const collabMap = new Map();
+      (creditsData || []).forEach((c) => {
+        if (!c.person_id || !c.people) return;
+        const pid = c.person_id;
+        if (!collabMap.has(pid)) {
+          collabMap.set(pid, {
+            ...c.people,
+            filmCount: 0,
+            roles: new Set(),
+          });
+        }
+        const item = collabMap.get(pid);
+        item.filmCount++;
+        if (c.role) item.roles.add(c.role);
+      });
+
+      comp.frequentCollaborators = Array.from(collabMap.values())
+        .map((item) => ({
+          ...item,
+          rolesList: Array.from(item.roles),
+        }))
+        .sort((a, b) => b.filmCount - a.filmCount)
+        .slice(0, 24);
+    } else {
+      comp.frequentCollaborators = [];
+    }
+
     setCompany(comp);
     setLoading(false);
   };
@@ -188,6 +221,14 @@ export default function CompanyDetail() {
 
   const representedTalents = useMemo(() => {
     return company?.representedTalents || [];
+  }, [company]);
+
+  const frequentCollaborators = useMemo(() => {
+    return company?.frequentCollaborators || [];
+  }, [company]);
+
+  const linkedChannels = useMemo(() => {
+    return company?.linkedChannels || [];
   }, [company]);
 
   // Studio Performance Scorecard & Financial Analytics
@@ -340,6 +381,49 @@ export default function CompanyDetail() {
     return filteredFilms.slice(0, visibleCount);
   }, [filteredFilms, visibleCount]);
 
+  // Filtered Talents
+  const filteredTalents = useMemo(() => {
+    let list = [...representedTalents];
+    if (talentSearch.trim()) {
+      const q = talentSearch.toLowerCase().trim();
+      list = list.filter((t) => t.name?.toLowerCase().includes(q) || t.known_for_department?.toLowerCase().includes(q));
+    }
+    if (talentDeptFilter !== 'all') {
+      list = list.filter((t) => (t.known_for_department || 'acting').toLowerCase() === talentDeptFilter.toLowerCase());
+    }
+    return list;
+  }, [representedTalents, talentSearch, talentDeptFilter]);
+
+  const displayedTalents = useMemo(() => {
+    return filteredTalents.slice(0, visibleTalentCount);
+  }, [filteredTalents, visibleTalentCount]);
+
+  const talentDepartments = useMemo(() => {
+    const set = new Set();
+    representedTalents.forEach((t) => {
+      if (t.known_for_department) set.add(t.known_for_department);
+    });
+    return Array.from(set);
+  }, [representedTalents]);
+
+  // Filtered Collaborators
+  const filteredCollaborators = useMemo(() => {
+    let list = [...frequentCollaborators];
+    if (collaboratorSearch.trim()) {
+      const q = collaboratorSearch.toLowerCase().trim();
+      list = list.filter((c) =>
+        c.name?.toLowerCase().includes(q) ||
+        c.known_for_department?.toLowerCase().includes(q) ||
+        (c.rolesList || []).some((r) => r.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [frequentCollaborators, collaboratorSearch]);
+
+  const displayedCollaborators = useMemo(() => {
+    return filteredCollaborators.slice(0, visibleCollabCount);
+  }, [filteredCollaborators, visibleCollabCount]);
+
   const handleShare = () => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
@@ -452,16 +536,32 @@ export default function CompanyDetail() {
               <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 text-xs text-text-muted font-bold mb-4">
                 {company.founded_year && <span>Est. {company.founded_year}</span>}
                 {company.founded_year && <span>•</span>}
-                <span>{allFilmsWithRole.length} Catalog Releases</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPrimarySection('films');
+                    document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="hover:text-brand hover:underline transition-colors cursor-pointer"
+                >
+                  {allFilmsWithRole.length} Catalog Releases
+                </button>
                 {studioMetrics.productionCount > 0 && <span>({studioMetrics.productionCount} Produced)</span>}
                 {studioMetrics.distributionCount > 0 && <span>({studioMetrics.distributionCount} Distributed)</span>}
                 {representedTalents.length > 0 && (
                   <>
                     <span>•</span>
-                    <span className="text-brand font-black flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPrimarySection('talents');
+                        document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="text-brand font-black flex items-center gap-1 hover:underline cursor-pointer bg-brand/10 hover:bg-brand/20 px-2 py-0.5 rounded-md transition-all"
+                    >
                       <Icon icon="solar:users-group-rounded-bold" className="w-3.5 h-3.5" />
                       {representedTalents.length} Signed Talents
-                    </span>
+                    </button>
                   </>
                 )}
               </div>
@@ -512,6 +612,18 @@ export default function CompanyDetail() {
                     <Icon icon="solar:arrow-right-up-linear" className="text-xs text-text-muted" />
                   </a>
                 )}
+
+                {linkedChannels.map((ch) => (
+                  <Link
+                    key={ch.id}
+                    to={`/channels/${ch.slug || ch.id}`}
+                    className="inline-flex items-center gap-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/30 hover:border-red-500 font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
+                  >
+                    <Icon icon="solar:play-circle-bold" className="text-base text-red-500" />
+                    <span>Official YouTube Channel {ch.subscriber_count ? `(${formatViews(ch.subscriber_count)})` : ''}</span>
+                    <Icon icon="solar:arrow-right-linear" className="text-xs" />
+                  </Link>
+                ))}
 
                 <button
                   type="button"
@@ -664,87 +776,210 @@ export default function CompanyDetail() {
         </div>
       </section>
 
-      {/* ─── TALENT ROSTER (For Talent Agencies / Represented Talents) ─── */}
-      {representedTalents.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-            <div>
-              <div className="inline-flex items-center gap-1.5 text-brand text-xs font-black uppercase tracking-widest mb-1">
+      {/* ─── SECTION NAVIGATION BAR ─── */}
+      <div id="company-tabs" className="sticky top-16 z-30 bg-bg/95 backdrop-blur-md border-y border-border py-3 px-4 sm:px-6 lg:px-8 mt-10 shadow-xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+            {/* Tab 1: Films & Releases */}
+            <button
+              type="button"
+              onClick={() => {
+                setPrimarySection('films');
+                document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer shrink-0 ${
+                primarySection === 'films'
+                  ? 'bg-brand text-black shadow-md shadow-brand/20'
+                  : 'bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary border border-border'
+              }`}
+            >
+              <Icon icon="solar:clapperboard-play-bold" className="w-4 h-4" />
+              <span>Films & Releases</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                primarySection === 'films' ? 'bg-black text-white' : 'bg-surface border border-border text-text-muted'
+              }`}>
+                {allFilmsWithRole.length}
+              </span>
+            </button>
+
+            {/* Tab 2: Signed Talents (if any) */}
+            {representedTalents.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPrimarySection('talents');
+                  document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer shrink-0 ${
+                  primarySection === 'talents'
+                    ? 'bg-brand text-black shadow-md shadow-brand/20'
+                    : 'bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary border border-border'
+                }`}
+              >
                 <Icon icon="solar:users-group-rounded-bold" className="w-4 h-4" />
-                Signed Talent Roster
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-heading font-black text-text-primary tracking-tight">
-                Represented Actors & Creatives
-              </h2>
-              <p className="text-xs text-text-muted mt-1">
-                Official represented talent roster managed by {toTitleCase(company.name)}
-              </p>
-            </div>
-            <span className="px-3.5 py-1.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-xs font-black tracking-wider self-start sm:self-auto flex items-center gap-1.5 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-              {representedTalents.length} Signed Talents
-            </span>
-          </div>
+                <span>Signed Talents</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  primarySection === 'talents' ? 'bg-black text-white' : 'bg-surface border border-border text-text-muted'
+                }`}>
+                  {representedTalents.length}
+                </span>
+              </button>
+            )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6">
-            {representedTalents.map((talent) => {
-              const rep = talent.representation || {};
-              return (
-                <Link
-                  key={talent.id}
-                  to={`/people/${talent.slug || talent.id}`}
-                  className="group relative bg-surface border border-border hover:border-brand/60 rounded-2xl p-3.5 sm:p-4 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 flex flex-col justify-between"
+            {/* Tab 3: Frequent Collaborators (if any) */}
+            {frequentCollaborators.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPrimarySection('collaborators');
+                  document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer shrink-0 ${
+                  primarySection === 'collaborators'
+                    ? 'bg-brand text-black shadow-md shadow-brand/20'
+                    : 'bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary border border-border'
+                }`}
+              >
+                <Icon icon="solar:star-fall-bold" className="w-4 h-4 text-amber-400" />
+                <span>Frequent Collaborators</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  primarySection === 'collaborators' ? 'bg-black text-white' : 'bg-surface border border-border text-text-muted'
+                }`}>
+                  {frequentCollaborators.length}
+                </span>
+              </button>
+            )}
+
+            {/* Tab 4: About Studio / Agency */}
+            {company.description && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPrimarySection('about');
+                  document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer shrink-0 ${
+                  primarySection === 'about'
+                    ? 'bg-brand text-black shadow-md shadow-brand/20'
+                    : 'bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text-primary border border-border'
+                }`}
+              >
+                <Icon icon="solar:info-circle-bold" className="w-4 h-4" />
+                <span>About</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── SECTION 1: FILMS & RELEASES (FRONT-AND-CENTER) ─── */}
+      {primarySection === 'films' && (
+        <>
+          {/* ─── SIGNED TALENTS SPOTLIGHT (4-5 Talent Images + View All) ─── */}
+          {representedTalents.length > 0 && (
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 mb-4">
+              <div className="flex items-center justify-between gap-4 mb-3.5">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 text-brand text-xs font-black uppercase tracking-widest mb-0.5">
+                    <Icon icon="solar:users-group-rounded-bold" className="w-4 h-4" />
+                    Represented Talent Roster
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-heading font-black text-text-primary tracking-tight">
+                    Signed Actors & Creatives
+                  </h3>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPrimarySection('talents');
+                    document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand/10 hover:bg-brand hover:text-black text-brand text-xs font-black transition-all border border-brand/25 cursor-pointer shadow-xs shrink-0"
                 >
-                  <div>
-                    <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-black mb-3 shadow-md">
-                      <ImageWithFallback
-                        src={talent.photo_url}
-                        alt={talent.name}
-                        fallbackType="avatar"
-                        name={talent.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                  <span>View All {representedTalents.length} Talents</span>
+                  <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5" />
+                </button>
+              </div>
 
-                      {/* Rep Type Badge */}
-                      <div className="absolute top-2 left-2">
-                        <span className="px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-wider border border-white/10 shadow-sm">
-                          {rep.representation_type || 'Talent'}
-                        </span>
+              {/* 4 to 5 Talent Cards + "View All" Card */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                {representedTalents.slice(0, 5).map((talent) => {
+                  const rep = talent.representation || {};
+                  return (
+                    <Link
+                      key={talent.id}
+                      to={`/people/${talent.slug || talent.id}`}
+                      className="group relative bg-surface border border-border hover:border-brand/60 rounded-2xl p-2.5 sm:p-3 transition-all duration-300 shadow-sm hover:shadow-lg hover:-translate-y-1 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-black mb-2 shadow-xs">
+                          <ImageWithFallback
+                            src={talent.photo_url}
+                            alt={talent.name}
+                            fallbackType="avatar"
+                            name={talent.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+
+                          {/* Rep Pill */}
+                          <div className="absolute top-1.5 left-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-xs text-white text-[8px] font-black uppercase tracking-wider border border-white/10">
+                              {rep.representation_type || 'Signed'}
+                            </span>
+                          </div>
+
+                          {/* Dept Pill */}
+                          <div className="absolute bottom-1.5 left-1.5 right-1.5">
+                            <span className="text-[9px] font-black text-brand uppercase tracking-wider truncate block">
+                              {talent.known_for_department || 'Acting'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <h4 className="font-heading font-black text-xs sm:text-sm text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                          {talent.name}
+                        </h4>
                       </div>
 
-                      {/* Department Tag */}
-                      <div className="absolute bottom-2 left-2 right-2">
-                        <span className="text-[10px] font-black text-brand uppercase tracking-wider">
-                          {talent.known_for_department || 'Acting'}
-                        </span>
+                      <div className="mt-2 pt-1.5 border-t border-border/40 flex items-center justify-between text-[10px] text-brand font-semibold">
+                        <span>Profile</span>
+                        <Icon icon="solar:arrow-right-linear" className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                       </div>
+                    </Link>
+                  );
+                })}
+
+                {/* 6th Card: "View All Talents" */}
+                {representedTalents.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrimarySection('talents');
+                      document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="group relative bg-surface-2/60 hover:bg-brand/10 border-2 border-dashed border-border hover:border-brand rounded-2xl p-4 transition-all duration-300 flex flex-col items-center justify-center text-center cursor-pointer min-h-[160px]"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-brand/15 text-brand group-hover:bg-brand group-hover:text-black flex items-center justify-center transition-colors mb-2 shadow-xs">
+                      <Icon icon="solar:users-group-rounded-bold" className="w-5 h-5" />
                     </div>
+                    <span className="text-xs font-black text-text-primary group-hover:text-brand transition-colors">
+                      +{representedTalents.length - 5} More
+                    </span>
+                    <span className="text-[11px] text-text-muted mt-0.5 font-semibold">
+                      View All {representedTalents.length}
+                    </span>
+                    <span className="mt-2 text-[10px] font-bold text-brand flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      <span>Full Roster</span>
+                      <Icon icon="solar:arrow-right-linear" className="w-3 h-3" />
+                    </span>
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
 
-                    <div>
-                      <h3 className="font-heading font-black text-sm sm:text-base text-text-primary group-hover:text-brand transition-colors line-clamp-1">
-                        {talent.name}
-                      </h3>
-                      {rep.agent_name && (
-                        <p className="text-[11px] text-text-muted mt-0.5 line-clamp-1">
-                          Rep: <span className="text-text-secondary font-medium">{rep.agent_name}</span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between text-[11px] text-brand font-bold">
-                    <span>View Actor Profile</span>
-                    <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* ─── 3. TOP COMMERCIAL BLOCKBUSTERS (HALL OF FAME) ─── */}
       {studioMetrics.rankedBlockbusters.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
           <div className="flex items-center justify-between mb-4">
@@ -1165,7 +1400,488 @@ export default function CompanyDetail() {
           </div>
         )}
 
+        {/* ─── CREATIVE NETWORK SPOTLIGHT CARDS (Preview at bottom of movies) ─── */}
+        {(representedTalents.length > 0 || frequentCollaborators.length > 0) && (
+          <div className="mt-16 pt-10 border-t border-border/80">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-6">
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-wider text-brand">Agency & Creative Network</span>
+                <h3 className="text-xl font-heading font-black text-text-primary">Studio Talent & Frequent Cast</h3>
+              </div>
+              <span className="text-xs text-text-muted font-medium">Explore actors, directors, and creatives associated with this studio</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Card 1: Signed Talents Teaser */}
+              {representedTalents.length > 0 && (
+                <div className="p-5 rounded-2xl bg-surface border border-border hover:border-brand/40 transition-all flex flex-col justify-between shadow-sm">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand/10 text-brand text-xs font-black">
+                        <Icon icon="solar:users-group-rounded-bold" className="w-3.5 h-3.5" />
+                        Signed Talent Agency Roster
+                      </span>
+                      <span className="text-xs font-bold text-text-primary">
+                        {representedTalents.length} Signed Talents
+                      </span>
+                    </div>
+                    <p className="text-xs text-text-muted leading-relaxed mb-4">
+                      Official represented talent roster managed by {toTitleCase(company.name)}.
+                    </p>
+
+                    {/* Miniature Avatars */}
+                    <div className="flex items-center -space-x-2 mb-4 overflow-hidden py-1">
+                      {representedTalents.slice(0, 5).map((t) => (
+                        <div key={t.id} className="relative w-10 h-10 rounded-full border-2 border-surface bg-surface-2 overflow-hidden shadow-xs shrink-0" title={t.name}>
+                          <ImageWithFallback
+                            src={t.photo_url}
+                            alt={t.name}
+                            fallbackType="avatar"
+                            name={t.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                      {representedTalents.length > 5 && (
+                        <div className="w-10 h-10 rounded-full border-2 border-surface bg-brand text-black font-black text-[11px] flex items-center justify-center shrink-0 shadow-xs">
+                          +{representedTalents.length - 5}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrimarySection('talents');
+                      document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-surface-2 hover:bg-brand hover:text-black text-text-primary font-bold text-xs transition-all flex items-center justify-center gap-2 border border-border hover:border-brand cursor-pointer"
+                  >
+                    <span>Browse Signed Talent Roster ({representedTalents.length})</span>
+                    <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Card 2: Frequent Collaborators Teaser */}
+              {frequentCollaborators.length > 0 && (
+                <div className="p-5 rounded-2xl bg-surface border border-border hover:border-brand/40 transition-all flex flex-col justify-between shadow-sm">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-black">
+                        <Icon icon="solar:star-fall-bold" className="w-3.5 h-3.5" />
+                        Frequent Cast & Crew
+                      </span>
+                      <span className="text-xs font-bold text-text-primary">
+                        {frequentCollaborators.length} Creatives
+                      </span>
+                    </div>
+                    <p className="text-xs text-text-muted leading-relaxed mb-4">
+                      Key actors, directors, and crew who repeatedly collaborate across this studio's filmography.
+                    </p>
+
+                    {/* Miniature Avatars */}
+                    <div className="flex items-center -space-x-2 mb-4 overflow-hidden py-1">
+                      {frequentCollaborators.slice(0, 5).map((c) => (
+                        <div key={c.id} className="relative w-10 h-10 rounded-full border-2 border-surface bg-surface-2 overflow-hidden shadow-xs shrink-0" title={`${c.name} (${c.filmCount} films)`}>
+                          <ImageWithFallback
+                            src={c.photo_url}
+                            alt={c.name}
+                            fallbackType="avatar"
+                            name={c.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                      {frequentCollaborators.length > 5 && (
+                        <div className="w-10 h-10 rounded-full border-2 border-surface bg-surface-3 text-text-secondary font-black text-[11px] flex items-center justify-center shrink-0 shadow-xs border border-border">
+                          +{frequentCollaborators.length - 5}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrimarySection('collaborators');
+                      document.getElementById('company-tabs')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl bg-surface-2 hover:bg-amber-500 hover:text-black text-text-primary font-bold text-xs transition-all flex items-center justify-center gap-2 border border-border hover:border-amber-400 cursor-pointer"
+                  >
+                    <span>View All Collaborators ({frequentCollaborators.length})</span>
+                    <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
+      </>
+    )}
+
+      {/* ─── SECTION 2: SIGNED TALENTS (DEDICATED AGENCY VIEW WITH SEARCH & PAGINATION) ─── */}
+      {primarySection === 'talents' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-brand text-xs font-black uppercase tracking-widest mb-1">
+                <Icon icon="solar:users-group-rounded-bold" className="w-4 h-4" />
+                Signed Talent Agency Roster
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-heading font-black text-text-primary tracking-tight">
+                Represented Actors & Creatives
+              </h2>
+              <p className="text-xs text-text-muted mt-1">
+                Official represented talent roster managed by {toTitleCase(company.name)}
+              </p>
+            </div>
+            <span className="px-3.5 py-1.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-xs font-black tracking-wider self-start sm:self-auto flex items-center gap-1.5 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+              {representedTalents.length} Signed Talents
+            </span>
+          </div>
+
+          {/* Search & Department Filters */}
+          <div className="bg-surface border border-border rounded-2xl p-4 sm:p-5 shadow-sm space-y-4 mb-8">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Icon
+                  icon="solar:magnifer-linear"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted w-4 h-4"
+                />
+                <input
+                  type="text"
+                  value={talentSearch}
+                  onChange={(e) => { setTalentSearch(e.target.value); setVisibleTalentCount(12); }}
+                  placeholder="Search signed talents by name..."
+                  className="w-full bg-surface-2 border border-border rounded-xl pl-9 pr-8 py-2 text-xs text-text-primary focus:outline-none focus:border-brand transition-colors"
+                />
+                {talentSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setTalentSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                  >
+                    <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Department Pills */}
+              {talentDepartments.length > 0 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => { setTalentDeptFilter('all'); setVisibleTalentCount(12); }}
+                    className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 cursor-pointer ${
+                      talentDeptFilter === 'all'
+                        ? 'bg-brand text-black border-brand font-black'
+                        : 'bg-surface-2 border-border text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    All ({representedTalents.length})
+                  </button>
+                  {talentDepartments.map((dept) => (
+                    <button
+                      key={dept}
+                      type="button"
+                      onClick={() => { setTalentDeptFilter(dept); setVisibleTalentCount(12); }}
+                      className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 capitalize cursor-pointer ${
+                        talentDeptFilter.toLowerCase() === dept.toLowerCase()
+                          ? 'bg-brand text-black border-brand font-black'
+                          : 'bg-surface-2 border-border text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      {dept}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Talents Grid */}
+          {displayedTalents.length === 0 ? (
+            <div className="text-center py-16 bg-surface border border-border rounded-2xl">
+              <Icon icon="solar:users-group-rounded-linear" className="w-12 h-12 text-text-muted mx-auto mb-3 opacity-30" />
+              <h3 className="text-base font-bold text-text-primary mb-1">No signed talents match your search</h3>
+              <p className="text-xs text-text-muted mb-4">Try clearing your search query or department filter.</p>
+              <button
+                type="button"
+                onClick={() => { setTalentSearch(''); setTalentDeptFilter('all'); }}
+                className="px-4 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-colors"
+              >
+                Reset Search
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4 sm:gap-6">
+              {displayedTalents.map((talent) => {
+                const rep = talent.representation || {};
+                return (
+                  <Link
+                    key={talent.id}
+                    to={`/people/${talent.slug || talent.id}`}
+                    className="group relative bg-surface border border-border hover:border-brand/60 rounded-2xl p-3.5 sm:p-4 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden bg-black mb-3 shadow-md">
+                        <ImageWithFallback
+                          src={talent.photo_url}
+                          alt={talent.name}
+                          fallbackType="avatar"
+                          name={talent.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+
+                        {/* Rep Type Badge */}
+                        <div className="absolute top-2 left-2">
+                          <span className="px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-wider border border-white/10 shadow-sm">
+                            {rep.representation_type || 'Talent'}
+                          </span>
+                        </div>
+
+                        {/* Department Tag */}
+                        <div className="absolute bottom-2 left-2 right-2">
+                          <span className="text-[10px] font-black text-brand uppercase tracking-wider">
+                            {talent.known_for_department || 'Acting'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="font-heading font-black text-sm sm:text-base text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                          {talent.name}
+                        </h3>
+                        {rep.agent_name && (
+                          <p className="text-[11px] text-text-muted mt-0.5 line-clamp-1">
+                            Rep: <span className="text-text-secondary font-medium">{rep.agent_name}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-border/50 flex items-center justify-between text-[11px] text-brand font-bold">
+                      <span>View Actor Profile</span>
+                      <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Load More Talents Button */}
+          {filteredTalents.length > visibleTalentCount && (
+            <div className="mt-10 text-center">
+              <button
+                type="button"
+                onClick={() => setVisibleTalentCount((prev) => prev + 12)}
+                className="px-8 py-3 bg-surface border border-border hover:border-brand/50 text-text-primary font-bold text-xs rounded-xl shadow-md hover:bg-surface-2 transition-all inline-flex items-center gap-2 cursor-pointer"
+              >
+                <span>Load More Talents ({filteredTalents.length - visibleTalentCount} remaining)</span>
+                <Icon icon="solar:alt-arrow-down-linear" className="w-4 h-4 text-brand" />
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─── SECTION 3: FREQUENT COLLABORATORS (DEDICATED VIEW WITH SEARCH & PAGINATION) ─── */}
+      {primarySection === 'collaborators' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-brand text-xs font-black uppercase tracking-widest mb-1">
+                <Icon icon="solar:star-fall-bold" className="w-4 h-4 text-amber-400" />
+                Key Talents & Frequent Cast/Crew
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-heading font-black text-text-primary tracking-tight">
+                Frequent Collaborators
+              </h2>
+              <p className="text-xs text-text-muted mt-1">
+                Actors, directors, and creatives who frequently work with {toTitleCase(company.name)}
+              </p>
+            </div>
+            <span className="px-3.5 py-1.5 rounded-full bg-surface-2 border border-border text-text-secondary text-xs font-bold tracking-wider self-start sm:self-auto flex items-center gap-1.5 shadow-sm">
+              <Icon icon="solar:users-group-rounded-linear" className="w-3.5 h-3.5 text-brand" />
+              {frequentCollaborators.length} Frequent Cast & Crew
+            </span>
+          </div>
+
+          {/* Search Collaborators */}
+          <div className="bg-surface border border-border rounded-2xl p-4 sm:p-5 shadow-sm space-y-4 mb-8">
+            <div className="relative max-w-md">
+              <Icon
+                icon="solar:magnifer-linear"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted w-4 h-4"
+              />
+              <input
+                type="text"
+                value={collaboratorSearch}
+                onChange={(e) => { setCollaboratorSearch(e.target.value); setVisibleCollabCount(18); }}
+                placeholder="Search collaborators by name or role..."
+                className="w-full bg-surface-2 border border-border rounded-xl pl-9 pr-8 py-2 text-xs text-text-primary focus:outline-none focus:border-brand transition-colors"
+              />
+              {collaboratorSearch && (
+                <button
+                  type="button"
+                  onClick={() => setCollaboratorSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                >
+                  <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Collaborators Grid */}
+          {displayedCollaborators.length === 0 ? (
+            <div className="text-center py-16 bg-surface border border-border rounded-2xl">
+              <Icon icon="solar:star-fall-linear" className="w-12 h-12 text-text-muted mx-auto mb-3 opacity-30" />
+              <h3 className="text-base font-bold text-text-primary mb-1">No collaborators match your search</h3>
+              <p className="text-xs text-text-muted mb-4">Try clearing your search term.</p>
+              <button
+                type="button"
+                onClick={() => setCollaboratorSearch('')}
+                className="px-4 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-colors"
+              >
+                Reset Search
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+              {displayedCollaborators.map((person) => {
+                return (
+                  <Link
+                    key={person.id}
+                    to={`/people/${person.slug || person.id}`}
+                    className="group relative bg-surface border border-border hover:border-brand/60 rounded-2xl p-3 transition-all duration-300 shadow-sm hover:shadow-lg hover:-translate-y-1 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-black mb-2.5 shadow-xs">
+                        <ImageWithFallback
+                          src={person.photo_url}
+                          alt={person.name}
+                          fallbackType="avatar"
+                          name={person.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <span className="absolute bottom-1.5 right-1.5 bg-black/85 backdrop-blur-md text-amber-400 border border-amber-400/30 text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                          {person.filmCount} {person.filmCount === 1 ? 'film' : 'films'}
+                        </span>
+                      </div>
+
+                      <h3 className="font-heading font-bold text-xs sm:text-sm text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                        {person.name}
+                      </h3>
+                      <p className="text-[10px] text-text-muted truncate mt-0.5 capitalize">
+                        {person.known_for_department || (person.rolesList?.[0] || 'Talent')}
+                      </p>
+                    </div>
+
+                    <div className="mt-2 pt-2 border-t border-border/40 flex items-center justify-between text-[10px] text-brand font-semibold">
+                      <span>Profile</span>
+                      <Icon icon="solar:arrow-right-linear" className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Load More Collaborators Button */}
+          {filteredCollaborators.length > visibleCollabCount && (
+            <div className="mt-10 text-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCollabCount((prev) => prev + 18)}
+                className="px-8 py-3 bg-surface border border-border hover:border-brand/50 text-text-primary font-bold text-xs rounded-xl shadow-md hover:bg-surface-2 transition-all inline-flex items-center gap-2 cursor-pointer"
+              >
+                <span>Load More Collaborators ({filteredCollaborators.length - visibleCollabCount} remaining)</span>
+                <Icon icon="solar:alt-arrow-down-linear" className="w-4 h-4 text-brand" />
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─── SECTION 4: ABOUT STUDIO / AGENCY ─── */}
+      {primarySection === 'about' && (
+        <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+          <div className="bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+            <div>
+              <span className="text-[11px] font-black uppercase tracking-wider text-brand">Profile & History</span>
+              <h2 className="text-2xl font-heading font-black text-text-primary mt-1">
+                About {toTitleCase(company.name)}
+              </h2>
+            </div>
+
+            {company.description && (
+              <div className="text-sm text-text-secondary leading-relaxed space-y-3 whitespace-pre-line">
+                {company.description}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-border/80 text-xs">
+              <div className="p-4 rounded-xl bg-surface-2 border border-border">
+                <span className="text-text-muted font-semibold block mb-1">Company Type</span>
+                <span className="font-bold text-text-primary capitalize">{company.company_type?.replace(/_/g, ' ') || 'Studio / Agency'}</span>
+              </div>
+              <div className="p-4 rounded-xl bg-surface-2 border border-border">
+                <span className="text-text-muted font-semibold block mb-1">Founded</span>
+                <span className="font-bold text-text-primary">{company.founded_year ? `Est. ${company.founded_year}` : 'Not Specified'}</span>
+              </div>
+              <div className="p-4 rounded-xl bg-surface-2 border border-border">
+                <span className="text-text-muted font-semibold block mb-1">Headquarters</span>
+                <span className="font-bold text-text-primary">{company.headquarters || 'Nigeria'}</span>
+              </div>
+            </div>
+
+            {/* Linked YouTube Channels if any */}
+            {linkedChannels.length > 0 && (
+              <div className="pt-6 border-t border-border/80">
+                <span className="text-xs font-black text-text-muted uppercase tracking-wider block mb-3">
+                  Official YouTube Distribution Channel
+                </span>
+                <div className="space-y-3">
+                  {linkedChannels.map((ch) => (
+                    <div key={ch.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-red-600/5 border border-red-500/20">
+                      <div className="flex items-center gap-3">
+                        <Icon icon="solar:play-circle-bold" className="w-8 h-8 text-red-500 shrink-0" />
+                        <div>
+                          <h4 className="font-bold text-text-primary text-sm flex items-center gap-2">
+                            <span>{ch.name || ch.channel_title}</span>
+                            {ch.channel_handle && (
+                              <span className="text-xs text-text-muted font-normal">{ch.channel_handle}</span>
+                            )}
+                          </h4>
+                          <p className="text-xs text-text-muted">
+                            Official YouTube Home {ch.subscriber_count ? `• ${formatViews(ch.subscriber_count)} Subscribers` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={ch.channel_url || `https://youtube.com/channel/${ch.channel_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors shrink-0 self-start sm:self-auto"
+                      >
+                        <span>Visit Channel</span>
+                        <Icon icon="solar:arrow-right-up-linear" className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

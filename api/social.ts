@@ -831,14 +831,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err: any) {
     const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     console.error(`[api/social:${requestId}]`, err);
-    const status = Number(err?.status || 500);
+    const status = Number(err?.status || err?.statusCode || (err?.code ? 400 : 500));
+    const errorMessage = err?.message || err?.error || (typeof err === 'string' ? err : 'The request could not be completed');
     return res.status(status).json({
       error: status < 500
-        ? (err?.message || 'The request could not be completed')
+        ? errorMessage
         : task === 'render_preview'
           ? 'The deployed graphic renderer could not complete this preview. Please retry after the deployment finishes.'
-          : 'Social Studio could not complete that request. Please try again.',
+          : (err?.message || 'Social Studio could not complete that request. Please try again.'),
       requestId,
+      details: err?.details || undefined,
     });
   }
 }

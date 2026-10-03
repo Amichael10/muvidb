@@ -255,6 +255,10 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
     if (isVideo) {
       containerParams.set('media_type', 'REELS');
       containerParams.set('video_url', assetUrl);
+      const coverUrl = request.options?.cover_url || request.options?.cover_image_url || request.options?.thumbnail_url;
+      if (coverUrl && typeof coverUrl === 'string' && coverUrl.trim()) {
+        containerParams.set('cover_url', coverUrl.trim());
+      }
     } else {
       containerParams.set('image_url', assetUrl);
     }

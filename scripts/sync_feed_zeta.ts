@@ -341,25 +341,83 @@ async function syncToDatabase(movies: any[]) {
   let errorCount = 0;
 
   for (const movie of movies) {
+    const isPartTitle = /(?:part|pt|episode|season)\s*\d+/i.test(movie.title);
     const { isSeries, baseTitle, episodeNum } = detectAndNormalizeSeries(movie.title);
-    const cleanedTitle = cleanTitle(baseTitle);
+    const cleanedBase = cleanTitle(baseTitle);
+    const cleanedTitle = isPartTitle && episodeNum ? `${cleanedBase} Part ${episodeNum}` : cleanTitle(movie.title);
     const movieYear = movie.year || new Date().getFullYear();
     const runtimeMinutes = parseDocuthDuration(movie.durationStr);
 
-    console.log(`🔄 Processing Zeta Movie: "${cleanedTitle}" (Year: ${movieYear})`);
+    console.log(`🔄 Processing Zeta Movie: "${cleanedTitle}" (Year: ${movieYear}) [URL: ${movie.url}]`);
 
     try {
-      // 1. Check for existing film by exact cleaned title and year
-      let existing = null;
-      const { data: results } = await supabase
-        .from('films')
-        .select('id, title, year, streaming_links, status, release_type, synopsis, poster_url, runtime_minutes')
-        .ilike('title', cleanedTitle);
+      let existing: any = null;
 
-      if (results && results.length > 0) {
-        existing = results.find(r => r.year === movieYear) ||
-                   results.find(r => Math.abs((r.year || 0) - movieYear) <= 1) ||
-                   results[0];
+      // 1. Check if this exact Docuth URL is already saved on ANY film
+      if (movie.url) {
+        const { data: urlMatches } = await supabase
+          .from('films')
+          .select('id, title, year, streaming_links, status, release_type, synopsis, poster_url, runtime_minutes')
+          .eq('streaming_links->>docuth', movie.url)
+          .limit(1);
+
+        if (urlMatches && urlMatches.length > 0) {
+          existing = urlMatches[0];
+          console.log(`  🔗 Found existing film by exact Docuth URL: "${existing.title}" (${existing.id})`);
+        }
+      }
+
+      // 2. Check by URL slug in streaming_links->>docuth
+      if (!existing && movie.url) {
+        const slugMatch = movie.url.match(/movies\/([^/?#]+)/);
+        if (slugMatch) {
+          const urlSlug = slugMatch[1].replace(/\/+$/, '');
+          const { data: slugMatches } = await supabase
+            .from('films')
+            .select('id, title, year, streaming_links, status, release_type, synopsis, poster_url, runtime_minutes')
+            .ilike('streaming_links->>docuth', `%${urlSlug}%`)
+            .limit(1);
+
+          if (slugMatches && slugMatches.length > 0) {
+            existing = slugMatches[0];
+            console.log(`  🔗 Found existing film by Docuth slug "${urlSlug}": "${existing.title}" (${existing.id})`);
+          }
+        }
+      }
+
+      // 3. Check by exact cleaned title and year
+      if (!existing) {
+        const { data: results } = await supabase
+          .from('films')
+          .select('id, title, year, streaming_links, status, release_type, synopsis, poster_url, runtime_minutes')
+          .ilike('title', cleanedTitle);
+
+        if (results && results.length > 0) {
+          existing = results.find(r => r.year === movieYear) ||
+                     results.find(r => Math.abs((r.year || 0) - movieYear) <= 1) ||
+                     results[0];
+          if (existing) {
+            console.log(`  🎯 Found existing film by title "${cleanedTitle}": "${existing.title}" (${existing.id})`);
+          }
+        }
+      }
+
+      // 4. Fallback: Check without trailing punctuation (e.g. "Who Cares" vs "Who Cares?")
+      if (!existing) {
+        const stripped = cleanedTitle.replace(/[?!.,;:-]+$/g, '').trim();
+        if (stripped && stripped !== cleanedTitle) {
+          const { data: strippedResults } = await supabase
+            .from('films')
+            .select('id, title, year, streaming_links, status, release_type, synopsis, poster_url, runtime_minutes')
+            .or(`title.ilike.${stripped},title.ilike.${stripped}?`);
+
+          if (strippedResults && strippedResults.length > 0) {
+            existing = strippedResults.find(r => r.year === movieYear) || strippedResults[0];
+            if (existing) {
+              console.log(`  🎯 Found existing film by fuzzy title "${stripped}": "${existing.title}" (${existing.id})`);
+            }
+          }
+        }
       }
 
       let filmId;

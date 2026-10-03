@@ -26,20 +26,22 @@ function getR2Config(): R2Config {
   return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl };
 }
 
-export async function createR2UploadUrl(fileName: string, mimeType: string, expiresIn = 900) {
+export async function createR2UploadUrl(fileNameOrKey: string, mimeType: string, expiresIn = 900) {
   const config = getR2Config();
   const client = new S3Client({
     region: 'auto',
     endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
   });
-  const key = `social/clips/${Date.now()}_${fileName.replace(/[^a-z0-9._-]+/gi, '_').slice(0, 140)}`;
+  const key = fileNameOrKey.startsWith('media/') || fileNameOrKey.startsWith('social/')
+    ? fileNameOrKey
+    : `media/actors/${fileNameOrKey.replace(/[^a-z0-9._-]+/gi, '_').slice(0, 140)}`;
   const command = new PutObjectCommand({ Bucket: config.bucketName, Key: key, ContentType: mimeType });
   const uploadUrl = await getSignedUrl(client, command, { expiresIn });
   const publicBase = config.publicUrl
     ? config.publicUrl.replace(/\/+$/, '')
     : `https://${config.bucketName}.${config.accountId}.r2.dev`;
-  return { uploadUrl, key, publicUrl: `${publicBase}/${key}` };
+  return { uploadUrl, key, publicUrl: `${publicBase}/${encodeURI(key)}` };
 }
 
 function hmacSha256(key: Buffer | string, data: string): Buffer {

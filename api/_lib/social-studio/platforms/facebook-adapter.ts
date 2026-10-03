@@ -164,6 +164,10 @@ export class FacebookPlatformAdapter implements SocialPlatformAdapter {
       if (isVideo) {
         params.set('description', request.caption);
         params.set('file_url', assetUrl);
+        const coverUrl = request.options?.cover_url || request.options?.cover_image_url || request.options?.thumbnail_url;
+        if (coverUrl && typeof coverUrl === 'string' && coverUrl.trim()) {
+          params.set('thumb', coverUrl.trim());
+        }
         const res = await this.post(`/${encodeURIComponent(this.pageId)}/videos`, params);
         const externalPostId = res.id;
         const externalPermalink = await this.permalink(externalPostId);

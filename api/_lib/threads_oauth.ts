@@ -331,7 +331,7 @@ export async function getPlatformPublishingCredentials(platform: string, connect
     .from('social_connections')
     .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at,connection_metadata,token_ciphertext,token_iv,token_auth_tag')
     .eq('platform', platform)
-    .eq('status', 'connected');
+    .in('status', ['connected', 'expired']);
   if (connectionId) query = query.eq('id', connectionId);
   const { data: connection, error } = await query.order('updated_at', { ascending: false }).limit(1).maybeSingle();
 

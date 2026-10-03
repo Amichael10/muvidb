@@ -217,6 +217,15 @@ function normalizeInitialData(data) {
     }
   }
 
+  const coverUrl =
+    data.coverUrl ||
+    data.videoCoverUrl ||
+    data.cover_url ||
+    rawVariants.find(v => v.platform_options?.cover_url || v.platform_options?.cover_image_url)?.platform_options?.cover_url ||
+    rawVariants.find(v => v.platform_options?.thumbnail_url)?.platform_options?.thumbnail_url ||
+    (Array.isArray(data.social_assets) ? data.social_assets.find(a => a.render_metadata?.cover_url)?.render_metadata?.cover_url : '') ||
+    '';
+
   return {
     id,
     title,
@@ -229,6 +238,7 @@ function normalizeInitialData(data) {
     aspectRatio,
     scheduledFor,
     status: data.status || 'draft',
+    coverUrl,
   };
 }
 
@@ -260,6 +270,12 @@ export default function UniversalSocialComposer({
   const [uploadProgress, setUploadProgress] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Video Cover / Thumbnail
+  const [videoCoverUrl, setVideoCoverUrl] = useState(() => parsed?.coverUrl || '');
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const coverInputRef = useRef(null);
+  const videoPlayerRef = useRef(null);
+
   // Scheduling
   const [scheduledFor, setScheduledFor] = useState(() => parsed?.scheduledFor || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -287,6 +303,7 @@ export default function UniversalSocialComposer({
       setPlatformCaptions(parsed.platformCaptions);
       setMediaAssets(parsed.mediaAssets);
       setScheduledFor(parsed.scheduledFor);
+      setVideoCoverUrl(parsed.coverUrl || '');
     }
   }, [parsed]);
 
@@ -340,6 +357,61 @@ export default function UniversalSocialComposer({
       return next;
     });
     toast.success(`Reset ${platformId} caption to master`);
+  };
+
+  // Handle uploading a custom image cover for video
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingCover(true);
+    try {
+      const res = await uploadAdminSocialMedia(file);
+      if (res.error) throw new Error(res.error);
+      setVideoCoverUrl(res.url);
+      toast.success('Video cover image set!');
+    } catch (err) {
+      toast.error(err.message || 'Failed to upload cover image');
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    }
+  };
+
+  // Handle capturing current paused frame from video
+  const handleCaptureVideoFrame = () => {
+    const vid = videoPlayerRef.current || document.querySelector('video[data-composer-video="true"]');
+    if (!vid) {
+      toast.error('Video player not ready');
+      return;
+    }
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = vid.videoWidth || 1080;
+      canvas.height = vid.videoHeight || 1920;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast.error('Could not capture frame');
+          return;
+        }
+        const file = new File([blob], `cover_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        setUploadingCover(true);
+        try {
+          const res = await uploadAdminSocialMedia(file);
+          if (res.error) throw new Error(res.error);
+          setVideoCoverUrl(res.url);
+          toast.success('Captured current frame as video cover!');
+        } catch (err) {
+          toast.error(err.message || 'Failed to save cover frame');
+        } finally {
+          setUploadingCover(false);
+        }
+      }, 'image/jpeg', 0.92);
+    } catch (err) {
+      toast.error('Failed to capture video frame: ' + (err.message || ''));
+    }
   };
 
   // Media upload handler
@@ -663,6 +735,16 @@ export default function UniversalSocialComposer({
     );
 
     try {
+      const formattedMediaAssets = mediaAssets.map((asset, i) => {
+        if (i === 0 && (postFormat === 'video' || asset.mimeType?.startsWith('video/'))) {
+          return {
+            ...asset,
+            coverUrl: videoCoverUrl || undefined,
+          };
+        }
+        return asset;
+      });
+
       const payload = {
         contentItemId: parsed?.id || undefined,
         title: title || universalCaption.slice(0, 40) || 'Social Post',
@@ -670,7 +752,9 @@ export default function UniversalSocialComposer({
         platforms: selectedPlatforms,
         universalCaption,
         platformCaptions: isCustomizingPerPlatform ? platformCaptions : {},
-        mediaAssets,
+        mediaAssets: formattedMediaAssets,
+        coverUrl: videoCoverUrl || undefined,
+        videoCoverUrl: videoCoverUrl || undefined,
         scheduledFor: finalSchedule,
         status: finalStatus,
         sourceEntityId: selectedMovieForCaption?.id || undefined,
@@ -902,10 +986,14 @@ export default function UniversalSocialComposer({
                       <div key={idx} className="group relative aspect-square rounded-xl overflow-hidden border border-border/60 bg-black">
                         {asset.mimeType?.startsWith('video/') ? (
                           <video
+                            ref={idx === 0 ? videoPlayerRef : null}
+                            data-composer-video="true"
                             src={asset.publicUrl}
+                            poster={videoCoverUrl || undefined}
                             className="w-full h-full object-cover"
                             muted
                             playsInline
+                            controls
                           />
                         ) : (
                           <img
@@ -953,6 +1041,117 @@ export default function UniversalSocialComposer({
                     Supports high-res PNG, JPG, WebP, MP4, WebM (up to 500 MB)
                   </span>
                 </label>
+
+                {/* Video Cover / Poster Frame Selector */}
+                {(postFormat === 'video' || mediaAssets.some(m => m.mimeType?.startsWith('video/'))) && (
+                  <div className="bg-surface-2/70 border border-border/70 rounded-xl p-4 space-y-3">
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleCoverUpload}
+                      className="hidden"
+                      disabled={uploadingCover}
+                    />
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon icon="solar:picture-in-picture-bold" className="text-primary" width="18" />
+                        <span className="text-xs font-bold text-white">Video Cover / Poster Image</span>
+                      </div>
+                      {videoCoverUrl ? (
+                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Icon icon="solar:check-circle-bold" width="12" />
+                          Custom Cover Active
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                          Auto-generated by platform
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-text-muted">
+                      This cover image is published to Instagram Reels, Facebook Video, TikTok, and YouTube as the custom thumbnail/cover poster.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      {/* Cover Thumbnail Preview */}
+                      <div className="relative w-24 h-32 rounded-lg overflow-hidden border border-border bg-black shrink-0 flex items-center justify-center group shadow-md">
+                        {videoCoverUrl ? (
+                          <>
+                            <img src={videoCoverUrl} alt="Video cover preview" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setVideoCoverUrl('')}
+                              title="Remove cover"
+                              className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/80 hover:bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Icon icon="solar:trash-bin-trash-bold" width="11" />
+                            </button>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-text-muted p-2 text-center">
+                            <Icon icon="solar:gallery-wide-linear" width="22" className="opacity-40 mb-1" />
+                            <span className="text-[9px] leading-tight">No custom cover</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Cover actions */}
+                      <div className="space-y-2.5 flex-1 w-full">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => coverInputRef.current?.click()}
+                            disabled={uploadingCover}
+                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-surface-3 hover:bg-surface-4 text-white border border-border/60 hover:border-text-muted flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                          >
+                            {uploadingCover ? (
+                              <Icon icon="solar:spinner-line-duotone" className="animate-spin text-primary" width="14" />
+                            ) : (
+                              <Icon icon="solar:upload-track-2-bold" width="14" />
+                            )}
+                            <span>Upload Cover Photo</span>
+                          </button>
+
+                          {mediaAssets.some(m => m.mimeType?.startsWith('video/')) && (
+                            <button
+                              type="button"
+                              onClick={handleCaptureVideoFrame}
+                              disabled={uploadingCover}
+                              title="Pause the video at the frame you like, then click here"
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-surface-3 hover:bg-surface-4 text-white border border-border/60 hover:border-text-muted flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                            >
+                              <Icon icon="solar:camera-bold" width="14" />
+                              <span>Capture Paused Frame</span>
+                            </button>
+                          )}
+
+                          {videoCoverUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setVideoCoverUrl('')}
+                              className="px-2.5 py-1.5 text-xs font-semibold rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                            >
+                              Remove Cover
+                            </button>
+                          )}
+                        </div>
+
+                        {/* URL input */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="url"
+                            value={videoCoverUrl}
+                            onChange={(e) => setVideoCoverUrl(e.target.value.trim())}
+                            placeholder="Or enter public cover image URL..."
+                            className="flex-1 bg-surface-1 border border-border/50 focus:border-primary/60 rounded-lg px-2.5 py-1 text-xs text-white placeholder-text-muted/60 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1335,6 +1534,7 @@ export default function UniversalSocialComposer({
                   mediaAssets[0].mimeType?.startsWith('video/') ? (
                     <video
                       src={mediaAssets[0].publicUrl}
+                      poster={videoCoverUrl || undefined}
                       className="w-full h-full object-cover"
                       controls
                       playsInline

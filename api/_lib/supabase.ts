@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import dns from 'dns';
-try { dns.setDefaultResultOrder('ipv4first'); } catch {}
+try { dns.setDefaultResultOrder('ipv4first'); dns.setServers(['1.1.1.1', '8.8.8.8']); } catch {}
 
 import { Agent, setGlobalDispatcher } from 'undici';
 try {

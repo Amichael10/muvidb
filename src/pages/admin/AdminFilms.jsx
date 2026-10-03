@@ -152,6 +152,14 @@ export default function AdminFilms() {
   const [isCreatingDistributorCompany, setIsCreatingDistributorCompany] = useState(false);
   const distributorSearchTimeout = useRef(null);
 
+  // YouTube Channel Linking States in Drawer
+  const [selectedChannel, setSelectedChannel] = useState(null);
+  const [formChannelSearch, setFormChannelSearch] = useState('');
+  const [formChannelResults, setFormChannelResults] = useState([]);
+  const [isSearchingFormChannels, setIsSearchingFormChannels] = useState(false);
+  const [isDetectingChannel, setIsDetectingChannel] = useState(false);
+  const formChannelSearchTimeout = useRef(null);
+
   const initialFormState = {
     title: '',
     year: new Date().getFullYear(),
@@ -264,9 +272,28 @@ export default function AdminFilms() {
         window.history.replaceState({}, '', window.location.pathname);
       } else if (mapVideoId) {
         // Handle mapping a new video
-        const { data: video } = await supabase.from('channel_videos').select('*, channels(name)').eq('id', mapVideoId).single();
+        const { data: video } = await supabase
+          .from('channel_videos')
+          .select('*, channels(id, name, channel_handle, thumbnail_url, owner_company_id)')
+          .eq('id', mapVideoId)
+          .single();
         if (video) {
           setEditingFilm(null); // It's a new film record
+          if (video.channels) {
+            setSelectedChannel(video.channels);
+            setFormChannelSearch(video.channels.name);
+            if (video.channels.owner_company_id) {
+              const { data: comp } = await supabase
+                .from('companies')
+                .select('*')
+                .eq('id', video.channels.owner_company_id)
+                .maybeSingle();
+              if (comp) {
+                setSelectedCompany(comp);
+                setCompanySearch(comp.name);
+              }
+            }
+          }
           setFormData({
             ...initialFormState,
             title: video.title,
@@ -640,7 +667,8 @@ export default function AdminFilms() {
       { data: creditData },
       { data: showtimeData },
       { data: genreData },
-      { data: companyData }
+      { data: companyData },
+      { data: channelVideoData }
     ] = await Promise.all([
       supabase
         .from('credits')
@@ -661,7 +689,12 @@ export default function AdminFilms() {
         .from('film_companies')
         .select('companies(*)')
         .eq('film_id', filmId)
-        .limit(1)
+        .limit(1),
+      supabase
+        .from('channel_videos')
+        .select('id, channel_id, video_id, channels(id, name, channel_handle, thumbnail_url, owner_company_id)')
+        .eq('film_id', filmId)
+        .maybeSingle()
     ]);
     
     if (creditData) {
@@ -709,6 +742,14 @@ export default function AdminFilms() {
     } else {
       setSelectedCompany(null);
       setCompanySearch('');
+    }
+
+    if (channelVideoData && channelVideoData.channels) {
+      setSelectedChannel(channelVideoData.channels);
+      setFormChannelSearch(channelVideoData.channels.name);
+    } else {
+      setSelectedChannel(null);
+      setFormChannelSearch('');
     }
   };
 
@@ -813,6 +854,9 @@ export default function AdminFilms() {
       } else {
         setSelectedDistributorCompany(null);
       }
+      setSelectedChannel(draft?.selectedChannel || null);
+      setFormChannelSearch(draft?.selectedChannel?.name || '');
+      setFormChannelResults([]);
     }
     setDistributorResults([]);
     setIsDrawerOpen(true);
@@ -952,6 +996,100 @@ export default function AdminFilms() {
     setPeopleSearch('');
     setPeopleResults([]);
     setCustomRoles([]);
+    setSelectedChannel(null);
+    setFormChannelSearch('');
+    setFormChannelResults([]);
+  };
+
+  const detectChannelFromVideoId = async (videoId) => {
+    if (!videoId) return;
+    setIsDetectingChannel(true);
+    try {
+      // 1. Check if video already exists in channel_videos with a channel
+      const { data: cv } = await supabase
+        .from('channel_videos')
+        .select('*, channels(id, name, channel_handle, thumbnail_url, owner_company_id)')
+        .eq('video_id', videoId)
+        .maybeSingle();
+
+      if (cv?.channels) {
+        setSelectedChannel(cv.channels);
+        setFormChannelSearch(cv.channels.name);
+        if (cv.channels.owner_company_id && !selectedCompany) {
+          const { data: comp } = await supabase
+            .from('companies')
+            .select('*')
+            .eq('id', cv.channels.owner_company_id)
+            .maybeSingle();
+          if (comp) {
+            setSelectedCompany(comp);
+            setCompanySearch(comp.name);
+          }
+        }
+        toast.success(`Matched to channel: ${cv.channels.name}`);
+        return;
+      }
+
+      // 2. Fallback to YouTube oEmbed API for zero-key author and handle discovery
+      const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+      if (res.ok) {
+        const data = await res.json();
+        const authorName = data.author_name;
+        const authorUrl = data.author_url || '';
+        const handleMatch = authorUrl.match(/@([a-zA-Z0-9_.-]+)/);
+        const handle = handleMatch ? handleMatch[1] : null;
+
+        let query = supabase.from('channels').select('id, name, channel_handle, thumbnail_url, owner_company_id');
+        if (handle) {
+          query = query.or(`channel_handle.ilike.@${handle},channel_handle.ilike.${handle},name.ilike.%${authorName}%`);
+        } else if (authorName) {
+          query = query.ilike('name', `%${authorName}%`);
+        }
+
+        const { data: matchedChannels } = await query.limit(1);
+        if (matchedChannels && matchedChannels.length > 0) {
+          const matched = matchedChannels[0];
+          setSelectedChannel(matched);
+          setFormChannelSearch(matched.name);
+          if (matched.owner_company_id && !selectedCompany) {
+            const { data: comp } = await supabase
+              .from('companies')
+              .select('*')
+              .eq('id', matched.owner_company_id)
+              .maybeSingle();
+            if (comp) {
+              setSelectedCompany(comp);
+              setCompanySearch(comp.name);
+            }
+          }
+          toast.success(`Auto-detected channel: ${matched.name}`);
+        }
+      }
+    } catch (err) {
+      console.warn('Channel detection note:', err);
+    } finally {
+      setIsDetectingChannel(false);
+    }
+  };
+
+  const handleFormChannelSearch = (query) => {
+    setFormChannelSearch(query);
+    if (!query || !query.trim()) {
+      setFormChannelResults([]);
+      return;
+    }
+    if (formChannelSearchTimeout.current) clearTimeout(formChannelSearchTimeout.current);
+    formChannelSearchTimeout.current = setTimeout(async () => {
+      setIsSearchingFormChannels(true);
+      const clean = query.trim();
+      const { data } = await supabase
+        .from('channels')
+        .select('id, name, channel_handle, thumbnail_url, owner_company_id')
+        .or(`name.ilike.%${clean}%,channel_handle.ilike.%${clean}%`)
+        .limit(8);
+      setFormChannelResults(data || []);
+      setIsSearchingFormChannels(false);
+    }, 250);
   };
 
   const handleChange = (e) => {
@@ -965,6 +1103,29 @@ export default function AdminFilms() {
         setFormData(prev => ({ ...prev, [name]: extractedId, trailer_external_url: value }));
         return;
       }
+    }
+
+    if (name === 'youtube_watch_url') {
+      const extractedId = extractYoutubeId(value);
+      if (extractedId) {
+        setFormData(prev => ({
+          ...prev,
+          [name]: value,
+          source_video_id: prev.source_video_id || extractedId
+        }));
+        if (!selectedChannel) {
+          detectChannelFromVideoId(extractedId);
+        }
+        return;
+      }
+    }
+
+    if (name === 'source_video_id' && value.trim()) {
+      setFormData(prev => ({ ...prev, [name]: value }));
+      if (!selectedChannel && value.trim().length >= 11) {
+        detectChannelFromVideoId(value.trim());
+      }
+      return;
     }
 
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -1207,7 +1368,7 @@ export default function AdminFilms() {
         is_in_cinemas: Boolean(formData.is_in_cinemas),
         slug: formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
         mubi_slug: formData.mubi_slug || formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
-        source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || null,
+        source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || (formData.youtube_watch_url ? extractYoutubeId(formData.youtube_watch_url) : null) || null,
         trailer_youtube_id: (typeof formData.trailer_youtube_id === 'string' ? formData.trailer_youtube_id.trim() : formData.trailer_youtube_id) || null,
         youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
         release_date: formData.release_date || null,
@@ -1290,8 +1451,33 @@ export default function AdminFilms() {
 
       }
 
-      // Always try to link the channel_videos record to this film (new or existing)
-      if (channel_video_id) {
+      // Link channel_videos record to this film & channel
+      const targetVideoId = cleanFilmPayload.source_video_id || (cleanFilmPayload.youtube_watch_url ? extractYoutubeId(cleanFilmPayload.youtube_watch_url) : null);
+
+      if (selectedChannel && targetVideoId) {
+        const { data: existingCv } = await supabase
+          .from('channel_videos')
+          .select('id')
+          .eq('video_id', targetVideoId)
+          .maybeSingle();
+
+        if (existingCv) {
+          await supabase.from('channel_videos').update({
+            channel_id: selectedChannel.id,
+            film_id: filmId,
+            match_status: 'manual'
+          }).eq('id', existingCv.id);
+        } else {
+          await supabase.from('channel_videos').insert([{
+            channel_id: selectedChannel.id,
+            video_id: targetVideoId,
+            film_id: filmId,
+            title: cleanFilmPayload.title || 'Untitled',
+            thumbnail_url: cleanFilmPayload.poster_url || null,
+            match_status: 'manual'
+          }]);
+        }
+      } else if (channel_video_id) {
         await supabase.from('channel_videos').update({ film_id: filmId }).eq('id', channel_video_id);
       } else if (cleanFilmPayload.source_video_id) {
         await supabase.from('channel_videos').update({ film_id: filmId }).eq('video_id', cleanFilmPayload.source_video_id);
@@ -1389,6 +1575,8 @@ export default function AdminFilms() {
 
       if (selectedCompany) {
         insertPromises.push(supabase.from('film_companies').insert([{ film_id: filmId, company_id: selectedCompany.id }]));
+      } else if (selectedChannel?.owner_company_id) {
+        insertPromises.push(supabase.from('film_companies').insert([{ film_id: filmId, company_id: selectedChannel.owner_company_id }]));
       }
 
       if (insertPromises.length > 0) {
@@ -3132,6 +3320,117 @@ export default function AdminFilms() {
                       className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none" 
                       placeholder="https://..." 
                     />
+
+                    {/* Connected YouTube Channel Card & Search */}
+                    <div className="mt-3 p-3.5 rounded-xl border border-border bg-surface-2/60 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                          <Icon icon="solar:videocamera-record-bold" className="text-red-500 w-3.5 h-3.5" />
+                          Connected YouTube Channel
+                        </label>
+                        {isDetectingChannel && (
+                          <span className="text-[10px] text-brand font-bold flex items-center gap-1 animate-pulse">
+                            <Icon icon="solar:refresh-circle-linear" className="w-3 h-3 animate-spin" />
+                            Detecting channel...
+                          </span>
+                        )}
+                      </div>
+
+                      {selectedChannel ? (
+                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-surface border border-brand/30 shadow-xs">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-full overflow-hidden bg-surface-2 border border-border shrink-0 flex items-center justify-center">
+                              {selectedChannel.thumbnail_url ? (
+                                <img src={selectedChannel.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <Icon icon="solar:play-circle-bold" className="w-5 h-5 text-red-500" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-text-primary truncate">{selectedChannel.name}</p>
+                              <p className="text-[10px] text-text-muted font-mono truncate">
+                                {selectedChannel.channel_handle || 'Official Channel'}
+                                {selectedChannel.owner_company_id ? ' • Linked to Production Studio' : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedChannel(null);
+                                setFormChannelSearch('');
+                              }}
+                              className="text-[10px] font-bold text-red-400 hover:text-red-300 hover:underline px-2 py-1 cursor-pointer"
+                            >
+                              Unlink
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={formChannelSearch}
+                              onChange={(e) => handleFormChannelSearch(e.target.value)}
+                              placeholder="Search YouTube channel to connect (e.g. BaggyLand, ApataTV, Yorubaplus)..."
+                              className="w-full bg-surface border border-border rounded-lg pl-8 pr-8 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                            />
+                            <Icon icon="solar:magnifer-linear" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted w-3.5 h-3.5" />
+                            {isSearchingFormChannels && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-brand/20 border-t-brand rounded-full animate-spin" />
+                            )}
+                          </div>
+
+                          {formChannelResults.length > 0 && (
+                            <div className="absolute left-0 top-full mt-1.5 w-full bg-surface border border-border rounded-xl shadow-2xl z-50 overflow-hidden ring-1 ring-black/10 max-h-48 overflow-y-auto divide-y divide-border">
+                              {formChannelResults.map((ch) => (
+                                <button
+                                  key={ch.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedChannel(ch);
+                                    setFormChannelSearch(ch.name);
+                                    setFormChannelResults([]);
+                                    if (ch.owner_company_id && !selectedCompany) {
+                                      supabase
+                                        .from('companies')
+                                        .select('*')
+                                        .eq('id', ch.owner_company_id)
+                                        .maybeSingle()
+                                        .then(({ data: comp }) => {
+                                          if (comp) {
+                                            setSelectedCompany(comp);
+                                            setCompanySearch(comp.name);
+                                            toast.success(`Also linked production company: ${comp.name}`);
+                                          }
+                                        });
+                                    }
+                                  }}
+                                  className="w-full flex items-center gap-3 p-2.5 hover:bg-surface-2 transition-colors text-left cursor-pointer"
+                                >
+                                  <div className="w-7 h-7 rounded-full overflow-hidden bg-surface-2 border border-border flex items-center justify-center shrink-0">
+                                    {ch.thumbnail_url ? (
+                                      <img src={ch.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-red-500">YT</span>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-bold text-text-primary truncate">{ch.name}</p>
+                                    <p className="text-[10px] text-text-muted truncate">{ch.channel_handle || 'Channel'}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-[9px] text-text-muted">
+                        Connecting to a channel ensures this film appears on the channel page and automatically links to the production company.
+                      </p>
+                    </div>
                   </div>
                 )}
 

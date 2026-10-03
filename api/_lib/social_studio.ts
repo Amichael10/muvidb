@@ -413,6 +413,8 @@ export async function createUniversalSocialPost(input: {
   platforms: string[];
   universalCaption: string;
   platformCaptions?: Record<string, string>;
+  coverUrl?: string | null;
+  videoCoverUrl?: string | null;
   mediaAssets?: Array<{
     id?: string;
     publicUrl: string;
@@ -422,6 +424,7 @@ export async function createUniversalSocialPost(input: {
     fileSizeBytes?: number;
     width?: number;
     height?: number;
+    coverUrl?: string | null;
   }>;
   scheduledFor?: string | null;
   status?: 'draft' | 'scheduled' | 'publish_now';
@@ -443,6 +446,9 @@ export async function createUniversalSocialPost(input: {
 
   let contentItemId = input.contentItemId;
 
+  const rawCoverUrl = input.coverUrl || input.videoCoverUrl || input.mediaAssets?.find(m => m.coverUrl)?.coverUrl || '';
+  const coverUrl = typeof rawCoverUrl === 'string' && rawCoverUrl.trim() ? rawCoverUrl.trim() : null;
+
   const snapshot = {
     kind: 'universal_post',
     capturedAt: new Date().toISOString(),
@@ -450,6 +456,7 @@ export async function createUniversalSocialPost(input: {
     format,
     caption: universalCaption,
     mediaCount: input.mediaAssets?.length || 0,
+    ...(coverUrl ? { coverUrl } : {}),
   };
 
   if (contentItemId) {
@@ -470,14 +477,12 @@ export async function createUniversalSocialPost(input: {
       await supabase
         .from('social_publish_jobs')
         .delete()
-        .in('platform_variant_id', oldVarIds)
-        .in('status', ['queued', 'retrying', 'cancelled']);
+        .in('platform_variant_id', oldVarIds);
 
       await supabase
         .from('social_platform_variants')
         .delete()
-        .in('id', oldVarIds)
-        .in('status', ['draft', 'approved', 'scheduled', 'cancelled']);
+        .in('id', oldVarIds);
     }
 
     await supabase.from('social_assets').delete().eq('content_item_id', contentItemId);
@@ -515,7 +520,11 @@ export async function createUniversalSocialPost(input: {
         width: Math.max(1, Math.round(media.width || 1080)),
         height: Math.max(1, Math.round(media.height || 1080)),
         file_size_bytes: Math.max(0, Math.round(media.fileSizeBytes || 0)),
-        render_metadata: { source: 'universal_composer', format: assetFormat },
+        render_metadata: {
+          source: 'universal_composer',
+          format: assetFormat,
+          ...(coverUrl && isVideo ? { cover_url: coverUrl } : {}),
+        },
       }).select('id,format,public_url').single();
 
       if (!assetError && asset) {
@@ -545,6 +554,11 @@ export async function createUniversalSocialPost(input: {
         post_format: format === 'carousel' ? 'carousel' : 'single',
         carousel_assets: carouselUrls.map((url, i) => ({ id: `asset_${i}`, url })),
         carousel_asset_urls: carouselUrls,
+        ...(coverUrl ? {
+          cover_url: coverUrl,
+          cover_image_url: coverUrl,
+          thumbnail_url: coverUrl,
+        } : {}),
       },
     };
   });
@@ -557,11 +571,7 @@ export async function createUniversalSocialPost(input: {
   }
 
   if (input.status === 'scheduled' && input.scheduledFor) {
-    try {
-      await scheduleContentItem({ contentItemId, scheduledFor: input.scheduledFor }, actor);
-    } catch (schedErr: any) {
-      console.warn('Post created as draft but scheduling failed:', schedErr?.message);
-    }
+    await scheduleContentItem({ contentItemId, scheduledFor: input.scheduledFor }, actor);
   }
 
   await insertSocialEvent({

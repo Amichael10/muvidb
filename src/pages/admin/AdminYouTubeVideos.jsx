@@ -557,7 +557,7 @@ export default function AdminYouTubeVideos() {
       .select(`
         id, video_id, title, thumbnail_url, published_at,
         duration_seconds, is_hidden, film_id, match_status,
-        channels(id, name),
+        channels(id, name, owner_company_id),
         films(id, title, needs_review, release_type, year, synopsis)
       `, { count: 'exact' })
       .gte('duration_seconds', FILM_MIN)
@@ -738,7 +738,15 @@ export default function AdminYouTubeVideos() {
       toast.error(`Linking failed: ${vErr.message}`);
     } else {
       // 3. Attempt to link Production Company (Producer Name)
-      if (video.channels?.name) {
+      if (video.channels?.owner_company_id) {
+        try {
+          await supabase
+            .from('film_companies')
+            .insert([{ film_id: newFilm.id, company_id: video.channels.owner_company_id }]);
+        } catch (e) {
+          console.error('Owner company link failed:', e);
+        }
+      } else if (video.channels?.name) {
         try {
           const channelName = video.channels.name;
           // Check if company exists
