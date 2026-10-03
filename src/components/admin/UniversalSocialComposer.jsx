@@ -163,7 +163,7 @@ function normalizeInitialData(data) {
     if (!mediaAssets.length) {
       for (const v of rawVariants) {
         const carouselUrls = v.platform_options?.carousel_asset_urls;
-        if (Array.isArray(carouselUrls) && carouselUrls.length) {
+        if (v.platform_options?.post_format === 'carousel' && Array.isArray(carouselUrls) && carouselUrls.length) {
           mediaAssets = carouselUrls.map((url, idx) => ({
             id: `carousel_${idx}`,
             publicUrl: url,
@@ -532,7 +532,7 @@ export default function UniversalSocialComposer({
       const { data: fullFilm, error } = await supabase
         .from('films')
         .select(`
-          id, title, year, synopsis, genres, youtube_watch_url, youtube_channel_name,
+          id, title, year, synopsis, genres, youtube_watch_url, distributor,
           credits (
             role,
             character_name,
@@ -642,7 +642,7 @@ export default function UniversalSocialComposer({
               directors,
               topCast,
               creditedPeople,
-              youtubeChannelName: film.youtube_channel_name,
+              youtubeChannelName: film.distributor || '',
             },
           },
           angle: 'dynamic_story',

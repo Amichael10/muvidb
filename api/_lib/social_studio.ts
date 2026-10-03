@@ -534,11 +534,21 @@ export async function createUniversalSocialPost(input: {
   }
 
   const primaryAsset = insertedAssets[0] || null;
-  const carouselUrls = insertedAssets.map(a => a.public_url);
+  const isCarousel = format === 'carousel';
+  const carouselUrls = isCarousel ? insertedAssets.map(a => a.public_url) : [];
 
   const variants = platforms.map(platform => {
     const platformSpecificCaption = input.platformCaptions?.[platform];
     const caption = String(platformSpecificCaption !== undefined && platformSpecificCaption !== null && platformSpecificCaption !== '' ? platformSpecificCaption : universalCaption).trim();
+
+    let chosenAsset = primaryAsset;
+    if (format === 'video' && insertedAssets.length > 1) {
+      if (['tiktok', 'youtube'].includes(platform)) {
+        chosenAsset = insertedAssets.find(a => a.format === 'video_vertical_9_16' || a.format?.includes('9_16')) || primaryAsset;
+      } else {
+        chosenAsset = insertedAssets.find(a => a.format === 'square_1_1' || a.format?.includes('1_1')) || primaryAsset;
+      }
+    }
 
     return {
       content_item_id: contentItemId,
@@ -548,12 +558,12 @@ export async function createUniversalSocialPost(input: {
       caption,
       hashtags: [],
       mentions: [],
-      selected_asset_id: primaryAsset?.id || null,
+      selected_asset_id: chosenAsset?.id || null,
       platform_options: {
         media_kind: format,
-        post_format: format === 'carousel' ? 'carousel' : 'single',
-        carousel_assets: carouselUrls.map((url, i) => ({ id: `asset_${i}`, url })),
-        carousel_asset_urls: carouselUrls,
+        post_format: isCarousel ? 'carousel' : 'single',
+        carousel_assets: isCarousel ? carouselUrls.map((url, i) => ({ id: `asset_${i}`, url })) : [],
+        carousel_asset_urls: isCarousel ? carouselUrls : [],
         ...(coverUrl ? {
           cover_url: coverUrl,
           cover_image_url: coverUrl,
@@ -2390,10 +2400,11 @@ export async function scheduleContentItem(
       const { error: routeError } = await supabase.from('social_platform_variants').update({ connection_id: connectionId }).eq('id', variant.id);
       if (routeError) throw routeError;
     }
-    const urls = Array.isArray(variant.platform_options?.carousel_asset_urls)
+    const isCarousel = variant.platform_options?.post_format === 'carousel';
+    const urls = isCarousel && Array.isArray(variant.platform_options?.carousel_asset_urls)
       ? variant.platform_options.carousel_asset_urls.filter((url: unknown) => typeof url === 'string')
       : [];
-    if (urls.length > 1) {
+    if (isCarousel && urls.length > 1) {
       const limit = variant.platform === 'threads' ? 20 : variant.platform === 'tiktok' ? 35 : 10;
       if (urls.length > limit) {
         throw httpError(400, `${variant.platform} allows at most ${limit} carousel items; this draft has ${urls.length}`);
