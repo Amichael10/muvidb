@@ -18,7 +18,7 @@ const STATUS_TONES = {
   approved: 'green',
   scheduled: 'amber',
   published: 'green',
-  partially_published: 'green',
+  partially_published: 'amber',
   failed: 'red',
   rejected: 'red',
 };
@@ -1716,6 +1716,32 @@ export default function AdminSocialStudio() {
     }
   };
 
+  const runRetryFailed = async (contentItemId, platform = null) => {
+    setReviewingId(contentItemId);
+    const toastId = toast.loading(platform ? `Retrying ${platform}...` : 'Retrying failed platforms...');
+    try {
+      const res = await fetch('/api/social?task=retry_failed', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId, platform }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      toast.success(
+        data.retriedCount > 0
+          ? `⚡ Retrying ${data.retriedCount} platform(s): ${data.platforms?.join(', ')}`
+          : 'All platforms already published!',
+        { id: toastId },
+      );
+      await refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Failed to retry platforms', { id: toastId });
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
   const openFullStudioEditor = async item => {
     setReviewingId(item.id);
     try {
@@ -2656,7 +2682,10 @@ export default function AdminSocialStudio() {
                 const previewAsset = carouselPreviewUrl
                   ? { public_url: carouselPreviewUrl, format: 'carousel' }
                   : assets.find(asset => asset.id === selectedAssetId) || assets[0];
-                const canChangeQueueItem = !['publishing', 'partially_published', 'published'].includes(item.status);
+                const hasFailedVariants = variants.some(v => v.status === 'failed');
+                const hasStalePublishing = item.status === 'publishing' && (!item.updated_at || Date.now() - new Date(item.updated_at).getTime() > 2 * 60 * 1000);
+                const needsRetry = hasFailedVariants || item.status === 'partially_published' || item.status === 'failed' || hasStalePublishing;
+                const canChangeQueueItem = !['publishing', 'published'].includes(item.status);
                 const isExpanded = Boolean(expandedCaptions[item.id]);
 
                 const scheduledTime = item.scheduled_for || variants.find(v => v.scheduled_for)?.scheduled_for;
@@ -2773,6 +2802,21 @@ export default function AdminSocialStudio() {
                             )}
                           </div>
 
+                          {/* Failure Warning Banner */}
+                          {hasFailedVariants && (
+                            <div className="flex flex-wrap items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/25 px-3 py-1.5 text-xs text-rose-300">
+                              <Icon icon="solar:danger-triangle-bold" className="text-rose-400 shrink-0" width="14" />
+                              <span className="font-bold">
+                                Failed on: {variants.filter(v => v.status === 'failed').map(v => v.platform).join(', ')}
+                              </span>
+                              {variants.find(v => v.status === 'failed' && v.last_error_message)?.last_error_message && (
+                                <span className="text-[11px] text-rose-300/80 truncate max-w-md">
+                                  — {variants.find(v => v.status === 'failed' && v.last_error_message).last_error_message}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
                           {/* Platform Badges with Quick Include/Exclude Toggle */}
                           <div className="flex flex-wrap gap-2 pt-1">
                             {variants.map(variant => {
@@ -2786,12 +2830,19 @@ export default function AdminSocialStudio() {
                               }[variant.platform] || 'solar:share-linear';
 
                               const isExcluded = variant.status === 'cancelled';
+                              const isFailed = variant.status === 'failed';
+                              const isPublished = variant.status === 'published' || variant.status === 'uploaded_as_draft';
 
                               return (
                                 <button
                                   key={variant.id}
                                   type="button"
                                   onClick={async () => {
+                                    if (isFailed) {
+                                      // Quick retry single failed platform
+                                      await runRetryFailed(item.id, variant.platform);
+                                      return;
+                                    }
                                     if (!canChangeQueueItem) return;
                                     const nextStatus = isExcluded ? 'draft' : 'cancelled';
                                     setDrafts(current => current.map(draft => draft.id === item.id
@@ -2811,17 +2862,31 @@ export default function AdminSocialStudio() {
                                       toast.error(`Failed to update ${variant.platform}: ${err.message}`);
                                     }
                                   }}
-                                  disabled={!canChangeQueueItem}
-                                  title={canChangeQueueItem ? `Click to ${isExcluded ? 'include' : 'exclude'} ${variant.platform}` : undefined}
+                                  disabled={!canChangeQueueItem && !isFailed}
+                                  title={
+                                    isFailed
+                                      ? `${variant.platform} failed: ${variant.last_error_message || 'Click to retry'}`
+                                      : canChangeQueueItem
+                                      ? `Click to ${isExcluded ? 'include' : 'exclude'} ${variant.platform}`
+                                      : undefined
+                                  }
                                   className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-all ${
                                     isExcluded
                                       ? 'border-dashed border-rose-500/30 bg-rose-500/5 text-rose-300 opacity-50 hover:opacity-80'
+                                      : isFailed
+                                      ? 'border-red-500/40 bg-red-500/10 text-red-300 shadow-sm shadow-red-500/10 hover:bg-red-500/20'
+                                      : isPublished
+                                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
                                       : 'border-white/10 bg-surface-2 hover:border-brand/40 text-text-primary'
                                   }`}
                                 >
-                                  <Icon icon={icon} width="14" className={isExcluded ? 'text-rose-400' : 'text-brand'} />
+                                  <Icon
+                                    icon={icon}
+                                    width="14"
+                                    className={isExcluded ? 'text-rose-400' : isFailed ? 'text-red-400' : isPublished ? 'text-emerald-400' : 'text-brand'}
+                                  />
                                   <span className={`capitalize font-bold text-[11px] ${isExcluded ? 'line-through text-rose-300/80' : ''}`}>{variant.platform}</span>
-                                  <span className={`text-[9px] uppercase font-mono ${isExcluded ? 'text-rose-400 font-bold' : 'text-text-muted'}`}>
+                                  <span className={`text-[9px] uppercase font-mono ${isExcluded ? 'text-rose-400 font-bold' : isFailed ? 'text-red-400 font-bold' : 'text-text-muted'}`}>
                                     ({isExcluded ? 'off' : variant.status})
                                   </span>
                                 </button>
@@ -2844,7 +2909,18 @@ export default function AdminSocialStudio() {
                           </button>
                         )}
 
-                        {item.status === 'scheduled' ? (
+                        {needsRetry ? (
+                          <button
+                            type="button"
+                            onClick={() => runRetryFailed(item.id)}
+                            disabled={reviewingId === item.id}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 px-3.5 py-1.5 text-xs font-black text-black shadow-md shadow-amber-500/20 active:scale-95 disabled:opacity-50 transition-all"
+                            title="Retry publishing only on the platforms that failed"
+                          >
+                            <Icon icon={reviewingId === item.id ? 'solar:spinner-linear' : 'solar:restart-bold'} className={reviewingId === item.id ? 'animate-spin' : ''} width="14" />
+                            <span>⚡ Retry Failed</span>
+                          </button>
+                        ) : item.status === 'scheduled' ? (
                           <>
                             <button
                               type="button"

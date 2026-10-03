@@ -354,8 +354,35 @@ export async function publishContentItemNow(input: { contentItemId: string }, ac
   if (error) throw error;
   if (!item) throw httpError(404, 'Content item not found');
 
-  if (['published', 'publishing'].includes(item.status)) {
-    throw httpError(409, `Content item is already ${item.status}`);
+  if (item.status === 'published') {
+    throw httpError(409, 'Content item is already published');
+  }
+
+  // If already partially published, seamlessly retry the remaining un-posted/failed platforms
+  if (item.status === 'partially_published') {
+    return await retryFailedVariants({ contentItemId: input.contentItemId }, actor);
+  }
+
+  // If in 'publishing', check if there are actual active jobs processing within the last 2 minutes
+  if (item.status === 'publishing') {
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: activeJobs } = await supabase
+      .from('social_publish_jobs')
+      .select('id, locked_at')
+      .eq('status', 'processing')
+      .gt('locked_at', twoMinutesAgo);
+
+    if (activeJobs && activeJobs.length > 0) {
+      return {
+        id: input.contentItemId,
+        title: item.title,
+        status: 'publishing',
+        message: 'Publishing is currently in progress. Please wait a moment.',
+      };
+    }
+
+    console.log(`[publishContentItemNow] Stale publishing state on item ${input.contentItemId}. Auto-healing...`);
+    return await retryFailedVariants({ contentItemId: input.contentItemId }, actor);
   }
 
   // Reconcile with latest database source first before publishing
@@ -401,6 +428,143 @@ export async function publishContentItemNow(input: { contentItemId: string }, ac
     id: input.contentItemId,
     title: item.title,
     status: 'publishing',
+    processed: pubResult.processed,
+    results: pubResult.results,
+  };
+}
+
+export async function retryFailedVariants(
+  input: { contentItemId: string; platform?: string },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  const { data: item, error: itemError } = await supabase
+    .from('social_content_items')
+    .select('id, status, title, destination_id, content_type')
+    .eq('id', input.contentItemId)
+    .maybeSingle();
+
+  if (itemError) throw itemError;
+  if (!item) throw httpError(404, 'Content item not found');
+
+  let variantQuery = supabase
+    .from('social_platform_variants')
+    .select('id, platform, status, selected_asset_id, platform_options, connection_id')
+    .eq('content_item_id', input.contentItemId);
+
+  if (input.platform) {
+    variantQuery = variantQuery.eq('platform', input.platform);
+  }
+
+  const { data: variants, error: variantError } = await variantQuery;
+  if (variantError) throw variantError;
+
+  // Zero-duplicate guarantee: strictly NEVER retry already published platforms!
+  const retryable = (variants || []).filter(v =>
+    ['failed', 'cancelled', 'publishing'].includes(v.status)
+  );
+
+  if (!retryable.length) {
+    await recalculateContentStatus(input.contentItemId);
+    return {
+      success: true,
+      message: 'All platforms for this post are already published.',
+      retriedCount: 0,
+      platforms: [],
+    };
+  }
+
+  const retriedPlatforms: string[] = [];
+  for (const variant of retryable) {
+    retriedPlatforms.push(variant.platform);
+
+    let connectionId = variant.connection_id;
+    if (getSocialPublishMode() === 'live' && !connectionId) {
+      connectionId = await resolveDestinationConnection(
+        item.destination_id,
+        variant.platform as SocialPlatform,
+        item.content_type,
+      ).catch(() => null);
+    }
+
+    await supabase
+      .from('social_platform_variants')
+      .update({
+        status: 'scheduled',
+        scheduled_for: nowIso,
+        last_error_code: null,
+        last_error_message: null,
+        ...(connectionId ? { connection_id: connectionId } : {}),
+      })
+      .eq('id', variant.id);
+
+    const { data: existingJobs } = await supabase
+      .from('social_publish_jobs')
+      .select('id, status')
+      .eq('platform_variant_id', variant.id);
+
+    if (existingJobs && existingJobs.length > 0) {
+      for (const ej of existingJobs) {
+        await supabase
+          .from('social_publish_jobs')
+          .update({
+            status: 'queued',
+            attempt_count: 0,
+            available_at: nowIso,
+            scheduled_for: nowIso,
+            completed_at: null,
+            locked_at: null,
+            locked_by: null,
+            provider_publish_id: null,
+            provider_response: null,
+            last_error_code: null,
+            last_error_message: null,
+            last_error_details: null,
+          })
+          .eq('id', ej.id);
+      }
+    } else {
+      const idempotencyKey = createPublishJobIdempotencyKey({
+        contentItemId: input.contentItemId,
+        platform: variant.platform as SocialPlatform,
+        scheduledFor: nowIso,
+      });
+      await supabase
+        .from('social_publish_jobs')
+        .insert({
+          platform_variant_id: variant.id,
+          status: 'queued',
+          scheduled_for: nowIso,
+          available_at: nowIso,
+          idempotency_key: idempotencyKey,
+        });
+    }
+  }
+
+  await supabase
+    .from('social_content_items')
+    .update({ status: 'publishing' })
+    .eq('id', input.contentItemId);
+
+  await insertSocialEvent({
+    contentItemId: input.contentItemId,
+    eventType: 'retry_failed_started',
+    eventData: { actor_id: actor.id, platforms: retriedPlatforms },
+  });
+
+  const pubResult = await runSocialPublisher({
+    limit: 10,
+    lockedBy: `retry-failed:${actor.id}`,
+    now,
+  });
+
+  return {
+    success: true,
+    retriedCount: retryable.length,
+    platforms: retriedPlatforms,
     processed: pubResult.processed,
     results: pubResult.results,
   };
@@ -1046,8 +1210,8 @@ export async function runSocialPublisher(input: {
   const nowIso = now.toISOString();
   const limit = Math.min(Math.max(input.limit || 10, 1), 25);
 
-  // 1. Recover stale processing locks (e.g. jobs stuck in processing for > 10 mins from crashed runs)
-  const staleThreshold = new Date(now.getTime() - 10 * 60 * 1000).toISOString();
+  // 1. Recover stale processing locks (e.g. jobs stuck in processing for > 2 mins from crashed runs)
+  const staleThreshold = new Date(now.getTime() - 2 * 60 * 1000).toISOString();
   const { data: staleJobs } = await supabase
     .from('social_publish_jobs')
     .select('id,platform_variant_id')
@@ -1067,6 +1231,35 @@ export async function runSocialPublisher(input: {
       .update({ status: 'scheduled', last_error_code: 'publisher_timeout_recovered', last_error_message: 'Previous publish attempt timed out; retrying.' })
       .in('id', staleJobs.map(job => job.platform_variant_id))
       .eq('status', 'publishing');
+
+    const { data: affectedVariants } = await supabase
+      .from('social_platform_variants')
+      .select('content_item_id')
+      .in('id', staleJobs.map(job => job.platform_variant_id));
+
+    const itemIds = [...new Set((affectedVariants || []).map(v => v.content_item_id).filter(Boolean))];
+    for (const itemId of itemIds) {
+      await recalculateContentStatus(itemId).catch(() => {});
+    }
+  }
+
+  // 1b. Recover orphaned publishing variants (no active worker lock in last 2 mins)
+  const { data: orphanedVariants } = await supabase
+    .from('social_platform_variants')
+    .select('id, content_item_id, updated_at')
+    .eq('status', 'publishing')
+    .lt('updated_at', staleThreshold);
+
+  if (orphanedVariants?.length) {
+    await supabase
+      .from('social_platform_variants')
+      .update({ status: 'failed', last_error_code: 'publishing_orphaned_recovered', last_error_message: 'Publishing stalled with no active worker; auto-recovered to failed.' })
+      .in('id', orphanedVariants.map(v => v.id));
+
+    const orphanedItemIds = [...new Set(orphanedVariants.map(v => v.content_item_id).filter(Boolean))];
+    for (const itemId of orphanedItemIds) {
+      await recalculateContentStatus(itemId).catch(() => {});
+    }
   }
 
   // 2. Auto-heal: ensure any scheduled variants with scheduled_for <= now have a queued publish job

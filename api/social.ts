@@ -262,6 +262,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       createEditorVideoDraft,
       createUniversalSocialPost,
       publishContentItemNow,
+      retryFailedVariants,
       resetSocialStudioData,
       getEditorialCalendar,
       seedEditorialCalendarSlots,
@@ -774,6 +775,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { contentItemId } = req.body || {};
         if (typeof contentItemId !== 'string' || !contentItemId) return res.status(400).json({ error: 'contentItemId is required' });
         return res.status(200).json(await publishContentItemNow({ contentItemId }, actor));
+      }
+
+      if (task === 'retry_failed' || task === 'retry_failed_variants') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId, platform } = req.body || {};
+        if (typeof contentItemId !== 'string' || !contentItemId) return res.status(400).json({ error: 'contentItemId is required' });
+        return res.status(200).json(await retryFailedVariants({ contentItemId, platform }, actor));
       }
 
       if (task === 'review') {
