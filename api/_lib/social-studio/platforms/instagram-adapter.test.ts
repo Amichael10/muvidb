@@ -102,4 +102,37 @@ describe('InstagramPlatformAdapter', () => {
       code: 'instagram_media_required',
     });
   });
+
+  it('retries without cover_url if Instagram rejects the cover image', async () => {
+    const fetchImpl = vi.fn()
+      // First attempt with cover_url fails
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { message: 'Invalid cover image format', code: 100 }
+      }), { status: 400 }))
+      // Second attempt without cover_url succeeds
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_fallback' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_reel_fallback' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_reel_fallback', permalink: 'https://instagram.com/reel/fallback' }), { status: 200 }));
+
+    const adapter = new InstagramPlatformAdapter({
+      accessToken: 'token',
+      instagramAccountId: 'ig-user-1',
+      fetchImpl,
+      pollIntervalMs: 10,
+    });
+
+    const result = await adapter.publish(request({
+      assetUrl: 'https://cdn.example.com/trailer.mp4',
+      options: { cover_url: 'https://cdn.example.com/bad_cover.jpg' },
+    }));
+
+    expect(result.externalPostId).toBe('ig_reel_fallback');
+    expect(result.externalPermalink).toBe('https://instagram.com/reel/fallback');
+    // First call had cover_url
+    expect((fetchImpl.mock.calls[0][1].body as URLSearchParams).get('cover_url')).toBe('https://cdn.example.com/bad_cover.jpg');
+    // Second call retried without cover_url
+    expect((fetchImpl.mock.calls[1][1].body as URLSearchParams).get('cover_url')).toBeNull();
+  });
 });
+

@@ -267,8 +267,20 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
       containerParams.set('image_url', assetUrl);
     }
 
-    // 1. Create Media Container
-    const containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, containerParams);
+    // 1. Create Media Container (with graceful fallback if cover_url is rejected)
+    let containerRes: { id?: string };
+    try {
+      containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, containerParams);
+    } catch (createErr: any) {
+      if (containerParams.has('cover_url')) {
+        console.warn(`[instagram-adapter] Failed to create media container with cover_url (${createErr?.message}). Retrying without cover_url...`);
+        const fallbackParams = new URLSearchParams(containerParams);
+        fallbackParams.delete('cover_url');
+        containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, fallbackParams);
+      } else {
+        throw createErr;
+      }
+    }
     const containerId = containerRes.id;
     if (!containerId) {
       throw new SocialPlatformError({
