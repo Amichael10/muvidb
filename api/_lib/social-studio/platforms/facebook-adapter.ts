@@ -163,11 +163,13 @@ export class FacebookPlatformAdapter implements SocialPlatformAdapter {
       const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(assetUrl);
       if (isVideo) {
         params.set('description', request.caption);
-        params.set('file_url', assetUrl);
-        const coverUrl = request.options?.cover_url || request.options?.cover_image_url || request.options?.thumbnail_url;
-        if (coverUrl && typeof coverUrl === 'string' && coverUrl.trim()) {
-          params.set('thumb', coverUrl.trim());
+        if (request.title) {
+          params.set('title', request.title);
         }
+        params.set('file_url', assetUrl);
+        // Note: Meta Graph API POST /{page_id}/videos only accepts 'thumb' as multipart binary data,
+        // NOT a URL string. Passing a URL string triggers Meta error (#100) Invalid image format.
+        // Omitting 'thumb' allows Facebook to automatically generate video thumbnail frames.
         const res = await this.post(`/${encodeURIComponent(this.pageId)}/videos`, params);
         const externalPostId = res.id;
         const externalPermalink = await this.permalink(externalPostId);

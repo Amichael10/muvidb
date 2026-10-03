@@ -93,4 +93,40 @@ describe('TikTokPlatformAdapter', () => {
     expect(body.post_info.auto_add_music).toBe(true);
     expect(body.post_info.brand_organic_toggle).toBe(true);
   });
+
+  it('splits large video (>64MB) into multiple chunks for FILE_UPLOAD', async () => {
+    // 70 MB pseudo-video
+    const largeSize = 70 * 1024 * 1024;
+    const dummyBuffer = Buffer.alloc(1024); // mock arrayBuffer with length metadata
+    const fakeArrayBuffer = new ArrayBuffer(largeSize);
+
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: {
+        privacy_level_options: ['PUBLIC_TO_EVERYONE'],
+        comment_disabled: false,
+      } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(fakeArrayBuffer, { status: 200 })) // fetch video
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { publish_id: 'large_pub_123', upload_url: 'https://upload.tiktok.com/chunk' } }), { status: 200 })) // init
+      // 70MB / 10MB = 7 chunks
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { status: 'PUBLISH_COMPLETE', publicly_available_post_id: ['post_large_1'] } }), { status: 200 }));
+
+    const adapter = new TikTokPlatformAdapter({ accessToken: 'tt-token', fetchImpl });
+    const result = await adapter.publish(request({
+      assetUrl: 'https://cdn.example.com/large.mp4',
+      options: { tiktok: { force_file_upload: true } },
+    }));
+
+    expect(result.externalPostId).toBe('post_large_1');
+    const initBody = JSON.parse(fetchImpl.mock.calls[2][1].body as string);
+    expect(initBody.source_info.source).toBe('FILE_UPLOAD');
+    expect(initBody.source_info.chunk_size).toBe(10 * 1024 * 1024);
+    expect(initBody.source_info.total_chunk_count).toBe(7);
+  });
 });

@@ -168,20 +168,81 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
     if (isVideo) {
       const isDirectFileUpload = Boolean(settings.force_file_upload);
 
-      const initVideoPublish = async (useFileUpload: boolean, videoBytes?: Buffer) => {
-        const sourceInfo = useFileUpload && videoBytes
-          ? {
-              source: 'FILE_UPLOAD',
-              video_size: videoBytes.length,
-              chunk_size: videoBytes.length,
-              total_chunk_count: 1,
-            }
-          : {
-              source: 'PULL_FROM_URL',
-              video_url: targetAssetUrl,
-            };
+      const MAX_CHUNK_SIZE = 64 * 1024 * 1024; // 64 MB TikTok ceiling
+      const MULTI_CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB chunks for files > 64 MB
 
-        const payload = postMode === 'MEDIA_UPLOAD'
+      const getChunkPlan = (totalBytes: number) => {
+        if (totalBytes <= MAX_CHUNK_SIZE) {
+          return { chunkSize: totalBytes, totalChunks: 1 };
+        }
+        const chunkSize = MULTI_CHUNK_SIZE;
+        // Per TikTok API specification: total_chunk_count must be floor(video_size / chunk_size).
+        // The final chunk contains any trailing bytes (up to 128 MB).
+        const totalChunks = Math.max(1, Math.floor(totalBytes / chunkSize));
+        return { chunkSize, totalChunks };
+      };
+
+      const uploadBinaryChunks = async (uploadUrl: string, videoBytes: Buffer) => {
+        const totalBytes = videoBytes.length;
+        const plan = getChunkPlan(totalBytes);
+        console.log(`[TikTok Adapter] Uploading ${totalBytes} bytes in ${plan.totalChunks} chunk(s) (chunk_size: ${plan.chunkSize})...`);
+
+        for (let i = 0; i < plan.totalChunks; i++) {
+          const start = i * plan.chunkSize;
+          // All chunks except the last must be exactly chunkSize; the final chunk includes all remaining trailing bytes
+          const end = (i === plan.totalChunks - 1) ? totalBytes : start + plan.chunkSize;
+          const chunk = videoBytes.subarray(start, end);
+          const contentRange = `bytes ${start}-${end - 1}/${totalBytes}`;
+
+          console.log(`[TikTok Adapter] Uploading chunk ${i + 1}/${plan.totalChunks} (${contentRange}, ${chunk.length} bytes)...`);
+
+          const putRes = await this.fetchImpl(uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'video/mp4',
+              'Content-Range': contentRange,
+              'Content-Length': String(chunk.length),
+            },
+            body: chunk,
+            // @ts-ignore
+            duplex: 'half',
+            signal: AbortSignal.timeout(180_000),
+          });
+
+          if (!putRes.ok) {
+            const errBody = await putRes.text().catch(() => '');
+            throw new Error(`TikTok video file binary upload failed on chunk ${i + 1}/${plan.totalChunks} (${putRes.status}): ${errBody}`);
+          }
+        }
+        console.log('[TikTok Adapter] All video chunks uploaded to TikTok successfully!');
+      };
+
+      let effectivePostMode = postMode;
+
+      const initVideoPublish = async (
+        useFileUpload: boolean,
+        videoBytes?: Buffer,
+        overrideMode?: 'MEDIA_UPLOAD' | 'DIRECT_POST',
+      ) => {
+        let sourceInfo: Record<string, any>;
+        if (useFileUpload && videoBytes) {
+          const plan = getChunkPlan(videoBytes.length);
+          sourceInfo = {
+            source: 'FILE_UPLOAD',
+            video_size: videoBytes.length,
+            chunk_size: plan.chunkSize,
+            total_chunk_count: plan.totalChunks,
+          };
+        } else {
+          sourceInfo = {
+            source: 'PULL_FROM_URL',
+            video_url: targetAssetUrl,
+          };
+        }
+
+        const mode = overrideMode || effectivePostMode;
+
+        const payload = mode === 'MEDIA_UPLOAD'
           ? { source_info: sourceInfo }
           : {
               post_info: {
@@ -197,11 +258,24 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
               source_info: sourceInfo,
             };
 
-        const endpoint = postMode === 'MEDIA_UPLOAD'
+        const endpoint = mode === 'MEDIA_UPLOAD'
           ? '/post/publish/inbox/video/init/'
           : '/post/publish/video/init/';
 
         return this.postJson(endpoint, payload);
+      };
+
+      const safeInitVideo = async (useFileUpload: boolean, videoBytes?: Buffer) => {
+        try {
+          return await initVideoPublish(useFileUpload, videoBytes);
+        } catch (initErr: any) {
+          if (initErr?.details?.provider_code === 'unaudited_client_can_only_post_to_private_accounts') {
+            console.log('[TikTok Adapter] TikTok app is in unaudited developer mode. Falling back to creator Inbox Draft (MEDIA_UPLOAD)...');
+            effectivePostMode = 'MEDIA_UPLOAD';
+            return await initVideoPublish(useFileUpload, videoBytes, 'MEDIA_UPLOAD');
+          }
+          throw initErr;
+        }
       };
 
       let res: Record<string, any>;
@@ -210,52 +284,25 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
           const videoRes = await this.fetchImpl(targetAssetUrl);
           if (!videoRes.ok) throw new Error(`Failed to fetch video asset (${videoRes.status})`);
           const videoBytes = Buffer.from(await videoRes.arrayBuffer());
-          res = await initVideoPublish(true, videoBytes);
+          res = await safeInitVideo(true, videoBytes);
           const uploadUrl = res.data?.upload_url;
           if (uploadUrl) {
-            const putRes = await this.fetchImpl(uploadUrl, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'video/mp4',
-                'Content-Range': `bytes 0-${videoBytes.length - 1}/${videoBytes.length}`,
-              },
-              body: videoBytes,
-            });
-            if (!putRes.ok) {
-              throw new Error(`TikTok video file binary upload failed (${putRes.status})`);
-            }
+            await uploadBinaryChunks(uploadUrl, videoBytes);
           }
         } else {
-          res = await initVideoPublish(false);
+          res = await safeInitVideo(false);
         }
       } catch (err: any) {
         // If TikTok rejects domain verification on PULL_FROM_URL, fallback to direct FILE_UPLOAD automatically!
-        if (err?.details?.provider_code === 'url_ownership_unverified' || err?.message?.includes('ownership')) {
+        if (err?.details?.provider_code === 'url_ownership_unverified' || err?.message?.includes('ownership') || err?.message?.includes('PULL_FROM_URL')) {
           console.log('[TikTok Adapter] PULL_FROM_URL domain unverified. Streaming binary bytes via FILE_UPLOAD...');
           const videoRes = await this.fetchImpl(targetAssetUrl);
           if (!videoRes.ok) throw new Error(`Failed to fetch video asset (${videoRes.status})`);
           const videoBytes = Buffer.from(await videoRes.arrayBuffer());
-          res = await initVideoPublish(true, videoBytes);
+          res = await safeInitVideo(true, videoBytes);
           const uploadUrl = res.data?.upload_url;
           if (uploadUrl) {
-            console.log(`[TikTok Adapter] Uploading ${videoBytes.length} bytes to TikTok upload URL...`);
-            const putRes = await fetch(uploadUrl, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'video/mp4',
-                'Content-Range': `bytes 0-${videoBytes.length - 1}/${videoBytes.length}`,
-                'Content-Length': String(videoBytes.length),
-              },
-              body: videoBytes,
-              // @ts-ignore
-              duplex: 'half',
-              signal: AbortSignal.timeout(180_000),
-            });
-            if (!putRes.ok) {
-              const errBody = await putRes.text().catch(() => '');
-              throw new Error(`TikTok video file binary upload failed (${putRes.status}): ${errBody}`);
-            }
-            console.log('[TikTok Adapter] Binary bytes uploaded to TikTok successfully!');
+            await uploadBinaryChunks(uploadUrl, videoBytes);
           }
         } else {
           throw err;
@@ -271,7 +318,7 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
         });
       }
 
-      const statusResult = await this.checkPublishStatus(publishId, postMode);
+      const statusResult = await this.checkPublishStatus(publishId, effectivePostMode);
       statusResult.providerResponse = { ...statusResult.providerResponse, creator_info: creatorInfo };
       return statusResult;
     }

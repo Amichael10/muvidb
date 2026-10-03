@@ -20,7 +20,8 @@ import { runCriticsSync } from '../_lib/critics_sync.js';
  * Orchestrates various sync tasks: showtimes, videos, TMDB discovery, and AI maintenance.
  */
 
-export const config = { maxDuration: 300 }; // 5-minute timeout
+export const maxDuration = 300; // 5-minute timeout
+export const config = { maxDuration: 300 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).end();

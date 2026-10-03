@@ -60,8 +60,8 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
     const domain = isDirectInstagramToken ? 'graph.instagram.com' : 'graph.facebook.com';
     this.baseUrl = `https://${domain}/${cleanVersion(options.apiVersion)}`;
     this.fetchImpl = options.fetchImpl || fetch;
-    this.pollIntervalMs = options.pollIntervalMs || 2000;
-    this.maxPollAttempts = options.maxPollAttempts || 15;
+    this.pollIntervalMs = options.pollIntervalMs || 3000;
+    this.maxPollAttempts = options.maxPollAttempts || 40;
   }
 
   private async post(path: string, body: URLSearchParams): Promise<Record<string, any>> {
@@ -130,6 +130,10 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
           code: `instagram_media_${String(statusCode).toLowerCase()}`,
           message: `Instagram media container failed with status: ${statusCode}`,
         });
+      }
+
+      if (attempt % 5 === 0 || attempt === this.maxPollAttempts - 1) {
+        console.log(`[Instagram Adapter] Container ${containerId} status: ${statusCode || 'IN_PROGRESS'} (attempt ${attempt + 1}/${this.maxPollAttempts})`);
       }
 
       await new Promise((resolve) => setTimeout(resolve, this.pollIntervalMs));
