@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { assertUuid } from './_lib/social-studio/domain/validation.js';
 
 export const maxDuration = 60;
 
@@ -735,7 +736,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (task === 'streaming_poster') {
         await requireSocialStudioAdmin(req);
-        const { assertUuid } = await import('./_lib/social-studio/domain/validation.js');
         assertUuid(req.body?.contentItemId, 'contentItemId');
         const { refreshStreamingPoster } = await import('./_lib/social_studio.js');
         return res.status(200).json(await refreshStreamingPoster(req.body.contentItemId, req.body.refresh === true));

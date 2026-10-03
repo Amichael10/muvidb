@@ -94,11 +94,11 @@ async function scrapeFeedZeta() {
   await page.waitForTimeout(3500); // Allow initial content to load
 
   console.log('📜 Scrolling to lazy-load all movies...');
-  let lastHeight = await page.evaluate('document.body.scrollHeight');
+  let lastHeight = await page.evaluate(() => document.body?.scrollHeight || document.documentElement?.scrollHeight || 0);
   for (let i = 0; i < 8; i++) {
-    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+    await page.evaluate(() => window.scrollTo(0, document.body?.scrollHeight || document.documentElement?.scrollHeight || 0));
     await page.waitForTimeout(2000);
-    const newHeight = await page.evaluate('document.body.scrollHeight');
+    const newHeight = await page.evaluate(() => document.body?.scrollHeight || document.documentElement?.scrollHeight || 0);
     if (newHeight === lastHeight) break;
     lastHeight = newHeight;
   }

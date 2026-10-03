@@ -1797,7 +1797,7 @@ export async function generateSocialDraft(
   const posterOnly = (input.contentType === 'where_to_watch' || input.contentType === 'whats_on_stage') && !input.skipAssets;
   const isStage = snapshot.kind === 'whats_on_stage';
   const poster = posterOnly && (snapshot.kind === 'upcoming_movie' || isStage)
-    ? await preparePoster(await downloadSocialImage(snapshot.posterUrl || ''), isStage) : null;
+    ? await preparePoster(await downloadSocialImage((snapshot as any).posterUrl || ''), isStage) : null;
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
     snapshot.kind === 'actor_spotlight'

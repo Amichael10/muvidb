@@ -677,7 +677,7 @@ async function handleCallback(query: any) {
         .eq('id', draftId)
         .maybeSingle();
 
-      await publishContentItemNow(draftId, systemActor);
+      await publishContentItemNow({ contentItemId: draftId }, systemActor);
       if (chatId) {
         await reply(
           chatId,
