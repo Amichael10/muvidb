@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
@@ -87,7 +87,7 @@ function EmptyState({ icon, title, body, cta, to }) {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, refreshUserProfile, updatePassword } = useAuth();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('watchlist');
@@ -104,6 +104,20 @@ export default function Dashboard() {
   const [editRating, setEditRating] = useState(0);
   const [expandedReviewId, setExpandedReviewId] = useState(null);
   const [savingReview, setSavingReview] = useState(false);
+
+  // Settings profile form state
+  const [displayName, setDisplayName] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setDisplayName(user.name || '');
+      setWhatsappPhone(user.whatsapp_phone || localStorage.getItem('muvidb_user_whatsapp_phone') || '');
+    }
+  }, [user]);
 
   useEffect(() => {
     document.title = 'MuviDB | Dashboard';
@@ -194,7 +208,14 @@ export default function Dashboard() {
         setWatchlist(rows);
       }
 
-      const people = (followRes.data || []).map((item) => item.people).filter(Boolean);
+      let people = (followRes.data || []).map((item) => item.people).filter(Boolean);
+      if (people.length === 0 && (followRes.data || []).length > 0) {
+        const pids = (followRes.data || []).map((f) => f.person_id).filter(Boolean);
+        if (pids.length) {
+          const { data: directPeople } = await supabase.from('people').select('*').in('id', pids);
+          people = directPeople || [];
+        }
+      }
       setFollowing(people);
       await fetchFollowStrip(people.map((p) => p.id));
 
@@ -282,6 +303,72 @@ export default function Dashboard() {
       toast.success('Unfollowed');
     } else {
       toast.error('Could not unfollow');
+    }
+  };
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const cleanPhone = whatsappPhone.trim();
+      const cleanName = displayName.trim();
+
+      const res = await fetch('/api/whatsapp?action=update-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name: cleanName,
+          phone: cleanPhone || null,
+          enabled: true,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to update profile');
+      }
+
+      if (cleanPhone) {
+        localStorage.setItem('muvidb_user_whatsapp_phone', data.whatsapp_phone || cleanPhone);
+      } else {
+        localStorage.removeItem('muvidb_user_whatsapp_phone');
+      }
+
+      if (refreshUserProfile) {
+        await refreshUserProfile();
+      }
+
+      toast.success('Profile and WhatsApp preferences saved!');
+    } catch (err) {
+      console.error('Save profile error:', err);
+      toast.error(err.message || 'Could not save profile changes');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
+    setUpdatingPassword(true);
+    try {
+      await updatePassword(newPassword);
+      toast.success('Password updated successfully!');
+      setNewPassword('');
+    } catch (err) {
+      console.error('Password update error:', err);
+      toast.error(err.message || 'Failed to update password');
+    } finally {
+      setUpdatingPassword(false);
     }
   };
 
@@ -796,7 +883,7 @@ export default function Dashboard() {
                 <div className="space-y-10 max-w-2xl">
                   <SectionHeader title="Settings" subtitle="Profile and account preferences" />
 
-                  <section className="space-y-6">
+                  <form onSubmit={handleSaveProfile} className="space-y-6">
                     <h3 className="text-sm font-bold text-text-primary">Profile</h3>
                     <div className="flex items-center gap-5">
                       <div className="w-16 h-16 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted">
@@ -806,12 +893,15 @@ export default function Dashboard() {
                         JPG, PNG, or WebP. Square photos work best.
                       </p>
                     </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-text-muted">Display name</label>
                         <input
                           type="text"
-                          defaultValue={user.name}
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          placeholder="Your name"
                           className="w-full bg-surface border border-border text-text-primary rounded-lg px-4 py-3 text-sm focus:border-brand focus:outline-none transition-colors"
                         />
                       </div>
@@ -819,46 +909,89 @@ export default function Dashboard() {
                         <label className="text-xs font-semibold text-text-muted">Email</label>
                         <input
                           type="email"
-                          defaultValue={user.email}
+                          value={user?.email || ''}
                           disabled
                           className="w-full bg-surface-2/50 border border-border text-text-muted rounded-lg px-4 py-3 text-sm cursor-not-allowed"
                         />
                       </div>
                     </div>
+
+                    {/* WhatsApp Phone Number Card */}
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-4 sm:p-5 space-y-3">
+                      <div className="flex items-center gap-2.5">
+                        <Icon icon="logos:whatsapp-icon" className="text-xl flex-shrink-0" />
+                        <div>
+                          <label htmlFor="settings-whatsapp-phone" className="text-xs font-bold text-text-primary block">
+                            WhatsApp Phone Number
+                          </label>
+                          <p className="text-[11px] text-text-muted mt-0.5">
+                            Enable instant 1-click follow. When saved, you will never have to re-enter your number to receive new release and film alerts.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="relative">
+                        <input
+                          id="settings-whatsapp-phone"
+                          type="tel"
+                          value={whatsappPhone}
+                          onChange={(e) => setWhatsappPhone(e.target.value)}
+                          placeholder="+234 801 234 5678 or 08012345678"
+                          className="w-full bg-surface border border-border text-text-primary rounded-lg px-4 py-3 text-sm focus:border-emerald-500 focus:outline-none transition-colors"
+                        />
+                        {whatsappPhone && (
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                            <Icon icon="solar:check-circle-bold" className="text-xs" />
+                            Saved
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
                     <button
-                      type="button"
-                      className="bg-brand text-white px-6 py-2.5 rounded-lg text-xs font-bold hover:bg-brand/90 transition-colors"
+                      type="submit"
+                      disabled={savingProfile}
+                      className="inline-flex items-center gap-2 bg-brand text-white px-6 py-2.5 rounded-lg text-xs font-bold hover:bg-brand/90 transition-colors disabled:opacity-50"
                     >
-                      Save changes
+                      {savingProfile ? (
+                        <>
+                          <Icon icon="solar:spinner-linear" className="text-sm animate-spin" />
+                          Saving changes...
+                        </>
+                      ) : (
+                        'Save changes'
+                      )}
                     </button>
-                  </section>
+                  </form>
 
                   <section className="space-y-6 pt-8 border-t border-border/70">
                     <h3 className="text-sm font-bold text-text-primary">Password</h3>
-                    <div className="space-y-4 max-w-md">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-text-muted">Current password</label>
-                        <input
-                          type="password"
-                          placeholder="••••••••"
-                          className="w-full bg-surface border border-border text-text-primary rounded-lg px-4 py-3 text-sm focus:border-brand focus:outline-none transition-colors"
-                        />
-                      </div>
+                    <form onSubmit={handleUpdatePassword} className="space-y-4 max-w-md">
                       <div className="space-y-1.5">
                         <label className="text-xs font-semibold text-text-muted">New password</label>
                         <input
                           type="password"
-                          placeholder="••••••••"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Min. 6 characters"
                           className="w-full bg-surface border border-border text-text-primary rounded-lg px-4 py-3 text-sm focus:border-brand focus:outline-none transition-colors"
                         />
                       </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="border border-border text-text-primary px-6 py-2.5 rounded-lg text-xs font-bold hover:border-brand hover:text-brand transition-colors"
-                    >
-                      Update password
-                    </button>
+                      <button
+                        type="submit"
+                        disabled={updatingPassword || !newPassword}
+                        className="inline-flex items-center gap-2 border border-border text-text-primary px-6 py-2.5 rounded-lg text-xs font-bold hover:border-brand hover:text-brand transition-colors disabled:opacity-50"
+                      >
+                        {updatingPassword ? (
+                          <>
+                            <Icon icon="solar:spinner-linear" className="text-sm animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          'Update password'
+                        )}
+                      </button>
+                    </form>
                   </section>
 
                   <section className="pt-8 border-t border-border/70 space-y-3">

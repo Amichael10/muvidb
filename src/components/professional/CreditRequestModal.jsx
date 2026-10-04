@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { CAST_ROLE, CREW_ROLES } from '../../lib/creditRoles';
+import { notifyProAdminOnTelegram } from '../../lib/proModeration';
 
 const inputClass = 'mt-2 w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10';
 
@@ -67,6 +68,15 @@ export default function CreditRequestModal({ person, onClose, onSaved }) {
       });
       if (error) throw error;
       toast.success('Credit request submitted for review.');
+      notifyProAdminOnTelegram({
+        personId: person.id,
+        personName: person.name,
+        personSlug: person.slug,
+        updateType: 'credits',
+        summary: `Credit addition: "${proposedFilm?.title || film?.title || 'Film'}" as ${kind === 'cast' ? `Actor (${characterName || 'cast'})` : crewRole}`,
+        details: note ? `Note: ${note}` : undefined,
+        link: '/admin/actor-claims'
+      }).catch((err) => console.warn('Credit request telegram notify error:', err));
       onSaved();
       onClose();
     } catch (error) {

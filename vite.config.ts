@@ -493,7 +493,7 @@ export default defineConfig(({ mode, isSsrBuild }) => {
     build: {
       manifest: true,
       rollupOptions: {
-        external: ['tesseract.js', 'qrcode'],
+        external: ['tesseract.js'],
       },
     },
     ssr: {

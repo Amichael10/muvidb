@@ -3,6 +3,7 @@ import { getCorsHeaders } from './cors.js';
 import { supabase } from './supabase.js';
 import { sendActorClaimApprovedEmail } from './actor_claim_email.js';
 import { notifyActorClaimSubmission } from './actor_claim_notify.js';
+import { sendTelegramMessage } from './telegram.js';
 import { generateProfessionalCvPdf } from './professional_cv_pdf.js';
 
 function cors(req: VercelRequest, res: VercelResponse) {
@@ -123,6 +124,53 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
 
       const notification = await notifyActorClaimSubmission(claim.id, { expectedUserId: user.id });
       return res.status(201).json({ success: true, claim, notification });
+    }
+
+    if (action === 'notify-pro-update') {
+      if (!user) return res.status(403).json({ error: 'Authentication required' });
+      const personId = String(req.body?.personId || '').trim();
+      const personName = String(req.body?.personName || '').trim();
+      const personSlug = String(req.body?.personSlug || personId).trim();
+      const updateType = String(req.body?.updateType || 'general').trim();
+      const summary = String(req.body?.summary || '').trim();
+      const details = String(req.body?.details || '').trim();
+      const link = String(req.body?.link || '/admin/contributions').trim();
+
+      const typeLabels: Record<string, string> = {
+        representation: 'Talent Management & Agent Contacts',
+        guilds: 'Guild & Union Memberships',
+        awards: 'Industry Award / Nomination',
+        photos: 'Headshot / Photo Portfolio',
+        videos: 'Showreel / Video Portfolio',
+        credits: 'Film Credit Addition / Removal',
+        profile: 'General Profile & Bio Update',
+      };
+
+      const configured = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || '').trim();
+      const base = configured || 'https://muvidb.com';
+      const reviewUrl = link.startsWith('http') ? link : `${base.replace(/\/$/, '')}${link.startsWith('/') ? link : `/${link}`}`;
+
+      const message = [
+        '🎭 Pro Actor Update Submitted (Pending Approval)',
+        `Actor: ${personName || 'Verified Actor'}`,
+        `Section: ${typeLabels[updateType] || updateType}`,
+        summary ? `Summary: ${summary}` : null,
+        details ? `Details:\n${details}` : null,
+        `Submitted by: ${user.email || user.id}`,
+        `Time: ${new Date().toISOString()}`,
+      ].filter(Boolean).join('\n');
+
+      const sent = await sendTelegramMessage({
+        text: message,
+        replyMarkup: {
+          inline_keyboard: [
+            [{ text: 'Review in Admin Queue', url: reviewUrl }],
+            ...(personId ? [[{ text: 'View Actor Profile', url: `${base.replace(/\/$/, '')}/people/${personSlug || personId}` }]] : []),
+          ],
+        },
+      });
+
+      return res.status(200).json({ success: true, notification: sent });
     }
 
     if (!id && action !== 'notify-pending-claims') {

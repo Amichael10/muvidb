@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { suggestPersonEdit } from '../../lib/contributions';
 import { uploadContributionImage } from '../../lib/imageUpload';
+import { notifyProAdminOnTelegram } from '../../lib/proModeration';
 import { getChangedProfileFields } from '../../lib/professionalProfile';
 import { extractChannelIdentifier, fetchChannelData } from '../../lib/youtube';
 import { formatViewCount } from '../../utils/youtube';
@@ -71,6 +72,15 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
       });
       if (!result.ok) throw result.error;
       toast.success('Profile update sent to the MuviDB editorial team.');
+      notifyProAdminOnTelegram({
+        personId: person.id,
+        personName: person.name,
+        personSlug: person.slug,
+        updateType: 'profile',
+        summary: `Profile bio/details update: ${Object.keys(changedFields).join(', ')}`,
+        details: Object.entries(changedFields).map(([k, v]) => `${k}: ${v}`).join('\n'),
+        link: '/admin/contributions'
+      }).catch((err) => console.warn('Profile editor telegram notify error:', err));
       onSaved();
       onClose();
     } catch (error) {

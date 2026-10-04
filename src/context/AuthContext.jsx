@@ -123,12 +123,28 @@ export function AuthProvider({ children }) {
     }
     
     try {
-      // Check public.users table directly for the role
+      // Check public.users table directly for role and whatsapp preferences
       const { data: profile, error } = await supabase
         .from('users')
-        .select('role,account_intent,professional_roles,professional_onboarding_status')
+        .select('name,role,account_intent,professional_roles,professional_onboarding_status,whatsapp_phone,whatsapp_enabled')
         .eq('id', authUser.id)
-        .single();
+        .maybeSingle();
+
+      if (!profile) {
+        // Automatically sync auth user into public.users in the background so relations/FKs work smoothly
+        supabase.auth.getSession().then(({ data: sessionData }) => {
+          const token = sessionData?.session?.access_token;
+          if (token) {
+            fetch('/api/whatsapp?action=sync-user', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            }).catch(() => {});
+          }
+        });
+      }
       
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching user profile:', error);
@@ -155,7 +171,7 @@ export function AuthProvider({ children }) {
 
       // New accounts only — server is idempotent; never blocks auth UX.
       // Small delay so the access token is fully available right after signup.
-      const name = authUser.user_metadata?.name || authUser.user_metadata?.full_name;
+      const name = profile?.name || authUser.user_metadata?.name || authUser.user_metadata?.full_name;
       setTimeout(() => {
         void requestWelcomeEmail(name);
       }, 600);
@@ -409,9 +425,16 @@ export function AuthProvider({ children }) {
   const user = authState.user;
   const role = authState.role;
 
+  const refreshUserProfile = async () => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (currentUser) {
+      await fetchUserProfile(currentUser);
+    }
+  };
+
   const formattedUser = user ? {
     id: user.id,
-    name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
+    name: authState.profile?.name || user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
     email: user.email,
     avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
     role: role,
@@ -419,6 +442,9 @@ export function AuthProvider({ children }) {
     professional_roles: authState.profile?.professional_roles?.length ? authState.profile.professional_roles : (user.user_metadata?.professional_roles || []),
     professional_onboarding_status: authState.profile?.professional_onboarding_status || 'not_started',
     career_passport_welcome_seen_at: user.user_metadata?.career_passport_welcome_seen_at || null,
+    whatsapp_phone: authState.profile?.whatsapp_phone || user.user_metadata?.whatsapp_phone || null,
+    whatsapp_enabled: authState.profile?.whatsapp_enabled !== false && user.user_metadata?.whatsapp_enabled !== false,
+    user_metadata: user.user_metadata || {},
     onboarded: user.user_metadata?.onboarded || (role && role !== 'new_user' && role !== 'admin' && role !== 'professional') || role === 'admin'
   } : null;
 
@@ -429,6 +455,7 @@ export function AuthProvider({ children }) {
     signup,
     logout,
     updateUserProfile,
+    refreshUserProfile,
     requestPasswordReset,
     updatePassword,
     isAuthenticated: !!user,

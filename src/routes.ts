@@ -34,6 +34,7 @@ export default [
   route('forgot-password', 'pages/ForgotPassword.jsx'),
   route('reset-password', 'pages/ResetPassword.jsx'),
   route('people', 'routes/people-list.tsx'),
+  route('people/:slug/v2', 'pages/PersonDetailV2.jsx'),
   route('people/:slug', 'routes/person-detail.tsx'),
   route('critics', 'pages/CriticsList.jsx'),
   route('critics/:slug', 'pages/CriticDetail.jsx'),

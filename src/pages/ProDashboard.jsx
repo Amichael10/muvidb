@@ -16,9 +16,18 @@ import CareerPassportModal from '../components/professional/CareerPassportModal'
 import CareerPassportWelcome from '../components/professional/CareerPassportWelcome';
 import PhotoUploadModal from '../components/professional/PhotoUploadModal';
 import VideoUploadModal from '../components/professional/VideoUploadModal';
-import RepresentationModal from '../components/professional/RepresentationModal';
 import ProVideoTheaterModal from '../components/professional/ProVideoTheaterModal';
 import ProIntelligenceAssistant from '../components/professional/ProIntelligenceAssistant';
+import { submitProProfileUpdate, notifyProAdminOnTelegram } from '../lib/proModeration';
+
+const NIGERIAN_GUILDS = [
+  { id: 'agn', label: 'Actors Guild of Nigeria (AGN)', badge: 'AGN' },
+  { id: 'dgn', label: 'Directors Guild of Nigeria (DGN)', badge: 'DGN' },
+  { id: 'tampan', label: 'Theatre Arts & Motion Pictures Practitioners Association (TAMPAN)', badge: 'TAMPAN' },
+  { id: 'ancop', label: 'Association of Nollywood Core Producers (ANCOP)', badge: 'ANCOP' },
+  { id: 'cdgn', label: 'Creative Designers Guild of Nigeria (CDGN)', badge: 'CDGN' },
+  { id: 'sag_aftra', label: 'SAG-AFTRA (International)', badge: 'SAG-AFTRA' },
+];
 
 const OPEN_STATUSES = ['submitted', 'pending', 'in_review', 'needs_information'];
 
@@ -97,12 +106,37 @@ export default function ProDashboard() {
   const [photoCategoryFilter, setPhotoCategoryFilter] = useState('all');
   const [videoCategoryFilter, setVideoCategoryFilter] = useState('all');
 
-  // Modals
+  // Modals & Action States
   const [addingCredit, setAddingCredit] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
-  const [editingRep, setEditingRep] = useState(false);
+
+  // Inline Form States (Less Pop-ups)
+  const [inlineRepOpen, setInlineRepOpen] = useState(false);
+  const [repForm, setRepForm] = useState({
+    agency: '',
+    agent_name: '',
+    agent_email: '',
+    agent_phone: '',
+    manager_name: '',
+    manager_email: '',
+    publicist: '',
+    guilds: ['agn'],
+    territory: 'Pan-African & International',
+  });
+  const [savingRep, setSavingRep] = useState(false);
+
+  const [inlineAwardOpen, setInlineAwardOpen] = useState(false);
+  const [awardForm, setAwardForm] = useState({
+    name: '',
+    category: '',
+    year: new Date().getFullYear(),
+    status: 'Winner',
+    organization: '',
+  });
+  const [savingAward, setSavingAward] = useState(false);
+
   const [theaterVideo, setTheaterVideo] = useState(null);
   const [passportOpen, setPassportOpen] = useState(false);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
@@ -200,6 +234,119 @@ export default function ProDashboard() {
   const awardsList = Array.isArray(person.awards) ? person.awards : [];
   const repData = youtubeStats.representation || {};
 
+  const pendingRepRequest = profileRequests.find(
+    (r) => OPEN_STATUSES.includes(r.status) && r.payload?.fields?.representation
+  );
+  const pendingAwardsRequest = profileRequests.find(
+    (r) => OPEN_STATUSES.includes(r.status) && r.payload?.fields?.awards
+  );
+
+  useEffect(() => {
+    if (repData && Object.keys(repData).length) {
+      setRepForm({
+        agency: repData.agency || '',
+        agent_name: repData.agent_name || '',
+        agent_email: repData.agent_email || '',
+        agent_phone: repData.agent_phone || '',
+        manager_name: repData.manager_name || '',
+        manager_email: repData.manager_email || '',
+        publicist: repData.publicist || '',
+        guilds: Array.isArray(repData.guilds) && repData.guilds.length ? repData.guilds : ['agn'],
+        territory: repData.territory || 'Pan-African & International',
+      });
+    }
+  }, [person.id, repData.agency, repData.agent_name, repData.manager_name]);
+
+  const handleSaveRepresentation = async (e) => {
+    e.preventDefault();
+    setSavingRep(true);
+    try {
+      const updatedRep = {
+        agency: repForm.agency.trim() || null,
+        agent_name: repForm.agent_name.trim() || null,
+        agent_email: repForm.agent_email.trim() || null,
+        agent_phone: repForm.agent_phone.trim() || null,
+        manager_name: repForm.manager_name.trim() || null,
+        manager_email: repForm.manager_email.trim() || null,
+        publicist: repForm.publicist.trim() || null,
+        guilds: repForm.guilds,
+        territory: repForm.territory || 'Pan-African & International',
+        updated_at: new Date().toISOString(),
+      };
+
+      const res = await submitProProfileUpdate({
+        person,
+        updateType: 'representation',
+        proposedFields: { representation: updatedRep },
+        summary: `Representation & Guild update: ${updatedRep.agency || 'Direct'} (${updatedRep.guilds?.join(', ').toUpperCase()})`,
+        details: [
+          updatedRep.agency ? `Agency: ${updatedRep.agency}` : null,
+          updatedRep.agent_name ? `Agent: ${updatedRep.agent_name} (${updatedRep.agent_email || 'No email'})` : null,
+          updatedRep.manager_name ? `Manager: ${updatedRep.manager_name}` : null,
+          `Guilds: ${updatedRep.guilds?.join(', ').toUpperCase()}`,
+        ].filter(Boolean).join('\n'),
+      });
+
+      if (!res.ok) throw res.error;
+
+      toast.success('Representation & guild changes submitted for admin approval! Admin notified on Telegram.');
+      setInlineRepOpen(false);
+      load();
+    } catch (err) {
+      console.error('Representation submit error:', err);
+      toast.error('Failed to submit representation updates.');
+    } finally {
+      setSavingRep(false);
+    }
+  };
+
+  const handleSaveAward = async (e) => {
+    e.preventDefault();
+    if (!awardForm.name.trim()) {
+      return toast.error('Please enter the award or organization name.');
+    }
+    setSavingAward(true);
+    try {
+      const newAwardItem = {
+        name: awardForm.name.trim(),
+        category: awardForm.category.trim() || 'General Recognition',
+        year: Number(awardForm.year) || new Date().getFullYear(),
+        status: awardForm.status || 'Winner',
+        organization: awardForm.organization.trim() || null,
+        created_at: new Date().toISOString(),
+      };
+
+      const existingAwards = Array.isArray(person.awards) ? [...person.awards] : [];
+      const updatedAwards = [newAwardItem, ...existingAwards];
+
+      const res = await submitProProfileUpdate({
+        person,
+        updateType: 'awards',
+        proposedFields: { awards: updatedAwards },
+        summary: `Added ${newAwardItem.status}: "${newAwardItem.name}" (${newAwardItem.year}) - ${newAwardItem.category}`,
+        details: `Award: ${newAwardItem.name}\nCategory: ${newAwardItem.category}\nYear: ${newAwardItem.year}\nStatus: ${newAwardItem.status}`,
+      });
+
+      if (!res.ok) throw res.error;
+
+      toast.success('Award submitted for review! Admin notified on Telegram.');
+      setAwardForm({
+        name: '',
+        category: '',
+        year: new Date().getFullYear(),
+        status: 'Winner',
+        organization: '',
+      });
+      setInlineAwardOpen(false);
+      load();
+    } catch (err) {
+      console.error('Award submit error:', err);
+      toast.error('Failed to submit award.');
+    } finally {
+      setSavingAward(false);
+    }
+  };
+
   const roles = (user?.professional_roles?.length ? user.professional_roles : [person?.known_for_department || 'actor']).map(
     professionalRoleLabel
   );
@@ -257,6 +404,17 @@ export default function ProDashboard() {
         status: 'submitted',
       });
       if (error) throw error;
+
+      notifyProAdminOnTelegram({
+        personId: access.person_id,
+        personName: person.name,
+        personSlug: person.slug,
+        updateType: 'credits',
+        summary: `Credit removal request for "${credit.films?.title || 'Film'}"`,
+        details: `Reason: ${reason.trim()}`,
+        link: '/admin/actor-claims',
+      }).catch((err) => console.warn('Credit removal telegram alert error:', err));
+
       toast.success('Removal request sent to editorial review.');
       load();
     } catch (error) {
@@ -410,75 +568,75 @@ export default function ProDashboard() {
   return (
     <main className="relative min-h-screen bg-[#0d0d0d] px-4 pb-24 pt-20 text-text-primary">
       {/* Cinematic Ambient Glow */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[600px] bg-[radial-gradient(circle_at_80%_0%,rgba(255,83,31,.12),transparent_40%),radial-gradient(circle_at_20%_20%,rgba(255,255,255,.02),transparent_35%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[640px] bg-[radial-gradient(circle_at_80%_0%,rgba(255,83,31,.14),transparent_45%),radial-gradient(circle_at_20%_20%,rgba(255,255,255,.03),transparent_35%)]" />
 
       <div className="relative mx-auto max-w-7xl space-y-6">
         {/* Top Control Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="flex items-center gap-2.5">
             <span className="flex items-center gap-1.5 rounded-lg bg-brand/15 px-2.5 py-1 text-[10px] font-black tracking-widest text-brand uppercase">
               <Icon icon="solar:shield-check-bold" width="14" /> MuviDB Pro
             </span>
-            <span className="text-xs font-bold text-text-muted">Talent & Creator Management Console</span>
+            <span className="text-xs font-bold text-text-muted truncate">Creator Studio & Industry Passport</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setUploadingPhoto(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3.5 py-2 text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
             >
-              <Icon icon="solar:camera-add-bold" width="16" /> Add Photo
+              <Icon icon="solar:camera-add-bold" width="15" /> Add Photo
             </button>
             <button
               onClick={() => setUploadingVideo(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3.5 py-2 text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
             >
-              <Icon icon="solar:videocamera-record-bold" width="16" /> Add Reel / Video
+              <Icon icon="solar:videocamera-record-bold" width="15" /> Add Reel
             </button>
             <button
               onClick={() => setAddingCredit(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-xs font-black text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-black text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90"
             >
-              <Icon icon="solar:add-circle-bold" width="16" /> Add Credit
+              <Icon icon="solar:add-circle-bold" width="15" /> Add Credit
             </button>
             <Link
               to={`/people/${person.slug || person.id}`}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2 text-xs font-black text-text-muted transition hover:border-white/25 hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.03] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-muted transition hover:border-white/25 hover:text-white"
             >
-              <Icon icon="solar:eye-linear" width="16" /> Public Profile
+              <Icon icon="solar:eye-linear" width="15" /> Public View
             </Link>
           </div>
         </div>
 
-        {/* IMDbPro-Style Hero Talent Banner */}
-        <header className="relative overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-[#1b1b1b] via-[#141414] to-[#0f0f0f] p-6 shadow-2xl md:p-8">
-          <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-brand/10 blur-[100px]" />
+        {/* Cinematic Studio Hero Banner */}
+        <header className="relative overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-[#1a1a1a] via-[#141414] to-[#0d0d0d] p-5 shadow-2xl md:p-8">
+          <div className="absolute right-0 top-0 h-80 w-80 rounded-full bg-brand/10 blur-[110px] pointer-events-none" />
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
             {/* Avatar & Hover Quick Upload */}
-            <div className="group relative shrink-0">
+            <div className="group relative shrink-0 mx-auto sm:mx-0">
               <img
                 src={person.photo_url || '/images/person-placeholder.png'}
                 alt={person.name}
-                className="h-36 w-32 rounded-2xl border border-white/15 object-cover shadow-2xl md:h-44 md:w-36"
+                className="h-40 w-32 rounded-2xl border-2 border-white/15 object-cover shadow-2xl md:h-48 md:w-38"
               />
-              <span className="absolute -bottom-2 -right-2 grid h-8 w-8 place-items-center rounded-full border-2 border-[#171717] bg-brand text-white shadow-lg">
+              <span className="absolute -bottom-2 -right-2 grid h-8 w-8 place-items-center rounded-full border-2 border-[#141414] bg-brand text-white shadow-lg">
                 <Icon icon="solar:verified-check-bold" width="16" />
               </span>
               <button
                 onClick={() => setUploadingPhoto(true)}
-                className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-black/70 p-2 text-center opacity-0 backdrop-blur-sm transition group-hover:opacity-100"
+                className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-black/70 p-2 text-center opacity-0 backdrop-blur-sm transition duration-200 group-hover:opacity-100"
               >
-                <Icon icon="solar:camera-bold" width="22" className="text-brand" />
+                <Icon icon="solar:camera-bold" width="24" className="text-brand" />
                 <span className="mt-1 text-[10px] font-black text-white">Change Headshot</span>
               </button>
             </div>
 
-            {/* Profile Info & Bio */}
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-brand/20 bg-brand/10 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
-                  Verified Talent
+            {/* Profile Identity Details */}
+            <div className="min-w-0 flex-1 text-center sm:text-left">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full border border-brand/25 bg-brand/10 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
+                  <Icon icon="solar:star-circle-bold" width="12" /> Verified Talent
                 </span>
                 {repData.guilds?.map((g) => (
                   <span key={g} className="rounded-full border border-white/10 bg-white/[.04] px-2.5 py-0.5 text-[9px] font-black uppercase text-text-muted">
@@ -486,71 +644,72 @@ export default function ProDashboard() {
                   </span>
                 ))}
                 {hasPendingProfileUpdate && (
-                  <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-[9px] font-black uppercase text-amber-400">
-                    Update Pending
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-0.5 text-[9px] font-black uppercase text-amber-400">
+                    <Icon icon="solar:hourglass-line-bold" width="11" /> In Review
                   </span>
                 )}
               </div>
 
-              <h1 className="mt-3 truncate text-3xl font-black tracking-tight text-white md:text-5xl">{person.name}</h1>
-              <p className="mt-1.5 text-sm font-bold text-brand">{roles.join(' · ')}</p>
-              <p className="mt-2.5 max-w-2xl text-xs leading-5 text-text-muted">
-                {person.bio || 'Add a professional biography and career details so casting directors, agents, and audiences can connect with your work.'}
+              <h1 className="mt-2.5 truncate text-2xl font-black tracking-tight text-white sm:text-4xl md:text-5xl">{person.name}</h1>
+              <p className="mt-1 text-xs sm:text-sm font-black text-brand tracking-wide">{roles.join(' · ')}</p>
+              
+              <p className="mt-2.5 max-w-2xl text-xs leading-relaxed text-text-muted line-clamp-2">
+                {person.bio || 'Add a professional biography and career milestones so producers, casting directors, and international festival juries can discover your profile.'}
               </p>
 
               {/* Badges & Location */}
-              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-text-muted">
+              <div className="mt-3.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-xs text-text-muted">
                 {person.nationality && (
-                  <span>
-                    <Icon icon="solar:global-linear" className="mr-1.5 inline text-brand" />
+                  <span className="flex items-center gap-1">
+                    <Icon icon="solar:global-linear" className="text-brand" width="14" />
                     {person.nationality}
                   </span>
                 )}
                 {person.birthplace && (
-                  <span>
-                    <Icon icon="solar:map-point-linear" className="mr-1.5 inline text-brand" />
+                  <span className="flex items-center gap-1">
+                    <Icon icon="solar:map-point-linear" className="text-brand" width="14" />
                     {person.birthplace}
                   </span>
                 )}
                 {repData.agency && (
-                  <span>
-                    <Icon icon="solar:buildings-2-bold" className="mr-1.5 inline text-emerald-400" />
-                    Rep: <strong className="text-text-primary">{repData.agency}</strong>
+                  <span className="flex items-center gap-1">
+                    <Icon icon="solar:buildings-2-bold" className="text-emerald-400" width="14" />
+                    Rep: <strong className="text-white">{repData.agency}</strong>
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Profile Strength & Quick Actions */}
-            <div className="w-full shrink-0 rounded-2xl border border-white/10 bg-black/30 p-5 lg:w-72">
+            {/* Profile Strength & Passport Card */}
+            <div className="w-full shrink-0 rounded-2xl border border-white/10 bg-black/40 p-4 sm:p-5 lg:w-72 shadow-inner">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">IMDbPro Profile Strength</p>
-                  <p className="mt-0.5 text-2xl font-black text-text-primary">{progress.percent}%</p>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Profile Completeness</p>
+                  <p className="mt-0.5 text-2xl font-black text-white">{progress.percent}%</p>
                 </div>
                 <div
                   className="relative grid h-12 w-12 place-items-center rounded-full"
                   style={{ background: `conic-gradient(#ff531f ${progress.percent * 3.6}deg, rgba(255,255,255,.08) 0)` }}
                 >
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-[#171717] text-[10px] font-black">
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-[#161616] text-[10px] font-black text-text-primary">
                     {progress.completed}/{progress.total}
                   </div>
                 </div>
               </div>
               <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-brand transition-all" style={{ width: `${progress.percent}%` }} />
+                <div className="h-full rounded-full bg-brand transition-all duration-500" style={{ width: `${progress.percent}%` }} />
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setEditingProfile(true)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[.03] py-2.5 text-xs font-black text-text-primary hover:border-brand/40"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] py-2 text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
                 >
-                  <Icon icon="solar:pen-2-bold" width="14" /> Edit Profile
+                  <Icon icon="solar:pen-2-bold" width="14" /> Edit Bio
                 </button>
                 <button
                   onClick={() => setPassportOpen(true)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl bg-brand py-2.5 text-xs font-black text-white shadow-lg shadow-brand/15 hover:bg-brand/90"
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-brand py-2 text-xs font-black text-white shadow-lg shadow-brand/15 transition hover:bg-brand/90"
                 >
                   <Icon icon="solar:share-bold" width="14" /> Passport
                 </button>
@@ -573,38 +732,61 @@ export default function ProDashboard() {
           />
         </div>
 
-        {/* Primary Tabs Navigation */}
-        <nav className="flex overflow-x-auto border-b border-white/10">
-          <div className="flex gap-2">
+        {/* Redesigned Floating Segmented Capsule Navigation (Zero scrollbars, zero clipping) */}
+        <div className="sticky top-20 z-30">
+          <nav
+            className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-[#141414]/95 p-1.5 shadow-2xl backdrop-blur-xl no-scrollbar scrollbar-none"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {[
-              { id: 'filmography', label: 'Filmography & Credits', icon: 'solar:clapperboard-bold', count: credits.length },
-              { id: 'photos', label: 'Photos & Headshots', icon: 'solar:camera-bold', count: photosList.length },
-              { id: 'videos', label: 'Videos & Showreels', icon: 'solar:videocamera-record-bold', count: videosList.length },
-              { id: 'awards', label: 'Awards & Honors', icon: 'solar:cup-star-bold', count: awardsList.length },
-              { id: 'representation', label: 'Representation & Guilds', icon: 'solar:users-group-two-rounded-bold' },
-              { id: 'intelligence', label: 'AI Intelligence', icon: 'solar:magic-stick-3-bold' },
-              { id: 'requests', label: 'Requests & History', icon: 'solar:inbox-bold', count: openRequests.length },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-black transition ${
-                  activeTab === tab.id
-                    ? 'border-brand text-brand'
-                    : 'border-transparent text-text-muted hover:border-white/20 hover:text-white'
-                }`}
-              >
-                <Icon icon={tab.icon} width="16" />
-                <span>{tab.label}</span>
-                {tab.count !== undefined && (
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] ${activeTab === tab.id ? 'bg-brand/15 text-brand' : 'bg-white/[.05] text-text-muted'}`}>
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </nav>
+              { id: 'filmography', label: 'Filmography', icon: 'solar:clapperboard-bold', count: credits.length },
+              { id: 'photos', label: 'Photos', icon: 'solar:camera-bold', count: photosList.length },
+              { id: 'videos', label: 'Showreels', icon: 'solar:videocamera-record-bold', count: videosList.length },
+              { id: 'awards', label: 'Awards', icon: 'solar:cup-star-bold', count: awardsList.length },
+              { id: 'representation', label: 'Representation', icon: 'solar:users-group-two-rounded-bold' },
+              { id: 'intelligence', label: 'AI Studio', icon: 'solar:magic-stick-3-bold', badge: 'Pro' },
+              { id: 'requests', label: 'Requests', icon: 'solar:inbox-bold', count: openRequests.length },
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`group relative flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-black transition-all ${
+                    isActive
+                      ? 'bg-brand text-white shadow-lg shadow-brand/25'
+                      : 'text-text-muted hover:bg-white/[.05] hover:text-white'
+                  }`}
+                >
+                  <Icon icon={tab.icon} width="16" className={isActive ? 'text-white' : 'text-text-muted group-hover:text-white'} />
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && (
+                    <span
+                      className={`grid min-w-[18px] place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none ${
+                        isActive
+                          ? 'bg-white/25 text-white'
+                          : 'bg-white/[.07] text-text-muted group-hover:bg-white/15 group-hover:text-white'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                  {tab.badge && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider ${
+                        isActive
+                          ? 'bg-black/30 text-amber-200'
+                          : 'bg-brand/15 text-brand group-hover:bg-brand/25'
+                      }`}
+                    >
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
         {/* Tab 1: Filmography & Credits */}
         {activeTab === 'filmography' && (
@@ -612,13 +794,13 @@ export default function ProDashboard() {
             {/* Toolbar: Search, Role Filter, Release Filter, View Toggle, Sort */}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#161616] p-3.5">
               {/* Search Bar */}
-              <div className="relative min-w-[240px] flex-1">
+              <div className="relative min-w-[220px] flex-1">
                 <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-3 text-text-muted" width="16" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search titles, character names..."
+                  placeholder="Search titles, characters..."
                   className="w-full rounded-xl border border-white/10 bg-white/[.03] py-2 pl-10 pr-4 text-xs font-bold text-text-primary outline-none focus:border-brand"
                 />
               </div>
@@ -656,7 +838,7 @@ export default function ProDashboard() {
                   <option value="box_office">Box Office / Views</option>
                 </select>
 
-                <div className="flex rounded-xl border border-white/10 bg-white/[.03] p-1">
+                <div className="hidden sm:flex rounded-xl border border-white/10 bg-white/[.03] p-1">
                   <button
                     onClick={() => setViewMode('table')}
                     className={`rounded-lg p-1.5 transition ${viewMode === 'table' ? 'bg-brand text-white' : 'text-text-muted hover:text-white'}`}
@@ -677,16 +859,82 @@ export default function ProDashboard() {
 
             {/* Results Count & Add Credit CTA */}
             <div className="flex items-center justify-between px-1 text-xs text-text-muted">
-              <span>Showing {filteredCredits.length} of {credits.length} productions</span>
+              <span>Showing {filteredCredits.length} of {credits.length} verified productions</span>
               <button onClick={() => setAddingCredit(true)} className="inline-flex items-center gap-1.5 text-xs font-black text-brand hover:underline">
                 <Icon icon="solar:add-circle-bold" width="16" /> Add missing credit
               </button>
             </div>
 
-            {/* Table View */}
+            {/* Mobile Card Stack View (Eliminates mobile horizontal table scroll) */}
+            <div className="block sm:hidden space-y-3">
+              {filteredCredits.length === 0 ? (
+                <EmptyState
+                  icon="solar:clapperboard-text-linear"
+                  title="No credits found"
+                  body="Try adjusting your search or add a missing title to your filmography."
+                  action={<button onClick={() => setAddingCredit(true)} className="text-xs font-black text-brand">Add credit →</button>}
+                />
+              ) : (
+                filteredCredits.map((credit) => {
+                  const film = credit.films || {};
+                  const boxOffice = Number(film.box_office_domestic || film.box_office_worldwide) || 0;
+                  return (
+                    <article key={credit.id} className="rounded-2xl border border-white/10 bg-[#161616] p-3.5 flex gap-3.5 items-start">
+                      <img
+                        src={film.poster_url || '/images/film-placeholder.webp'}
+                        alt=""
+                        className="h-20 w-14 shrink-0 rounded-xl border border-white/10 object-cover shadow"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-1">
+                          <Link
+                            to={`/films/${film.slug || credit.film_id}`}
+                            className="font-black text-sm text-text-primary hover:text-brand line-clamp-1"
+                          >
+                            {film.title || 'Untitled Film'}
+                          </Link>
+                          <span className="shrink-0 rounded bg-white/[.06] px-1.5 py-0.5 text-[10px] font-black text-text-primary">
+                            {film.year || 'N/A'}
+                          </span>
+                        </div>
+
+                        <p className="mt-0.5 text-xs font-bold text-brand">{formatRole(credit.role)}</p>
+                        {credit.character_name && (
+                          <p className="text-[11px] text-text-muted truncate">as {credit.character_name}</p>
+                        )}
+
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+                          <div>
+                            {boxOffice > 0 ? (
+                              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black text-emerald-300">
+                                {formatMoney(boxOffice, film.box_office_currency || 'NGN')}
+                              </span>
+                            ) : Number(film.view_count) > 0 ? (
+                              <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[9px] font-black text-red-300">
+                                {formatViewCount(film.view_count)} views
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <button
+                            disabled={pendingRemoval.has(credit.id)}
+                            onClick={() => requestRemoval(credit)}
+                            className="rounded-lg border border-white/10 px-2 py-1 text-[10px] font-bold text-text-muted transition hover:border-red-500/40 hover:text-red-400 disabled:opacity-50"
+                          >
+                            {pendingRemoval.has(credit.id) ? 'Pending' : 'Request Removal'}
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop Table View */}
             {viewMode === 'table' && (
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#161616]">
-                <div className="overflow-x-auto">
+              <div className="hidden sm:block overflow-hidden rounded-2xl border border-white/10 bg-[#161616]">
+                <div className="overflow-x-auto no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <table className="w-full text-left text-xs">
                     <thead className="border-b border-white/10 bg-white/[.02] text-[10px] font-black uppercase tracking-wider text-text-muted">
                       <tr>
@@ -786,7 +1034,7 @@ export default function ProDashboard() {
 
             {/* Poster Grid View */}
             {viewMode === 'grid' && (
-              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              <div className="hidden sm:grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {filteredCredits.map((credit) => {
                   const film = credit.films || {};
                   return (
@@ -979,18 +1227,143 @@ export default function ProDashboard() {
         {/* Tab 4: Awards & Honors */}
         {activeTab === 'awards' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#161616] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#161616] p-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-brand">Recognition</p>
                 <h3 className="text-base font-black text-text-primary">Industry Awards & Nominations</h3>
               </div>
+              <button
+                onClick={() => setInlineAwardOpen(!inlineAwardOpen)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-2 text-xs font-black text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90"
+              >
+                <Icon icon={inlineAwardOpen ? 'solar:close-circle-bold' : 'solar:add-circle-bold'} width="16" />
+                {inlineAwardOpen ? 'Cancel' : 'Add Award / Nomination'}
+              </button>
             </div>
+
+            {/* Inline Award Submission Form (No Pop-ups!) */}
+            {inlineAwardOpen && (
+              <form onSubmit={handleSaveAward} className="space-y-4 rounded-2xl border border-brand/30 bg-[#191615] p-5 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-500/15 text-amber-400">
+                      <Icon icon="solar:cup-star-bold" width="18" />
+                    </span>
+                    <div>
+                      <h4 className="text-sm font-black text-white">Add Award or Industry Nomination</h4>
+                      <p className="text-[11px] text-text-muted">Changes go to admin review and notify on Telegram before publishing.</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setInlineAwardOpen(false)} className="text-text-muted hover:text-white">
+                    <Icon icon="solar:close-circle-linear" width="20" />
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-bold uppercase text-text-muted">Award Name / Honor *</label>
+                    <input
+                      type="text"
+                      required
+                      value={awardForm.name}
+                      onChange={(e) => setAwardForm({ ...awardForm, name: e.target.value })}
+                      placeholder="e.g. Africa Magic Viewers' Choice Awards (AMVCA)"
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.04] px-3.5 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-text-muted">Category</label>
+                    <input
+                      type="text"
+                      value={awardForm.category}
+                      onChange={(e) => setAwardForm({ ...awardForm, category: e.target.value })}
+                      placeholder="e.g. Best Actor in a Leading Role (Drama)"
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.04] px-3.5 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-text-muted">Year</label>
+                    <input
+                      type="number"
+                      value={awardForm.year}
+                      onChange={(e) => setAwardForm({ ...awardForm, year: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.04] px-3.5 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-text-muted">Result</label>
+                    <select
+                      value={awardForm.status}
+                      onChange={(e) => setAwardForm({ ...awardForm, status: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-[#222] px-3.5 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                    >
+                      <option value="Winner">Winner / Won</option>
+                      <option value="Nominee">Nominee / Nominated</option>
+                      <option value="Honoree">Special Honoree / Recognition</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="text-[10px] font-bold uppercase text-text-muted">Organization / Production Association</label>
+                    <input
+                      type="text"
+                      value={awardForm.organization}
+                      onChange={(e) => setAwardForm({ ...awardForm, organization: e.target.value })}
+                      placeholder="e.g. Multichoice / AMVCA Board of Jurors"
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.04] px-3.5 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setInlineAwardOpen(false)}
+                    className="rounded-xl border border-white/10 px-4 py-2 text-xs font-bold text-text-muted hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingAward}
+                    className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2 text-xs font-black text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90 disabled:opacity-50"
+                  >
+                    {savingAward ? (
+                      <>
+                        <Icon icon="solar:restart-circle-bold" className="animate-spin" width="16" /> Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Icon icon="solar:check-circle-bold" width="16" /> Submit for Approval
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {pendingAwardsRequest && (
+              <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-300">
+                <Icon icon="solar:hourglass-line-bold" width="20" className="shrink-0 text-amber-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-black">Award Update Pending Editorial Review</p>
+                  <p className="text-[11px] text-amber-300/80">Your recent award submission is queued for admin approval. Admin was notified on Telegram.</p>
+                </div>
+              </div>
+            )}
 
             {awardsList.length === 0 ? (
               <EmptyState
                 icon="solar:cup-star-bold"
                 title="No awards listed yet"
-                body="Awards and nominations will appear here once verified by the MuviDB editorial committee."
+                body="Add your verified awards, festival selections, and nominations to showcase on your public IMDbPro profile."
+                action={
+                  <button
+                    onClick={() => setInlineAwardOpen(true)}
+                    className="rounded-xl bg-brand px-4 py-2 text-xs font-black text-white"
+                  >
+                    Add Your First Award
+                  </button>
+                }
               />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1018,67 +1391,255 @@ export default function ProDashboard() {
 
         {/* Tab 5: Representation & Guilds */}
         {activeTab === 'representation' && (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <section className="rounded-3xl border border-white/10 bg-[#161616] p-6 md:p-7">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-brand">Talent Representation</p>
-                  <h3 className="text-lg font-black text-text-primary">Agent & Manager Contacts</h3>
-                </div>
-                <button
-                  onClick={() => setEditingRep(true)}
-                  className="rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2 text-xs font-black text-brand hover:border-brand/40"
-                >
-                  Edit Contacts
-                </button>
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#161616] p-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-brand">Talent Representation & Guilds</p>
+                <h3 className="text-base font-black text-text-primary">Agent, Manager & Professional Guild Credentials</h3>
               </div>
+              <button
+                onClick={() => setInlineRepOpen(!inlineRepOpen)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-2 text-xs font-black text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90"
+              >
+                <Icon icon={inlineRepOpen ? 'solar:close-circle-bold' : 'solar:pen-2-bold'} width="16" />
+                {inlineRepOpen ? 'Cancel' : 'Edit Contacts & Guilds'}
+              </button>
+            </div>
 
-              <div className="mt-5 space-y-4 text-xs">
-                <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4">
-                  <p className="text-[10px] font-black uppercase text-brand">Talent Agency</p>
-                  <p className="mt-1 text-sm font-black text-text-primary">{repData.agency || 'Not specified'}</p>
-                  {repData.agent_name && <p className="mt-1 text-text-muted">Agent: {repData.agent_name}</p>}
-                  {repData.agent_email && <p className="text-text-muted">Email: {repData.agent_email}</p>}
-                  {repData.agent_phone && <p className="text-text-muted">WhatsApp/Phone: {repData.agent_phone}</p>}
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4">
-                  <p className="text-[10px] font-black uppercase text-brand">Personal Management & Publicist</p>
-                  <p className="mt-1 text-sm font-black text-text-primary">{repData.manager_name || 'Direct Management'}</p>
-                  {repData.manager_email && <p className="mt-1 text-text-muted">Email: {repData.manager_email}</p>}
-                  {repData.publicist && <p className="text-text-muted">PR: {repData.publicist}</p>}
+            {pendingRepRequest && (
+              <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-300">
+                <Icon icon="solar:hourglass-line-bold" width="20" className="shrink-0 text-amber-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-black">Representation Updates In Review</p>
+                  <p className="text-[11px] text-amber-300/80">Your proposed contact & guild changes are in the moderation queue awaiting approval. Admin was notified on Telegram.</p>
                 </div>
               </div>
-            </section>
+            )}
 
-            <section className="rounded-3xl border border-white/10 bg-[#161616] p-6 md:p-7">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-brand">Affiliations</p>
-                  <h3 className="text-lg font-black text-text-primary">Guild & Union Memberships</h3>
-                </div>
-                <button
-                  onClick={() => setEditingRep(true)}
-                  className="rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2 text-xs font-black text-brand hover:border-brand/40"
-                >
-                  Manage Guilds
-                </button>
-              </div>
-
-              <div className="mt-5 space-y-2.5">
-                {(repData.guilds || ['agn']).map((g) => (
-                  <div key={g} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-3">
-                    <div className="flex items-center gap-3">
-                      <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand/10 text-brand">
-                        <Icon icon="solar:shield-check-bold" width="18" />
-                      </span>
-                      <span className="text-xs font-black uppercase tracking-wide text-text-primary">{g.toUpperCase()} Member</span>
-                    </div>
-                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[9px] font-black text-emerald-400">Verified</span>
+            {/* Inline Representation Editor (No Pop-ups!) */}
+            {inlineRepOpen && (
+              <form onSubmit={handleSaveRepresentation} className="space-y-6 rounded-2xl border border-brand/30 bg-[#191615] p-5 md:p-6 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h4 className="text-sm font-black text-white">Edit Representation, Contacts & Guild Memberships</h4>
+                    <p className="text-[11px] text-text-muted">Update your agent, manager, and affiliations. All changes go to admin for approval with immediate Telegram alert.</p>
                   </div>
-                ))}
-              </div>
-            </section>
+                  <button type="button" onClick={() => setInlineRepOpen(false)} className="text-text-muted hover:text-white">
+                    <Icon icon="solar:close-circle-linear" width="20" />
+                  </button>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Agency & Agent */}
+                  <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[.02] p-4">
+                    <p className="text-[10px] font-black uppercase text-brand">Talent Agency & Agent</p>
+                    <div>
+                      <label className="text-[10px] font-bold text-text-muted">Agency Name</label>
+                      <input
+                        type="text"
+                        value={repForm.agency}
+                        onChange={(e) => setRepForm({ ...repForm, agency: e.target.value })}
+                        placeholder="e.g. The Temple Management Company"
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-text-muted">Agent Name</label>
+                      <input
+                        type="text"
+                        value={repForm.agent_name}
+                        onChange={(e) => setRepForm({ ...repForm, agent_name: e.target.value })}
+                        placeholder="e.g. Femi Adeyemi"
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-text-muted">Agent Email</label>
+                        <input
+                          type="email"
+                          value={repForm.agent_email}
+                          onChange={(e) => setRepForm({ ...repForm, agent_email: e.target.value })}
+                          placeholder="agent@agency.com"
+                          className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-text-muted">WhatsApp / Phone</label>
+                        <input
+                          type="text"
+                          value={repForm.agent_phone}
+                          onChange={(e) => setRepForm({ ...repForm, agent_phone: e.target.value })}
+                          placeholder="+234 800 000 0000"
+                          className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Manager & Publicist */}
+                  <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[.02] p-4">
+                    <p className="text-[10px] font-black uppercase text-brand">Management & Public Relations</p>
+                    <div>
+                      <label className="text-[10px] font-bold text-text-muted">Manager / Management Company</label>
+                      <input
+                        type="text"
+                        value={repForm.manager_name}
+                        onChange={(e) => setRepForm({ ...repForm, manager_name: e.target.value })}
+                        placeholder="e.g. Raw Artistry Management (London / Lagos)"
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-text-muted">Manager Email</label>
+                      <input
+                        type="email"
+                        value={repForm.manager_email}
+                        onChange={(e) => setRepForm({ ...repForm, manager_email: e.target.value })}
+                        placeholder="management@rawartistry.com"
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-text-muted">Publicist / PR Agency</label>
+                      <input
+                        type="text"
+                        value={repForm.publicist}
+                        onChange={(e) => setRepForm({ ...repForm, publicist: e.target.value })}
+                        placeholder="e.g. MediaRoom Hub PR & Communications"
+                        className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Guild Memberships Selection */}
+                <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4">
+                  <p className="text-[10px] font-black uppercase text-brand">Guild & Union Affiliations</p>
+                  <p className="mt-1 text-xs text-text-muted">Select all industry guilds and unions you currently hold membership in:</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {NIGERIAN_GUILDS.map((g) => {
+                      const isSelected = repForm.guilds.includes(g.id);
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => {
+                            setRepForm({
+                              ...repForm,
+                              guilds: isSelected
+                                ? repForm.guilds.filter((id) => id !== g.id)
+                                : [...repForm.guilds, g.id],
+                            });
+                          }}
+                          className={`flex items-center gap-2.5 rounded-xl border p-2.5 text-left transition ${
+                            isSelected
+                              ? 'border-brand bg-brand/10 text-white'
+                              : 'border-white/10 bg-white/[.02] text-text-muted hover:border-white/20'
+                          }`}
+                        >
+                          <span className={`grid h-6 w-6 place-items-center rounded-md text-xs ${isSelected ? 'bg-brand text-white' : 'bg-white/10 text-text-muted'}`}>
+                            <Icon icon={isSelected ? 'solar:check-square-bold' : 'solar:square-linear'} width="16" />
+                          </span>
+                          <span className="text-xs font-bold leading-tight">{g.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setInlineRepOpen(false)}
+                    className="rounded-xl border border-white/10 px-4 py-2 text-xs font-bold text-text-muted hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingRep}
+                    className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90 disabled:opacity-50"
+                  >
+                    {savingRep ? (
+                      <>
+                        <Icon icon="solar:restart-circle-bold" className="animate-spin" width="16" /> Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Icon icon="solar:check-circle-bold" width="16" /> Submit for Admin Approval
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Read-only Display Cards */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <section className="rounded-3xl border border-white/10 bg-[#161616] p-6 md:p-7">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-brand">Talent Representation</p>
+                    <h3 className="text-lg font-black text-text-primary">Agent & Manager Contacts</h3>
+                  </div>
+                  <button
+                    onClick={() => setInlineRepOpen(true)}
+                    className="rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2 text-xs font-black text-brand hover:border-brand/40"
+                  >
+                    Edit Contacts
+                  </button>
+                </div>
+
+                <div className="mt-5 space-y-4 text-xs">
+                  <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4">
+                    <p className="text-[10px] font-black uppercase text-brand">Talent Agency</p>
+                    <p className="mt-1 text-sm font-black text-text-primary">{repData.agency || 'Not specified'}</p>
+                    {repData.agent_name && <p className="mt-1 text-text-muted">Agent: {repData.agent_name}</p>}
+                    {repData.agent_email && <p className="text-text-muted">Email: {repData.agent_email}</p>}
+                    {repData.agent_phone && <p className="text-text-muted">WhatsApp/Phone: {repData.agent_phone}</p>}
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[.02] p-4">
+                    <p className="text-[10px] font-black uppercase text-brand">Personal Management & Publicist</p>
+                    <p className="mt-1 text-sm font-black text-text-primary">{repData.manager_name || 'Direct Management'}</p>
+                    {repData.manager_email && <p className="mt-1 text-text-muted">Email: {repData.manager_email}</p>}
+                    {repData.publicist && <p className="text-text-muted">PR: {repData.publicist}</p>}
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-white/10 bg-[#161616] p-6 md:p-7">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-brand">Affiliations</p>
+                    <h3 className="text-lg font-black text-text-primary">Guild & Union Memberships</h3>
+                  </div>
+                  <button
+                    onClick={() => setInlineRepOpen(true)}
+                    className="rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2 text-xs font-black text-brand hover:border-brand/40"
+                  >
+                    Manage Guilds
+                  </button>
+                </div>
+
+                <div className="mt-5 space-y-2.5">
+                  {(repData.guilds || ['agn']).map((g) => (
+                    <div key={g} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-3">
+                      <div className="flex items-center gap-3">
+                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand/10 text-brand">
+                          <Icon icon="solar:shield-check-bold" width="18" />
+                        </span>
+                        <span className="text-xs font-black uppercase tracking-wide text-text-primary">
+                          {NIGERIAN_GUILDS.find((item) => item.id === g)?.label || `${g.toUpperCase()} Member`}
+                        </span>
+                      </div>
+                      <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[9px] font-black text-emerald-400">Verified</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
           </div>
         )}
 
@@ -1140,7 +1701,6 @@ export default function ProDashboard() {
       {editingProfile && <ProfileEditorModal person={person} onClose={() => setEditingProfile(false)} onSaved={load} />}
       {uploadingPhoto && <PhotoUploadModal person={person} onClose={() => setUploadingPhoto(false)} onSaved={load} />}
       {uploadingVideo && <VideoUploadModal person={person} credits={credits} onClose={() => setUploadingVideo(false)} onSaved={load} />}
-      {editingRep && <RepresentationModal person={person} onClose={() => setEditingRep(false)} onSaved={load} />}
       {theaterVideo && <ProVideoTheaterModal video={theaterVideo} onClose={() => setTheaterVideo(null)} />}
       {welcomeOpen && <CareerPassportWelcome firstName={person.name?.split(' ')[0]} onDismiss={() => setWelcomeOpen(false)} onCreate={() => { setWelcomeOpen(false); setPassportOpen(true); }} />}
       {passportOpen && <CareerPassportModal person={{ ...person, claimed: true }} credits={credits} stageCredits={stageCredits} personalized onClose={() => setPassportOpen(false)} />}

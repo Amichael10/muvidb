@@ -34,26 +34,60 @@ export const useFollow = (personId, currentUser) => {
   }
 
   const toggleFollow = async () => {
-    if (!currentUser?.id) return false
+    if (!currentUser?.id || !personId) return false
 
     setLoading(true)
 
     if (isFollowing) {
-      await supabase
+      const { error } = await supabase
         .from('follows')
         .delete()
         .eq('user_id', currentUser.id)
         .eq('person_id', personId)
 
+      if (error) {
+        console.error('Failed to unfollow:', error)
+        setLoading(false)
+        return false
+      }
+
       setIsFollowing(false)
       setFollowerCount(prev => Math.max(0, prev - 1))
     } else {
-      await supabase
+      let insertRes = await supabase
         .from('follows')
         .insert({
           user_id: currentUser.id,
           person_id: personId
         })
+
+      // If failed due to missing user in public.users (foreign key 23503), sync user and retry
+      if (insertRes.error && insertRes.error.code === '23503') {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData?.session?.access_token
+        if (token) {
+          await fetch('/api/whatsapp?action=sync-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          }).catch(() => {})
+
+          insertRes = await supabase
+            .from('follows')
+            .insert({
+              user_id: currentUser.id,
+              person_id: personId
+            })
+        }
+      }
+
+      if (insertRes.error) {
+        console.error('Follow failed:', insertRes.error)
+        setLoading(false)
+        return false
+      }
 
       setIsFollowing(true)
       setFollowerCount(prev => prev + 1)

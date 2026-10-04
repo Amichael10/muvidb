@@ -73,6 +73,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handleWhatsApp } = await import('./_lib/whatsapp_handler.js');
       return handleWhatsApp(req, res);
     }
+    if (key === 'person-media') {
+      const { handlePersonMedia } = await import('./_lib/person_media_handler.js');
+      return handlePersonMedia(req, res);
+    }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
   } catch (err: any) {

@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
+import { notifyProAdminOnTelegram } from '../../lib/proModeration';
 
 const VIDEO_CATEGORIES = [
   { id: 'showreel', label: 'Official Showreel / Acting Reel', desc: 'Curated montage showcasing your best performances' },
@@ -156,6 +157,38 @@ export default function VideoUploadModal({ person, credits = [], onClose, onSave
         .eq('id', person.id);
 
       if (dbError) throw dbError;
+
+      // Also record into person_media with pending moderation status
+      try {
+        await supabase.from('person_media').insert({
+          person_id: person.id,
+          media_type: 'video',
+          category,
+          title: title || `${person.name} - ${category.toUpperCase()}`,
+          url: finalUrl,
+          thumbnail_url: thumbnailUrl,
+          embed_provider: embedProvider,
+          embed_id: embedId,
+          film_id: taggedFilmId || null,
+          character_name: characterName || selectedCredit?.character_name || null,
+          year: Number(year) || new Date().getFullYear(),
+          is_primary: isFeatured,
+          status: 'pending'
+        });
+      } catch (mediaErr) {
+        console.warn('person_media video insert note:', mediaErr);
+      }
+
+      // Notify Admin on Telegram
+      notifyProAdminOnTelegram({
+        personId: person.id,
+        personName: person.name,
+        personSlug: person.slug,
+        updateType: 'videos',
+        summary: `New video reel uploaded (${category}): "${title}"`,
+        details: `URL: ${finalUrl}\nTagged Film: ${filmTitle || 'None'}\nFeatured: ${isFeatured ? 'Yes' : 'No'}`,
+        link: '/admin/contributions'
+      }).catch((err) => console.warn('Video upload telegram notify error:', err));
 
       toast.success(isFeatured ? 'Video added and pinned as your main featured showreel!' : 'Video added to portfolio!');
       onSaved?.();

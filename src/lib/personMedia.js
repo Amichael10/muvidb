@@ -36,25 +36,50 @@ export function parseVideoUrl(url) {
   if (!url || typeof url !== 'string') return { provider: 'unknown', id: null };
   const trimmed = url.trim();
 
-  // YouTube
+  // YouTube (including Shorts)
   if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) {
-    const match = trimmed.match(/(?:v=|youtu\.be\/|embed\/)([^&?#/]+)/);
+    const match = trimmed.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([^&?#/]+)/);
     return {
       provider: 'youtube',
       id: match ? match[1] : null,
       thumbnailUrl: match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null,
-      embedUrl: match ? `https://www.youtube-nocookie.com/embed/${match[1]}?autoplay=1` : null,
+      embedUrl: match ? `https://www.youtube-nocookie.com/embed/${match[1]}?autoplay=1&rel=0` : null,
     };
   }
 
   // Vimeo
   if (trimmed.includes('vimeo.com')) {
-    const match = trimmed.match(/vimeo\.com\/(\d+)/);
+    const match = trimmed.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)/) || trimmed.match(/vimeo\.com\/(\d+)/);
+    const vimeoId = match ? (match[3] || match[1] || match[0]) : null;
     return {
       provider: 'vimeo',
-      id: match ? match[1] : null,
+      id: vimeoId,
       thumbnailUrl: null,
-      embedUrl: match ? `https://player.vimeo.com/video/${match[1]}?autoplay=1` : null,
+      embedUrl: vimeoId ? `https://player.vimeo.com/video/${vimeoId}?autoplay=1` : null,
+    };
+  }
+
+  // Google Drive
+  if (trimmed.includes('drive.google.com')) {
+    const match = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || trimmed.match(/id=([a-zA-Z0-9_-]+)/);
+    const driveId = match ? match[1] : null;
+    return {
+      provider: 'gdrive',
+      id: driveId,
+      thumbnailUrl: null,
+      embedUrl: driveId ? `https://drive.google.com/file/d/${driveId}/preview` : trimmed,
+    };
+  }
+
+  // Dailymotion
+  if (trimmed.includes('dailymotion.com') || trimmed.includes('dai.ly')) {
+    const match = trimmed.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
+    const dmId = match ? match[1] : null;
+    return {
+      provider: 'dailymotion',
+      id: dmId,
+      thumbnailUrl: dmId ? `https://www.dailymotion.com/thumbnail/video/${dmId}` : null,
+      embedUrl: dmId ? `https://www.dailymotion.com/embed/video/${dmId}?autoplay=1` : null,
     };
   }
 

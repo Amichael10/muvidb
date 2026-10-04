@@ -66,8 +66,8 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // ── USER OPT-IN / PHONE UPDATE (POST) ───────────────────────────────────────
-  if (req.method === 'POST' && action === 'opt-in') {
+  // ── USER OPT-IN / PROFILE UPDATE / SYNC (POST) ──────────────────────────────
+  if (req.method === 'POST' && (action === 'opt-in' || action === 'update-profile' || action === 'sync-user')) {
     const authHeader = req.headers['authorization'];
     if (!authHeader?.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Sign in required' });
@@ -78,44 +78,69 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    const { phone, enabled = true, personId } = req.body || {};
+    const { phone, enabled = true, personId, name } = req.body || {};
     const normalizedPhone = phone ? normalizeWhatsAppNumber(phone) : null;
 
     if (phone && (!normalizedPhone || normalizedPhone.length < 9)) {
       return res.status(400).json({ error: 'Please enter a valid phone number with country code' });
     }
 
-    // Update user record
-    const updatePayload: Record<string, any> = {
+    const resolvedName = name?.trim() || user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+
+    // Upsert user record in public.users using service role to prevent FK constraint failures
+    const upsertPayload: Record<string, any> = {
+      id: user.id,
+      email: user.email,
+      name: resolvedName,
+      role: user.user_metadata?.role || 'fan',
       whatsapp_enabled: Boolean(enabled),
     };
     if (normalizedPhone) {
-      updatePayload.whatsapp_phone = normalizedPhone;
+      upsertPayload.whatsapp_phone = normalizedPhone;
     }
 
-    const { error: updateErr } = await supabase
+    const { error: upsertErr } = await supabase
       .from('users')
-      .update(updatePayload)
-      .eq('id', user.id);
+      .upsert(upsertPayload, { onConflict: 'id' });
 
-    if (updateErr) {
-      console.error('[WhatsApp Opt-In] User update failed:', updateErr);
+    if (upsertErr) {
+      console.error('[WhatsApp Opt-In/Profile] User upsert failed:', upsertErr);
       return res.status(500).json({ error: 'Failed to update preferences' });
     }
 
-    // If personId was provided, also ensure notify_whatsapp is set on follows
+    // Sync auth user_metadata so frontend immediately reflects changes
+    try {
+      await supabase.auth.admin.updateUserById(user.id, {
+        user_metadata: {
+          ...user.user_metadata,
+          name: resolvedName,
+          ...(normalizedPhone ? { whatsapp_phone: normalizedPhone } : {}),
+          whatsapp_enabled: Boolean(enabled),
+        },
+      });
+    } catch (metaErr) {
+      console.warn('[WhatsApp Opt-In] Meta update warning:', metaErr);
+    }
+
+    // If personId was provided, ensure follows record exists with notify_whatsapp: true
     if (personId) {
       await supabase
         .from('follows')
-        .update({ notify_whatsapp: true })
-        .eq('user_id', user.id)
-        .eq('person_id', personId);
+        .upsert(
+          {
+            user_id: user.id,
+            person_id: personId,
+            notify_whatsapp: true,
+          },
+          { onConflict: 'user_id,person_id' }
+        );
     }
 
     return res.status(200).json({
       success: true,
-      whatsapp_phone: normalizedPhone,
+      whatsapp_phone: normalizedPhone || user.user_metadata?.whatsapp_phone || null,
       whatsapp_enabled: Boolean(enabled),
+      name: resolvedName,
     });
   }
 

@@ -109,7 +109,14 @@ function sameValue(a, b) {
 }
 
 function displayValue(v) {
-  return Array.isArray(v) ? v.join(', ') : String(v ?? '');
+  if (v == null) return '';
+  if (typeof v === 'object') {
+    if (Array.isArray(v)) {
+      return v.map((item) => (typeof item === 'object' ? JSON.stringify(item) : item)).join(', ');
+    }
+    return JSON.stringify(v);
+  }
+  return String(v ?? '');
 }
 
 /** Proposed structured fields + whether an image was attached. */
@@ -369,6 +376,24 @@ function FieldEditor({ def, value, onChange }) {
         value={String(value ?? '').slice(0, 10)}
         onChange={(e) => onChange(e.target.value)}
         className={inputCls}
+      />
+    );
+  }
+
+  if (kind === 'json' || (typeof value === 'object' && value !== null)) {
+    const formatted = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? '');
+    return (
+      <textarea
+        rows={4}
+        value={formatted}
+        onChange={(e) => {
+          try {
+            onChange(JSON.parse(e.target.value));
+          } catch {
+            onChange(e.target.value);
+          }
+        }}
+        className={`${inputCls} font-mono text-[11px]`}
       />
     );
   }
@@ -684,6 +709,30 @@ export default function AdminContributions() {
               last_updated: channel.lastUpdated,
             };
             approvedYoutube = channel;
+          }
+          if (update.representation) {
+            try {
+              const repObj = typeof update.representation === 'string' ? JSON.parse(update.representation) : update.representation;
+              const { data: currentPerson } = await supabase.from('people').select('youtube_stats').eq('id', item.target_id).single();
+              const currentStats = currentPerson?.youtube_stats || {};
+              update.youtube_stats = {
+                ...(update.youtube_stats || currentStats),
+                representation: {
+                  ...(currentStats.representation || {}),
+                  ...repObj,
+                },
+              };
+            } catch (err) {
+              console.warn('Could not parse representation object:', err);
+            }
+            delete update.representation;
+          }
+          if (update.awards && typeof update.awards === 'string') {
+            try {
+              update.awards = JSON.parse(update.awards);
+            } catch {
+              // keep as-is
+            }
           }
         }
 

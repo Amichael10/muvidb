@@ -52,6 +52,7 @@ const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
 const ProDashboard = lazyWithRetry(() => import('./pages/ProDashboard'));
 
 const PersonDetail = lazyWithRetry(() => import('./pages/PersonDetail'));
+const PersonDetailV2 = lazyWithRetry(() => import('./pages/PersonDetailV2'));
 const Showtimes = lazyWithRetry(() => import('./pages/Showtimes'));
 const Cinemas = lazyWithRetry(() => import('./pages/Cinemas'));
 const CinemaDetail = lazyWithRetry(() => import('./pages/CinemaDetail'));
@@ -341,6 +342,7 @@ export default function App() {
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/people" element={<PeopleList />} />
                 <Route path="/people/:slug" element={<PersonDetail />} />
+                <Route path="/people/:slug/v2" element={<PersonDetailV2 />} />
                 <Route path="/showtimes" element={<Showtimes />} />
                 <Route path="/cinemas" element={<Cinemas />} />
                 <Route path="/cinemas/:id" element={<CinemaDetail />} />

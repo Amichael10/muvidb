@@ -179,6 +179,10 @@
       "destination": "/api/data?_r=whatsapp"
     },
     {
+      "source": "/api/person-media",
+      "destination": "/api/data?_r=person-media"
+    },
+    {
       "source": "/api/youtube",
       "destination": "/api/external?provider=youtube"
     },

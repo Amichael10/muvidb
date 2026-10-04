@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link, useLoaderData } from 'react-router-dom'
+import { useParams, useNavigate, Link, useLoaderData, useSearchParams } from 'react-router-dom'
+import PersonDetailV2 from './PersonDetailV2'
 import { supabase } from '../lib/supabase'
 import { useFollow } from '../hooks/useFollow'
 import { useAuth } from '../context/AuthContext'
@@ -150,7 +151,7 @@ const PersonDetail = () => {
 
   const { slug } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, refreshUserProfile } = useAuth()
   // The route loader (src/routes/person-detail.tsx) already fetched this person
   // server-side for the SEO head, so the same row seeds the page.
   const loaderData = useLoaderData()
@@ -527,15 +528,27 @@ const PersonDetail = () => {
     }
 
     const wasFollowing = isFollowing
-    await toggleFollow()
+    const success = await toggleFollow()
+    if (!success) return
 
-    // If user just followed (was not following before) and hasn't set up WhatsApp yet:
+    // If user just followed (was not following before):
     if (!wasFollowing) {
-      // Check if user already has a saved phone or opted out
-      const hasPhone = Boolean(user.whatsapp_phone || user.user_metadata?.whatsapp_phone)
-      if (!hasPhone) {
+      const savedPhone = user.whatsapp_phone || user.user_metadata?.whatsapp_phone || localStorage.getItem('muvidb_user_whatsapp_phone')
+      if (savedPhone) {
+        // User already has WhatsApp configured in profile: 1-click follow with automatic alerts
+        supabase
+          .from('follows')
+          .update({ notify_whatsapp: true })
+          .eq('user_id', user.id)
+          .eq('person_id', personId)
+          .then(() => {})
+        toast.success(`Following ${person?.name || 'filmmaker'}! WhatsApp alerts active.`)
+      } else {
+        // User doesn't have a phone number yet: open modal once to save it to profile
         setWhatsappOptInOpen(true)
       }
+    } else {
+      toast.success(`Unfollowed ${person?.name || 'filmmaker'}.`)
     }
   }
 
@@ -816,6 +829,21 @@ const PersonDetail = () => {
 
   return (
     <div className="min-h-screen bg-bg overflow-x-hidden">
+      {/* ── LOCAL PREVIEW SWITCHER BAR ── */}
+      <div className="sticky top-0 z-40 bg-surface-2/95 text-text-primary backdrop-blur-md px-4 py-2 border-b border-border shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs">
+          <span className="bg-surface text-text-muted border border-border rounded px-1.5 py-0.5 text-[10px] font-bold">Classic View</span>
+          <span className="text-text-muted hidden sm:inline">Comparing people details layouts</span>
+        </div>
+        <Link
+          to={`/people/${slug}/v2`}
+          className="bg-brand text-white hover:bg-brand/90 font-bold px-3 py-1 rounded-lg text-xs transition flex items-center gap-1.5 shadow"
+        >
+          <span>Try Redesigned V2 (IMDb / RT Layout)</span>
+          <Icon icon="solar:arrow-right-linear" width="14" />
+        </Link>
+      </div>
+
       <div className="bg-surface-2/10 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
         <div className="max-w-7xl mx-auto px-4 py-8 md:py-12 border-x border-border relative z-10">
@@ -1592,6 +1620,14 @@ const PersonDetail = () => {
           personName={person?.name}
           personId={personId}
           user={user}
+          onOptInSuccess={(savedPhone) => {
+            if (savedPhone) {
+              localStorage.setItem('muvidb_user_whatsapp_phone', savedPhone)
+            }
+            if (refreshUserProfile) {
+              refreshUserProfile()
+            }
+          }}
         />
       </div>
     </div>

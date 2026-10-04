@@ -162,23 +162,18 @@ export default function PersonMediaEditor({ personId, personName }) {
           embedId = ytId;
         } else if (formData.url.includes('vimeo.com')) {
           embedProvider = 'vimeo';
+        } else if (formData.url.includes('.r2.dev') || formData.url.includes('pub-') || formData.url.includes('r2.cloudflarestorage.com')) {
+          embedProvider = 'r2';
+        } else if (formData.url.includes('drive.google.com')) {
+          embedProvider = 'gdrive';
+        } else if (formData.url.includes('dailymotion.com') || formData.url.includes('dai.ly')) {
+          embedProvider = 'dailymotion';
+        } else {
+          embedProvider = 'direct';
         }
       }
 
-      // If set as primary, un-primary existing items of same media_type for this person
-      if (formData.is_primary) {
-        try {
-          await supabase
-            .from('person_media')
-            .update({ is_primary: false })
-            .eq('person_id', personId)
-            .eq('media_type', formData.media_type);
-        } catch (primErr) {
-          console.warn('Could not reset primary flag:', primErr);
-        }
-      }
-
-      // Ensure uploaded_by is set to authenticated user id to satisfy RLS
+      // Ensure uploaded_by is set
       const { data: authData } = await supabase.auth.getUser();
       const currentUserId = user?.id || authData?.user?.id;
 
@@ -199,27 +194,22 @@ export default function PersonMediaEditor({ personId, personName }) {
         is_primary: formData.is_primary,
         status: formData.status || 'approved',
         uploaded_by: currentUserId || null,
-        updated_at: new Date().toISOString()
       };
 
-      if (editingItem) {
-        const { error } = await supabase
-          .from('person_media')
-          .update(payload)
-          .eq('id', editingItem.id);
-        if (error) throw error;
-        toast.success('Media updated successfully');
-      } else {
-        const { error } = await supabase
-          .from('person_media')
-          .insert({
-            ...payload,
-            created_at: new Date().toISOString()
-          });
-        if (error) throw error;
-        toast.success('Media added successfully');
+      const res = await fetch('/api/person-media', {
+        method: editingItem ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(editingItem ? { id: editingItem.id } : {}),
+          ...payload
+        })
+      });
+      const resJson = await res.json();
+      if (!res.ok) {
+        throw new Error(resJson.error || 'Failed to save media');
       }
 
+      toast.success(editingItem ? 'Media updated successfully' : 'Media added successfully');
       setShowAddModal(false);
       resetForm();
       fetchMedia();
@@ -235,11 +225,13 @@ export default function PersonMediaEditor({ personId, personName }) {
     if (!confirm('Are you sure you want to delete this media item?')) return;
     setDeletingId(id);
     try {
-      const { error } = await supabase
-        .from('person_media')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
+      const res = await fetch(`/api/person-media?id=${id}`, {
+        method: 'DELETE'
+      });
+      const resJson = await res.json();
+      if (!res.ok) {
+        throw new Error(resJson.error || 'Failed to delete media');
+      }
       toast.success('Media deleted');
       setMediaList(prev => prev.filter(m => m.id !== id));
     } catch (err) {
@@ -618,16 +610,14 @@ export default function PersonMediaEditor({ personId, personName }) {
                           required
                         />
                       </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-text-muted mb-1">Thumbnail URL (Optional)</label>
-                        <input
-                          type="url"
-                          placeholder="Auto-detected from YouTube or custom URL"
-                          value={formData.thumbnail_url}
-                          onChange={(e) => setFormData(prev => ({ ...prev, thumbnail_url: e.target.value }))}
-                          className="w-full bg-surface border border-border px-3 py-2 rounded-lg text-xs focus:border-brand outline-none"
-                        />
-                      </div>
+                      <ImageField
+                        label="Video Thumbnail / Cover (Optional)"
+                        value={formData.thumbnail_url}
+                        onChange={(url) => setFormData(prev => ({ ...prev, thumbnail_url: url }))}
+                        bucket="people"
+                        aspect="wide"
+                        hint="Upload a custom cover or paste an image link. Optional."
+                      />
                     </div>
                   )}
                 </div>

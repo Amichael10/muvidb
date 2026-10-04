@@ -5,15 +5,26 @@ export default function ProVideoTheaterModal({ video, onClose }) {
 
   const isYouTube = video.embed_provider === 'youtube' || video.url?.includes('youtube.com') || video.url?.includes('youtu.be');
   const isVimeo = video.embed_provider === 'vimeo' || video.url?.includes('vimeo.com');
-  const isDirect = video.embed_provider === 'r2' || (!isYouTube && !isVimeo);
+  const isGDrive = video.embed_provider === 'gdrive' || video.url?.includes('drive.google.com');
+  const isDailymotion = video.embed_provider === 'dailymotion' || video.url?.includes('dailymotion.com') || video.url?.includes('dai.ly');
+  const isDirect = video.embed_provider === 'r2' || (!isYouTube && !isVimeo && !isGDrive && !isDailymotion);
 
   let embedSrc = '';
   if (isYouTube) {
-    const id = video.embed_id || video.url?.match(/(?:v=|youtu\.be\/)([\w-]+)/)?.[1];
+    const id = video.embed_id || video.url?.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]+)/)?.[1];
     embedSrc = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
   } else if (isVimeo) {
-    const id = video.embed_id || video.url?.match(/vimeo\.com\/(\d+)/)?.[1];
+    const match = video.url?.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)/) || video.url?.match(/vimeo\.com\/(\d+)/);
+    const id = video.embed_id || (match ? (match[3] || match[1] || match[0]) : null);
     embedSrc = `https://player.vimeo.com/video/${id}?autoplay=1`;
+  } else if (isGDrive) {
+    const match = video.url?.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || video.url?.match(/id=([a-zA-Z0-9_-]+)/);
+    const id = video.embed_id || (match ? match[1] : null);
+    embedSrc = id ? `https://drive.google.com/file/d/${id}/preview` : video.url;
+  } else if (isDailymotion) {
+    const match = video.url?.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
+    const id = video.embed_id || (match ? match[1] : null);
+    embedSrc = `https://www.dailymotion.com/embed/video/${id}?autoplay=1`;
   }
 
   return (

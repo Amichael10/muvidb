@@ -40,6 +40,8 @@ export const PERSON_EDIT_FIELDS = [
   { key: 'facebook_url', label: 'Facebook', kind: 'url', placeholder: 'https://facebook.com/…' },
   { key: 'youtube_channel_id', label: 'YouTube channel ID', kind: 'text', placeholder: 'UC…' },
   { key: 'youtube_handle', label: 'YouTube handle', kind: 'text', placeholder: '@channel' },
+  { key: 'representation', label: 'Talent Representation & Guilds', kind: 'json', placeholder: 'Agency, management & guild affiliations' },
+  { key: 'awards', label: 'Awards & Honors', kind: 'json', placeholder: 'Industry awards and nominations' },
 ];
 
 /** Film edit fields that can be proposed + selectively applied. */

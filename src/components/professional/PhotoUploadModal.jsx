@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
+import { notifyProAdminOnTelegram } from '../../lib/proModeration';
 
 const CATEGORIES = [
   { id: 'headshot', label: 'Official Headshot', desc: 'Primary professional headshot or portfolio portrait' },
@@ -136,6 +137,35 @@ export default function PhotoUploadModal({ person, onClose, onSaved }) {
         .eq('id', person.id);
 
       if (dbError) throw dbError;
+
+      // Also record into person_media with pending moderation status
+      try {
+        await supabase.from('person_media').insert({
+          person_id: person.id,
+          media_type: 'photo',
+          category,
+          title: title || 'Official Photo',
+          url: finalUrl,
+          thumbnail_url: finalUrl,
+          photographer_credit: photographer || null,
+          year: Number(year) || new Date().getFullYear(),
+          is_primary: isPrimary,
+          status: 'pending'
+        });
+      } catch (mediaErr) {
+        console.warn('person_media insert note:', mediaErr);
+      }
+
+      // Notify Admin on Telegram
+      notifyProAdminOnTelegram({
+        personId: person.id,
+        personName: person.name,
+        personSlug: person.slug,
+        updateType: 'photos',
+        summary: `New photo uploaded (${category}): "${title || 'Official Photo'}"`,
+        details: `URL: ${finalUrl}\nPhotographer: ${photographer || 'N/A'}\nPrimary: ${isPrimary ? 'Yes' : 'No'}`,
+        link: '/admin/contributions'
+      }).catch((err) => console.warn('Photo upload telegram notify error:', err));
 
       toast.success(isPrimary ? 'Photo uploaded and set as primary headshot!' : 'Photo added to portfolio!');
       onSaved?.();

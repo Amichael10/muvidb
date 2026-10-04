@@ -47,7 +47,10 @@ export default function WhatsAppOptInModal({
         throw new Error(data.error || 'Failed to enable WhatsApp alerts');
       }
 
-      toast.success(`WhatsApp alerts enabled for ${personName || 'this filmmaker'}!`);
+      if (data.whatsapp_phone) {
+        localStorage.setItem('muvidb_user_whatsapp_phone', data.whatsapp_phone);
+      }
+      toast.success(`WhatsApp alerts enabled for ${personName || 'this filmmaker'}! Number saved to your profile.`);
       if (onOptInSuccess) onOptInSuccess(data.whatsapp_phone);
       onClose();
     } catch (err) {

@@ -1,7 +1,17 @@
+import QRCode from 'qrcode';
 import { professionalRoleLabel } from './professionalRoles';
 
 export const CAREER_PASSPORT_WIDTH = 1080;
 export const CAREER_PASSPORT_HEIGHT = 1350;
+
+function sanitizeImageUrl(url) {
+  if (!url) return '';
+  const clean = String(url).replace(/[\r\n\t]/g, '').trim();
+  if (clean.includes('/storage/v1/render/image/public/')) {
+    return clean.replace('/storage/v1/render/image/public/', '/storage/v1/object/public/').replace(/\?.*$/, '');
+  }
+  return clean;
+}
 
 const ORANGE = '#ff4d0a';
 const BLACK = '#101112';
@@ -74,7 +84,7 @@ export function buildCareerPassportModel({ person = {}, credits = [], stageCredi
     role: roles.slice(0, 3).join(' · ') || 'Film Professional',
     nationality: person.nationality || 'African',
     bio: clipText(person.bio || person.biography || `${person.name || 'This professional'} is part of Africa’s growing film community.`, 235),
-    photoUrl: person.photo_url || '/images/person-placeholder.png',
+    photoUrl: sanitizeImageUrl(person.photo_url) || '/images/person-placeholder.png',
     claimed: Boolean(person.claimed_by || person.is_claimed || person.claimed),
     productions: films.length,
     credits: credits.length,
@@ -82,7 +92,7 @@ export function buildCareerPassportModel({ person = {}, credits = [], stageCredi
     formats: detectFormats(credits, stageCredits),
     selectedCredits: selectedCredits.map((credit) => ({
       title: credit.films?.title || 'Untitled production',
-      posterUrl: credit.films?.poster_url || '/images/film-placeholder.webp',
+      posterUrl: sanitizeImageUrl(credit.films?.poster_url) || '/images/film-placeholder.webp',
     })),
     profileUrl,
     displayUrl: `muvidb.com/people/${slug}`,
@@ -114,10 +124,45 @@ function loadImage(src) {
 }
 
 async function safeImage(src, fallback) {
-  try { return await loadImage(src); } catch {
-    if (!fallback) return null;
-    try { return await loadImage(fallback); } catch { return null; }
+  const primary = sanitizeImageUrl(src);
+  if (primary) {
+    try {
+      return await loadImage(primary);
+    } catch {
+      if (src && src.includes('/render/image/')) {
+        try {
+          const direct = src.replace('/storage/v1/render/image/public/', '/storage/v1/object/public/').split('?')[0];
+          return await loadImage(direct);
+        } catch {
+          // ignore
+        }
+      }
+    }
   }
+  if (!fallback) return null;
+  try {
+    return await loadImage(fallback);
+  } catch {
+    return null;
+  }
+}
+
+async function safeQrCode(text, options) {
+  try {
+    let qrLib = QRCode;
+    if (!qrLib?.toDataURL) {
+      const mod = await import('qrcode');
+      qrLib = mod?.default || mod;
+    }
+    const fn = qrLib?.toDataURL || qrLib?.default?.toDataURL;
+    if (typeof fn === 'function') {
+      const dataUrl = await fn(text, options);
+      return await loadImage(dataUrl);
+    }
+  } catch (err) {
+    console.warn('Career Passport QR generation failed:', err);
+  }
+  return null;
 }
 
 function drawCover(ctx, image, x, y, width, height, radius = 0) {
@@ -212,12 +257,10 @@ export async function generateCareerPassportJpeg(input) {
   ctx.fillStyle = ORANGE;
   for (let row = 0; row < 3; row += 1) for (let col = 0; col < 3; col += 1) ctx.beginPath(), ctx.arc(1000 + col * 14, 44 + row * 14, 3, 0, Math.PI * 2), ctx.fill();
 
-  const qrcodeModName = 'qrcode';
-  const { default: QRCode } = await import(/* @vite-ignore */ qrcodeModName);
   const [logo, portrait, qr, cinemaIcon, streamingIcon, youtubeIcon, theatreIcon, tvIcon, clapperIcon, starIcon, usersIcon, actorIcon, ...posters] = await Promise.all([
     safeImage('/images/MuviDB%20Brand/MuviDB%20Icon.png', '/images/logo.png'),
     safeImage(model.photoUrl, '/images/person-placeholder.png'),
-    loadImage(await QRCode.toDataURL(model.profileUrl, { width: 150, margin: 1, errorCorrectionLevel: 'M', color: { dark: BLACK, light: '#ffffff' } })),
+    safeQrCode(model.profileUrl, { width: 150, margin: 1, errorCorrectionLevel: 'M', color: { dark: BLACK, light: '#ffffff' } }),
     safeImage('/images/career-passport/solar-reel-outline.svg'),
     safeImage('/images/career-passport/solar-screencast-outline.svg'),
     safeImage('/images/career-passport/youtube.svg'),
@@ -317,7 +360,12 @@ export async function generateCareerPassportJpeg(input) {
   ctx.fillStyle = '#fff'; ctx.font = '500 19px Inter, sans-serif'; ctx.fillText('View Full Profile', 150, 1261);
   const urlSize = fitText(ctx, model.displayUrl, 390, 27, 'Inter, sans-serif', 800, 17);
   ctx.font = `800 ${urlSize}px Inter, sans-serif`; ctx.fillText(model.displayUrl, 150, 1294);
-  roundRect(ctx, 586, 1237, 98, 72, 10, '#fff'); ctx.drawImage(qr, 598, 1243, 60, 60);
+  roundRect(ctx, 586, 1237, 98, 72, 10, '#fff');
+  if (qr) {
+    ctx.drawImage(qr, 598, 1243, 60, 60);
+  } else {
+    drawMiniIcon(ctx, 'globe', 617, 1255, ORANGE);
+  }
   roundRect(ctx, 714, 1225, 320, 94, 18, '#fff', LINE, 1.5);
   ctx.fillStyle = ORANGE; ctx.font = '700 16px Inter, sans-serif'; ctx.fillText('MuviDB ID', 748, 1260);
   ctx.fillStyle = BLACK; ctx.font = '800 26px Inter, sans-serif'; ctx.fillText(model.passportId, 748, 1294);
