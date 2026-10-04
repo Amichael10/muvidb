@@ -176,6 +176,7 @@ export default function PersonDetailV2() {
   const [filmographySearch, setFilmographySearch] = useState('')
   const [filmographyView, setFilmographyView] = useState('grid') // 'grid' | 'list'
   const [filmographyMedium, setFilmographyMedium] = useState('screen') // 'screen' | 'stage'
+  const [visibleStageCount, setVisibleStageCount] = useState(6)
   const [passportOpen, setPassportOpen] = useState(false)
   const [whatsappOptInOpen, setWhatsappOptInOpen] = useState(false)
   const [showAddMedia, setShowAddMedia] = useState(false)
@@ -1684,33 +1685,47 @@ export default function PersonDetailV2() {
 
           {/* Stage & Theatre Credits View */}
           {filmographyMedium === 'stage' && stageCredits.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {stageCredits.map((play) => (
-                <Link
-                  key={play.id}
-                  to={`/plays/${play.slug}`}
-                  className="group bg-surface border border-border hover:border-brand rounded-2xl p-4 flex gap-4 items-stretch transition duration-300"
-                >
-                  <ImageWithFallback
-                    src={play.poster_url}
-                    alt={play.title}
-                    fallbackType="film"
-                    name={play.title}
-                    className="w-20 h-28 rounded-xl object-cover border border-border shrink-0"
-                  />
-                  <div className="min-w-0 flex flex-col justify-center">
-                    <h4 className="text-base font-bold text-white group-hover:text-brand transition line-clamp-2">
-                      {play.title}
-                    </h4>
-                    <span className="text-xs font-bold text-brand block mt-1">
-                      {play.role || 'Actor'} {play.character_name ? `as ${play.character_name}` : ''}
-                    </span>
-                    <p className="text-xs text-text-muted mt-2">
-                      📍 {play.venue || play.city || 'Theatre'} ({getPlayDateLabel(play, 'TBA')})
-                    </p>
-                  </div>
-                </Link>
-              ))}
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {stageCredits.slice(0, visibleStageCount).map((play) => (
+                  <Link
+                    key={play.id}
+                    to={`/plays/${play.slug}`}
+                    className="group bg-surface border border-border hover:border-brand rounded-2xl p-4 flex gap-4 items-stretch transition duration-300"
+                  >
+                    <ImageWithFallback
+                      src={play.poster_url}
+                      alt={play.title}
+                      fallbackType="film"
+                      name={play.title}
+                      className="w-20 h-28 rounded-xl object-cover border border-border shrink-0"
+                    />
+                    <div className="min-w-0 flex flex-col justify-center">
+                      <h4 className="text-base font-bold text-white group-hover:text-brand transition line-clamp-2">
+                        {play.title}
+                      </h4>
+                      <span className="text-xs font-bold text-brand block mt-1">
+                        {play.role || 'Actor'} {play.character_name ? `as ${play.character_name}` : ''}
+                      </span>
+                      <p className="text-xs text-text-muted mt-2">
+                        📍 {play.venue || play.city || 'Theatre'} ({getPlayDateLabel(play, 'TBA')})
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {stageCredits.length > visibleStageCount && (
+                <div className="flex justify-center mt-10">
+                  <button
+                    onClick={() => setVisibleStageCount((c) => c + 6)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-xs font-bold text-white hover:border-brand transition shadow-sm"
+                  >
+                    <Icon icon="solar:add-circle-linear" width="18" />
+                    Show More ({stageCredits.length - visibleStageCount} remaining)
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

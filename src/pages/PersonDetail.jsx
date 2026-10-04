@@ -181,6 +181,7 @@ const PersonDetail = () => {
   const [youtubeVideoIds, setYoutubeVideoIds] = useState([])
   const [youtubeLoading, setYoutubeLoading] = useState(false)
   const [visibleCreditsCount, setVisibleCreditsCount] = useState(20)
+  const [visibleStageCount, setVisibleStageCount] = useState(6)
   const [filmographySearch, setFilmographySearch] = useState('')
   const [filmographyView, setFilmographyView] = useState('grid')
   const [awardsOpen, setAwardsOpen] = useState(false)
@@ -1397,7 +1398,7 @@ const PersonDetail = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {stageCredits.map((play) => (
+              {stageCredits.slice(0, visibleStageCount).map((play) => (
                 <Link
                   key={play.id}
                   to={`/plays/${play.slug}`}
@@ -1437,6 +1438,18 @@ const PersonDetail = () => {
                 </Link>
               ))}
             </div>
+
+            {stageCredits.length > visibleStageCount && (
+              <div className="flex justify-center mt-8">
+                <button
+                  onClick={() => setVisibleStageCount((c) => c + 6)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-xs font-bold text-text-primary hover:border-brand hover:text-brand transition shadow-sm"
+                >
+                  <Icon icon="solar:add-circle-linear" width="18" />
+                  Show More Stage Credits ({stageCredits.length - visibleStageCount} remaining)
+                </button>
+              </div>
+            )}
           </div>
         )}
 
