@@ -24,6 +24,14 @@ export default function CreditRequestModal({ person, onClose, onSaved }) {
   const [newFilm, setNewFilm] = useState({ title: '', content_type: 'movie', year: new Date().getFullYear(), release_type: '', synopsis: '', genres: '', runtime_minutes: '', language: 'English', countries: 'Nigeria', release_date: '', nfvcb_rating: '', youtube_watch_url: '', trailer_youtube_id: '', poster_url: '' });
 
   useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     if (mode !== 'existing' || query.trim().length < 2 || film) {
       setResults([]);
       setSearching(false);
@@ -94,11 +102,11 @@ export default function CreditRequestModal({ person, onClose, onSaved }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <form onSubmit={submit} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[28px] border border-white/10 bg-[#151515] p-6 shadow-2xl md:p-8">
+    <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md overscroll-contain sm:items-center sm:p-5" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <form onSubmit={submit} className="relative my-auto max-h-[calc(100vh-1.5rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-[#151515] p-5 shadow-2xl sm:max-h-[88vh] sm:rounded-3xl sm:p-8">
         <div className="flex items-start justify-between gap-4">
-          <div><p className="text-[10px] font-black uppercase tracking-[.24em] text-brand">Filmography request</p><h2 className="mt-2 text-2xl font-black text-text-primary">Add a professional credit</h2><p className="mt-2 text-sm text-text-muted">Every credit is checked by a MuviDB editor before publishing.</p></div>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-text-muted"><Icon icon="solar:close-circle-linear" width="28" /></button>
+          <div><p className="text-[10px] font-black uppercase tracking-[.24em] text-brand">Filmography request</p><h2 className="mt-1 text-xl font-black text-text-primary sm:text-2xl">Add a professional credit</h2><p className="mt-1 text-xs text-text-muted sm:text-sm">Every credit is checked by a MuviDB editor before publishing.</p></div>
+          <button type="button" onClick={onClose} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-full bg-white/[.05] text-text-muted transition hover:bg-white/10 hover:text-white"><Icon icon="solar:close-circle-linear" width="20" /></button>
         </div>
 
         <div className="mt-7 grid grid-cols-2 gap-2 rounded-xl bg-surface-2 p-1.5">

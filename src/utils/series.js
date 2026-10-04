@@ -28,13 +28,12 @@ export function getShowName(title) {
     t = promoColon[1].trim();
   }
 
-  // Drop year parentheses / trailing years used in upload titles
-  t = t.replace(/\s*\((?:19|20)\d{2}\)\s*/g, ' ').trim();
-  t = t.replace(/\s*\([^)]*season[^)]*\)/gi, ' ').trim();
-  t = t.replace(/\b(?:EP|EPS|FIC|S\d+\s*E\d+)\b/gi, ' ').trim();
+  // Strip parenthesized episode subtitle before Ep/Season/Episode
+  // e.g. "Saamu Alajo (Aridaju) Ep 124" -> "Saamu Alajo"
+  t = t.replace(/\s*\([^)]+\)\s*(?:[\s:-]+)?\b(?:Season|Chapter|Episode|Part|Vol(?:ume)?|EP|EPS)\s*\d+.*$/i, '');
 
   // " - Chapter X", "Episode X", "Part X", etc.
-  const match = t.match(/^(.*?)(?:[\s:-]+)?\b(?:Season|Chapter|Episode|Part|Vol(?:ume)?)\s*\d+/i);
+  const match = t.match(/^(.*?)(?:[\s:-]+)?\b(?:Season|Chapter|Episode|Part|Vol(?:ume)?|EP|EPS|FIC|S\d+\s*E\d+)\s*\d+/i);
   if (match?.[1]) {
     t = match[1].replace(/[\s:-]+$/, '').trim();
   }
@@ -45,13 +44,18 @@ export function getShowName(title) {
     t = yorubaMatch[1].replace(/[\s:-]+$/, '').trim();
   }
 
+  // Drop year parentheses / trailing years used in upload titles
+  t = t.replace(/\s*\((?:19|20)\d{2}\)\s*/g, ' ').trim();
+  t = t.replace(/\s*\([^)]*season[^)]*\)/gi, ' ').trim();
+  t = t.replace(/\b(?:EP|EPS|FIC|S\d+\s*E\d+)\b/gi, ' ').trim();
+
   // Trailing standalone number ("Show 2") — only if leftover looks like a base name
   const numberMatch = t.match(/^(.*?)(?:[\s:-]+)?\b\d+$/);
   if (numberMatch?.[1] && numberMatch[1].trim().length >= 3) {
     t = numberMatch[1].replace(/[\s:-]+$/, '').trim();
   }
 
-  return t.replace(/\s+/g, ' ').trim();
+  return t.replace(/[\s:-]+$/, '').replace(/\s+/g, ' ').trim();
 }
 
 /** Lowercase merge key for grouping. */

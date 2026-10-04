@@ -21,7 +21,11 @@ export function toSentenceCase(str) {
 
 export function formatFilmTitle(str) {
   if (!str) return str;
-  return toSentenceCase(str);
+  const isAllCaps = str === str.toUpperCase() && str !== str.toLowerCase();
+  if (isAllCaps) {
+    return toTitleCase(str);
+  }
+  return str;
 }
 
 export function formatPersonName(str) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -201,200 +201,218 @@ export default function VideoUploadModal({ person, credits = [], onClose, onSave
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-md">
-      <div className="relative w-full max-w-2xl rounded-3xl border border-white/10 bg-[#171717] p-6 shadow-2xl md:p-8">
-        <button
-          onClick={onClose}
-          className="absolute right-6 top-6 grid h-9 w-9 place-items-center rounded-full bg-white/[.05] text-text-muted hover:bg-white/10 hover:text-white"
-        >
-          <Icon icon="solar:close-circle-linear" width="22" />
-        </button>
-
-        <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand/10 text-brand">
-            <Icon icon="solar:videocamera-record-bold" width="22" />
-          </span>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[.25em] text-brand">Reels & Performance Hub</p>
-            <h2 className="text-xl font-black text-text-primary">Add Showreel or Performance Video</h2>
+    <div
+      className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md overscroll-contain sm:items-center sm:p-5"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="relative my-auto flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#171717] shadow-2xl sm:max-h-[88vh] sm:rounded-3xl">
+        {/* Pinned Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-[#171717] px-5 py-3.5 sm:px-6 sm:py-4">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand sm:h-10 sm:w-10">
+              <Icon icon="solar:videocamera-record-bold" width="20" />
+            </span>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[.25em] text-brand">Reels & Performance Hub</p>
+              <h2 className="text-base font-black text-text-primary sm:text-lg">Add Showreel or Performance Video</h2>
+            </div>
           </div>
-        </div>
-
-        {/* Source Toggle */}
-        <div className="mt-6 flex rounded-2xl border border-white/10 bg-white/[.02] p-1.5">
           <button
             type="button"
-            onClick={() => setSourceType('url')}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition ${
-              sourceType === 'url' ? 'bg-brand text-white shadow-lg shadow-brand/15' : 'text-text-muted hover:text-white'
-            }`}
+            onClick={onClose}
+            aria-label="Close modal"
+            className="grid h-8 w-8 place-items-center rounded-full bg-white/[.05] text-text-muted transition hover:bg-white/10 hover:text-white"
           >
-            <Icon icon="logos:youtube-icon" width="16" /> Link YouTube / Vimeo
-          </button>
-          <button
-            type="button"
-            onClick={() => setSourceType('upload')}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition ${
-              sourceType === 'upload' ? 'bg-brand text-white shadow-lg shadow-brand/15' : 'text-text-muted hover:text-white'
-            }`}
-          >
-            <Icon icon="solar:cloud-upload-bold" width="16" /> Upload MP4 / MOV File
+            <Icon icon="solar:close-circle-linear" width="20" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          {sourceType === 'url' ? (
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+            {/* Source Toggle */}
+            <div className="flex rounded-xl border border-white/10 bg-white/[.02] p-1 sm:rounded-2xl sm:p-1.5">
+              <button
+                type="button"
+                onClick={() => setSourceType('url')}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-black transition sm:rounded-xl sm:py-2.5 ${
+                  sourceType === 'url' ? 'bg-brand text-white shadow-lg shadow-brand/15' : 'text-text-muted hover:text-white'
+                }`}
+              >
+                <Icon icon="logos:youtube-icon" width="16" /> Link YouTube / Vimeo
+              </button>
+              <button
+                type="button"
+                onClick={() => setSourceType('upload')}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-black transition sm:rounded-xl sm:py-2.5 ${
+                  sourceType === 'upload' ? 'bg-brand text-white shadow-lg shadow-brand/15' : 'text-text-muted hover:text-white'
+                }`}
+              >
+                <Icon icon="solar:cloud-upload-bold" width="16" /> Upload MP4 / MOV File
+              </button>
+            </div>
+
+            {sourceType === 'url' ? (
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                  YouTube or Vimeo URL
+                </label>
+                <div className="relative mt-1">
+                  <input
+                    type="url"
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                    className="w-full rounded-xl border border-white/10 bg-white/[.03] py-2 pl-3.5 pr-9 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                  />
+                  <Icon icon="solar:link-bold" width="15" className="absolute right-3 top-2.5 text-text-muted" />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                  Video File (MP4, MOV up to 150MB)
+                </label>
+                <input
+                  type="file"
+                  accept="video/mp4,video/quicktime"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] p-2.5 text-xs font-bold text-text-primary file:mr-3 file:rounded-lg file:border-0 file:bg-brand/15 file:px-2.5 file:py-1 file:text-xs file:font-black file:text-brand"
+                />
+              </div>
+            )}
+
+            {/* Category */}
             <div>
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                YouTube or Vimeo URL
+                Performance Category
               </label>
-              <div className="relative mt-1.5">
-                <input
-                  type="url"
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
-                  className="w-full rounded-xl border border-white/10 bg-white/[.03] py-2.5 pl-4 pr-10 text-xs font-bold text-text-primary outline-none focus:border-brand"
-                />
-                <Icon icon="solar:link-bold" width="16" className="absolute right-3.5 top-3 text-text-muted" />
+              <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+                {VIDEO_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    className={`flex items-start gap-2.5 rounded-xl border px-3 py-2 text-left transition ${
+                      category === cat.id
+                        ? 'border-brand bg-brand/10 text-text-primary'
+                        : 'border-white/10 bg-white/[.02] text-text-muted hover:border-white/20'
+                    }`}
+                  >
+                    <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
+                      category === cat.id ? 'border-brand bg-brand text-white' : 'border-white/20'
+                    }`}>
+                      {category === cat.id && <Icon icon="solar:check-bold" width="10" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-black truncate ${category === cat.id ? 'text-brand' : 'text-text-primary'}`}>
+                        {cat.label}
+                      </p>
+                      <p className="mt-0.5 line-clamp-1 text-[9px] leading-tight text-text-muted">{cat.desc}</p>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
-          ) : (
+
+            {/* Title */}
             <div>
               <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Video File (MP4, MOV up to 150MB)
-              </label>
-              <input
-                type="file"
-                accept="video/mp4,video/quicktime"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[.03] p-3 text-xs font-bold text-text-primary file:mr-3 file:rounded-lg file:border-0 file:bg-brand/15 file:px-3 file:py-1 file:text-xs file:font-black file:text-brand"
-              />
-            </div>
-          )}
-
-          {/* Category */}
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-              Performance Category
-            </label>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {VIDEO_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setCategory(cat.id)}
-                  className={`flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition ${
-                    category === cat.id
-                      ? 'border-brand bg-brand/10 text-text-primary'
-                      : 'border-white/10 bg-white/[.02] text-text-muted hover:border-white/20'
-                  }`}
-                >
-                  <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
-                    category === cat.id ? 'border-brand bg-brand text-white' : 'border-white/20'
-                  }`}>
-                    {category === cat.id && <Icon icon="solar:check-bold" width="10" />}
-                  </span>
-                  <div>
-                    <p className={`text-xs font-black ${category === cat.id ? 'text-brand' : 'text-text-primary'}`}>
-                      {cat.label}
-                    </p>
-                    <p className="text-[9px] leading-tight text-text-muted mt-0.5">{cat.desc}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-              Video Title
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. 2026 Dramatic Acting Reel or Monologue from Oloibiri"
-              className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[.03] px-4 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
-            />
-          </div>
-
-          {/* Tag to Movie & Character */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Tag to Credited Movie (Optional)
-              </label>
-              <select
-                value={taggedFilmId}
-                onChange={(e) => setTaggedFilmId(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-white/10 bg-[#202020] px-3 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
-              >
-                <option value="">-- None / Standalone Showreel --</option>
-                {credits.map((c) => (
-                  <option key={c.id} value={c.film_id || c.films?.id}>
-                    {c.films?.title || 'Untitled Film'} ({c.films?.year || 'N/A'})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                Character Portrayed (Optional)
+                Video Title
               </label>
               <input
                 type="text"
-                value={characterName}
-                onChange={(e) => setCharacterName(e.target.value)}
-                placeholder="e.g. Lead as Dr. Kemi"
-                className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/[.03] px-4 py-2.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. 2026 Dramatic Acting Reel or Monologue from Oloibiri"
+                className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
               />
             </div>
-          </div>
 
-          {/* Pin as Main Featured Reel */}
-          <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-white/10 bg-white/[.02] p-3.5 transition hover:border-brand/40">
-            <div className="flex items-center gap-3">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-red-500/10 text-red-400">
-                <Icon icon="solar:play-circle-bold" width="18" />
-              </span>
+            {/* Tag to Movie & Character */}
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <p className="text-xs font-black text-text-primary">Pin as Headline Showreel</p>
-                <p className="text-[10px] text-text-muted">Autoplays or features first on your profile for casting directors</p>
+                <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                  Tag to Credited Movie (Optional)
+                </label>
+                <select
+                  value={taggedFilmId}
+                  onChange={(e) => setTaggedFilmId(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#202020] px-3 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                >
+                  <option value="">-- None / Standalone Showreel --</option>
+                  {credits.map((c) => (
+                    <option key={c.id} value={c.film_id || c.films?.id}>
+                      {c.films?.title || 'Untitled Film'} ({c.films?.year || 'N/A'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                  Character Portrayed (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={characterName}
+                  onChange={(e) => setCharacterName(e.target.value)}
+                  placeholder="e.g. Lead as Dr. Kemi"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                />
               </div>
             </div>
-            <input
-              type="checkbox"
-              checked={isFeatured}
-              onChange={(e) => setIsFeatured(e.target.checked)}
-              className="h-4 w-4 accent-brand"
-            />
-          </label>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-2">
+            {/* Pin as Main Featured Reel */}
+            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-white/10 bg-white/[.02] p-3 transition hover:border-brand/40">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-red-500/10 text-red-400">
+                  <Icon icon="solar:play-circle-bold" width="16" />
+                </span>
+                <div>
+                  <p className="text-xs font-black text-text-primary">Pin as Headline Showreel</p>
+                  <p className="text-[10px] text-text-muted">Autoplays or features first on your profile for casting directors</p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={isFeatured}
+                onChange={(e) => setIsFeatured(e.target.checked)}
+                className="h-4 w-4 accent-brand"
+              />
+            </label>
+          </div>
+
+          {/* Pinned Footer Actions */}
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-white/10 bg-[#171717] px-5 py-3 sm:px-6 sm:py-3.5">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-white/10 px-5 py-2.5 text-xs font-black text-text-muted hover:text-white"
+              className="rounded-xl border border-white/10 px-4 py-2 text-xs font-black text-text-muted transition hover:bg-white/[.05] hover:text-white"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={uploading}
-              className="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-2.5 text-xs font-black text-white shadow-lg shadow-brand/20 hover:bg-brand/90 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2 text-xs font-black text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90 disabled:opacity-50"
             >
               {uploading ? (
                 <>
-                  <Icon icon="solar:spinner-linear" className="animate-spin" width="18" />
+                  <Icon icon="solar:spinner-linear" className="animate-spin" width="16" />
                   Saving Video...
                 </>
               ) : (
                 <>
-                  <Icon icon="solar:check-circle-bold" width="18" />
+                  <Icon icon="solar:check-circle-bold" width="16" />
                   Save Performance Reel
                 </>
               )}

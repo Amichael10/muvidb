@@ -765,7 +765,7 @@ async function summarizeFilm(data: any, res: VercelResponse) {
 async function cleanupTitles(res: VercelResponse) {
   // Deep scan: Prioritize titles with pipes (|) and common noise
   // NEVER touch locked titles or episodic series entries
-  const { data: films, error: dbError } = await supabase
+  const { data: rawFilms, error: dbError } = await supabase
     .from('films')
     .select('id, title')
     .eq('title_locked', false)
@@ -775,9 +775,17 @@ async function cleanupTitles(res: VercelResponse) {
     .not('title', 'ilike', '%Saamu Alajo%')
     .not('title', 'ilike', '%Ep %')
     .not('title', 'ilike', '%Episode%')
+    .not('title', 'ilike', '%Season%')
     .or('title.ilike.%|%,title.ilike.%YORUBA%,title.ilike.%MOVIE%,title.ilike.%PART%,title.ilike.%2024%,title.ilike.%2025%,title.ilike.%FULL%,title.ilike.%NIGERIAN%,title.ilike.%(%,title.ilike.%[%,title.ilike.%-%,title.ilike.%LATEST%')
     .order('created_at', { ascending: false })
     .limit(40); // Reduced batch size to 40 to avoid token rate limits (429)
+
+  const films = (rawFilms || []).filter((f: any) => {
+    const t = f.title || '';
+    if (/\b(?:ep\s*\d+|episode\s*\d+|season\s*\d+)\b/i.test(t)) return false;
+    if (/saamu alajo/i.test(t)) return false;
+    return true;
+  });
 
   if (dbError) {
     console.error('DB Error in cleanupTitles:', dbError);
@@ -832,6 +840,10 @@ async function extractCastFromTitles(res: VercelResponse) {
     .neq('content_type', 'series')
     .is('series_id', null)
     .is('episode_number', null)
+    .not('title', 'ilike', '%Saamu Alajo%')
+    .not('title', 'ilike', '%Ep %')
+    .not('title', 'ilike', '%Episode%')
+    .not('title', 'ilike', '%Season%')
     .or('title.ilike.%starring%,title.ilike.%feat%,title.ilike.%ft.%,title.ilike.%ft %')
     .order('created_at', { ascending: false })
     .limit(30);
@@ -849,18 +861,24 @@ async function extractCastFromTitles(res: VercelResponse) {
     .neq('content_type', 'series')
     .is('series_id', null)
     .is('episode_number', null)
+    .not('title', 'ilike', '%Saamu Alajo%')
+    .not('title', 'ilike', '%Ep %')
+    .not('title', 'ilike', '%Episode%')
+    .not('title', 'ilike', '%Season%')
     .ilike('title', '%|%')
     .order('created_at', { ascending: false })
     .limit(20);
 
-  // Merge and deduplicate
-  const allFilms = [...(films || [])];
-  const seenIds = new Set(allFilms.map(f => f.id));
-  for (const f of (pipeFilms || [])) {
-    if (!seenIds.has(f.id)) {
-      allFilms.push(f);
-      seenIds.add(f.id);
-    }
+  // Merge, deduplicate, and enforce strict exclusions
+  const allFilms: any[] = [];
+  const seenIds = new Set();
+  for (const f of [...(films || []), ...(pipeFilms || [])]) {
+    if (!f?.id || seenIds.has(f.id)) continue;
+    const t = f.title || '';
+    if (/\b(?:ep\s*\d+|episode\s*\d+|season\s*\d+)\b/i.test(t)) continue;
+    if (/saamu alajo/i.test(t)) continue;
+    seenIds.add(f.id);
+    allFilms.push(f);
   }
 
   if (allFilms.length === 0) {

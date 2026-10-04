@@ -19,6 +19,10 @@ export async function runCastExtraction(options: { limit?: number } = {}) {
     .neq('content_type', 'series')
     .is('series_id', null)
     .is('episode_number', null)
+    .not('title', 'ilike', '%Saamu Alajo%')
+    .not('title', 'ilike', '%Ep %')
+    .not('title', 'ilike', '%Episode%')
+    .not('title', 'ilike', '%Season%')
     .or('title.ilike.%starring%,title.ilike.%feat%,title.ilike.%ft.%,title.ilike.%ft %')
     .order('created_at', { ascending: false })
     .limit(selectorLimit);
@@ -30,6 +34,10 @@ export async function runCastExtraction(options: { limit?: number } = {}) {
     .neq('content_type', 'series')
     .is('series_id', null)
     .is('episode_number', null)
+    .not('title', 'ilike', '%Saamu Alajo%')
+    .not('title', 'ilike', '%Ep %')
+    .not('title', 'ilike', '%Episode%')
+    .not('title', 'ilike', '%Season%')
     .ilike('title', '%|%')
     .order('created_at', { ascending: false })
     .limit(selectorLimit);
@@ -46,19 +54,25 @@ export async function runCastExtraction(options: { limit?: number } = {}) {
     .neq('content_type', 'series')
     .is('series_id', null)
     .is('episode_number', null)
+    .not('title', 'ilike', '%Saamu Alajo%')
+    .not('title', 'ilike', '%Ep %')
+    .not('title', 'ilike', '%Episode%')
+    .not('title', 'ilike', '%Season%')
     .like('title', '%(%')
     .like('title', '%,%')
     .order('created_at', { ascending: false })
     .limit(selectorLimit);
 
-  // Merge and deduplicate
-  const allCastFilms = [...(starringFilms || [])];
-  const seenIds = new Set(allCastFilms.map(f => f.id));
-  for (const f of [...(pipeFilms || []), ...(bracketFilms || [])]) {
-    if (!seenIds.has(f.id)) {
-      allCastFilms.push(f);
-      seenIds.add(f.id);
-    }
+  // Merge, deduplicate, and enforce strict exclusions
+  const allCastFilms: any[] = [];
+  const seenIds = new Set();
+  for (const f of [...(starringFilms || []), ...(pipeFilms || []), ...(bracketFilms || [])]) {
+    if (!f?.id || seenIds.has(f.id)) continue;
+    const t = f.title || '';
+    if (/\b(?:ep\s*\d+|episode\s*\d+|season\s*\d+)\b/i.test(t)) continue;
+    if (/saamu alajo/i.test(t)) continue;
+    seenIds.add(f.id);
+    allCastFilms.push(f);
   }
   allCastFilms.splice(totalLimit);
 
@@ -217,7 +231,7 @@ export async function runTitleCleanup(options: { limit?: number } = {}) {
   
   // Only clean standalone messy movie titles where title_locked is false.
   // Never wipe series episodes (which contain subtitles/episode numbers) into bare parent series names.
-  const { data: messyFilms } = await supabase
+  const { data: rawMessyFilms } = await supabase
     .from('films')
     .select('id, title')
     .eq('title_locked', false)
@@ -227,9 +241,17 @@ export async function runTitleCleanup(options: { limit?: number } = {}) {
     .not('title', 'ilike', '%Saamu Alajo%')
     .not('title', 'ilike', '%Ep %')
     .not('title', 'ilike', '%Episode%')
+    .not('title', 'ilike', '%Season%')
     .or('title.ilike.%|%,title.ilike.%YORUBA%,title.ilike.%MOVIE%,title.ilike.%PART%,title.ilike.%2024%,title.ilike.%2025%,title.ilike.%FULL%,title.ilike.%NIGERIAN%,title.ilike.%(%,title.ilike.%[%,title.ilike.%-%,title.ilike.%LATEST%')
     .order('created_at', { ascending: false })
     .limit(limit);
+
+  const messyFilms = (rawMessyFilms || []).filter((f: any) => {
+    const t = f.title || '';
+    if (/\b(?:ep\s*\d+|episode\s*\d+|season\s*\d+)\b/i.test(t)) return false;
+    if (/saamu alajo/i.test(t)) return false;
+    return true;
+  });
 
   if (!messyFilms || messyFilms.length === 0) {
     return { analyzed: 0, message: 'No messy titles found' };

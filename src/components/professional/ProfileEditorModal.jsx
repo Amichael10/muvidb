@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { suggestPersonEdit } from '../../lib/contributions';
@@ -31,6 +31,14 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
   const [youtubeInput, setYoutubeInput] = useState(person.youtube_channel_id ? `https://youtube.com/channel/${person.youtube_channel_id}` : (person.youtube_handle || ''));
   const [youtubePreview, setYoutubePreview] = useState(person.youtube_stats || null);
   const [checkingYoutube, setCheckingYoutube] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const checkYoutube = async () => {
     const identifier = extractChannelIdentifier(youtubeInput.trim());
@@ -92,18 +100,19 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <form onSubmit={submit} className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-white/10 bg-[#151515] shadow-2xl">
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-5 border-b border-white/10 bg-[#151515]/95 px-6 py-6 backdrop-blur md:px-8">
+    <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md overscroll-contain sm:items-center sm:p-5" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <form onSubmit={submit} className="relative my-auto flex max-h-[calc(100vh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#151515] shadow-2xl sm:max-h-[88vh] sm:rounded-3xl">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 bg-[#151515] px-5 py-4 sm:px-8 sm:py-5">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[.24em] text-brand">Professional profile</p>
-            <h2 className="mt-2 text-2xl font-black text-text-primary">Complete your public profile</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-text-muted">Add the details casting teams and audiences need. MuviDB reviews changes before they appear publicly.</p>
+            <h2 className="mt-1 text-xl font-black text-text-primary sm:text-2xl">Complete your public profile</h2>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-text-muted sm:text-sm sm:leading-6">Add the details casting teams and audiences need. MuviDB reviews changes before they appear publicly.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close profile editor" className="rounded-full p-1 text-text-muted hover:text-white"><Icon icon="solar:close-circle-linear" width="28" /></button>
+          <button type="button" onClick={onClose} aria-label="Close profile editor" className="grid h-8 w-8 place-items-center rounded-full bg-white/[.05] text-text-muted transition hover:bg-white/10 hover:text-white"><Icon icon="solar:close-circle-linear" width="20" /></button>
         </header>
 
-        <div className="grid gap-8 p-6 md:grid-cols-[220px_1fr] md:p-8">
+        <div className="flex-1 overflow-y-auto p-5 sm:p-8">
+          <div className="grid gap-8 md:grid-cols-[220px_1fr]">
           <aside>
             <div className="overflow-hidden rounded-2xl border border-white/10 bg-surface-2">
               <img src={photo ? URL.createObjectURL(photo) : (person.photo_url || '/images/person-placeholder.png')} alt="Profile preview" className="aspect-[4/5] w-full object-cover" />
@@ -143,7 +152,8 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
             </div>
           </div>
         </div>
-      </form>
-    </div>
-  );
+      </div>
+    </form>
+  </div>
+);
 }

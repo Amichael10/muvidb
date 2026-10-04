@@ -1354,7 +1354,11 @@ export default function AdminFilms() {
       const channel_video_id = formData.channel_video_id || null;
 
       const cleanFilmPayload = {
-        title: formData.title ? toSentenceCase(formData.title.trim()) : '',
+        title: formData.title
+          ? (formData.title === formData.title.toUpperCase() && formData.title !== formData.title.toLowerCase()
+              ? toTitleCase(formData.title.trim())
+              : formData.title.trim())
+          : '',
         synopsis: formData.synopsis ? toSentenceCase(formData.synopsis.trim()) : '',
         tagline: formData.tagline ? formData.tagline.trim() : null,
         year: formData.year && !isNaN(parseInt(formData.year)) ? parseInt(formData.year) : null,

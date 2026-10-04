@@ -1,6 +1,15 @@
+import { useEffect } from 'react';
 import { Icon } from '@iconify/react';
 
 export default function ProVideoTheaterModal({ video, onClose }) {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!video) return null;
 
   const isYouTube = video.embed_provider === 'youtube' || video.url?.includes('youtube.com') || video.url?.includes('youtu.be');
@@ -28,10 +37,13 @@ export default function ProVideoTheaterModal({ video, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-lg">
-      <div className="relative flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#121212] shadow-2xl">
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-3 sm:p-4 backdrop-blur-lg overscroll-contain"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="relative my-auto flex max-h-[calc(100vh-1.5rem)] sm:max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-white/10 bg-[#121212] shadow-2xl">
         {/* Top bar */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-5 py-3.5 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand/10 text-brand">
               <Icon icon="solar:play-circle-bold" width="20" />
@@ -42,10 +54,12 @@ export default function ProVideoTheaterModal({ video, onClose }) {
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-full bg-white/[.05] text-text-muted hover:bg-white/10 hover:text-white"
+            aria-label="Close video player"
+            className="grid h-8 w-8 place-items-center rounded-full bg-white/[.05] text-text-muted transition hover:bg-white/10 hover:text-white"
           >
-            <Icon icon="solar:close-circle-linear" width="22" />
+            <Icon icon="solar:close-circle-linear" width="20" />
           </button>
         </div>
 
