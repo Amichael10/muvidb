@@ -209,7 +209,7 @@ export default function AdminFilms() {
   const [episodeSearchQuery, setEpisodeSearchQuery] = useState('');
 
   const draftKey = isDrawerOpen ? (editingFilm ? `MuviDB_draft_film_${editingFilm.id}` : 'MuviDB_draft_film_new') : null;
-  const draftData = useMemo(() => ({ formData, credits, showtimes, selectedCompany }), [formData, credits, showtimes, selectedCompany]);
+  const draftData = useMemo(() => ({ formData, credits, showtimes, selectedCompany, selectedChannel }), [formData, credits, showtimes, selectedCompany, selectedChannel]);
   const { clearDraft } = useLocalStorageDraft(draftKey, draftData, isDrawerOpen);
   const [draftRestoredMessage, setDraftRestoredMessage] = useState('');
 
@@ -662,7 +662,7 @@ export default function AdminFilms() {
     }
   };
 
-  const fetchFilmDetails = async (filmId) => {
+  const fetchFilmDetails = async (filmId, filmRecord = null) => {
     const [
       { data: creditData },
       { data: showtimeData },
@@ -694,7 +694,7 @@ export default function AdminFilms() {
         .from('channel_videos')
         .select('id, channel_id, video_id, channels(id, name, channel_handle, thumbnail_url, owner_company_id)')
         .eq('film_id', filmId)
-        .maybeSingle()
+        .limit(1)
     ]);
     
     if (creditData) {
@@ -744,9 +744,39 @@ export default function AdminFilms() {
       setCompanySearch('');
     }
 
-    if (channelVideoData && channelVideoData.channels) {
-      setSelectedChannel(channelVideoData.channels);
-      setFormChannelSearch(channelVideoData.channels.name);
+    let matchedChannel = (Array.isArray(channelVideoData) && channelVideoData.length > 0 && channelVideoData[0]?.channels)
+      ? channelVideoData[0].channels
+      : (channelVideoData && !Array.isArray(channelVideoData) && channelVideoData.channels ? channelVideoData.channels : null);
+
+    // Fallback 1: Query channel_videos by video ID if not matched by film_id
+    const targetVidId = filmRecord?.source_video_id || (filmRecord?.youtube_watch_url ? extractYoutubeId(filmRecord.youtube_watch_url) : null);
+    if (!matchedChannel && targetVidId) {
+      const { data: cvByVid } = await supabase
+        .from('channel_videos')
+        .select('id, channel_id, video_id, channels(id, name, channel_handle, thumbnail_url, owner_company_id)')
+        .eq('video_id', targetVidId)
+        .limit(1);
+      if (cvByVid && cvByVid.length > 0 && cvByVid[0]?.channels) {
+        matchedChannel = cvByVid[0].channels;
+      }
+    }
+
+    // Fallback 2: Query channels by streaming_links.youtube_channel_id
+    const streamingChannelId = filmRecord?.streaming_links?.youtube_channel_id;
+    if (!matchedChannel && streamingChannelId) {
+      const { data: ch } = await supabase
+        .from('channels')
+        .select('id, name, channel_handle, thumbnail_url, owner_company_id')
+        .eq('id', streamingChannelId)
+        .maybeSingle();
+      if (ch) {
+        matchedChannel = ch;
+      }
+    }
+
+    if (matchedChannel) {
+      setSelectedChannel(matchedChannel);
+      setFormChannelSearch(matchedChannel.name);
     } else {
       setSelectedChannel(null);
       setFormChannelSearch('');
@@ -814,6 +844,8 @@ export default function AdminFilms() {
         setShowtimes(draft.showtimes || []);
         setSelectedCompany(draft.selectedCompany || null);
         setCompanySearch(draft.selectedCompany?.name || '');
+        setSelectedChannel(draft.selectedChannel || null);
+        setFormChannelSearch(draft.selectedChannel?.name || '');
         const draftDist = draft.formData?.distributor || '';
         setDistributorSearch(draftDist);
         if (draftDist) {
@@ -825,7 +857,7 @@ export default function AdminFilms() {
           setSelectedDistributorCompany(null);
         }
       } else {
-        await fetchFilmDetails(film.id);
+        await fetchFilmDetails(film.id, film);
         const filmDist = film.distributor || film.streaming_links?.distributor || '';
         setDistributorSearch(filmDist);
         if (filmDist) {
@@ -1001,16 +1033,64 @@ export default function AdminFilms() {
     setFormChannelResults([]);
   };
 
-  const detectChannelFromVideoId = async (videoId) => {
-    if (!videoId) return;
+  const detectChannelFromVideoId = async (videoId, hintChannelId = null, hintChannelTitle = null) => {
+    if (!videoId && !hintChannelId && !hintChannelTitle) return;
     setIsDetectingChannel(true);
     try {
+      // 0. If channel ID hint or channel Title hint provided (e.g. from YouTube Import)
+      if (hintChannelId) {
+        const { data: chMatches } = await supabase
+          .from('channels')
+          .select('id, name, channel_handle, thumbnail_url, owner_company_id')
+          .eq('channel_id', hintChannelId)
+          .limit(1);
+        if (chMatches && chMatches.length > 0) {
+          const matched = chMatches[0];
+          setSelectedChannel(matched);
+          setFormChannelSearch(matched.name);
+          if (matched.owner_company_id && !selectedCompany) {
+            const { data: comp } = await supabase.from('companies').select('*').eq('id', matched.owner_company_id).maybeSingle();
+            if (comp) {
+              setSelectedCompany(comp);
+              setCompanySearch(comp.name);
+            }
+          }
+          toast.success(`Matched to channel: ${matched.name}`);
+          return;
+        }
+      }
+
+      if (hintChannelTitle) {
+        const { data: chByName } = await supabase
+          .from('channels')
+          .select('id, name, channel_handle, thumbnail_url, owner_company_id')
+          .ilike('name', `%${hintChannelTitle.trim()}%`)
+          .limit(1);
+        if (chByName && chByName.length > 0) {
+          const matched = chByName[0];
+          setSelectedChannel(matched);
+          setFormChannelSearch(matched.name);
+          if (matched.owner_company_id && !selectedCompany) {
+            const { data: comp } = await supabase.from('companies').select('*').eq('id', matched.owner_company_id).maybeSingle();
+            if (comp) {
+              setSelectedCompany(comp);
+              setCompanySearch(comp.name);
+            }
+          }
+          toast.success(`Matched to channel: ${matched.name}`);
+          return;
+        }
+      }
+
+      if (!videoId) return;
+
       // 1. Check if video already exists in channel_videos with a channel
-      const { data: cv } = await supabase
+      const { data: cvList } = await supabase
         .from('channel_videos')
         .select('*, channels(id, name, channel_handle, thumbnail_url, owner_company_id)')
         .eq('video_id', videoId)
-        .maybeSingle();
+        .limit(1);
+      const cv = cvList?.[0];
 
       if (cv?.channels) {
         setSelectedChannel(cv.channels);
@@ -1391,7 +1471,19 @@ export default function AdminFilms() {
           backdrop_url: formData.backdrop_url,
         }),
         streaming_links: {
-          ...(typeof formData.streaming_links === 'object' && formData.streaming_links !== null ? formData.streaming_links : {}),
+          ...(() => {
+            const baseStreaming = (typeof formData.streaming_links === 'object' && formData.streaming_links !== null) ? { ...formData.streaming_links } : {};
+            if (selectedChannel) {
+              baseStreaming.youtube_channel_id = selectedChannel.id;
+              baseStreaming.youtube_channel_name = selectedChannel.name;
+              baseStreaming.youtube_channel_handle = selectedChannel.channel_handle || null;
+            } else {
+              delete baseStreaming.youtube_channel_id;
+              delete baseStreaming.youtube_channel_name;
+              delete baseStreaming.youtube_channel_handle;
+            }
+            return baseStreaming;
+          })(),
           distributor: (formData.distributor || '').trim() || null,
           ...((formData.box_office_domestic || formData.box_office_worldwide) ? {
             box_office: {
@@ -1456,30 +1548,44 @@ export default function AdminFilms() {
       }
 
       // Link channel_videos record to this film & channel
-      const targetVideoId = cleanFilmPayload.source_video_id || (cleanFilmPayload.youtube_watch_url ? extractYoutubeId(cleanFilmPayload.youtube_watch_url) : null);
+      const rawYtId = cleanFilmPayload.source_video_id || extractYoutubeId(cleanFilmPayload.youtube_watch_url) || extractYoutubeId(formData.youtube_watch_url) || (typeof formData.source_video_id === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(formData.source_video_id.trim()) ? formData.source_video_id.trim() : null);
+      const targetVideoId = rawYtId || null;
 
-      if (selectedChannel && targetVideoId) {
-        const { data: existingCv } = await supabase
-          .from('channel_videos')
-          .select('id')
-          .eq('video_id', targetVideoId)
-          .maybeSingle();
-
-        if (existingCv) {
-          await supabase.from('channel_videos').update({
-            channel_id: selectedChannel.id,
+      // 1. Call server-side API (service-role client) to guarantee persistence and bypass client RLS restrictions
+      try {
+        await fetch('/api/data?_r=channels&action=link_video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             film_id: filmId,
-            match_status: 'manual'
-          }).eq('id', existingCv.id);
-        } else {
-          await supabase.from('channel_videos').insert([{
-            channel_id: selectedChannel.id,
+            channel_id: selectedChannel ? selectedChannel.id : null,
             video_id: targetVideoId,
-            film_id: filmId,
             title: cleanFilmPayload.title || 'Untitled',
-            thumbnail_url: cleanFilmPayload.poster_url || null,
-            match_status: 'manual'
-          }]);
+            thumbnail_url: cleanFilmPayload.poster_url || null
+          })
+        });
+      } catch (linkApiErr) {
+        console.warn('API link_video call notice:', linkApiErr);
+      }
+
+      // 2. Direct client fallback update if applicable
+      if (selectedChannel && targetVideoId) {
+        try {
+          const { data: existingCv } = await supabase
+            .from('channel_videos')
+            .select('id')
+            .eq('video_id', targetVideoId)
+            .limit(1);
+
+          if (existingCv && existingCv.length > 0) {
+            await supabase.from('channel_videos').update({
+              channel_id: selectedChannel.id,
+              film_id: filmId,
+              match_status: 'manual'
+            }).eq('id', existingCv[0].id);
+          }
+        } catch (cvErr) {
+          console.warn('Direct channel_videos client update fallback notice:', cvErr);
         }
       } else if (channel_video_id) {
         await supabase.from('channel_videos').update({ film_id: filmId }).eq('id', channel_video_id);
@@ -2532,6 +2638,9 @@ export default function AdminFilms() {
                 ...fields,
                 // Keep existing genres / awards / credits — import only fills media + copy.
               }));
+              if (fields.source_video_id || fields.channelId || fields.channelTitle) {
+                detectChannelFromVideoId(fields.source_video_id, fields.channelId, fields.channelTitle);
+              }
             }}
           />
 

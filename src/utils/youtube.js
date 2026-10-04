@@ -578,6 +578,7 @@ export const fetchVideoDetailsForImport = async (urlOrId) => {
         title: (snippet.title || '').trim(),
         description: snippet.description || '',
         channelTitle: snippet.channelTitle || '',
+        channelId: snippet.channelId || '',
         publishedAt: publishedAt?.toISOString() || null,
         year: publishedAt ? publishedAt.getFullYear() : null,
         releaseDate: publishedAt ? publishedAt.toISOString().slice(0, 10) : null,

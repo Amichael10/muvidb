@@ -32,6 +32,7 @@
     "scrape:imdb-from-db": "tsx scripts/imdb_bulk_sync.ts --from-db --full-credits --skip-people-pages",
     "sync:actors:continuous": "node scripts/run_continuous_actor_enrichment.mjs",
     "sync:media:continuous": "node scripts/run_continuous_actor_media_harvester.mjs",
+    "harvest:imdb-media": "tsx scripts/harvest_imdb_actor_media.ts",
     "harvest:3workers": "tsx scripts/run_automated_credit_harvester.ts",
     "harvest:automated": "tsx scripts/run_automated_credit_harvester.ts",
     "build:user-words": "tsx scripts/build_tesseract_user_words.ts",

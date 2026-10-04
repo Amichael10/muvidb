@@ -63,6 +63,8 @@ export default function YouTubeFilmImport({ onApply, disabled = false }) {
       runtime_minutes: preview.runtimeMinutes || '',
       year: preview.year || new Date().getFullYear(),
       release_date: preview.releaseDate || '',
+      channelId: preview.channelId || '',
+      channelTitle: preview.channelTitle || '',
     });
 
     toast.success('Fields filled — edit anything, then save the film');

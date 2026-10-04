@@ -19,13 +19,101 @@ async function ytGet(endpoint: string, params: Record<string, string>) {
 
 export async function handleChannels(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   if (checkRateLimit(req as unknown as Request)) {
     return res.status(429).json({ error: 'Too many requests' });
   }
 
   const { id, search, category, featured, action, query: ytQuery } = req.query;
+
+  // ── Link Video to Film & Channel (Admin Service-Role API) ──────────────────
+  if (action === 'link_video' || (req.method === 'POST' && req.body?.action === 'link_video')) {
+    try {
+      const { film_id, channel_id, video_id, title, thumbnail_url } = req.body || {};
+      if (!film_id && !video_id) {
+        return res.status(400).json({ error: 'film_id or video_id required' });
+      }
+
+      let targetVideoId = video_id;
+      if (!targetVideoId && film_id) {
+        const { data: film } = await supabase.from('films').select('source_video_id, youtube_watch_url').eq('id', film_id).maybeSingle();
+        targetVideoId = film?.source_video_id;
+      }
+
+      if (channel_id) {
+        // 1. If video_id is present, upsert into channel_videos
+        if (targetVideoId) {
+          const { data: existingRows } = await supabase
+            .from('channel_videos')
+            .select('id')
+            .eq('video_id', targetVideoId);
+
+          if (existingRows && existingRows.length > 0) {
+            for (const row of existingRows) {
+              await supabase.from('channel_videos').update({
+                channel_id,
+                film_id: film_id || undefined,
+                match_status: 'manual',
+                is_hidden: false
+              }).eq('id', row.id);
+            }
+          } else {
+            await supabase.from('channel_videos').insert([{
+              channel_id,
+              video_id: targetVideoId,
+              film_id: film_id || null,
+              title: title || 'Untitled',
+              thumbnail_url: thumbnail_url || `https://i.ytimg.com/vi/${targetVideoId}/hqdefault.jpg`,
+              match_status: 'manual',
+              is_hidden: false
+            }]);
+          }
+        }
+
+        // 2. Ensure all rows matching film_id also link to channel_id
+        if (film_id) {
+          await supabase.from('channel_videos').update({
+            channel_id,
+            match_status: 'manual',
+            is_hidden: false
+          }).eq('film_id', film_id);
+
+          // 3. Dual-persist to films.streaming_links
+          const { data: film } = await supabase.from('films').select('streaming_links, source_video_id').eq('id', film_id).maybeSingle();
+          if (film) {
+            const streaming = (film.streaming_links && typeof film.streaming_links === 'object') ? { ...film.streaming_links } : {};
+            streaming.youtube_channel_id = channel_id;
+            const updatePayload: any = { streaming_links: streaming };
+            if (!film.source_video_id && targetVideoId) {
+              updatePayload.source_video_id = targetVideoId;
+            }
+            await supabase.from('films').update(updatePayload).eq('id', film_id);
+          }
+        }
+      } else if (film_id) {
+        // Unlink channel from film
+        await supabase.from('channel_videos').update({
+          film_id: null,
+          match_status: 'unmatched'
+        }).eq('film_id', film_id);
+
+        const { data: film } = await supabase.from('films').select('streaming_links').eq('id', film_id).maybeSingle();
+        if (film && film.streaming_links && typeof film.streaming_links === 'object') {
+          const streaming = { ...film.streaming_links };
+          delete streaming.youtube_channel_id;
+          delete streaming.youtube_channel_name;
+          delete streaming.youtube_channel_handle;
+          await supabase.from('films').update({ streaming_links: streaming }).eq('id', film_id);
+        }
+      }
+
+      return res.status(200).json({ ok: true, film_id, channel_id, video_id: targetVideoId });
+    } catch (err: any) {
+      console.error('Error linking film channel:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
   // ── YouTube Admin Search ───────────────────────────────────────────────────
   if (action === 'yt_search') {

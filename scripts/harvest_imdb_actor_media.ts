@@ -442,15 +442,47 @@ async function harvestActor(person: { id: string; name: string; tmdb_id?: number
  */
 async function main() {
   const args = process.argv.slice(2);
-  const getArg = (flag: string) => {
-    const idx = args.indexOf(flag);
-    return idx !== -1 && args[idx + 1] ? args[idx + 1] : null;
+  const getArg = (...flags: string[]) => {
+    for (const flag of flags) {
+      const idx = args.indexOf(flag);
+      if (idx !== -1 && args[idx + 1] && !args[idx + 1].startsWith('--')) {
+        return args[idx + 1];
+      }
+      const eqArg = args.find((a) => a.startsWith(`${flag}=`));
+      if (eqArg) {
+        return eqArg.slice(flag.length + 1).replace(/^["']|["']$/g, '');
+      }
+    }
+    return null;
   };
 
-  const actorArg = getArg('--actor') || getArg('--name');
+  let actorArg = getArg('--actor', '--name', '--person');
   const imdbArg = getArg('--imdb');
   const limitArg = parseInt(getArg('--limit') || '10', 10);
   const runAll = args.includes('--all');
+
+  // If no explicit flag was used, look for positional or mis-flagged actor name (e.g. `--Richard Mofe-Damijo` or `"Richard Mofe-Damijo"`)
+  if (!actorArg && !imdbArg && !runAll) {
+    const candidateTokens: string[] = [];
+    for (let i = 0; i < args.length; i++) {
+      const token = args[i];
+      if (token === '--limit' || token.startsWith('--limit=')) {
+        if (!token.includes('=')) i++;
+        continue;
+      }
+      if (token === '--imdb' || token.startsWith('--imdb=')) {
+        if (!token.includes('=')) i++;
+        continue;
+      }
+      if (token === '--all') continue;
+      // Strip leading dashes if someone typed `--Richard` instead of `Richard` or `--name "Richard"`
+      const cleaned = token.replace(/^--+/, '').trim();
+      if (cleaned) candidateTokens.push(cleaned);
+    }
+    if (candidateTokens.length > 0) {
+      actorArg = candidateTokens.join(' ');
+    }
+  }
 
   console.log('🚀 Starting IMDb Actor Media Harvester to Cloudflare R2...');
 
