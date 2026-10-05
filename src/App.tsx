@@ -51,8 +51,8 @@ const Onboarding = lazyWithRetry(() => import('./pages/Onboarding'));
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
 const ProDashboard = lazyWithRetry(() => import('./pages/ProDashboard'));
 
-const PersonDetail = lazyWithRetry(() => import('./pages/PersonDetail'));
-const PersonDetailV2 = lazyWithRetry(() => import('./pages/PersonDetailV2'));
+const PersonDetail = lazyWithRetry(() => import('./pages/PersonDetailV2'));
+const PersonDetailV2 = PersonDetail;
 const Showtimes = lazyWithRetry(() => import('./pages/Showtimes'));
 const Cinemas = lazyWithRetry(() => import('./pages/Cinemas'));
 const CinemaDetail = lazyWithRetry(() => import('./pages/CinemaDetail'));

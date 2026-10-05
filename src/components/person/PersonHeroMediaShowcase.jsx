@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Icon } from '@iconify/react';
 import ProVideoTheaterModal from '../professional/ProVideoTheaterModal';
+import PersonPhotoLightboxModal from './PersonPhotoLightboxModal';
 
 export default function PersonHeroMediaShowcase({
   photoUrl,
@@ -480,64 +481,14 @@ export default function PersonHeroMediaShowcase({
         />
       )}
 
-      {/* ─── FULLSCREEN PHOTO LIGHTBOX ─── */}
+      {/* ─── FULLSCREEN PHOTO LIGHTBOX (IMDb-Style, Flexible & Fast) ─── */}
       {lightboxIndex !== null && photos[lightboxIndex] && (
-        <div
-          onClick={() => setLightboxIndex(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-2xl"
-        >
-          {photos.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxIndex((lightboxIndex - 1 + photos.length) % photos.length);
-                }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 grid h-12 w-12 place-items-center rounded-full bg-white/10 text-white backdrop-blur-md hover:bg-white/20"
-              >
-                <Icon icon="solar:arrow-left-bold" width="22" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxIndex((lightboxIndex + 1) % photos.length);
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 grid h-12 w-12 place-items-center rounded-full bg-white/10 text-white backdrop-blur-md hover:bg-white/20"
-              >
-                <Icon icon="solar:arrow-right-bold" width="22" />
-              </button>
-            </>
-          )}
-
-          <div className="relative max-h-[90vh] max-w-4xl" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={photos[lightboxIndex].url}
-              alt={photos[lightboxIndex].title}
-              className="max-h-[80vh] w-auto rounded-2xl object-contain shadow-2xl"
-            />
-            <div className="mt-3 flex items-center justify-between text-xs text-white">
-              <div>
-                <p className="font-black text-sm">{photos[lightboxIndex].title}</p>
-                <p className="text-[11px] text-text-muted mt-0.5">
-                  {photos[lightboxIndex].category?.replaceAll('_', ' ').toUpperCase()}
-                  {photos[lightboxIndex].photographer && ` · Photo by ${photos[lightboxIndex].photographer}`}
-                  {photos[lightboxIndex].year && ` · ${photos[lightboxIndex].year}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-text-muted text-[11px]">{lightboxIndex + 1} / {photos.length}</span>
-                <button
-                  onClick={() => setLightboxIndex(null)}
-                  className="rounded-xl bg-white/10 px-4 py-2 font-black hover:bg-white/20"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PersonPhotoLightboxModal
+          photos={photos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          personName={personName}
+        />
       )}
     </div>
   );

@@ -91,6 +91,42 @@ export default defineConfig(({ mode, isSsrBuild }) => {
           target: 'https://pkenrmorywmuvnzfoylp.supabase.co',
           changeOrigin: true,
         },
+        '/api/media': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              const targetUrl = url.searchParams.get('url');
+              if (!targetUrl) {
+                res.statusCode = 400;
+                res.end('Missing url');
+                return false;
+              }
+              const target = new URL(targetUrl);
+              const upstream = await fetch(target.toString(), {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                  'Referer': target.origin + '/',
+                },
+              });
+              if (!upstream.ok) {
+                res.statusCode = upstream.status;
+                res.end('Upstream error');
+                return false;
+              }
+              const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+              res.setHeader('Content-Type', contentType);
+              res.setHeader('Cache-Control', 'public, max-age=86400');
+              const arrayBuf = await upstream.arrayBuffer();
+              res.end(Buffer.from(arrayBuf));
+              return false;
+            } catch (err: any) {
+              res.statusCode = 502;
+              res.end(err.message || 'Fetch failed');
+              return false;
+            }
+          },
+        },
         '/api/external': {
           target: 'http://localhost:3001',
           bypass: async (req, res) => {

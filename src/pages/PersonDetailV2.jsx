@@ -23,6 +23,7 @@ import ProVideoTheaterModal from '../components/professional/ProVideoTheaterModa
 import CareerPassportModal from '../components/professional/CareerPassportModal'
 import WhatsAppOptInModal from '../components/person/WhatsAppOptInModal'
 import AddPersonMediaModal from '../components/person/AddPersonMediaModal'
+import PersonPhotoLightboxModal from '../components/person/PersonPhotoLightboxModal'
 
 const PLATFORM_STYLES = {
   cinema:      { label: 'Cinema',   bg: 'bg-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-400' },
@@ -1922,42 +1923,14 @@ export default function PersonDetailV2() {
         />
       )}
 
-      {/* Fullscreen Photo Lightbox */}
+      {/* Fullscreen Photo Lightbox (IMDb-Style, Flexible & Fast) */}
       {activeLightboxIndex !== null && photos[activeLightboxIndex] && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
-          <button
-            onClick={() => setActiveLightboxIndex(null)}
-            className="absolute top-4 right-4 text-white hover:text-brand p-2"
-          >
-            <Icon icon="solar:close-circle-linear" width="32" />
-          </button>
-          <div className="max-w-4xl max-h-[85vh] flex flex-col items-center">
-            <img
-              src={photos[activeLightboxIndex].url}
-              alt=""
-              className="max-h-[75vh] w-auto rounded-2xl object-contain shadow-2xl"
-            />
-            <p className="mt-4 text-sm font-bold text-white">
-              {photos[activeLightboxIndex].title} ({activeLightboxIndex + 1} of {photos.length})
-            </p>
-          </div>
-          {photos.length > 1 && (
-            <>
-              <button
-                onClick={() => setActiveLightboxIndex((activeLightboxIndex - 1 + photos.length) % photos.length)}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white hover:text-brand"
-              >
-                <Icon icon="solar:alt-arrow-left-linear" width="36" />
-              </button>
-              <button
-                onClick={() => setActiveLightboxIndex((activeLightboxIndex + 1) % photos.length)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white hover:text-brand"
-              >
-                <Icon icon="solar:alt-arrow-right-linear" width="36" />
-              </button>
-            </>
-          )}
-        </div>
+        <PersonPhotoLightboxModal
+          photos={photos}
+          initialIndex={activeLightboxIndex}
+          onClose={() => setActiveLightboxIndex(null)}
+          personName={person?.name}
+        />
       )}
 
       {showEdit && (

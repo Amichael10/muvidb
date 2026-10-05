@@ -1,3 +1,5 @@
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
 import { chromium } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';

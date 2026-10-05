@@ -2,7 +2,7 @@ import { data } from 'react-router';
 import { personSeo, baseUrlFrom } from '../lib/seo.server';
 import { toMeta, CACHE_OK, CACHE_404 } from '../lib/seo';
 
-export { default } from '../pages/PersonDetail';
+export { default } from '../pages/PersonDetailV2';
 
 export async function loader({ params, request }: { params: any; request: Request }) {
   const base = baseUrlFrom(request);

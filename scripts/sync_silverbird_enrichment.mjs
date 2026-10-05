@@ -1,3 +1,5 @@
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { veeziAdapter } from '../api/_lib/cinema-adapters/veezi.ts';
@@ -204,24 +206,31 @@ async function linkCredits(filmId, actors, directors) {
   // Fetch existing credits for this film
   const { data: existingCredits } = await supabase
     .from('credits')
-    .select('person_id, role')
+    .select('id, person_id, role, character_name')
     .eq('film_id', filmId);
 
-  const existingMap = new Set(
-    (existingCredits || []).map(c => `${c.person_id}_${c.role}`)
+  const existingActorIds = new Set(
+    (existingCredits || [])
+      .filter(c => ['actor', 'lead', 'supporting', 'cast'].includes(c.role?.toLowerCase()))
+      .map(c => c.person_id)
+  );
+  const existingDirectorIds = new Set(
+    (existingCredits || [])
+      .filter(c => ['director', 'directing'].includes(c.role?.toLowerCase()))
+      .map(c => c.person_id)
   );
 
   // Link directors
   for (const dirName of directors) {
     const personId = await getOrCreatePerson(dirName, 'Directing');
-    if (personId && !existingMap.has(`${personId}_director`)) {
+    if (personId && !existingDirectorIds.has(personId)) {
       await supabase.from('credits').insert({
         film_id: filmId,
         person_id: personId,
         role: 'director',
         source: 'silverbird'
       });
-      existingMap.add(`${personId}_director`);
+      existingDirectorIds.add(personId);
       console.log(`    + Added director: ${dirName}`);
     }
   }
@@ -230,7 +239,7 @@ async function linkCredits(filmId, actors, directors) {
   let order = (existingCredits?.length || 0) + 1;
   for (const actorName of actors) {
     const personId = await getOrCreatePerson(actorName, 'Acting');
-    if (personId && !existingMap.has(`${personId}_actor`)) {
+    if (personId && !existingActorIds.has(personId)) {
       await supabase.from('credits').insert({
         film_id: filmId,
         person_id: personId,
@@ -238,11 +247,12 @@ async function linkCredits(filmId, actors, directors) {
         billing_order: order++,
         source: 'silverbird'
       });
-      existingMap.add(`${personId}_actor`);
+      existingActorIds.add(personId);
       console.log(`    + Added actor: ${actorName}`);
     }
   }
 }
+
 
 async function runEnrichment() {
   console.log('Fetching Silverbird amy_movie sitemap...');

@@ -387,7 +387,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
 
         CLIP_JOBS[token].update({"message": "Extracting fast stream info…", "progress": 15})
         
-        # Prioritize 1080p H.264 over 4K AV1 to prevent CPU choking and timeouts
+        # Prioritize 1080p/720p H.264 and HLS streams (which slice instantly by chunk) over AV1
         opts = {
             "quiet": True,
             "no_warnings": True,
@@ -396,49 +396,22 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
             "writeautomaticsub": False,
             "allsubtitles": False,
             "embedsubtitles": False,
-            "format": "bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+            "format": "270+234/232+234/231+234/230+233/bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["web_safari", "web_embedded", "android", "web"]
+                    "player_client": ["visionos", "ios", "web_safari", "web_embedded", "android", "web"]
                 }
             },
             "socket_timeout": 30,
             **cookie_options(),
         }
 
+        is_youtube = "youtube.com" in url or "youtu.be" in url
         direct_stream_url = None
         direct_audio_url = None
         direct_stream_headers = {}
-        if "youtube.com" not in url and "youtu.be" not in url:
+        if not is_youtube:
             direct_stream_url = url
-        else:
-            try:
-                with yt_dlp.YoutubeDL(opts) as downloader:
-                    info = downloader.extract_info(url, download=False)
-                    rf = info.get("requested_formats")
-                    if rf and len(rf) >= 2:
-                        direct_stream_url = rf[0].get("url")
-                        direct_audio_url = rf[1].get("url")
-                        direct_stream_headers = rf[0].get("http_headers") or info.get("http_headers") or {}
-                    else:
-                        direct_stream_url = info.get("url")
-                        direct_stream_headers = info.get("http_headers") or {}
-            except Exception as e:
-                print(f"[Clipper] Direct stream extract with cookies failed: {e}. Retrying unauthenticated…")
-                try:
-                    clean_opts = {k: v for k, v in opts.items() if k not in ("cookiefile", "cookiesfrombrowser")}
-                    with yt_dlp.YoutubeDL(clean_opts) as clean_dl:
-                        info = clean_dl.extract_info(url, download=False)
-                        rf = info.get("requested_formats")
-                        if rf and len(rf) >= 2:
-                            direct_stream_url = rf[0].get("url")
-                            direct_audio_url = rf[1].get("url")
-                            direct_stream_headers = rf[0].get("http_headers") or info.get("http_headers") or {}
-                        else:
-                            direct_stream_url = info.get("url")
-                            direct_stream_headers = info.get("http_headers") or {}
-                except Exception as e2:
-                    print(f"[Clipper] Direct stream clean extract failed: {e2}")
 
         CLIP_JOBS[token].update({"message": f"Slicing & rendering {payload.aspect_ratio} with FFmpeg…", "progress": 40})
         
@@ -448,12 +421,12 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
             command = ["ffmpeg", "-y"]
             if header_str:
                 command.extend(["-headers", header_str])
-            command.extend(["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
+            command.extend(["-timeout", "15000000", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
             command.extend(["-ss", str(start), "-i", direct_stream_url])
             if direct_audio_url:
                 if header_str:
                     command.extend(["-headers", header_str])
-                command.extend(["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
+                command.extend(["-timeout", "15000000", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
                 command.extend(["-ss", str(start), "-i", direct_audio_url])
                 command.extend(["-map", "0:v:0", "-map", "1:a:0?"])
             command.extend([
@@ -467,7 +440,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
             ])
             try:
                 # Dynamic timeout based on clip duration (never hardcoded 35s)
-                stream_timeout = max(180, int(duration * 3) + 60)
+                stream_timeout = max(90, int(duration * 2) + 30)
                 rendered = subprocess.run(command, capture_output=True, text=True, timeout=stream_timeout)
             except subprocess.TimeoutExpired:
                 rendered = None
@@ -489,12 +462,12 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "writeautomaticsub": False,
                     "allsubtitles": False,
                     "embedsubtitles": False,
-                    "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best",
+                    "format": "270+234/232+234/231+234/230+233/bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best",
                     "download_ranges": yt_dlp.utils.download_range_func(None, [(start, end)]),
-                    "force_keyframes_at_cuts": True,
+                    "force_keyframes_at_cuts": False,
                     "extractor_args": {
                         "youtube": {
-                            "player_client": ["web_safari", "web_embedded", "android", "web"]
+                            "player_client": ["visionos", "ios", "web_safari", "web_embedded", "android", "web"]
                         }
                     },
                     "outtmpl": raw_template,

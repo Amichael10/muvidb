@@ -1647,5 +1647,6 @@ const PersonDetail = () => {
   )
 }
 
-export default PersonDetail
+// PersonDetail v1 is sunset in favor of PersonDetailV2
+export default PersonDetailV2
 

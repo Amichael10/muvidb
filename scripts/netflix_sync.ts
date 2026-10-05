@@ -24,9 +24,11 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const NETFLIX_URLS = [
-  'https://www.netflix.com/browse/genre/1138254?so=su', // Nollywood
+  'https://www.netflix.com/browse/genre/1138254?so=su', // Nollywood (Suggested)
+  'https://www.netflix.com/browse/genre/1138254?so=yr', // Nollywood (Year Released - new additions)
   'https://www.netflix.com/browse/genre/3761?so=su', // African Movies & TV
-  'https://www.netflix.com/search?q=Nollywood' // General search includes TV shows
+  'https://www.netflix.com/search?q=Nollywood', // General search includes TV shows
+  'https://www.netflix.com/search?q=Nigerian' // Nigerian search
 ];
 const LOGIN_URL = 'https://www.netflix.com/login';
 const STATE_FILE = 'netflix_playwright_state.json';

@@ -8,6 +8,8 @@
  *   npx tsx scripts/harvest_imdb_actor_media.ts --all
  */
 
+import dns from 'node:dns';
+import { Agent, setGlobalDispatcher } from 'undici';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
@@ -15,12 +17,40 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
+dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
+const customLookup = (hostname: string, options: any, callback: any) => {
+  if (hostname === 'pkenrmorywmuvnzfoylp.supabase.co') {
+    if (options && options.all) {
+      return callback(null, [{ address: '172.64.149.246', family: 4 }]);
+    }
+    return callback(null, '172.64.149.246', 4);
+  }
+  return (dns.lookup as any)(hostname, options, callback);
+};
+
+setGlobalDispatcher(new Agent({
+  connect: {
+    lookup: customLookup,
+    timeout: 30000
+  },
+  headersTimeout: 30000,
+  bodyTimeout: 30000,
+  keepAliveTimeout: 10000
+}));
+
+const supabaseUrl = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://pkenrmorywmuvnzfoylp.supabase.co').trim();
+const supabaseKey = (
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  ''
+).trim();
+
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false }
+});
 
 const firecrawlKey = process.env.FIRECRAWL_API_KEY || process.env.VITE_FIRECRAWL_API_KEY || '';
 const tmdbKey = process.env.VITE_TMDB_API_KEY || process.env.TMDB_API_KEY || '';
@@ -200,13 +230,74 @@ interface ExtractedMedia {
   url: string;
   title: string;
   description: string | null;
-  category: 'headshot' | 'production_still' | 'behind_the_scenes' | 'red_carpet' | 'scene_clip';
+  category: 'headshot' | 'production_still' | 'behind_the_scenes' | 'red_carpet' | 'scene_clip' | 'showreel' | 'interview' | 'monologue';
   media_type: 'photo' | 'video';
   is_primary?: boolean;
+  thumbnail_url?: string | null;
+  embed_provider?: 'r2' | 'direct' | 'youtube' | 'imdb' | 'vimeo' | null;
+  embed_id?: string | null;
+  duration_seconds?: number | null;
+  film_id?: string | null;
+  character_name?: string | null;
 }
 
 /**
- * Scrapes IMDb profile and mediaindex gallery for all media assets
+ * Scrapes an IMDb video detail page (vi...) using Firecrawl rawHtml to extract
+ * full MP4 streaming URLs, thumbnail, title, and film connection from __NEXT_DATA__.
+ */
+async function scrapeImdbVideoPage(viId: string): Promise<ExtractedMedia | null> {
+  const url = `https://www.imdb.com/video/${viId}/`;
+  try {
+    const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${firecrawlKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url, formats: ['rawHtml'] }),
+    });
+
+    if (!res.ok) return null;
+    const jsonRes = await res.json();
+    const rawHtml = jsonRes.data?.rawHtml || '';
+    const nextDataMatch = rawHtml.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!nextDataMatch) return null;
+
+    const parsed = JSON.parse(nextDataMatch[1]);
+    const videoData = parsed.props?.pageProps?.videoPlaybackData?.video;
+    if (!videoData) return null;
+
+    const videoName = videoData.name?.value || 'Video Clip';
+    const filmTitle = videoData.primaryTitle?.titleText?.text || '';
+    const contentType = videoData.contentType?.displayName?.value || 'Clip';
+    const thumbnail = videoData.thumbnail?.url || null;
+    const description = videoData.description?.value || '';
+
+    // Extract playback stream URLs (prefer direct MP4 stream)
+    const playbackURLs = videoData.playbackURLs || [];
+    const mp4Streams = playbackURLs.filter((p: any) => p.mimeType === 'video/mp4');
+    const streamUrl = mp4Streams[0]?.url || playbackURLs[0]?.url || null;
+
+    const fullTitle = filmTitle ? `${filmTitle} - ${videoName}` : videoName;
+
+    return {
+      url: streamUrl || `https://www.imdb.com/video/${viId}/`,
+      title: fullTitle,
+      description: description || `IMDb video: ${fullTitle}`,
+      category: 'scene_clip',
+      media_type: 'video',
+      thumbnail_url: thumbnail,
+      embed_provider: streamUrl ? 'imdb' : 'imdb',
+      embed_id: viId,
+    };
+  } catch (e: any) {
+    console.warn(`    ⚠️ Failed scraping video ${viId}:`, e.message);
+    return null;
+  }
+}
+
+/**
+ * Scrapes IMDb profile, mediaindex gallery, and video galleries for all media assets
  */
 async function fetchActorImdbMedia(imdbId: string, actorName: string): Promise<ExtractedMedia[]> {
   const mediaList: ExtractedMedia[] = [];
@@ -261,10 +352,41 @@ async function fetchActorImdbMedia(imdbId: string, actorName: string): Promise<E
     }
   }
 
-  // 2. Scrape IMDb Media Gallery (/mediaindex/)
+  // 2. Discover and scrape all Video assets from IMDb
+  const rawVideoMatches = [
+    ...(profileData.html?.matchAll(/\/video\/(vi\d+)/g) || []),
+    ...(profileData.markdown?.matchAll(/\/video\/(vi\d+)/g) || []),
+  ].map((m) => m[1]);
+
+  // Also query video gallery for additional reels & trailers
+  try {
+    const vidGalleryUrl = `https://www.imdb.com/name/${imdbId}/videogallery/`;
+    const vidGalleryData = await scrapeUrlWithFirecrawl(vidGalleryUrl);
+    const galleryVidMatches = [
+      ...(vidGalleryData.html?.matchAll(/\/video\/(vi\d+)/g) || []),
+      ...(vidGalleryData.markdown?.matchAll(/\/video\/(vi\d+)/g) || []),
+    ].map((m) => m[1]);
+    rawVideoMatches.push(...galleryVidMatches);
+  } catch {}
+
+  const uniqueVideoIds = [...new Set(rawVideoMatches)].slice(0, 6);
+  if (uniqueVideoIds.length > 0) {
+    console.log(`  🎬 Discovered ${uniqueVideoIds.length} video assets for actor on IMDb...`);
+    for (const viId of uniqueVideoIds) {
+      console.log(`    🔍 Extracting video playback data for viId: ${viId}...`);
+      const videoItem = await scrapeImdbVideoPage(viId);
+      if (videoItem && !seenUrls.has(videoItem.url)) {
+        seenUrls.add(videoItem.url);
+        mediaList.push(videoItem);
+        console.log(`    ✅ Extracted video: "${videoItem.title}" [${videoItem.category}]`);
+      }
+    }
+  }
+
+  // 3. Scrape IMDb Media Gallery (/mediaindex/) for photos
   try {
     const mediaIndexUrl = `https://www.imdb.com/name/${imdbId}/mediaindex/`;
-    console.log(`  🖼️ Scraping gallery: ${mediaIndexUrl}...`);
+    console.log(`  🖼️ Scraping photo gallery: ${mediaIndexUrl}...`);
     const galleryData = await scrapeUrlWithFirecrawl(mediaIndexUrl);
     const $gallery = cheerio.load(galleryData.html || '');
 
@@ -312,9 +434,18 @@ async function processAndUploadMediaItem(
   person: { id: string; name: string },
   item: ExtractedMedia,
   index: number
-): Promise<{ r2Url: string; r2Key: string } | null> {
+): Promise<{ r2Url: string; r2Key: string | null } | null> {
   try {
-    // 1. Download image buffer
+    const isVideo = item.media_type === 'video';
+
+    // For videos (YouTube, IMDb stream, etc.), direct CDN streaming is instant and reliable
+    if (isVideo) {
+      console.log(`    🎬 Registering video stream asset [${item.embed_provider || 'video'}]: ${item.title}`);
+      return { r2Url: item.url, r2Key: null };
+    }
+
+    // 1. Download photo buffer
+    console.log(`    📥 Downloading photo: ${item.title}...`);
     const res = await fetch(item.url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -322,13 +453,19 @@ async function processAndUploadMediaItem(
     });
 
     if (!res.ok) {
-      throw new Error(`Failed to download image (${res.status}): ${item.url}`);
+      // If direct video download fails, fallback to streaming url
+      if (isVideo) {
+        console.warn(`    ⚠️ Video download returned ${res.status}. Falling back to streaming URL.`);
+        return { r2Url: item.url, r2Key: null };
+      }
+      throw new Error(`Failed to download asset (${res.status}): ${item.url}`);
     }
 
     const arrayBuf = await res.arrayBuffer();
     const buffer = Buffer.from(arrayBuf);
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    const ext = contentType.includes('png') ? 'png' : 'jpg';
+    let contentType = res.headers.get('content-type') || (isVideo ? 'video/mp4' : 'image/jpeg');
+    if (isVideo && !contentType.includes('video')) contentType = 'video/mp4';
+    const ext = isVideo ? 'mp4' : (contentType.includes('png') ? 'png' : 'jpg');
 
     // 2. Organize in Cloudflare R2 folder:
     // folder: media/actors/{person.name}/
@@ -339,7 +476,8 @@ async function processAndUploadMediaItem(
       .replace(/[^a-z0-9]+/g, '_')
       .slice(0, 40);
     const hash = crypto.createHash('md5').update(buffer).digest('hex').slice(0, 8);
-    const fileName = `${slugTitle}_${hash}.${ext}`;
+    const prefix = isVideo ? 'video_' : '';
+    const fileName = `${prefix}${slugTitle}_${hash}.${ext}`;
 
     const r2Key = `media/actors/${cleanActorFolder}/${fileName}`;
 
@@ -348,6 +486,10 @@ async function processAndUploadMediaItem(
 
     return { r2Url: r2Result.url, r2Key: r2Result.key };
   } catch (err: any) {
+    if (item.media_type === 'video') {
+      console.warn(`    ⚠️ Video processing fallback to original stream URL for ${item.title}:`, err.message);
+      return { r2Url: item.url, r2Key: null };
+    }
     console.error(`    ❌ Failed to process ${item.url}:`, err.message);
     return null;
   }
@@ -378,11 +520,73 @@ async function harvestActor(person: { id: string; name: string; tmdb_id?: number
   const existingTitles = new Set((existingMedia || []).map((m) => m.title?.toLowerCase()).filter(Boolean));
   const hasPhotos = (existingMedia || []).some((m) => m.media_type === 'photo');
 
-  // Scrape all media from IMDb
+  // Scrape all media (photos and videos) from IMDb
   const items = await fetchActorImdbMedia(imdbId, person.name);
-  console.log(`  📦 Discovered ${items.length} media items on IMDb`);
+  const seenUrls = new Set<string>(items.map((i) => i.url));
+
+  // Also query actor's films from Supabase for official trailers & videos
+  const { data: creditsWithFilms } = await supabase
+    .from('credits')
+    .select(`
+      character_name,
+      films (
+        id, title, trailer_youtube_id, youtube_watch_url, streaming_links
+      )
+    `)
+    .eq('person_id', person.id)
+    .limit(10);
+
+  for (const row of creditsWithFilms || []) {
+    const film: any = row.films;
+    if (!film) continue;
+    let ytId = film.trailer_youtube_id;
+    if (!ytId && film.streaming_links?.youtube) {
+      const match = String(film.streaming_links.youtube).match(/(?:v=|youtu\.be\/|embed\/)([\w-]+)/);
+      if (match) ytId = match[1];
+    }
+    if (!ytId && film.youtube_watch_url) {
+      const match = String(film.youtube_watch_url).match(/(?:v=|youtu\.be\/|embed\/)([\w-]+)/);
+      if (match) ytId = match[1];
+    }
+
+    if (ytId) {
+      const ytUrl = `https://www.youtube.com/watch?v=${ytId}`;
+      const ytThumb = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+      const videoTitle = `${film.title} - Official Trailer`;
+
+      if (!seenUrls.has(ytUrl) && !existingTitles.has(videoTitle.toLowerCase())) {
+        seenUrls.add(ytUrl);
+        items.push({
+          url: ytUrl,
+          title: videoTitle,
+          description: `Official trailer for ${film.title} featuring ${person.name}.`,
+          category: 'scene_clip',
+          media_type: 'video',
+          thumbnail_url: ytThumb,
+          embed_provider: 'youtube',
+          embed_id: ytId,
+          film_id: film.id,
+          character_name: row.character_name,
+        });
+        console.log(`  🎬 Added credited film trailer: "${videoTitle}"`);
+      }
+    }
+  }
+
+  console.log(`  📦 Total Discovered Media: ${items.length} items (${items.filter(i => i.media_type === 'video').length} videos, ${items.filter(i => i.media_type === 'photo').length} photos)`);
 
   let addedCount = 0;
+
+  const VALID_CATEGORIES = new Set([
+    'showreel',
+    'monologue',
+    'scene_clip',
+    'interview',
+    'headshot',
+    'production_still',
+    'red_carpet',
+    'behind_the_scenes',
+  ]);
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -397,24 +601,33 @@ async function harvestActor(person: { id: string; name: string; tmdb_id?: number
     const uploaded = await processAndUploadMediaItem(person, item, i);
     if (!uploaded) continue;
 
-    if (existingR2Keys.has(uploaded.r2Key)) {
+    if (uploaded.r2Key && existingR2Keys.has(uploaded.r2Key)) {
       console.log(`    ⏭️ R2 key already logged in DB: ${uploaded.r2Key}`);
       continue;
     }
 
     // Insert into person_media
-    const isPrimary = !hasPhotos && i === 0;
+    const isPrimary = !hasPhotos && item.media_type === 'photo' && i === 0;
+
+    let validCategory = item.category as string;
+    if (!VALID_CATEGORIES.has(validCategory)) {
+      validCategory = item.media_type === 'video' ? 'scene_clip' : 'production_still';
+    }
 
     const { error: dbErr } = await supabase.from('person_media').insert({
       person_id: person.id,
       media_type: item.media_type,
-      category: item.category,
+      category: validCategory,
       title: item.title,
       description: item.description,
       url: uploaded.r2Url,
-      thumbnail_url: uploaded.r2Url,
+      thumbnail_url: item.thumbnail_url || uploaded.r2Url,
       r2_key: uploaded.r2Key,
-      embed_provider: 'r2',
+      embed_provider: uploaded.r2Key ? 'r2' : (item.embed_provider || (item.media_type === 'video' ? (uploaded.r2Url.includes('youtube') ? 'youtube' : 'imdb') : 'r2')),
+      embed_id: item.embed_id || null,
+      duration_seconds: item.duration_seconds || null,
+      film_id: item.film_id || null,
+      character_name: item.character_name || null,
       is_primary: isPrimary,
       status: 'approved',
       created_at: new Date().toISOString(),
@@ -424,9 +637,9 @@ async function harvestActor(person: { id: string; name: string; tmdb_id?: number
     if (dbErr) {
       console.error(`    ⚠️ Failed saving to DB:`, dbErr.message);
     } else {
-      console.log(`    ✅ Saved to person_media [${item.category}]: "${item.title}"`);
+      console.log(`    ✅ Saved to person_media [${item.media_type} - ${item.category}]: "${item.title}"`);
       addedCount++;
-      existingR2Keys.add(uploaded.r2Key);
+      if (uploaded.r2Key) existingR2Keys.add(uploaded.r2Key);
       existingTitles.add(item.title.toLowerCase());
     }
 
@@ -434,7 +647,7 @@ async function harvestActor(person: { id: string; name: string; tmdb_id?: number
     await new Promise((r) => setTimeout(r, 400));
   }
 
-  console.log(`🎉 Finished "${person.name}": Successfully ingested ${addedCount} media assets into Cloudflare R2!`);
+  console.log(`🎉 Finished "${person.name}": Successfully ingested ${addedCount} media assets!`);
 }
 
 /**
