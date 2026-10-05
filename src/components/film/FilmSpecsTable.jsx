@@ -16,6 +16,8 @@ export default function FilmSpecsTable({
   synopsis = null,
   onSuggestEdit = null,
   onReport = null,
+  onEditBoxOffice = null,
+  isAdmin = false,
   className = '',
 }) {
   if (!film) return null;
@@ -158,12 +160,37 @@ export default function FilmSpecsTable({
     {
       label: 'Box Office (Domestic Gross)',
       value: formattedBoxOffice ? (
-        <span className="inline-flex items-center gap-1.5 font-bold text-amber-400">
-          <Icon icon="solar:ticket-bold" className="text-sm" />
-          <span>{formattedBoxOffice}</span>
-          <span className="text-[10px] uppercase font-bold text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
-            Verified CEAN
+        <span className="inline-flex items-center gap-2 flex-wrap font-bold text-amber-400">
+          <span className="inline-flex items-center gap-1.5">
+            <Icon icon="solar:ticket-bold" className="text-sm" />
+            <span>{formattedBoxOffice}</span>
           </span>
+          <span className="text-[10px] uppercase font-bold text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
+            {film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN'}
+          </span>
+          {isAdmin && onEditBoxOffice && (
+            <button
+              type="button"
+              onClick={onEditBoxOffice}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
+              title="Edit Box Office Figures"
+            >
+              <Icon icon="solar:pen-bold" className="text-xs" />
+              <span>Edit</span>
+            </button>
+          )}
+        </span>
+      ) : isAdmin && onEditBoxOffice ? (
+        <span className="inline-flex items-center gap-2 text-text-muted">
+          <span className="italic">Not recorded yet</span>
+          <button
+            type="button"
+            onClick={onEditBoxOffice}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
+          >
+            <Icon icon="solar:add-circle-bold" className="text-xs" />
+            <span>Add Box Office</span>
+          </button>
         </span>
       ) : null,
     },
@@ -220,6 +247,17 @@ export default function FilmSpecsTable({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && onEditBoxOffice && (
+            <button
+              type="button"
+              onClick={onEditBoxOffice}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500 hover:text-bg border border-amber-500/30 text-amber-400 text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+              title="Set or update Box Office revenue"
+            >
+              <Icon icon="solar:ticket-bold" className="text-sm" />
+              <span>Edit Box Office</span>
+            </button>
+          )}
           {onSuggestEdit && (
             <button
               type="button"

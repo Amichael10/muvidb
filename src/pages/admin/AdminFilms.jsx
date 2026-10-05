@@ -1496,6 +1496,12 @@ export default function AdminFilms() {
             }
           } : {})
         },
+        box_office_domestic: formData.box_office_domestic ? parseFloat(formData.box_office_domestic) : null,
+        box_office_worldwide: formData.box_office_worldwide ? parseFloat(formData.box_office_worldwide) : null,
+        box_office_currency: formData.box_office_currency || 'NGN',
+        box_office_source: formData.box_office_source || null,
+        budget: formData.budget ? parseFloat(formData.budget) : null,
+        box_office_updated_at: (formData.box_office_domestic || formData.box_office_worldwide) ? new Date().toISOString() : null,
         awards: (formData.awards || [])
           .filter((a) => (a.organization || '').trim() || (a.category || '').trim())
           .map((a) => ({

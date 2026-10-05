@@ -671,8 +671,11 @@ async function main() {
 
   let actorArg = getArg('--actor', '--name', '--person');
   const imdbArg = getArg('--imdb');
-  const limitArg = parseInt(getArg('--limit') || '10', 10);
   const runAll = args.includes('--all');
+  const force = args.includes('--force');
+  const offsetArg = parseInt(getArg('--offset') || '0', 10);
+  const rawLimit = getArg('--limit');
+  const maxTotalToProcess = rawLimit ? parseInt(rawLimit, 10) : (runAll ? Infinity : 10);
 
   // If no explicit flag was used, look for positional or mis-flagged actor name (e.g. `--Richard Mofe-Damijo` or `"Richard Mofe-Damijo"`)
   if (!actorArg && !imdbArg && !runAll) {
@@ -683,11 +686,15 @@ async function main() {
         if (!token.includes('=')) i++;
         continue;
       }
+      if (token === '--offset' || token.startsWith('--offset=')) {
+        if (!token.includes('=')) i++;
+        continue;
+      }
       if (token === '--imdb' || token.startsWith('--imdb=')) {
         if (!token.includes('=')) i++;
         continue;
       }
-      if (token === '--all') continue;
+      if (token === '--all' || token === '--force') continue;
       // Strip leading dashes if someone typed `--Richard` instead of `Richard` or `--name "Richard"`
       const cleaned = token.replace(/^--+/, '').trim();
       if (cleaned) candidateTokens.push(cleaned);
@@ -723,32 +730,66 @@ async function main() {
     process.exit(1);
   }
 
-  // Batch Mode: Top actors with tmdb_id or high popularity
-  console.log(`📋 Running in batch mode (Limit: ${limitArg})...`);
-  const { data: people, error } = await supabase
-    .from('people')
-    .select('id, name, tmdb_id, popularity_score, film_count')
-    .not('tmdb_id', 'is', null)
-    .order('popularity_score', { ascending: false })
-    .limit(limitArg);
+  // Batch Mode: Paginate across actors in chunks
+  const BATCH_SIZE = 50;
+  let currentOffset = offsetArg;
+  let processedCount = 0;
+  let ingestedActors = 0;
 
-  if (error || !people || people.length === 0) {
-    console.error('❌ Could not fetch candidates from database:', error?.message);
-    process.exit(1);
-  }
+  console.log(`📋 Running in batch mode (Target: ${runAll ? 'ALL actors' : maxTotalToProcess}, Offset: ${offsetArg}, Force: ${force})...`);
 
-  console.log(`Found ${people.length} candidate actors with TMDB/IMDb profiles.`);
+  while (processedCount < maxTotalToProcess) {
+    const fetchLimit = Math.min(BATCH_SIZE, maxTotalToProcess - processedCount);
+    const rangeEnd = currentOffset + fetchLimit - 1;
 
-  for (const person of people) {
-    try {
-      await harvestActor(person);
-    } catch (err: any) {
-      console.error(`❌ Error harvesting ${person.name}:`, err.message);
+    console.log(`\n⏳ Fetching actors batch from offset ${currentOffset} to ${rangeEnd}...`);
+    const { data: people, error } = await supabase
+      .from('people')
+      .select('id, name, tmdb_id, popularity_score, film_count')
+      .order('popularity_score', { ascending: false, nullsFirst: false })
+      .range(currentOffset, rangeEnd);
+
+    if (error) {
+      console.error('❌ Supabase error fetching people candidates:', error.message);
+      break;
     }
-    await new Promise((r) => setTimeout(r, 1500));
+
+    if (!people || people.length === 0) {
+      console.log('🏁 Reached the end of the actors catalogue!');
+      break;
+    }
+
+    for (const person of people) {
+      if (processedCount >= maxTotalToProcess) break;
+      processedCount++;
+
+      // Check if actor already has media unless --force is set
+      if (!force) {
+        const { count, error: countErr } = await supabase
+          .from('person_media')
+          .select('id', { count: 'exact', head: true })
+          .eq('person_id', person.id);
+
+        if (!countErr && typeof count === 'number' && count > 0) {
+          console.log(`  ⏭️ [${person.name}] Already has ${count} media items in person_media. Skipping (use --force to re-harvest).`);
+          continue;
+        }
+      }
+
+      try {
+        await harvestActor(person);
+        ingestedActors++;
+      } catch (err: any) {
+        console.error(`❌ Error harvesting ${person.name}:`, err.message);
+      }
+
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+
+    currentOffset += people.length;
   }
 
-  console.log('\n🏁 Completed all scheduled IMDb actor media ingestion jobs!');
+  console.log(`\n🏁 Completed! Total checked: ${processedCount} actors (${ingestedActors} ingested/updated).`);
 }
 
 main().catch((err) => {

@@ -13,6 +13,7 @@ import FilmCard from '../components/film/FilmCard';
 import LikedScore from '../components/film/LikedScore';
 import RottenTomatoesScorecard from '../components/film/RottenTomatoesScorecard';
 import FilmSpecsTable from '../components/film/FilmSpecsTable';
+import AdminBoxOfficeModal from '../components/film/AdminBoxOfficeModal';
 import RateMoviePrompt from '../components/film/RateMoviePrompt';
 import WatchOptions from '../components/film/WatchOptions';
 import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
@@ -182,7 +183,8 @@ const parseFilmCredits = (credits = []) => {
 export default function FilmDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isAdmin = role === 'admin' || user?.role === 'admin';
 
   // The route loader (src/routes/film-detail.tsx) already fetched this film and
   // credits server-side, so the same row seeds the page and cast list on SSR.
@@ -280,6 +282,7 @@ export default function FilmDetail() {
 
   const [criticSummary, setCriticSummary] = useState({ score: null, count: 0, featuredQuote: null });
   const [showFilmEdit, setShowFilmEdit] = useState(false);
+  const [showBoxOfficeModal, setShowBoxOfficeModal] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
   const [awardsOpen, setAwardsOpen] = useState(false);
@@ -763,20 +766,51 @@ export default function FilmDetail() {
             {/* Right-Hand Side Box inside Hero Section */}
             {(() => {
               const domGross = film.box_office_domestic || film.streaming_links?.box_office?.domestic;
-              if (!domGross) return null;
+              if (!domGross && !isAdmin) return null;
+
+              if (!domGross && isAdmin) {
+                return (
+                  <div className="hidden lg:flex flex-col items-end justify-end shrink-0 z-10 self-end mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowBoxOfficeModal(true)}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold backdrop-blur-xl transition-all shadow-lg active:scale-95 cursor-pointer"
+                      title="Set Box Office Revenue"
+                    >
+                      <Icon icon="solar:ticket-bold" className="text-amber-400" />
+                      <span>+ Set Box Office Revenue</span>
+                    </button>
+                  </div>
+                );
+              }
+
               const currency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
               const symbol = currency === 'NGN' ? '₦' : `${currency} `;
               const formatted = domGross >= 1_000_000_000 
                 ? `${(domGross / 1_000_000_000).toFixed(2)} Billion` 
                 : `${(domGross / 1_000_000).toFixed(1)} Million`;
               const rawFormatted = Number(domGross).toLocaleString('en-NG');
+              const sourceLabel = film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN';
 
               return (
                 <div className="hidden lg:flex flex-col items-end justify-end shrink-0 z-10 self-end mb-1">
                   <div className="p-4 rounded-2xl bg-black/70 border border-amber-500/40 backdrop-blur-xl shadow-2xl shadow-amber-500/20 max-w-xs w-full text-right space-y-2">
-                    <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-amber-400 uppercase tracking-widest">
-                      <Icon icon="solar:ticket-bold" className="text-amber-400 text-sm" />
-                      <span>Box Office Revenue</span>
+                    <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => setShowBoxOfficeModal(true)}
+                          className="hover:text-white transition-colors text-[10px] inline-flex items-center gap-1 font-mono uppercase bg-amber-500/20 hover:bg-amber-500/40 px-2 py-0.5 rounded border border-amber-500/30 cursor-pointer"
+                          title="Edit Box Office Revenue"
+                        >
+                          <Icon icon="solar:pen-bold" className="text-xs" />
+                          <span>Edit</span>
+                        </button>
+                      )}
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        <Icon icon="solar:ticket-bold" className="text-amber-400 text-sm" />
+                        <span>Box Office Revenue</span>
+                      </div>
                     </div>
                     <p className="text-2xl font-black text-white font-heading tracking-tight leading-none">
                       {symbol}{rawFormatted}
@@ -784,7 +818,7 @@ export default function FilmDetail() {
                     <div className="flex items-center justify-between pt-2 border-t border-amber-500/20 text-[10px] font-bold">
                       <span className="text-amber-300/90 font-mono">({symbol}{formatted})</span>
                       <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded uppercase text-[9px] border border-amber-500/30">
-                        Verified CEAN
+                        {sourceLabel}
                       </span>
                     </div>
                   </div>
@@ -867,9 +901,23 @@ export default function FilmDetail() {
               cast={cast}
               crew={crew}
               synopsis={film.synopsis}
+              isAdmin={isAdmin}
+              onEditBoxOffice={() => setShowBoxOfficeModal(true)}
               onSuggestEdit={() => setShowFilmEdit(true)}
               onReport={() => setShowReport(true)}
             />
+            {showBoxOfficeModal && (
+              <AdminBoxOfficeModal
+                film={film}
+                onClose={() => setShowBoxOfficeModal(false)}
+                onUpdated={(updatedFilm) => {
+                  setFilm((prev) => ({
+                    ...prev,
+                    ...updatedFilm,
+                  }));
+                }}
+              />
+            )}
             {showFilmEdit && (
               <SuggestEditModal
                 target="film"
