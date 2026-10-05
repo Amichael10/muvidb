@@ -45,14 +45,9 @@ Disallow: /login
 Disallow: /user/
 Disallow: /watchlist
 
-# Block AI scrapers & commercial SEO dataset harvesters
+# AI search and user-requested assistants follow the public-page rules above.
+# Block training crawlers & commercial SEO dataset harvesters.
 User-agent: GPTBot
-Disallow: /
-
-User-agent: ChatGPT-User
-Disallow: /
-
-User-agent: OAI-SearchBot
 Disallow: /
 
 User-agent: ClaudeBot
@@ -74,9 +69,6 @@ User-agent: Meta-ExternalAgent
 Disallow: /
 
 User-agent: FacebookBot
-Disallow: /
-
-User-agent: PerplexityBot
 Disallow: /
 
 User-agent: cohere-ai
