@@ -106,7 +106,9 @@ export async function runCriticsSync(): Promise<{
     { url: 'https://afrocritik.com/feed/', source: 'Afrocritik' },
     { url: 'https://whatkeptmeup.com/feed/', source: 'What Kept Me Up' },
     { url: 'https://filmefiko.com/feed/', source: 'Film Efiko' },
-    { url: 'https://nigerianmoviesreview.com/category/reviews/feed/', source: 'Nigerian Movies Review' }
+    { url: 'https://nigerianmoviesreview.com/category/reviews/feed/', source: 'Nigerian Movies Review' },
+    { url: 'https://www.itsawrapng.com/blog-feed.xml', source: "It's A Wrap" },
+    { url: 'https://intro2filmclass.blogspot.com/feeds/posts/default?alt=rss', source: 'Intro to Film Class' }
   ];
 
   const candidateReviews: DiscoveredReview[] = [];
@@ -126,29 +128,57 @@ export async function runCriticsSync(): Promise<{
       continue;
     }
 
-    // Try finding matching film first
-    const { data: matchedFilms } = await supabase
-      .from('films')
-      .select('id, title, year')
-      .ilike('title', item.film_title)
-      .limit(1);
+    // Generate candidate titles (full, before colon, before dash, before comma)
+    const titleCandidates = [
+      item.film_title,
+      item.film_title.split(':')[0].trim(),
+      item.film_title.split('–')[0].trim(),
+      item.film_title.split('-')[0].trim(),
+      item.film_title.split(',')[0].trim()
+    ].filter(t => t.length >= 2);
 
-    const film = matchedFilms?.[0];
+    // Also extract 2-to-4 word prefix if title is long sentence-style editorial headline
+    const words = item.film_title.split(/\s+/);
+    if (words.length > 4) {
+      titleCandidates.push(words.slice(0, 3).join(' '));
+      titleCandidates.push(words.slice(0, 2).join(' '));
+    }
+
+    const uniqueCandidates = [...new Set(titleCandidates)];
+
+    let film: any = null;
+    for (const cand of uniqueCandidates) {
+      const { data: matchedFilms } = await supabase
+        .from('films')
+        .select('id, title, year')
+        .ilike('title', cand)
+        .order('year', { ascending: false, nullsFirst: false })
+        .limit(1);
+
+      if (matchedFilms && matchedFilms[0]) {
+        film = matchedFilms[0];
+        break;
+      }
+    }
+
     let matchedFilmId: string | null = film?.id || null;
     let matchedPlayId: string | null = null;
     let targetTitle: string = film?.title || item.film_title;
 
     if (!matchedFilmId) {
       // Check if this is a stage play / theatre review
-      const { data: matchedPlays } = await supabase
-        .from('plays')
-        .select('id, title, year')
-        .ilike('title', item.film_title)
-        .limit(1);
+      for (const cand of uniqueCandidates) {
+        const { data: matchedPlays } = await supabase
+          .from('plays')
+          .select('id, title, year')
+          .ilike('title', cand)
+          .limit(1);
 
-      if (matchedPlays?.[0]) {
-        matchedPlayId = matchedPlays[0].id;
-        targetTitle = matchedPlays[0].title;
+        if (matchedPlays?.[0]) {
+          matchedPlayId = matchedPlays[0].id;
+          targetTitle = matchedPlays[0].title;
+          break;
+        }
       }
     }
 
