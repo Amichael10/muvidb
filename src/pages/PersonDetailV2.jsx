@@ -721,23 +721,6 @@ export default function PersonDetailV2() {
   return (
     <div className="min-h-screen bg-bg text-text-primary selection:bg-brand selection:text-white">
 
-      {/* ── FLOATING DESIGN SWITCHER (Local Preview Mode) ── */}
-      <div className="sticky top-0 z-40 bg-brand/95 text-white backdrop-blur-md px-4 py-2.5 shadow-md flex items-center justify-between border-b border-brand-accent">
-        <div className="flex items-center gap-2 text-xs font-bold">
-          <span className="bg-white text-brand rounded px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider">Preview Mode</span>
-          <span>Viewing <strong>Redesigned Hierarchy (V2)</strong> · IMDb & Rotten Tomatoes Layout</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to={`/people/${slug}`}
-            className="bg-black/30 hover:bg-black/50 text-white rounded-lg px-3 py-1 text-xs font-bold transition flex items-center gap-1.5"
-          >
-            <Icon icon="solar:arrow-left-linear" width="14" />
-            Switch to Classic View
-          </Link>
-        </div>
-      </div>
-
       {/* ── 1. PRESTIGE HERO (Theatrical Backdrop & Vital Profile) ── */}
       <section className="relative border-b border-border bg-gradient-to-b from-surface-2/30 via-bg to-bg pt-8 pb-12">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">

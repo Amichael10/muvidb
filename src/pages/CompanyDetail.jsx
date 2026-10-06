@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { Icon } from '@iconify/react';
 import { toTitleCase, toSentenceCase, formatFilmTitle } from '../utils/format';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
@@ -33,6 +34,7 @@ export default function CompanyDetail() {
   const { id, slug: slugParam } = useParams();
   const slug = slugParam || id;
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -633,6 +635,25 @@ export default function CompanyDetail() {
                   <Icon icon={copiedLink ? 'solar:check-circle-bold' : 'solar:share-linear'} className="text-sm text-brand" />
                   <span>{copiedLink ? 'Link Copied!' : 'Share Profile'}</span>
                 </button>
+
+                {/* Claim or Studio Dashboard Manage Button */}
+                {user && (user.role === 'admin' || company.claimed_by === user.id) ? (
+                  <Link
+                    to={`/company/dashboard?companyId=${company.id}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand text-white font-bold text-xs transition-all shadow-md hover:bg-brand/90 cursor-pointer"
+                  >
+                    <Icon icon="solar:widget-2-bold" className="text-sm" />
+                    <span>Manage Studio Slate</span>
+                  </Link>
+                ) : (
+                  <Link
+                    to={`/claim/company?company=${company.slug || company.id}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 hover:border-brand text-brand text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  >
+                    <Icon icon="solar:shield-check-bold" className="text-sm" />
+                    <span>Represent this {company.company_type === 'talent_agency' ? 'Agency' : 'Studio'}? Claim Page</span>
+                  </Link>
+                )}
               </div>
             </div>
 

@@ -34,7 +34,6 @@ export default [
   route('forgot-password', 'pages/ForgotPassword.jsx'),
   route('reset-password', 'pages/ResetPassword.jsx'),
   route('people', 'routes/people-list.tsx'),
-  route('people/:slug/v2', 'pages/PersonDetailV2.jsx'),
   route('people/:slug', 'routes/person-detail.tsx'),
   route('critics', 'pages/CriticsList.jsx'),
   route('critics/:slug', 'pages/CriticDetail.jsx'),
@@ -67,7 +66,11 @@ export default [
     route('onboarding', 'pages/Onboarding.jsx'),
     route('dashboard', 'pages/Dashboard.jsx'),
     route('claim', 'pages/ClaimProfile.jsx'),
+    route('claim/company', 'pages/ClaimCompany.jsx'),
+    route('claim-company', 'pages/ClaimCompany.jsx', { id: 'claim-company-alias' }),
     route('pro-dashboard', 'pages/ProDashboard.jsx'),
+    route('company/dashboard', 'pages/CompanyDashboard.jsx'),
+    route('company-dashboard', 'pages/CompanyDashboard.jsx', { id: 'company-dashboard-alias' }),
   ]),
 
   // ---- Admin ----

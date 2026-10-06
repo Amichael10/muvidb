@@ -50,9 +50,11 @@ const Signup = lazyWithRetry(() => import('./pages/Signup'));
 const Onboarding = lazyWithRetry(() => import('./pages/Onboarding'));
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
 const ProDashboard = lazyWithRetry(() => import('./pages/ProDashboard'));
+const CompanyDashboard = lazyWithRetry(() => import('./pages/CompanyDashboard'));
+const ClaimCompany = lazyWithRetry(() => import('./pages/ClaimCompany'));
+const ClaimProfile = lazyWithRetry(() => import('./pages/ClaimProfile'));
 
 const PersonDetail = lazyWithRetry(() => import('./pages/PersonDetailV2'));
-const PersonDetailV2 = PersonDetail;
 const Showtimes = lazyWithRetry(() => import('./pages/Showtimes'));
 const Cinemas = lazyWithRetry(() => import('./pages/Cinemas'));
 const CinemaDetail = lazyWithRetry(() => import('./pages/CinemaDetail'));
@@ -342,7 +344,6 @@ export default function App() {
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/people" element={<PeopleList />} />
                 <Route path="/people/:slug" element={<PersonDetail />} />
-                <Route path="/people/:slug/v2" element={<PersonDetailV2 />} />
                 <Route path="/showtimes" element={<Showtimes />} />
                 <Route path="/cinemas" element={<Cinemas />} />
                 <Route path="/cinemas/:id" element={<CinemaDetail />} />
@@ -373,6 +374,12 @@ export default function App() {
 
                 {/* Protected Routes */}
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/claim" element={<ProtectedRoute><ClaimProfile /></ProtectedRoute>} />
+                <Route path="/claim/company" element={<ProtectedRoute><ClaimCompany /></ProtectedRoute>} />
+                <Route path="/claim-company" element={<ProtectedRoute><ClaimCompany /></ProtectedRoute>} />
+                <Route path="/company/dashboard" element={<ProtectedRoute><CompanyDashboard /></ProtectedRoute>} />
+                <Route path="/company-dashboard" element={<ProtectedRoute><CompanyDashboard /></ProtectedRoute>} />
+                <Route path="/companies/:slug/manage" element={<ProtectedRoute><CompanyDashboard /></ProtectedRoute>} />
                 <Route path="/pro-dashboard" element={<ProtectedRoute allowedRoles={['professional', 'admin']}><ProDashboard /></ProtectedRoute>} />
 
 

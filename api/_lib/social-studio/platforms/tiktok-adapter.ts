@@ -217,7 +217,7 @@ export class TikTokPlatformAdapter implements SocialPlatformAdapter {
         console.log('[TikTok Adapter] All video chunks uploaded to TikTok successfully!');
       };
 
-      let effectivePostMode = postMode;
+      let effectivePostMode: 'DIRECT_POST' | 'MEDIA_UPLOAD' = postMode;
 
       const initVideoPublish = async (
         useFileUpload: boolean,
