@@ -12,8 +12,8 @@ interface OPayInitializeRequest {
   returnUrl?: string;
 }
 
-const OPAY_SANDBOX_URL = 'https://sandbox-cashier-api.opayweb.com/api/v3/cashier/initialize';
-const OPAY_LIVE_URL = 'https://cashier-api.opayweb.com/api/v3/cashier/initialize';
+const OPAY_SANDBOX_URL = 'https://testapi.opaycheckout.com/api/v1/international/cashier/create';
+const OPAY_LIVE_URL = 'https://api.opaycheckout.com/api/v1/international/cashier/create';
 
 export async function handleOpay(req: VercelRequest, res: VercelResponse) {
   const op = req.query.op || req.body?.op || (req.url?.includes('webhook') ? 'webhook' : 'initialize');
@@ -41,8 +41,6 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
     const {
       companyId,
       userEmail,
-      userName = 'Studio Member',
-      userPhone = '+2348000000000',
       amount = 25000,
       planType = 'pro_monthly',
       returnUrl,
@@ -52,14 +50,22 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'userEmail is required' });
     }
 
+    const publicKey = (process.env.OPAY_PUBLIC_KEY || process.env.PUBLIC_KEY || '').trim();
     const secretKey = (process.env.OPAY_SECRET_KEY || process.env.SECRET_KEY || '').trim();
     const merchantId = (process.env.OPAY_MERCHANT_ID || '').trim();
-    const isLive = process.env.OPAY_ENV === 'live' || secretKey.startsWith('OPAYPRV_LIVE');
+
+    const isLive = process.env.OPAY_ENV === 'live';
     const endpoint = isLive ? OPAY_LIVE_URL : OPAY_SANDBOX_URL;
 
-    if (!secretKey) {
+    if (!publicKey && !secretKey) {
       return res.status(500).json({
-        error: 'OPay configuration missing: OPAY_SECRET_KEY is not configured',
+        error: 'OPay configuration missing: OPAY_PUBLIC_KEY is not configured',
+      });
+    }
+
+    if (!merchantId) {
+      return res.status(500).json({
+        error: 'OPay configuration missing: OPAY_MERCHANT_ID is not configured in .env',
       });
     }
 
@@ -68,34 +74,34 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
     const finalReturnUrl = returnUrl || `${origin}/company/dashboard?tab=api&payment=success&ref=${reference}`;
     const callbackUrl = `${origin}/api/webhooks/opay`;
 
-    // Amount: OPay cashier requires amount in kobo (or string formatted). Standard kobo = amount * 100
-    const amountKobo = String(Math.round(amount * 100));
+    // Amount in Kobo: e.g. 25000 NGN -> 2500000 Kobo
+    const amountKobo = Math.round(amount * 100);
 
-    const payload: Record<string, any> = {
+    const payload = {
       reference,
-      mchShortName: 'MuviDB',
-      productName: `MuviDB Studio Pro (${planType})`,
-      productDesc: 'MuviDB Studio Management & Developer API Tier',
-      userPhone: userPhone.startsWith('+') ? userPhone : `+234${userPhone.replace(/^0/, '')}`,
-      userEmail,
-      userName,
-      amount: amountKobo,
-      currency: 'NGN',
-      payMethods: ['account', 'card', 'bankTransfer', 'qrcode'],
-      callbackUrl,
+      country: 'NG',
+      amount: {
+        total: amountKobo,
+        currency: 'NGN',
+      },
       returnUrl: finalReturnUrl,
+      callbackUrl,
+      product: {
+        name: `MuviDB Studio Pro (${planType})`,
+        description: 'MuviDB Studio Pro & Developer API Tier',
+      },
     };
+
+    // Public Key is standard for /cashier/create
+    const token = publicKey || secretKey;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${secretKey}`,
+      'Authorization': `Bearer ${token}`,
+      'MerchantId': merchantId,
     };
 
-    if (merchantId) {
-      headers['MerchantId'] = merchantId;
-    }
-
-    console.log(`[OPay] Initializing checkout for ${reference} (${amount} NGN)`);
+    console.log(`[OPay] Initializing cashier checkout for ${reference} (Merchant: ${merchantId})`);
 
     const opayRes = await fetch(endpoint, {
       method: 'POST',
@@ -105,16 +111,14 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
 
     const data = await opayRes.json().catch(() => null);
 
-    if (!opayRes.ok || !data || data.code !== '00000') {
+    if (!opayRes.ok || !data || (data.code !== '00000' && !data.data?.cashierUrl)) {
       console.error('[OPay] Initialize error:', opayRes.status, data);
       return res.status(opayRes.status || 502).json({
         error: data?.message || 'Failed to initialize OPay cashier checkout',
         details: data,
-        needsMerchantId: !merchantId,
       });
     }
 
-    // Success response: returns cashierUrl to redirect user
     return res.status(200).json({
       success: true,
       reference,
@@ -158,7 +162,6 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse) {
     if (status === 'SUCCESS') {
       console.log(`[OPay Webhook] Payment SUCCESS for reference: ${reference}`);
 
-      // Extract company ID if embedded in reference (e.g. MUV_CMP_<id>_...)
       if (reference?.includes('_CMP_')) {
         const parts = reference.split('_');
         const companyId = parts[2];
@@ -173,7 +176,6 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // OPay expects 200 response
     return res.status(200).json({ code: '00000', message: 'SUCCESS' });
   } catch (err: any) {
     console.error('[OPay Webhook] Error:', err);
@@ -193,18 +195,18 @@ async function handleCheckStatus(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'reference or orderNo is required' });
     }
 
-    const secretKey = (process.env.OPAY_SECRET_KEY || process.env.SECRET_KEY || '').trim();
+    const publicKey = (process.env.OPAY_PUBLIC_KEY || process.env.PUBLIC_KEY || '').trim();
     const merchantId = (process.env.OPAY_MERCHANT_ID || '').trim();
-    const isLive = process.env.OPAY_ENV === 'live' || secretKey.startsWith('OPAYPRV_LIVE');
+    const isLive = process.env.OPAY_ENV === 'live';
     const endpoint = isLive
-      ? 'https://cashier-api.opayweb.com/api/v3/cashier/status'
-      : 'https://sandbox-cashier-api.opayweb.com/api/v3/cashier/status';
+      ? 'https://api.opaycheckout.com/api/v1/international/cashier/status'
+      : 'https://testapi.opaycheckout.com/api/v1/international/cashier/status';
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${secretKey}`,
+      'Authorization': `Bearer ${publicKey}`,
+      'MerchantId': merchantId,
     };
-    if (merchantId) headers['MerchantId'] = merchantId;
 
     const opayRes = await fetch(endpoint, {
       method: 'POST',
