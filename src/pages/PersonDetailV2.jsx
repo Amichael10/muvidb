@@ -772,17 +772,12 @@ export default function PersonDetailV2() {
                   <h1 className="text-3xl sm:text-4xl lg:text-5xl font-heading font-black tracking-tight text-text-primary">
                     {formatPersonName(person.name)}
                   </h1>
-                  {person.is_pro ? (
-                    <span className="bg-amber-500/15 text-amber-400 text-xs font-black px-2.5 py-1 rounded-lg border border-amber-500/40 flex items-center gap-1 shadow-sm shadow-amber-500/10" title="Talent Pro Verified Creator">
-                      <Icon icon="solar:crown-bold" width="14" />
-                      Talent Pro
-                    </span>
-                  ) : person.is_verified ? (
+                  {person.is_verified && (
                     <span className="bg-brand/15 text-brand text-xs font-black px-2.5 py-1 rounded-lg border border-brand/30 flex items-center gap-1">
                       <Icon icon="solar:verified-check-bold" width="14" />
                       Verified
                     </span>
-                  ) : null}
+                  )}
                 </div>
 
                 {/* Live Availability Status */}
@@ -952,7 +947,7 @@ export default function PersonDetailV2() {
                 )}
 
                 {/* 3. Representation & Talent Booking (Talent Pro & Verified Representation) */}
-                {(person.is_pro || person.booking_email || person.booking_phone || person.booking_whatsapp || representations?.length > 0) && (
+                {(person.booking_email || person.booking_phone || person.booking_whatsapp || representations?.length > 0) && (
                   <button
                     onClick={() => setBookingModalOpen(true)}
                     className="flex-1 sm:flex-none inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 transition whitespace-nowrap shadow-sm group/rep"

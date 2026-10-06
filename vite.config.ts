@@ -612,7 +612,6 @@ export default defineConfig(({ mode, isSsrBuild }) => {
       },
     },
     ssr: {
-      noExternal: ['react-router-dom'],
       external: ['tesseract.js'],
     },
   };

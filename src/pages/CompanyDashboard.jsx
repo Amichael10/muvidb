@@ -434,14 +434,6 @@ export default function CompanyDashboard() {
       return;
     }
 
-    const currentCount = companyDetails?.talents?.length || 0;
-    if (currentCompany?.api_tier !== 'pro' && currentCount >= 3) {
-      toast.error(`Free Tier Limit: Studio Standard allows up to 3 roster talents. Upgrade to Studio Pro for unlimited representation.`);
-      setTalentModalOpen(false);
-      handleOpayCheckout(PLANS.studio_pro_monthly.amount, 'pro_monthly');
-      return;
-    }
-
     try {
       await saveTalentRepresentation(currentCompany.id, {
         person_id: selectedPerson.id,
@@ -1200,12 +1192,6 @@ export default function CompanyDashboard() {
               <button
                 type="button"
                 onClick={() => {
-                  const currentCount = companyDetails?.talents?.length || 0;
-                  if (currentCompany?.api_tier !== 'pro' && currentCount >= 3) {
-                    toast.error('Free Tier Limit: Studio Standard allows up to 3 talents. Upgrade to Studio Pro for unlimited roster.');
-                    handleOpayCheckout(25000, 'pro_monthly');
-                    return;
-                  }
                   setSelectedPerson(null);
                   setPersonQuery('');
                   setTalentForm({

@@ -126,7 +126,7 @@ export async function runCriticsSync(): Promise<{
       continue;
     }
 
-    // Try finding matching film
+    // Try finding matching film first
     const { data: matchedFilms } = await supabase
       .from('films')
       .select('id, title, year')
@@ -134,7 +134,25 @@ export async function runCriticsSync(): Promise<{
       .limit(1);
 
     const film = matchedFilms?.[0];
-    if (!film) {
+    let matchedFilmId: string | null = film?.id || null;
+    let matchedPlayId: string | null = null;
+    let targetTitle: string = film?.title || item.film_title;
+
+    if (!matchedFilmId) {
+      // Check if this is a stage play / theatre review
+      const { data: matchedPlays } = await supabase
+        .from('plays')
+        .select('id, title, year')
+        .ilike('title', item.film_title)
+        .limit(1);
+
+      if (matchedPlays?.[0]) {
+        matchedPlayId = matchedPlays[0].id;
+        targetTitle = matchedPlays[0].title;
+      }
+    }
+
+    if (!matchedFilmId && !matchedPlayId) {
       skipped++;
       continue;
     }
@@ -145,12 +163,13 @@ export async function runCriticsSync(): Promise<{
                           critics?.find(c => c.publication?.includes(item.source_publication));
 
     const payload = {
-      film_id: film.id,
+      film_id: matchedFilmId,
+      play_id: matchedPlayId,
       critic_id: matchedCritic?.id || null,
       critic_name: matchedCritic?.name || item.critic_name || item.source_publication,
-      critic_title: matchedCritic?.title || 'Film Critic',
+      critic_title: matchedCritic?.title || (matchedPlayId ? 'Theatre Critic' : 'Film Critic'),
       avatar_url: matchedCritic?.avatar_url || null,
-      quote: item.quote || `${item.source_publication} review of ${film.title}`,
+      quote: item.quote || `${item.source_publication} review of ${targetTitle}`,
       rating: 3.0, // default baseline if not numeric in feed
       review_url: item.review_url,
       is_featured: true,
@@ -163,9 +182,9 @@ export async function runCriticsSync(): Promise<{
     if (!insErr) {
       synced++;
       existingUrls.add(item.review_url);
-      newReviews.push(`${payload.critic_name} -> "${film.title}"`);
+      newReviews.push(`${payload.critic_name} -> "${targetTitle}"`);
     } else {
-      console.warn(`[critics_sync] Failed to insert review for ${film.title}:`, insErr.message);
+      console.warn(`[critics_sync] Failed to insert review for ${targetTitle}:`, insErr.message);
     }
   }
 

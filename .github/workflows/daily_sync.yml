@@ -15,8 +15,8 @@ on:
     # 2026), so each run re-checks a trailing six-month window rather than
     # only the month that just closed.
     - cron: '0 3 1 * *'
-    # Sunday Weekly Critics Reviews Sync (4:00 AM UTC = 5:00 AM WAT)
-    - cron: '0 4 * * 0'
+    # Daily Critics & Theatre Reviews Sync (4:00 AM UTC = 5:00 AM WAT)
+    - cron: '0 4 * * *'
   workflow_dispatch:
     inputs:
       task:
@@ -39,6 +39,7 @@ on:
           - nfvcb
           - credits_enrichment
           - critics
+          - theatre
 
 jobs:
   sync:
@@ -228,8 +229,8 @@ jobs:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY }}
-          VITE_YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY || secrets.VITE_YOUTUBE_API_KEY }}
+          VITE_YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY || secrets.YOUTUBE_API_KEY }}
           YOUTUBE_API_KEY_2: ${{ secrets.YOUTUBE_API_KEY_2 }}
           YOUTUBE_API_KEY_3: ${{ secrets.YOUTUBE_API_KEY_3 }}
           YOUTUBE_API_KEY_4: ${{ secrets.YOUTUBE_API_KEY_4 }}
@@ -350,11 +351,22 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - name: Sync Critics Reviews (Sundays & Manual)
-        if: github.event.schedule == '0 4 * * 0' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'critics'))
+      - name: Sync Critics & Theatre Reviews (Daily)
+        if: github.event.schedule == '0 4 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'critics'))
         run: |
-          echo "Scanning Nollywood critic publications & syncing reviews..."
+          echo "Scanning Nollywood critic publications & syncing film/theatre reviews..."
           npx tsx scripts/sync-critics.ts
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Sync Theatre Plays & Live Stages (Daily)
+        if: github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'theatre'))
+        run: |
+          echo "Scraping live stages (Terra Kulture, BAP Productions, MUSON) & auditing play statuses..."
+          npx tsx scripts/sync_all_theatres_and_scrape.ts
         continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

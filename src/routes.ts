@@ -59,6 +59,8 @@ export default [
   route('title-checker', 'pages/TitleChecker.jsx', { id: 'title-checker-alias' }),
   route('developers', 'pages/DeveloperApi.jsx'),
   route('api-docs', 'pages/DeveloperApi.jsx', { id: 'api-docs-alias' }),
+  route('support', 'pages/Support.jsx'),
+  route('support-us', 'pages/Support.jsx', { id: 'support-us-alias' }),
   route('waitlist', 'pages/Waitlist.tsx'),
   route('run-scanners', 'routes/api.run-scanners.tsx'),
   // ---- Authenticated ----

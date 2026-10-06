@@ -72,6 +72,9 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
     // Amount in Kobo: e.g. 25000 NGN -> 2500000 Kobo
     const amountKobo = Math.round(amount * 100);
 
+    const productName = (req.body as any)?.productName || (planType === 'support' ? 'MuviDB Archive Contribution' : `MuviDB Studio Pro (${planType})`);
+    const productDesc = (req.body as any)?.productDescription || (planType === 'support' ? 'Support & Preservation Contribution for MuviDB Archive' : 'MuviDB Studio Pro & Developer API Tier');
+
     const payload = {
       reference,
       country: 'NG',
@@ -82,8 +85,8 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
       returnUrl: finalReturnUrl,
       callbackUrl,
       product: {
-        name: `MuviDB Studio Pro (${planType})`,
-        description: 'MuviDB Studio Pro & Developer API Tier',
+        name: productName,
+        description: productDesc,
       },
     };
 
@@ -128,7 +131,9 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
 
     // In Test mode or if upstream sandbox is unreachable from localhost/development:
     // Provide seamless OPay Sandbox Cashier session
-    const mockCashierUrl = `${origin}/company/dashboard?tab=api&mock_opay=1&ref=${reference}&amount=${amount}&plan=${planType}&company_id=${companyId || ''}`;
+    const mockCashierUrl = returnUrl
+      ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}mock_opay=1&ref=${reference}&amount=${amount}&plan=${planType}`
+      : `${origin}/company/dashboard?tab=api&mock_opay=1&ref=${reference}&amount=${amount}&plan=${planType}&company_id=${companyId || ''}`;
 
     return res.status(200).json({
       success: true,

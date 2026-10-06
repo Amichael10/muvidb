@@ -77,6 +77,7 @@ const CriticDetail = lazyWithRetry(() => import('./pages/CriticDetail'));
 const PlaysList = lazyWithRetry(() => import('./pages/PlaysList'));
 const PlayDetail = lazyWithRetry(() => import('./pages/PlayDetail'));
 const TitleChecker = lazyWithRetry(() => import('./pages/TitleChecker'));
+const Support = lazyWithRetry(() => import('./pages/Support'));
 
 // Lazy admin pages — kept entirely out of the public bundle
 const AdminLayout = lazyWithRetry(() => import('./pages/admin/AdminLayout'));
@@ -117,6 +118,7 @@ import MobileNav from './components/layout/MobileNav';
 import SmoothScroll from './components/layout/SmoothScroll';
 import CookieConsent from './components/CookieConsent';
 import QuickViewModal from './components/film/QuickViewModal';
+import SupportFloatingButton from './components/layout/SupportFloatingButton';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children, allowedRoles = [] }) {
@@ -175,6 +177,7 @@ function Layout({ children }) {
   const isAdminPath = location.pathname.startsWith('/admin');
   const isOnboardingPath = location.pathname === '/onboarding';
   const isWaitlistPath = location.pathname === '/waitlist';
+  const isSupportPath = location.pathname.startsWith('/support');
   
   const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath;
   
@@ -186,6 +189,7 @@ function Layout({ children }) {
       </main>
       {!hideLayout && <Footer />}
       {!hideLayout && <MobileNav />}
+      {!hideLayout && !isSupportPath && <SupportFloatingButton />}
       {!hideLayout && <BackToTop />}
     </div>
   );
@@ -367,6 +371,8 @@ export default function App() {
                 <Route path="/title-search" element={<TitleChecker />} />
                 <Route path="/tools/title-checker" element={<TitleChecker />} />
                 <Route path="/title-checker" element={<TitleChecker />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/support-us" element={<Support />} />
 
                 {/* Onboarding */}
                 <Route path="/waitlist" element={<Waitlist />} />

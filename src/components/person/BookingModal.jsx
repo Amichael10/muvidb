@@ -30,7 +30,7 @@ export default function BookingModal({
       case 'hiatus':
         return { label: 'On Hiatus', bg: 'bg-zinc-500/15 border-zinc-500/30 text-zinc-400', icon: 'solar:pause-circle-bold' };
       default:
-        return { label: 'Verified Talent Profile', bg: 'bg-brand/15 border-brand/30 text-brand', icon: 'solar:crown-bold' };
+        return { label: 'Profile Roster & Contacts', bg: 'bg-surface-2 border-border text-text-secondary', icon: 'solar:user-bold' };
     }
   };
 
@@ -59,26 +59,12 @@ export default function BookingModal({
                 name={person.name}
                 className="w-full h-full object-cover"
               />
-              {person.is_pro && (
-                <div 
-                  className="absolute bottom-0 right-0 p-0.5 bg-amber-500 rounded-tl-md text-black shadow"
-                  title="Talent Pro Verified Member"
-                >
-                  <Icon icon="solar:crown-bold" width="10" />
-                </div>
-              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-heading font-black text-base text-text-primary truncate">
                   {person.name}
                 </h3>
-                {person.is_pro && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[9px] font-black uppercase text-amber-400">
-                    <Icon icon="solar:crown-bold" width="10" />
-                    <span>Pro</span>
-                  </span>
-                )}
               </div>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusInfo.bg}`}>
@@ -268,7 +254,7 @@ export default function BookingModal({
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand text-white font-bold text-xs hover:bg-brand/90 transition shadow-sm"
                 >
                   <Icon icon="solar:shield-check-bold" width="15" />
-                  <span>Claim Profile &amp; Enable Pro Contacts</span>
+                  <span>Claim Profile &amp; Add Booking Contacts</span>
                 </Link>
               </div>
             </div>

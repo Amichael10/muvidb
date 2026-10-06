@@ -31,7 +31,7 @@ const footerGroups = [
       { label: 'About Us', to: '/about' },
       { label: 'Developer API', to: '/developers', isNew: true },
       { label: 'Title Search', to: '/tools/title-checker', isNew: true },
-      { label: 'MuviDB Pro', comingSoon: true },
+      { label: 'Support the Archive', to: '/support' },
       { label: 'Add a Film', to: '/submit/film' },
       { label: 'Contribute', to: '/submit' },
       { label: 'Film Classification', to: '/classification' },
