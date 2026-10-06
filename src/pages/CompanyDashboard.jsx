@@ -105,6 +105,9 @@ export default function CompanyDashboard() {
   const [apiKey, setApiKey] = useState('mvd_live_7e8b91a24d5f6c802143eb99a4');
   const [keyCopied, setKeyCopied] = useState(false);
   const [checkingOutOpay, setCheckingOutOpay] = useState(false);
+  const [opayModalData, setOpayModalData] = useState(null);
+  const [confirmingOpayPayment, setConfirmingOpayPayment] = useState(false);
+  const [selectedOpayMethod, setSelectedOpayMethod] = useState('card');
 
   const handleOpayCheckout = async (amount = 25000, planType = 'pro_monthly') => {
     setCheckingOutOpay(true);
@@ -114,7 +117,7 @@ export default function CompanyDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           companyId: currentCompany?.id,
-          userEmail: user?.email,
+          userEmail: user?.email || 'admin@muvidb.com',
           userName: user?.user_metadata?.name || currentCompany?.name || 'Studio Representative',
           amount,
           planType,
@@ -124,7 +127,15 @@ export default function CompanyDashboard() {
 
       const data = await res.json().catch(() => null);
 
-      if (data?.cashierUrl) {
+      if (data?.isSandbox || data?.cashierUrl?.includes('mock_opay=1')) {
+        setOpayModalData({
+          reference: data.reference || `MUV_${Date.now()}`,
+          orderNo: data.orderNo || `OPAY_${Date.now()}`,
+          amount,
+          planType,
+          companyId: currentCompany?.id,
+        });
+      } else if (data?.cashierUrl) {
         toast.success('Redirecting to OPay Cashier...');
         window.location.href = data.cashierUrl;
       } else {
@@ -135,6 +146,35 @@ export default function CompanyDashboard() {
       toast.error('Failed to connect to payment gateway.');
     } finally {
       setCheckingOutOpay(false);
+    }
+  };
+
+  const handleConfirmMockOpay = async () => {
+    setConfirmingOpayPayment(true);
+    try {
+      const res = await fetch('/api/opay?op=confirm_sandbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: opayModalData?.companyId || currentCompany?.id,
+          reference: opayModalData?.reference,
+        }),
+      });
+      const result = await res.json().catch(() => null);
+      if (result?.success) {
+        toast.success('Payment Confirmed! Studio Pro API tier is now active.');
+        setOpayModalData(null);
+        if (currentCompany) {
+          setCurrentCompany({ ...currentCompany, api_tier: 'pro' });
+        }
+        setRefreshTrigger((prev) => prev + 1);
+      } else {
+        toast.error(result?.error || 'Failed to confirm sandbox payment');
+      }
+    } catch (err) {
+      toast.error('Payment confirmation failed');
+    } finally {
+      setConfirmingOpayPayment(false);
     }
   };
 
@@ -1317,54 +1357,90 @@ export default function CompanyDashboard() {
                 <Link to="/developers" target="_blank" className="text-brand font-semibold hover:underline flex items-center gap-1">
                   View API Documentation <Icon icon="solar:arrow-right-up-linear" width="14" />
                 </Link>
-                <span className="text-text-muted text-[11px]">Rate Limit: 10,000 req/day</span>
+                <span className="text-text-muted text-[11px]">
+                  Rate Limit: {currentCompany?.api_tier === 'pro' ? '100,000 req/day (Studio Pro)' : '10,000 req/day (Free Tier)'}
+                </span>
               </div>
             </div>
 
-            {/* OPay Merchant Checkout Card */}
-            <div className="bg-gradient-to-br from-surface to-surface-2 border border-emerald-500/30 rounded-2xl p-6 shadow-lg relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-              
-              <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                <div className="space-y-2 max-w-lg">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-wider">
-                    <Icon icon="solar:shield-check-bold" width="12" /> OPay Merchant Checkout
+            {/* OPay Merchant Checkout Card / Active Pro Status */}
+            {currentCompany?.api_tier === 'pro' ? (
+              <div className="bg-gradient-to-br from-surface to-emerald-950/20 border border-emerald-500/40 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                  <div className="space-y-2 max-w-lg">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
+                      <Icon icon="solar:verified-check-bold" width="12" /> Studio Pro Active
+                    </div>
+                    <h3 className="text-lg font-bold text-text-primary">Studio Pro Plan Activated</h3>
+                    <p className="text-xs text-text-muted leading-relaxed">
+                      Your studio has unlocked 100,000 requests/day, live automated box office data webhooks, dedicated tech support, and instant catalog indexing.
+                    </p>
+                    <div className="flex items-center gap-4 pt-1 text-xs">
+                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                        <Icon icon="solar:shield-check-bold" width="14" /> Verified by OPay Merchant Gateway
+                      </span>
+                      <span className="text-text-muted">Auto-renews monthly</span>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold text-text-primary">Upgrade to Studio Pro API Plan</h3>
-                  <p className="text-xs text-text-muted leading-relaxed">
-                    Unlock 100,000 requests/day, live automated box office data webhooks, dedicated tech support, and instant catalog indexing.
-                  </p>
-                  <div className="flex items-baseline gap-2 pt-1">
-                    <span className="text-2xl font-black text-text-primary">₦25,000</span>
-                    <span className="text-xs text-text-muted font-semibold">/ month</span>
-                  </div>
-                </div>
 
-                <div className="shrink-0 flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleOpayCheckout(25000, 'pro_monthly')}
-                    disabled={checkingOutOpay}
-                    className="bg-[#00B875] hover:bg-[#009E64] text-white font-extrabold px-6 py-3 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-[#00B875]/25 disabled:opacity-50 cursor-pointer"
-                  >
-                    {checkingOutOpay ? (
-                      <>
-                        <Icon icon="solar:restart-linear" className="animate-spin" width="16" />
-                        <span>Connecting to OPay...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Icon icon="solar:card-2-bold" width="16" />
-                        <span>Pay with OPay (Card / Transfer / App)</span>
-                      </>
-                    )}
-                  </button>
-                  <p className="text-[10px] text-center text-text-muted">
-                    Secured by OPay Central Payment Gateway
-                  </p>
+                  <div className="shrink-0 flex flex-col gap-2">
+                    <div className="px-5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-extrabold text-xs flex items-center justify-center gap-2">
+                      <Icon icon="solar:check-circle-bold" width="16" />
+                      <span>Pro Status Enabled</span>
+                    </div>
+                    <p className="text-[10px] text-center text-text-muted">
+                      Merchant ID: 256626100609333
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-gradient-to-br from-surface to-surface-2 border border-emerald-500/30 rounded-2xl p-6 shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+                
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                  <div className="space-y-2 max-w-lg">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-wider">
+                      <Icon icon="solar:shield-check-bold" width="12" /> OPay Merchant Checkout
+                    </div>
+                    <h3 className="text-lg font-bold text-text-primary">Upgrade to Studio Pro API Plan</h3>
+                    <p className="text-xs text-text-muted leading-relaxed">
+                      Unlock 100,000 requests/day, live automated box office data webhooks, dedicated tech support, and instant catalog indexing.
+                    </p>
+                    <div className="flex items-baseline gap-2 pt-1">
+                      <span className="text-2xl font-black text-text-primary">₦25,000</span>
+                      <span className="text-xs text-text-muted font-semibold">/ month</span>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpayCheckout(25000, 'pro_monthly')}
+                      disabled={checkingOutOpay}
+                      className="bg-[#00B875] hover:bg-[#009E64] text-white font-extrabold px-6 py-3 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-[#00B875]/25 disabled:opacity-50 cursor-pointer"
+                    >
+                      {checkingOutOpay ? (
+                        <>
+                          <Icon icon="solar:restart-linear" className="animate-spin" width="16" />
+                          <span>Connecting to OPay...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Icon icon="solar:card-2-bold" width="16" />
+                          <span>Pay with OPay (Card / Transfer / App)</span>
+                        </>
+                      )}
+                    </button>
+                    <p className="text-[10px] text-center text-text-muted">
+                      Secured by OPay Central Payment Gateway
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Connected Apps / Integrations Showcase */}
             <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
@@ -1933,7 +2009,190 @@ export default function CompanyDashboard() {
         </div>
       )}
 
-      {/* ── MODAL: INVITE TEAM MEMBER ── */}
+      {/* ── MODAL: OPAY HOSTED CASHIER SIMULATION ── */}
+      {opayModalData && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-surface border border-[#00B875]/40 rounded-3xl max-w-md w-full shadow-2xl overflow-hidden relative">
+            
+            {/* OPay Branded Header */}
+            <div className="bg-[#00B875] text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-black text-lg">
+                  <Icon icon="solar:card-2-bold" width="22" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm tracking-tight">OPay Central Cashier</h3>
+                  <p className="text-[10px] text-white/80 font-medium flex items-center gap-1">
+                    <Icon icon="solar:shield-check-bold" width="12" /> Official Merchant Checkout
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setOpayModalData(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition cursor-pointer"
+              >
+                <Icon icon="solar:close-circle-bold" width="20" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 text-xs">
+              
+              {/* Order Info & Amount Card */}
+              <div className="bg-surface-2/80 border border-border rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Merchant Order</span>
+                  <span className="font-bold text-text-primary text-xs truncate max-w-[180px] block">
+                    {currentCompany?.name || 'MuviDB Studio Pro'}
+                  </span>
+                  <span className="text-[10px] font-mono text-text-muted">
+                    {opayModalData.reference}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Total Amount</span>
+                  <span className="text-xl font-black text-[#00B875]">₦25,000</span>
+                  <span className="text-[9px] text-text-muted block">NGN</span>
+                </div>
+              </div>
+
+              {/* Payment Channel Selector */}
+              <div>
+                <label className="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2">
+                  Choose Payment Method
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOpayMethod('card')}
+                    className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 cursor-pointer ${
+                      selectedOpayMethod === 'card'
+                        ? 'border-[#00B875] bg-[#00B875]/10 text-text-primary font-bold shadow-sm'
+                        : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <Icon icon="solar:card-bold" width="18" className={selectedOpayMethod === 'card' ? 'text-[#00B875]' : ''} />
+                    <span className="text-[11px]">Bank Card</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOpayMethod('wallet')}
+                    className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 cursor-pointer ${
+                      selectedOpayMethod === 'wallet'
+                        ? 'border-[#00B875] bg-[#00B875]/10 text-text-primary font-bold shadow-sm'
+                        : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <Icon icon="solar:smartphone-2-bold" width="18" className={selectedOpayMethod === 'wallet' ? 'text-[#00B875]' : ''} />
+                    <span className="text-[11px]">OPay Wallet</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOpayMethod('transfer')}
+                    className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 cursor-pointer ${
+                      selectedOpayMethod === 'transfer'
+                        ? 'border-[#00B875] bg-[#00B875]/10 text-text-primary font-bold shadow-sm'
+                        : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <Icon icon="solar:bank-bold" width="18" className={selectedOpayMethod === 'transfer' ? 'text-[#00B875]' : ''} />
+                    <span className="text-[11px]">Transfer</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Method Details simulation */}
+              {selectedOpayMethod === 'card' && (
+                <div className="p-3.5 bg-surface-2 border border-border rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-text-muted">
+                    <span>Card Number</span>
+                    <span className="text-[10px] text-emerald-500 font-bold">Mastercard / Visa / Verve</span>
+                  </div>
+                  <div className="font-mono text-xs font-bold text-text-primary tracking-widest bg-surface p-2 rounded-lg border border-border">
+                    5399 •••• •••• 8910
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1 bg-surface p-2 rounded-lg border border-border font-mono text-[11px] text-text-muted">
+                      EXP: 12/28
+                    </div>
+                    <div className="w-16 bg-surface p-2 rounded-lg border border-border font-mono text-[11px] text-text-muted text-center">
+                      CVV: •••
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedOpayMethod === 'wallet' && (
+                <div className="p-3.5 bg-surface-2 border border-border rounded-xl space-y-1.5 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-[#00B875]/15 text-[#00B875] flex items-center justify-center mx-auto mb-1">
+                    <Icon icon="solar:qr-code-bold" width="24" />
+                  </div>
+                  <p className="font-bold text-text-primary text-xs">OPay Express One-Click</p>
+                  <p className="text-[11px] text-text-muted">
+                    Debit your registered OPay account: <span className="font-mono font-bold text-text-primary">256626100609333</span>
+                  </p>
+                </div>
+              )}
+
+              {selectedOpayMethod === 'transfer' && (
+                <div className="p-3.5 bg-surface-2 border border-border rounded-xl space-y-1 text-center">
+                  <p className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Dynamic Virtual Account</p>
+                  <p className="font-mono text-base font-black text-text-primary tracking-wider">9028 411 902</p>
+                  <p className="text-[11px] text-[#00B875] font-bold">OPay Digital Services Limited</p>
+                </div>
+              )}
+
+              {/* Merchant Security Badge */}
+              <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-[11px] text-emerald-400">
+                <Icon icon="solar:shield-check-bold" width="16" className="shrink-0" />
+                <span>OPay Test Sandbox: Click Authorize to test live plan activation and elevate your company's API access limits instantly.</span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setOpayModalData(null)}
+                  disabled={confirmingOpayPayment}
+                  className="w-1/3 py-3 rounded-xl bg-surface-2 border border-border text-text-muted hover:text-text-primary font-bold transition text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmMockOpay}
+                  disabled={confirmingOpayPayment}
+                  className="w-2/3 py-3 rounded-xl bg-[#00B875] hover:bg-[#009E64] text-white font-extrabold transition text-xs shadow-lg shadow-[#00B875]/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {confirmingOpayPayment ? (
+                    <>
+                      <Icon icon="solar:restart-linear" className="animate-spin" width="16" />
+                      <span>Authorizing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon icon="solar:lock-keyhole-bold" width="14" />
+                      <span>Authorize & Pay ₦25,000</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <p className="text-[10px] text-center text-text-muted">
+                Merchant ID: 256626100609333 • PCI DSS Level 1 Certified
+              </p>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {inviteModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 shadow-2xl">

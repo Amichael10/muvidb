@@ -8,6 +8,7 @@ export default defineConfig(({ mode, isSsrBuild }) => {
   // loadEnv reads .env files; process.env catches Vercel-injected vars at build time.
   // We merge both so the build works locally (via .env) and on Vercel (via process.env).
   const env = { ...process.env, ...loadEnv(mode, '.', '') };
+  Object.assign(process.env, env);
   return {
     plugins: [
       // reactRouter() supplies React/JSX handling and Fast Refresh itself, so
@@ -477,6 +478,45 @@ export default defineConfig(({ mode, isSsrBuild }) => {
                 body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
               }
               const { default: handler } = await import('./api/automation.js');
+              await handler(
+                { headers: req.headers, query: Object.fromEntries(url.searchParams), body, method: req.method, url: req.url },
+                {
+                  statusCode: 200,
+                  status: function (code) {
+                    this.statusCode = code;
+                    return this;
+                  },
+                  json: (data) => {
+                    res.statusCode = res.statusCode || 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(data));
+                  },
+                  setHeader: (k, v) => res.setHeader(k, v),
+                  end: () => res.end(),
+                }
+              );
+            } catch (err) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
+          },
+        },
+        '/api/opay': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              let body = {};
+              if (req.method === 'POST') {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                const raw = Buffer.concat(chunks).toString('utf8');
+                body = raw ? JSON.parse(raw) : {};
+              }
+              const mod = await import('./api/_lib/opay_handler.js');
+              const handler = mod.handleOpay || mod.default;
               await handler(
                 { headers: req.headers, query: Object.fromEntries(url.searchParams), body, method: req.method, url: req.url },
                 {
