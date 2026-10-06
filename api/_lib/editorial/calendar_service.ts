@@ -314,10 +314,22 @@ export async function generateDailyScheduleDrafts(options: GenerateScheduleDraft
 
       try {
         const candidates = await fetchSeriesCandidates(contentType, 20);
-        const candidate = candidates.find(c => !usedEntityIds.has(c.id)) || candidates[0];
+        const { isLikelyLandscapeOrThumbnailUrl } = await import('./candidate_strategy.js');
+        const candidate = candidates.find(c => {
+          if (usedEntityIds.has(c.id)) return false;
+          if (contentType === 'where_to_watch' || contentType === 'whats_on_stage') {
+            return Boolean(c.imageUrl && !isLikelyLandscapeOrThumbnailUrl(c.imageUrl));
+          }
+          return true;
+        }) || candidates.find(c => {
+          if (contentType === 'where_to_watch' || contentType === 'whats_on_stage') {
+            return Boolean(c.imageUrl && !isLikelyLandscapeOrThumbnailUrl(c.imageUrl));
+          }
+          return true;
+        }) || null;
 
         if (!candidate) {
-          console.warn(`[calendar_service] No candidates found for ${contentType} on ${dateStr}`);
+          console.warn(`[calendar_service] No eligible portrait candidates found for ${contentType} on ${dateStr}`);
           continue;
         }
 

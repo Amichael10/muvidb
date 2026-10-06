@@ -1,5 +1,5 @@
 import { resolveDestinationConnection } from './social-studio/destination-routing.js';
-import { downloadSocialImage, preparePoster, socialPhotoUrl } from './social-studio/content/poster-media.js';
+import { downloadSocialImage, preparePoster, socialPhotoUrl, isLikelyLandscapeOrThumbnailUrl, validatePosterUrlIsHighResPortrait } from './social-studio/content/poster-media.js';
 import { assertCarouselVariantsReady } from './social-studio/domain/carousel-validation.js';
 import type { User } from '@supabase/supabase-js';
 import type { VercelRequest } from '@vercel/node';
@@ -1028,7 +1028,7 @@ async function processJob(job: any, lockedBy: string, now: Date) {
     if (adapter instanceof TikTokPlatformAdapter && !job.provider_publish_id && assetUrl && !/\.(mp4|mov|webm)(?:$|\?)/i.test(assetUrl)) {
       const preparedUrls: string[] = [];
       for (const [index, url] of (assetUrls.length ? assetUrls : [assetUrl]).entries()) {
-        const prepared = await preparePoster(await downloadSocialImage(url), false);
+        const prepared = await preparePoster(await downloadSocialImage(url));
         const path = `tiktok/${variant.id}/${index}.jpg`;
         const { error } = await supabase.storage.from(getAssetBucket()).upload(path, prepared.jpeg, { contentType: 'image/jpeg', upsert: true });
         if (error) throw error;
@@ -1037,6 +1037,50 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       assetUrl = preparedUrls[0];
       assetUrls = preparedUrls;
     }
+
+    // ── Strict Pre-Publish Validation: Under NO condition post landscape or low-res posters ──
+    const isImageVariant = !/\.(mp4|mov|webm)(?:$|\?)/i.test(assetUrl || '');
+    const isPosterJob = Boolean(
+      variant.platform_options?.poster_only ||
+      variant.platform_options?.poster_source_url ||
+      contentItem.content_type === 'where_to_watch' ||
+      contentItem.content_type === 'whats_on_stage' ||
+      variant.platform_options?.asset_format === 'portrait_4_5'
+    );
+
+    if (isImageVariant && isPosterJob) {
+      const urlsToCheck = isCarousel && assetUrls.length ? assetUrls : (assetUrl ? [assetUrl] : []);
+      if (!urlsToCheck.length) {
+        throw new SocialPlatformError({
+          platform: variant.platform,
+          code: 'missing_poster_asset',
+          message: 'Social Studio publication blocked: poster asset is missing.',
+          retryable: false,
+        });
+      }
+      for (const testUrl of urlsToCheck) {
+        if (isLikelyLandscapeOrThumbnailUrl(testUrl)) {
+          throw new SocialPlatformError({
+            platform: variant.platform,
+            code: 'landscape_poster_rejected',
+            message: `Social Studio publication blocked: landscape/thumbnail artwork detected (${testUrl}). On no condition can Social Studio post landscape artwork.`,
+            retryable: false,
+          });
+        }
+        try {
+          await validatePosterUrlIsHighResPortrait(testUrl);
+        } catch (verr: any) {
+          if (verr instanceof SocialPlatformError) throw verr;
+          throw new SocialPlatformError({
+            platform: variant.platform,
+            code: 'landscape_poster_rejected',
+            message: `Social Studio publication blocked: artwork failed portrait rule (${verr?.message}). Only high-resolution portrait posters are allowed.`,
+            retryable: false,
+          });
+        }
+      }
+    }
+
     const result = adapter instanceof TikTokPlatformAdapter && job.provider_publish_id
       ? await adapter.checkPublishStatus(
           String(job.provider_publish_id),
@@ -1690,9 +1734,8 @@ export async function syncContentItemWithSource(
 
   if ((changes.includes('poster') || options.force) && posterUrlToFetch) {
     try {
-      const isStage = freshSnapshot.kind === 'whats_on_stage';
       const rawImage = await downloadSocialImage(posterUrlToFetch);
-      const poster = await preparePoster(rawImage, isStage);
+      const poster = await preparePoster(rawImage);
       const assetResult = await storePosterAsset(item.id, poster, posterUrlToFetch);
       newAssetId = assetResult.rows[0]?.id || null;
       newAssetUrl = assetResult.rows[0]?.publicUrl || null;
@@ -2013,9 +2056,9 @@ export async function generateSocialDraft(
   }
 
   const posterOnly = (input.contentType === 'where_to_watch' || input.contentType === 'whats_on_stage') && !input.skipAssets;
-  const isStage = snapshot.kind === 'whats_on_stage';
-  const poster = posterOnly && (snapshot.kind === 'upcoming_movie' || isStage)
-    ? await preparePoster(await downloadSocialImage((snapshot as any).posterUrl || ''), isStage) : null;
+  const isPosterKind = snapshot.kind === 'upcoming_movie' || snapshot.kind === 'whats_on_stage';
+  const poster = posterOnly && isPosterKind
+    ? await preparePoster(await downloadSocialImage((snapshot as any).posterUrl || '')) : null;
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
     snapshot.kind === 'actor_spotlight'

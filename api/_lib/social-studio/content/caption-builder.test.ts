@@ -113,7 +113,7 @@ describe('buildVariantContent', () => {
     expect(content.caption).toContain('New Look at Jagun Jagun (2026) 🎬');
     expect(content.caption).toContain('A warrior never kneels.');
     expect(content.caption).toContain('Starring:\nFemi Adebayo');
-    expect(content.caption).toContain('Are you seated for this one?');
+    expect(content.caption).toContain('Are you adding this to your watchlist?');
     expect(content.hashtags).toContain('ComingSoon');
   });
 

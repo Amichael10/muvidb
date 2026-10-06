@@ -84,6 +84,13 @@ async function fetchArtwork(url: string): Promise<Artwork> {
   const size = imageSize(buffer);
   if (!size || !size.width || !size.height) return null;
 
+  // Strict Rule: Never use landscape or square artwork as poster artwork.
+  // Must be strictly portrait with aspect ratio >= 1.15:1.
+  if (size.width >= size.height || (size.height / size.width) < 1.15) return null;
+
+  // Strict Rule: Must be high-resolution (minimum 450x600).
+  if (size.width < 450 || size.height < 600) return null;
+
   return {
     dataUri: `data:${type};base64,${buffer.toString('base64')}`,
     width: size.width,
@@ -93,6 +100,10 @@ async function fetchArtwork(url: string): Promise<Artwork> {
 
 async function loadArtwork(url: string | null): Promise<Artwork> {
   if (!url) return null;
+  // Reject obvious video thumbnails or landscape banners up front
+  if (/ytimg\.com|img\.youtube\.com|hqdefault|maxresdefault|sddefault|mqdefault|\/vi\/|(?:^|[-_/])(?:backdrop|banner|landscape|wide|horizontal)(?:[-_./]|$)/i.test(url)) {
+    return null;
+  }
 
   for (const candidate of artworkCandidates(url)) {
     try {

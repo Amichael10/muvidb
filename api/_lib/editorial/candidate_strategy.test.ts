@@ -43,4 +43,12 @@ describe('editorial candidate strategy', () => {
     ];
     expect(rankAndDedupeFilms(films, 'upcoming', 10, now).map(f => f.id)).toEqual(['future']);
   });
+
+  it('excludes films whose poster URL is a landscape YouTube thumbnail or banner', () => {
+    const films = [
+      { id: 'landscape-yt', release_date: '2026-08-01', release_type: 'docuth', poster_url: 'https://i.ytimg.com/vi/xyz/hqdefault.jpg', updated_at: '2026-08-23' },
+      { id: 'valid-portrait', release_date: '2026-08-01', release_type: 'docuth', poster_url: 'https://cloud.bakkaz.name.ng/poster1.jpg', updated_at: '2026-08-23' },
+    ];
+    expect(rankAndDedupeFilms(films, 'streaming', 10, now).map(f => f.id)).toEqual(['valid-portrait']);
+  });
 });

@@ -75,7 +75,15 @@ export function classifyFilmLifecycle(film: any, referenceDate = new Date()): Fi
   return 'catalogue';
 }
 
+export function isLikelyLandscapeOrThumbnailUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string' || !url.trim()) return false;
+  return /ytimg\.com|img\.youtube\.com|hqdefault|maxresdefault|sddefault|mqdefault|\/vi\/|(?:^|[-_/])(?:backdrop|banner|landscape|wide|horizontal)(?:[-_./]|$)/i.test(url);
+}
+
 export function isFilmEligibleForIntent(film: any, intent: EditorialSeriesIntent, referenceDate = new Date()): boolean {
+  // Films with obvious landscape video thumbnails or banners cannot be posted as posters
+  if (isLikelyLandscapeOrThumbnailUrl(film?.poster_url)) return false;
+
   const lifecycle = classifyFilmLifecycle(film, referenceDate);
   if (intent === 'streaming') return lifecycle === 'now_streaming';
   if (intent === 'upcoming') {
@@ -93,7 +101,8 @@ export function filmCandidateScore(film: any, intent: EditorialSeriesIntent, ref
   const release = dateValue(film?.release_date);
   const updated = dateValue(film?.updated_at) || dateValue(film?.created_at) || 0;
   const freshnessDays = updated ? Math.max(0, (referenceDate.getTime() - updated) / 86_400_000) : 3650;
-  const completeness = (film?.poster_url ? 25 : 0) + (film?.synopsis ? 10 : 0) + (film?.backdrop_url || film?.backdrop ? 5 : 0);
+  const hasLandscapePoster = isLikelyLandscapeOrThumbnailUrl(film?.poster_url);
+  const completeness = (film?.poster_url && !hasLandscapePoster ? 25 : 0) + (film?.synopsis ? 10 : 0) + (film?.backdrop_url || film?.backdrop ? 5 : 0);
 
   if (intent === 'streaming') {
     return (PLATFORM_PRIORITY[platform || ''] || 0) + Math.max(0, 120 - freshnessDays) + completeness;
