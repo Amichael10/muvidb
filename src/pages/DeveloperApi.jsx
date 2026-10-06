@@ -614,23 +614,8 @@ export default function DeveloperApi() {
   }, [selectedEndpoint, activeCodeTab, playgroundParams]);
 
   return (
-    <div className="min-h-screen bg-[#07090D] text-slate-100 selection:bg-brand selection:text-white relative overflow-x-hidden font-sans">
-      
-      {/* ── Ambient Radial Glows & Grid Mesh ── */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[550px] bg-gradient-to-b from-brand/15 via-emerald-500/5 to-transparent rounded-full blur-[140px]" />
-        <div className="absolute top-[35%] right-[-5%] w-[650px] h-[650px] bg-blue-600/10 rounded-full blur-[150px]" />
-        <div className="absolute top-[65%] left-[-5%] w-[550px] h-[550px] bg-amber-500/10 rounded-full blur-[150px]" />
-        <div 
-          className="absolute inset-0 opacity-[0.035]" 
-          style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0)`,
-            backgroundSize: '36px 36px'
-          }} 
-        />
-      </div>
-
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-32 space-y-28">
+    <div className="min-h-screen bg-[#080A0D] text-slate-100 selection:bg-brand selection:text-white relative overflow-x-hidden font-sans">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-32 space-y-20">
 
         {/* ── Navigation Strip ── */}
         <header className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
@@ -679,9 +664,7 @@ export default function DeveloperApi() {
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight font-heading text-white leading-[1.08]">
             The Definitive Data Engine for{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand via-amber-300 to-amber-100">
-              African Cinema
-            </span>
+            <span className="text-brand">African Cinema</span>
           </h1>
 
           <p className="text-base sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
@@ -802,10 +785,10 @@ export default function DeveloperApi() {
                     <button
                       key={endpoint.id}
                       onClick={() => setSelectedEndpoint(endpoint)}
-                      className={`w-full text-left p-4 rounded-2xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
+                      className={`w-full text-left p-4 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
                         isSelected
-                          ? 'bg-gradient-to-r from-brand/10 via-surface-2 to-surface border-brand/60 shadow-lg shadow-brand/10'
-                          : 'bg-surface/50 border-white/5 hover:bg-surface/80 hover:border-white/15'
+                          ? 'bg-[#141A22] border-brand shadow-sm text-white'
+                          : 'bg-[#0E1217] border-white/10 hover:border-white/20 hover:bg-[#121620]'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -1103,8 +1086,8 @@ export default function DeveloperApi() {
             </div>
 
             {/* 2. Pro Developer (Featured Commercial Tier) */}
-            <div className="rounded-3xl bg-gradient-to-b from-[#141A24] to-[#0A0D12] border-2 border-brand p-8 flex flex-col justify-between relative shadow-2xl shadow-brand/20 backdrop-blur-xl">
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-brand text-white text-[11px] font-extrabold uppercase tracking-wider shadow-md">
+            <div className="rounded-2xl bg-[#141A22] border-2 border-brand p-8 flex flex-col justify-between relative shadow-lg">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-brand text-white text-[10px] font-bold uppercase tracking-wider">
                 Recommended for Apps &amp; Startups
               </div>
 
@@ -1339,7 +1322,7 @@ export default function DeveloperApi() {
         </section>
 
         {/* ── Bottom CTA ── */}
-        <section className="rounded-3xl bg-gradient-to-r from-brand/20 via-[#121620] to-amber-500/10 border border-brand/30 p-8 sm:p-14 text-center space-y-6 relative overflow-hidden shadow-2xl">
+        <section className="rounded-2xl bg-[#0E1217] border border-white/10 p-8 sm:p-12 text-center space-y-6 relative overflow-hidden">
           <div className="max-w-2xl mx-auto space-y-3">
             <h2 className="text-3xl sm:text-4xl font-black text-white font-heading">
               Ready to Build with African Cinema Data?

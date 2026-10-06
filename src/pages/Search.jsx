@@ -126,9 +126,19 @@ export default function Search() {
                 Search
               </button>
             </form>
+            <div className="mt-3 flex items-center justify-between text-xs px-1">
+              <span className="text-text-muted text-[11px]">Looking for complex multi-criteria or collaborations?</span>
+              <Link
+                to="/advanced-search"
+                className="inline-flex items-center gap-1.5 text-brand hover:underline font-bold text-xs"
+              >
+                <Icon icon="solar:tuning-square-2-bold" className="text-sm" />
+                <span>Advanced Search &amp; Collaborations &rarr;</span>
+              </Link>
+            </div>
             {initialQuery && (
-              <p className="mt-4 sm:mt-6 text-center text-xs font-bold text-text-secondary opacity-80">
-                Results for <span className="text-brand">"{initialQuery}"</span>
+              <p className="mt-3 sm:mt-4 text-center text-xs font-bold text-text-secondary opacity-80">
+                Results for <span className="text-brand">&quot;{initialQuery}&quot;</span>
               </p>
             )}
           </div>

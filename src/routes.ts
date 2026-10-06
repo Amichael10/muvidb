@@ -53,6 +53,8 @@ export default [
   route('about', 'pages/About.jsx'),
   route('contact', 'pages/Contact.jsx'),
   route('careers', 'pages/Careers.jsx'),
+  route('search/advanced', 'pages/AdvancedSearch.jsx'),
+  route('advanced-search', 'pages/AdvancedSearch.jsx', { id: 'advanced-search-alias' }),
   route('tools/title-search', 'pages/TitleChecker.jsx'),
   route('title-search', 'pages/TitleChecker.jsx', { id: 'title-search-alias' }),
   route('tools/title-checker', 'pages/TitleChecker.jsx', { id: 'tools-title-checker-alias' }),

@@ -92,6 +92,7 @@ export default function Navbar() {
   ];
 
   const moreLinks = [
+    { name: 'Advanced Search', path: '/advanced-search', icon: 'solar:tuning-square-2-linear' },
     { name: 'Cinemas', path: '/cinemas', icon: 'solar:videocamera-linear' },
     { name: 'Channels', path: '/channels', icon: 'solar:tv-linear' },
     { name: 'Awards', path: '/awards', icon: 'solar:cup-star-linear' },
@@ -381,6 +382,21 @@ export default function Navbar() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs text-text-muted">Looking for complex multi-criteria, box office, or collaborations?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSearchOpen(false);
+                  navigate('/advanced-search');
+                }}
+                className="text-xs font-bold text-brand hover:underline flex items-center gap-1.5"
+              >
+                <Icon icon="solar:tuning-square-2-bold" />
+                <span>Open Advanced Search &amp; Collaborations &rarr;</span>
+              </button>
             </div>
           </div>
         </div>
