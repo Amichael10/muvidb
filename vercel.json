@@ -183,6 +183,14 @@
       "destination": "/api/data?_r=person-media"
     },
     {
+      "source": "/api/opay/:path*",
+      "destination": "/api/data?_r=opay&path=:path*"
+    },
+    {
+      "source": "/api/webhooks/opay",
+      "destination": "/api/data?_r=webhooks/opay"
+    },
+    {
       "source": "/api/youtube",
       "destination": "/api/external?provider=youtube"
     },

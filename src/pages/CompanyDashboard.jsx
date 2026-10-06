@@ -104,6 +104,39 @@ export default function CompanyDashboard() {
   // API Access state
   const [apiKey, setApiKey] = useState('mvd_live_7e8b91a24d5f6c802143eb99a4');
   const [keyCopied, setKeyCopied] = useState(false);
+  const [checkingOutOpay, setCheckingOutOpay] = useState(false);
+
+  const handleOpayCheckout = async (amount = 25000, planType = 'pro_monthly') => {
+    setCheckingOutOpay(true);
+    try {
+      const res = await fetch('/api/opay?op=initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: currentCompany?.id,
+          userEmail: user?.email,
+          userName: user?.user_metadata?.name || currentCompany?.name || 'Studio Representative',
+          amount,
+          planType,
+          returnUrl: window.location.origin + '/company/dashboard?tab=api&payment=success',
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (data?.cashierUrl) {
+        toast.success('Redirecting to OPay Cashier...');
+        window.location.href = data.cashierUrl;
+      } else {
+        toast.error(data?.error || 'Failed to initialize OPay checkout. Please verify OPay credentials.');
+      }
+    } catch (err) {
+      console.error('OPay checkout error:', err);
+      toast.error('Failed to connect to payment gateway.');
+    } finally {
+      setCheckingOutOpay(false);
+    }
+  };
 
   // Team Invite Modal
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
@@ -1285,6 +1318,51 @@ export default function CompanyDashboard() {
                   View API Documentation <Icon icon="solar:arrow-right-up-linear" width="14" />
                 </Link>
                 <span className="text-text-muted text-[11px]">Rate Limit: 10,000 req/day</span>
+              </div>
+            </div>
+
+            {/* OPay Merchant Checkout Card */}
+            <div className="bg-gradient-to-br from-surface to-surface-2 border border-emerald-500/30 rounded-2xl p-6 shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                <div className="space-y-2 max-w-lg">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-wider">
+                    <Icon icon="solar:shield-check-bold" width="12" /> OPay Merchant Checkout
+                  </div>
+                  <h3 className="text-lg font-bold text-text-primary">Upgrade to Studio Pro API Plan</h3>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Unlock 100,000 requests/day, live automated box office data webhooks, dedicated tech support, and instant catalog indexing.
+                  </p>
+                  <div className="flex items-baseline gap-2 pt-1">
+                    <span className="text-2xl font-black text-text-primary">₦25,000</span>
+                    <span className="text-xs text-text-muted font-semibold">/ month</span>
+                  </div>
+                </div>
+
+                <div className="shrink-0 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpayCheckout(25000, 'pro_monthly')}
+                    disabled={checkingOutOpay}
+                    className="bg-[#00B875] hover:bg-[#009E64] text-white font-extrabold px-6 py-3 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-[#00B875]/25 disabled:opacity-50 cursor-pointer"
+                  >
+                    {checkingOutOpay ? (
+                      <>
+                        <Icon icon="solar:restart-linear" className="animate-spin" width="16" />
+                        <span>Connecting to OPay...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Icon icon="solar:card-2-bold" width="16" />
+                        <span>Pay with OPay (Card / Transfer / App)</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[10px] text-center text-text-muted">
+                    Secured by OPay Central Payment Gateway
+                  </p>
+                </div>
               </div>
             </div>
 
