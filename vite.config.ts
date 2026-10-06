@@ -542,6 +542,45 @@ export default defineConfig(({ mode, isSsrBuild }) => {
             return false;
           },
         },
+        '/api/company-claims': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              let body = {};
+              if (req.method === 'POST') {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                const raw = Buffer.concat(chunks).toString('utf8');
+                body = raw ? JSON.parse(raw) : {};
+              }
+              const mod = await import('./api/_lib/company_claims_handler.js');
+              const handler = mod.handleCompanyClaims || mod.default;
+              await handler(
+                { headers: req.headers, query: Object.fromEntries(url.searchParams), body, method: req.method, url: req.url },
+                {
+                  statusCode: 200,
+                  status: function (code) {
+                    this.statusCode = code;
+                    return this;
+                  },
+                  json: (data) => {
+                    res.statusCode = res.statusCode || 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(data));
+                  },
+                  setHeader: (k, v) => res.setHeader(k, v),
+                  end: () => res.end(),
+                }
+              );
+            } catch (err) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
+          },
+        },
         '/api': {
           target: 'http://localhost:3001',
           bypass: (req, res) => {
@@ -573,6 +612,7 @@ export default defineConfig(({ mode, isSsrBuild }) => {
       },
     },
     ssr: {
+      noExternal: ['react-router-dom'],
       external: ['tesseract.js'],
     },
   };

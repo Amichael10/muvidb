@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
@@ -303,13 +304,20 @@ export default function CriticReviewsSection({ filmId, playId, user, filmSlug = 
       )}
 
       {/* Admin Management Modal */}
-      {showAdminModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-surface border border-border rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-4 relative">
+      {showAdminModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[300] flex items-start sm:items-center justify-center p-3 sm:p-6 pt-20 sm:pt-24 pb-10 overflow-y-auto bg-black/85 backdrop-blur-md animate-fade-in">
+          {/* Backdrop click to close */}
+          <div 
+            className="fixed inset-0 bg-transparent" 
+            onClick={() => setShowAdminModal(false)}
+            aria-label="Close dialog" 
+          />
+          <div className="bg-surface border border-border rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5 sm:p-7 shadow-2xl space-y-4 relative z-10 my-auto">
             <button
               type="button"
               onClick={() => setShowAdminModal(false)}
-              className="absolute top-4 right-4 p-2 text-text-muted hover:text-text-primary rounded-xl hover:bg-surface-2 transition-colors cursor-pointer"
+              className="absolute top-4 right-4 p-2 text-text-muted hover:text-text-primary rounded-xl hover:bg-surface-2 transition-colors cursor-pointer z-20"
+              title="Close modal"
             >
               <Icon icon="solar:close-circle-bold" className="text-xl" />
             </button>
@@ -322,7 +330,8 @@ export default function CriticReviewsSection({ filmId, playId, user, filmSlug = 
               }}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );

@@ -18,6 +18,7 @@ import {
 } from '../lib/companyClient';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { formatFilmTitle, formatPersonName, toTitleCase } from '../utils/format';
+import { PLANS } from '../config/plans';
 
 export default function CompanyDashboard() {
   const { user } = useAuth();
@@ -424,12 +425,20 @@ export default function CompanyDashboard() {
     }
   };
 
-  // Save Talent Representation
+  // Save Talent Representation (Free tier: max 3 talents, Pro tier: unlimited)
   const handleSaveTalentRep = async (e) => {
     e.preventDefault();
     if (!currentCompany?.id) return;
     if (!selectedPerson?.id) {
       toast.error('Please select a person to represent');
+      return;
+    }
+
+    const currentCount = companyDetails?.talents?.length || 0;
+    if (currentCompany?.api_tier !== 'pro' && currentCount >= 3) {
+      toast.error(`Free Tier Limit: Studio Standard allows up to 3 roster talents. Upgrade to Studio Pro for unlimited representation.`);
+      setTalentModalOpen(false);
+      handleOpayCheckout(PLANS.studio_pro_monthly.amount, 'pro_monthly');
       return;
     }
 
@@ -1166,13 +1175,37 @@ export default function CompanyDashboard() {
         {/* Tab 4: TALENT ROSTER */}
         {activeTab === 'talents' && (
           <div className="p-6 max-w-7xl w-full space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-bold text-text-primary">Represented Talent Roster</h2>
-                <p className="text-xs text-text-muted">Manage signed actors, directors, and creators represented by your agency or studio</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-lg font-bold text-text-primary">Represented Talent Roster</h2>
+                  {currentCompany?.api_tier === 'pro' ? (
+                    <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1" title="Studio Pro members enjoy unlimited talent roster seats and verified badges">
+                      <Icon icon="solar:verified-check-bold" width="12" /> Unlimited Pro
+                    </span>
+                  ) : (
+                    <span
+                      className="text-[10px] font-bold text-text-muted bg-surface-2 border border-border px-2.5 py-0.5 rounded-full flex items-center gap-1"
+                      title="Studio Standard free tier includes up to 3 roster talents. Upgrade to Studio Pro for unlimited seats."
+                    >
+                      <Icon icon="solar:info-circle-linear" width="12" /> {companyDetails?.talents?.length || 0} / 3 Free Seats
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-text-muted">
+                  Manage signed actors, directors, and creators represented by your agency or studio
+                </p>
               </div>
+
               <button
+                type="button"
                 onClick={() => {
+                  const currentCount = companyDetails?.talents?.length || 0;
+                  if (currentCompany?.api_tier !== 'pro' && currentCount >= 3) {
+                    toast.error('Free Tier Limit: Studio Standard allows up to 3 talents. Upgrade to Studio Pro for unlimited roster.');
+                    handleOpayCheckout(25000, 'pro_monthly');
+                    return;
+                  }
                   setSelectedPerson(null);
                   setPersonQuery('');
                   setTalentForm({
@@ -1185,10 +1218,10 @@ export default function CompanyDashboard() {
                   });
                   setTalentModalOpen(true);
                 }}
-                className="bg-brand text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition hover:bg-brand/90"
+                className="bg-brand text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition hover:bg-brand/90 cursor-pointer shadow-md shadow-brand/20 shrink-0"
               >
                 <Icon icon="solar:user-plus-bold" width="16" />
-                + Add Talent to Roster
+                <span>+ Add Talent to Roster</span>
               </button>
             </div>
 
@@ -1410,7 +1443,7 @@ export default function CompanyDashboard() {
                       Unlock 100,000 requests/day, live automated box office data webhooks, dedicated tech support, and instant catalog indexing.
                     </p>
                     <div className="flex items-baseline gap-2 pt-1">
-                      <span className="text-2xl font-black text-text-primary">₦25,000</span>
+                      <span className="text-2xl font-black text-text-primary">₦{PLANS.studio_pro_monthly.amount.toLocaleString()}</span>
                       <span className="text-xs text-text-muted font-semibold">/ month</span>
                     </div>
                   </div>
@@ -1418,7 +1451,7 @@ export default function CompanyDashboard() {
                   <div className="shrink-0 flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={() => handleOpayCheckout(25000, 'pro_monthly')}
+                      onClick={() => handleOpayCheckout(PLANS.studio_pro_monthly.amount, 'pro_monthly')}
                       disabled={checkingOutOpay}
                       className="bg-[#00B875] hover:bg-[#009E64] text-white font-extrabold px-6 py-3 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-[#00B875]/25 disabled:opacity-50 cursor-pointer"
                     >
@@ -1535,7 +1568,7 @@ export default function CompanyDashboard() {
 
       {/* ── MODAL: ADD / EDIT MOVIE ── */}
       {movieModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-surface border border-border rounded-2xl max-w-xl w-full p-6 shadow-2xl my-8">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <h3 className="text-base font-bold text-text-primary">
@@ -1683,7 +1716,7 @@ export default function CompanyDashboard() {
 
       {/* ── MODAL: ADD / EDIT CREDIT (Zero Duplicate Guarantee) ── */}
       {creditModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <h3 className="text-sm font-bold text-text-primary">Add Cast / Crew Member</h3>
@@ -1797,7 +1830,7 @@ export default function CompanyDashboard() {
 
       {/* ── MODAL: CREATE NEW PERSON ON THE FLY ── */}
       {newPersonModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <h3 className="text-sm font-bold text-text-primary">Create New Actor / Filmmaker Profile</h3>
@@ -1890,7 +1923,7 @@ export default function CompanyDashboard() {
 
       {/* ── MODAL: TALENT ROSTER ── */}
       {talentModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <h3 className="text-sm font-bold text-text-primary">Add Talent to Agency Roster</h3>
@@ -2011,7 +2044,7 @@ export default function CompanyDashboard() {
 
       {/* ── MODAL: OPAY HOSTED CASHIER SIMULATION ── */}
       {opayModalData && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-surface border border-[#00B875]/40 rounded-3xl max-w-md w-full shadow-2xl overflow-hidden relative">
             
             {/* OPay Branded Header */}
@@ -2194,7 +2227,7 @@ export default function CompanyDashboard() {
       )}
 
       {inviteModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-border mb-4">
               <h3 className="text-sm font-bold text-text-primary">Invite Team Member</h3>

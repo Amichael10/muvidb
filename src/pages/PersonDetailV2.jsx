@@ -24,6 +24,7 @@ import CareerPassportModal from '../components/professional/CareerPassportModal'
 import WhatsAppOptInModal from '../components/person/WhatsAppOptInModal'
 import AddPersonMediaModal from '../components/person/AddPersonMediaModal'
 import PersonPhotoLightboxModal from '../components/person/PersonPhotoLightboxModal'
+import BookingModal from '../components/person/BookingModal'
 
 const PLATFORM_STYLES = {
   cinema:      { label: 'Cinema',   bg: 'bg-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-400' },
@@ -182,6 +183,7 @@ export default function PersonDetailV2() {
   const [whatsappOptInOpen, setWhatsappOptInOpen] = useState(false)
   const [showAddMedia, setShowAddMedia] = useState(false)
   const [addMediaInitialType, setAddMediaInitialType] = useState('video')
+  const [bookingModalOpen, setBookingModalOpen] = useState(false)
 
   // Header Dropdown Menu State
   const [moreActionsOpen, setMoreActionsOpen] = useState(false)
@@ -770,13 +772,57 @@ export default function PersonDetailV2() {
                   <h1 className="text-3xl sm:text-4xl lg:text-5xl font-heading font-black tracking-tight text-text-primary">
                     {formatPersonName(person.name)}
                   </h1>
-                  {person.is_verified && (
+                  {person.is_pro ? (
+                    <span className="bg-amber-500/15 text-amber-400 text-xs font-black px-2.5 py-1 rounded-lg border border-amber-500/40 flex items-center gap-1 shadow-sm shadow-amber-500/10" title="Talent Pro Verified Creator">
+                      <Icon icon="solar:crown-bold" width="14" />
+                      Talent Pro
+                    </span>
+                  ) : person.is_verified ? (
                     <span className="bg-brand/15 text-brand text-xs font-black px-2.5 py-1 rounded-lg border border-brand/30 flex items-center gap-1">
                       <Icon icon="solar:verified-check-bold" width="14" />
                       Verified
                     </span>
-                  )}
+                  ) : null}
                 </div>
+
+                {/* Live Availability Status */}
+                {person.availability_status && (
+                  <div className="pt-2 flex items-center gap-2 flex-wrap">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                      person.availability_status === 'on_set'
+                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                        : person.availability_status === 'booked'
+                        ? 'bg-orange-500/15 border-orange-500/30 text-orange-300'
+                        : person.availability_status === 'not_taking_offers'
+                        ? 'bg-zinc-500/15 border-zinc-500/30 text-zinc-400'
+                        : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        person.availability_status === 'on_set'
+                          ? 'bg-amber-400 animate-pulse'
+                          : person.availability_status === 'booked'
+                          ? 'bg-orange-400'
+                          : person.availability_status === 'not_taking_offers'
+                          ? 'bg-zinc-400'
+                          : 'bg-emerald-400 animate-pulse'
+                      }`} />
+                      <span>
+                        {person.availability_status === 'on_set'
+                          ? 'On Set / Filming'
+                          : person.availability_status === 'booked'
+                          ? 'Booked for Production'
+                          : person.availability_status === 'not_taking_offers'
+                          ? 'Not Accepting Offers'
+                          : 'Available for Bookings'}
+                      </span>
+                    </span>
+                    {person.availability_note && (
+                      <span className="text-[11px] text-text-muted truncate">
+                        • {person.availability_note}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Primary Roles */}
                 <div className="flex flex-wrap items-center gap-2 pt-1.5">
@@ -905,6 +951,18 @@ export default function PersonDetailV2() {
                   </a>
                 )}
 
+                {/* 3. Representation & Talent Booking (Talent Pro & Verified Representation) */}
+                {(person.is_pro || person.booking_email || person.booking_phone || person.booking_whatsapp || representations?.length > 0) && (
+                  <button
+                    onClick={() => setBookingModalOpen(true)}
+                    className="flex-1 sm:flex-none inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 transition whitespace-nowrap shadow-sm group/rep"
+                    title={`View verified booking & agency representation details for ${person.name}`}
+                  >
+                    <Icon icon="solar:letter-bold" width="16" className="text-amber-400 group-hover/rep:scale-110 transition-transform" />
+                    <span>Contact Rep / Book</span>
+                  </button>
+                )}
+
                 {/* Compact Utilities Bar (Share · Socials · More) */}
                 <div className="flex items-center gap-2 shrink-0">
                   {/* 3. Quick Share (Icon button with dropdown) */}
@@ -969,6 +1027,13 @@ export default function PersonDetailV2() {
                             <span>Claim this profile</span>
                           </Link>
                         )}
+                        <button
+                          onClick={() => { setBookingModalOpen(true); setMoreActionsOpen(false); }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-text-primary hover:bg-surface-2 hover:text-amber-400 transition font-medium text-left"
+                        >
+                          <Icon icon="solar:letter-bold" width="16" className="text-amber-400" />
+                          <span>Contact Rep / Book</span>
+                        </button>
                         {person.claimed_by && (
                           <button
                             onClick={() => { setPassportOpen(true); setMoreActionsOpen(false); }}
@@ -1973,6 +2038,13 @@ export default function PersonDetailV2() {
           }}
         />
       )}
+
+      <BookingModal
+        isOpen={bookingModalOpen}
+        onClose={() => setBookingModalOpen(false)}
+        person={person}
+        representations={representations}
+      />
 
     </div>
   )

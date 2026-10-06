@@ -24,7 +24,7 @@
   },
   "functions": {
     "api/ssr.ts": {
-      "includeFiles": "build/server/**",
+      "includeFiles": "{build/server/**,node_modules/react-router/**}",
       "maxDuration": 60
     },
     "api/seo.ts": {

@@ -81,6 +81,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handleOpay } = await import('./_lib/opay_handler.js');
       return handleOpay(req, res);
     }
+    if (key === 'company-claims') {
+      const { handleCompanyClaims } = await import('./_lib/company_claims_handler.js');
+      return handleCompanyClaims(req, res);
+    }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
   } catch (err: any) {

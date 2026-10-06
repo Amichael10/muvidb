@@ -10,7 +10,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Ensure the RR server bundle is copied into this function's deployment.
 export const config = {
-  includeFiles: ['build/server/**'],
+  includeFiles: ['build/server/**', 'node_modules/react-router/**'],
   maxDuration: 60,
 };
 function headerString(
