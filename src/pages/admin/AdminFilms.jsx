@@ -2096,6 +2096,7 @@ export default function AdminFilms() {
             <option value="series">Series</option>
             <option value="mini_series">Mini-series</option>
             <option value="documentary">Documentaries</option>
+            <option value="skit">Skits</option>
           </select>
 
           <select
@@ -2264,6 +2265,8 @@ export default function AdminFilms() {
                                 ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
                                 : film.content_type === 'documentary'
                                 ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                : film.content_type === 'skit'
+                                ? 'bg-pink-500/10 text-pink-500 border-pink-500/20'
                                 : 'bg-surface-3 text-text-muted border-border'
                             }`}>
                               {(film.content_type || 'movie').replace(/_/g, ' ')}
@@ -2788,6 +2791,7 @@ export default function AdminFilms() {
                       <option value="series">Series</option>
                       <option value="mini_series">Mini-series</option>
                       <option value="documentary">Documentary</option>
+                      <option value="skit">Skit</option>
                     </select>
                   </div>
                   <div>

@@ -679,7 +679,8 @@ export default function AdvancedSearch() {
                         { id: 'movie', label: 'Feature Film' },
                         { id: 'series', label: 'TV Series / Show' },
                         { id: 'short', label: 'Short Film' },
-                        { id: 'documentary', label: 'Documentary' }
+                        { id: 'documentary', label: 'Documentary' },
+                        { id: 'skit', label: 'Skit' }
                       ].map(t => {
                         const checked = selectedTypes.includes(t.id);
                         return (

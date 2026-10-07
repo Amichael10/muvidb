@@ -129,6 +129,7 @@ export const CONTENT_TYPE_OPTIONS = [
   { value: 'series', label: 'Series' },
   { value: 'mini_series', label: 'Mini-series' },
   { value: 'documentary', label: 'Documentary' },
+  { value: 'skit', label: 'Skit' },
 ];
 
 /**
