@@ -48,6 +48,14 @@ export default function AdminOutreach() {
   const [editingMessage, setEditingMessage] = useState('');
   const [editingNotes, setEditingNotes] = useState('');
 
+  // Manual Search & Add Actor Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [actorSearch, setActorSearch] = useState('');
+  const [actorSearchResults, setActorSearchResults] = useState([]);
+  const [searchingActors, setSearchingActors] = useState(false);
+  const [customIgByPerson, setCustomIgByPerson] = useState({});
+  const [addingPersonId, setAddingPersonId] = useState(null);
+
   const [template, setTemplate] = useState(() => {
     try {
       return localStorage.getItem(TEMPLATE_KEY) || DEFAULT_OUTREACH_TEMPLATE;
@@ -112,6 +120,88 @@ export default function AdminOutreach() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Debounced search for manual actor outreach adder
+  useEffect(() => {
+    if (!showAddModal || !actorSearch.trim() || actorSearch.trim().length < 2) {
+      setActorSearchResults([]);
+      return;
+    }
+    const timeoutId = setTimeout(async () => {
+      setSearchingActors(true);
+      try {
+        const { data, error } = await supabase
+          .from('people')
+          .select('id, name, slug, photo_url, instagram_url, film_count, popularity_score, known_for_department, claimed_by, is_verified')
+          .ilike('name', `%${actorSearch.trim()}%`)
+          .order('film_count', { ascending: false, nullsFirst: false })
+          .limit(20);
+        if (error) throw error;
+        setActorSearchResults(data || []);
+      } catch (err) {
+        console.error('Failed to search actors:', err);
+      } finally {
+        setSearchingActors(false);
+      }
+    }, 250);
+    return () => clearTimeout(timeoutId);
+  }, [actorSearch, showAddModal]);
+
+  const handleAddActorToOutreach = async (person, customHandle = '') => {
+    setAddingPersonId(person.id);
+    try {
+      let igUrl = person.instagram_url;
+      const handleToUse = (customHandle || customIgByPerson[person.id] || '').trim();
+      if (handleToUse) {
+        const parsed = parseInstagramHandle(handleToUse);
+        if (parsed) {
+          igUrl = `https://instagram.com/${parsed}`;
+          await supabase
+            .from('people')
+            .update({ instagram_url: igUrl })
+            .eq('id', person.id);
+        }
+      }
+
+      if (!igUrl) {
+        toast.error(`Please provide an Instagram handle or profile URL for ${person.name}`);
+        return;
+      }
+
+      const payload = {
+        person_id: person.id,
+        status: 'pending',
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id || null,
+      };
+
+      const { data, error } = await supabase
+        .from('artist_outreach')
+        .upsert(payload, { onConflict: 'person_id' })
+        .select('id, person_id, status, notes, last_message, contacted_at, updated_at')
+        .single();
+      if (error) throw error;
+
+      const updatedPerson = { ...person, instagram_url: igUrl };
+
+      setPeople((prev) => {
+        const exists = prev.some((p) => p.id === person.id);
+        return exists ? prev.map((p) => (p.id === person.id ? updatedPerson : p)) : [updatedPerson, ...prev];
+      });
+
+      setOutreachByPerson((prev) => ({
+        ...prev,
+        [person.id]: data,
+      }));
+
+      toast.success(`Added ${person.name} to outreach studio!`);
+    } catch (err) {
+      console.error('Failed to add actor to outreach:', err);
+      toast.error(err.message || 'Failed to add actor');
+    } finally {
+      setAddingPersonId(null);
+    }
+  };
 
   // AI Batch Generator trigger
   const handleGenerateAiBatch = async () => {
@@ -418,6 +508,14 @@ export default function AdminOutreach() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand text-xs font-bold text-white shadow-lg shadow-brand/20 hover:bg-brand/90 transition-all cursor-pointer"
+          >
+            <Icon icon="solar:user-plus-bold" className="text-sm" />
+            Add Actor to Queue
+          </button>
           <button
             type="button"
             onClick={load}
@@ -879,6 +977,200 @@ export default function AdminOutreach() {
                 className="px-5 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:opacity-90 shadow-md shadow-brand/20"
               >
                 Save & Queue Pitch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Search & Add Actor Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="card-cal w-full max-w-2xl max-h-[85vh] flex flex-col p-6 rounded-3xl border border-border shadow-2xl bg-surface">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-brand/10 text-brand flex items-center justify-center border border-brand/20">
+                  <Icon icon="solar:user-plus-bold" className="text-xl" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-text-primary">Add Actor to Outreach Queue</h3>
+                  <p className="text-xs text-text-muted">Search actors by name to check or assign Instagram IDs and queue them for outreach.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setActorSearch('');
+                  setActorSearchResults([]);
+                }}
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
+              >
+                <Icon icon="solar:close-circle-bold" className="text-xl" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="py-4">
+              <div className="relative">
+                <Icon
+                  icon="solar:magnifer-linear"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-base"
+                />
+                <input
+                  type="text"
+                  autoFocus
+                  value={actorSearch}
+                  onChange={(e) => setActorSearch(e.target.value)}
+                  placeholder="Type actor name (e.g. Richard Mofe-Damijo, Lateef Adedimeji, Toyin Abraham)..."
+                  className="w-full pl-10 pr-10 py-3 rounded-2xl border border-border bg-surface-2 text-xs font-medium text-text-primary focus:outline-none focus:border-brand"
+                />
+                {searchingActors && (
+                  <Icon icon="solar:restart-circle-linear" className="animate-spin absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted text-base" />
+                )}
+                {actorSearch && !searchingActors && (
+                  <button
+                    type="button"
+                    onClick={() => setActorSearch('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                  >
+                    <Icon icon="solar:close-circle-linear" className="text-sm" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Results Container */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 min-h-[220px]">
+              {actorSearch.trim().length < 2 ? (
+                <div className="h-44 flex flex-col items-center justify-center text-center p-6 text-text-muted">
+                  <Icon icon="solar:users-group-rounded-linear" className="text-3xl mb-2 opacity-50" />
+                  <p className="text-xs font-semibold">Enter at least 2 characters to search artists</p>
+                  <p className="text-[11px] text-text-muted/70 mt-1">Search through all 35,000+ Nollywood actors and filmmakers</p>
+                </div>
+              ) : searchingActors ? (
+                <div className="h-44 flex flex-col items-center justify-center text-center text-text-muted">
+                  <Icon icon="solar:restart-circle-linear" className="animate-spin text-2xl text-brand mb-2" />
+                  <span className="text-xs">Searching actors...</span>
+                </div>
+              ) : actorSearchResults.length === 0 ? (
+                <div className="h-44 flex flex-col items-center justify-center text-center p-6 text-text-muted">
+                  <Icon icon="solar:sad-circle-linear" className="text-3xl mb-2 opacity-50" />
+                  <p className="text-xs font-semibold">No actors found matching "{actorSearch}"</p>
+                  <p className="text-[11px] text-text-muted/70 mt-1">Try checking for alternative spellings or nicknames</p>
+                </div>
+              ) : (
+                actorSearchResults.map((person) => {
+                  const existingOutreach = outreachByPerson[person.id];
+                  const hasIg = !!parseInstagramHandle(person.instagram_url);
+                  const isAdding = addingPersonId === person.id;
+                  const currentCustom = customIgByPerson[person.id] || '';
+
+                  return (
+                    <div
+                      key={person.id}
+                      className="p-3 rounded-2xl border border-border bg-surface-2/60 hover:bg-surface-2 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                    >
+                      {/* Person Details */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        {person.photo_url ? (
+                          <img
+                            src={person.photo_url}
+                            alt={person.name}
+                            className="w-11 h-11 rounded-xl object-cover shrink-0 border border-border"
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-xl bg-surface-3 flex items-center justify-center text-xs font-bold text-text-muted shrink-0 border border-border">
+                            {person.name?.slice(0, 2).toUpperCase() || '??'}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-text-primary truncate">{person.name}</span>
+                            {person.is_verified && (
+                              <Icon icon="solar:verified-check-bold" className="text-xs text-brand shrink-0" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-text-muted mt-0.5">
+                            <span>{person.film_count || 0} films</span>
+                            <span>•</span>
+                            <span>{person.known_for_department || 'Actor'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Instagram & Action */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto shrink-0">
+                        {hasIg ? (
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={instagramProfileUrl(person.instagram_url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-pink-500/10 text-pink-500 border border-pink-500/20 hover:bg-pink-500/20 transition-all"
+                            >
+                              <Icon icon="fa6-brands:instagram" className="text-xs" />
+                              @{parseInstagramHandle(person.instagram_url)}
+                              <Icon icon="solar:arrow-right-up-linear" className="text-[10px]" />
+                            </a>
+                            {existingOutreach ? (
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-surface border border-border text-text-muted">
+                                {statusMeta(existingOutreach.status).label}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isAdding}
+                                onClick={() => handleAddActorToOutreach(person)}
+                                className="px-3 py-1 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand/90 transition-all cursor-pointer disabled:opacity-50"
+                              >
+                                {isAdding ? 'Adding...' : '+ Add to Queue'}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <div className="relative flex-1 sm:w-44">
+                              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-text-muted">@</span>
+                              <input
+                                type="text"
+                                placeholder="instagram_id"
+                                value={currentCustom}
+                                onChange={(e) =>
+                                  setCustomIgByPerson((prev) => ({ ...prev, [person.id]: e.target.value }))
+                                }
+                                className="w-full pl-6 pr-2 py-1 rounded-lg border border-border bg-surface text-xs text-text-primary focus:outline-none focus:border-brand"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isAdding || !currentCustom.trim()}
+                              onClick={() => handleAddActorToOutreach(person, currentCustom)}
+                              className="px-3 py-1 rounded-lg bg-brand text-white text-xs font-bold hover:bg-brand/90 transition-all cursor-pointer disabled:opacity-40 shrink-0"
+                            >
+                              {isAdding ? 'Saving...' : '+ Add'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-4 border-t border-border flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setActorSearch('');
+                  setActorSearchResults([]);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>
