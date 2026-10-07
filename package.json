@@ -20,6 +20,8 @@
     "test:watch": "vitest",
     "ig:login": "tsx scripts/lib/ig_session_manager.ts",
     "ig:check": "tsx scripts/lib/ig_session_manager.ts --check",
+    "outreach:choose": "tsx scripts/outreach_queue_talents.ts",
+    "outreach:queue": "tsx scripts/outreach_queue_talents.ts",
     "outreach:worker": "tsx scripts/instagram_outreach_worker.ts",
     "outreach:send": "tsx scripts/instagram_outreach_worker.ts",
     "scrape:ironflix": "tsx scripts/ironflix_sync.ts",
