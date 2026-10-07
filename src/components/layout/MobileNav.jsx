@@ -27,6 +27,7 @@ const MobileNav = () => {
   ];
 
   const drawerItems = [
+    { name: 'Adv. Search', path: '/advanced-search', icon: 'solar:tuning-square-2-linear' },
     { name: 'TV Shows', path: '/tv-shows', icon: 'solar:tv-linear' },
     { name: 'Showtimes', path: '/showtimes', icon: 'solar:calendar-date-linear' },
     { name: 'Cinemas', path: '/cinemas', icon: 'solar:videocamera-linear' },

@@ -184,7 +184,7 @@ export default function AdvancedSearch() {
         id, slug, title, poster_url, backdrop_url, year, language, languages,
         runtime_minutes, view_count, average_rating, liked_percent, audience_rating,
         tmdb_rating, nfvcb_rating, content_type, release_type, streaming_links, source,
-        countries, budget, box_office_gross, synopsis,
+        countries, budget, box_office_worldwide, box_office_domestic, synopsis,
         film_genres!left(genres(name))
       `, { count: 'exact' });
 
@@ -228,7 +228,7 @@ export default function AdvancedSearch() {
 
       // Box Office
       if (minBoxOffice && Number(minBoxOffice) > 0) {
-        query = query.gte('box_office_gross', Number(minBoxOffice));
+        query = query.or(`box_office_worldwide.gte.${minBoxOffice},box_office_domestic.gte.${minBoxOffice}`);
       }
 
       // Talent Filtering (Actor / Director / Writer)
@@ -266,7 +266,7 @@ export default function AdvancedSearch() {
         'liked_desc': { col: 'liked_percent', asc: false },
         'year_desc': { col: 'year', asc: false },
         'year_asc': { col: 'year', asc: true },
-        'gross_desc': { col: 'box_office_gross', asc: false },
+        'gross_desc': { col: 'box_office_worldwide', asc: false },
         'title_asc': { col: 'title', asc: true }
       }[sortBy] || { col: 'view_count', asc: false };
 
@@ -278,6 +278,7 @@ export default function AdvancedSearch() {
 
       let processed = (data || []).map(f => ({
         ...f,
+        box_office_gross: f.box_office_worldwide || f.box_office_domestic || 0,
         genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || (Array.isArray(f.genres) ? f.genres : [])
       }));
 
@@ -323,8 +324,8 @@ export default function AdvancedSearch() {
     try {
       // 1. Resolve both people
       const [res1, res2] = await Promise.all([
-        supabase.from('people').select('id, name, slug, photo_url, primary_profession').ilike('name', `%${p1Name.trim()}%`).limit(1),
-        supabase.from('people').select('id, name, slug, photo_url, primary_profession').ilike('name', `%${p2Name.trim()}%`).limit(1)
+        supabase.from('people').select('id, name, slug, photo_url, known_for_department').ilike('name', `%${p1Name.trim()}%`).limit(1),
+        supabase.from('people').select('id, name, slug, photo_url, known_for_department').ilike('name', `%${p2Name.trim()}%`).limit(1)
       ]);
 
       const person1 = res1.data?.[0];
@@ -365,7 +366,7 @@ export default function AdvancedSearch() {
       // 3. Fetch shared film details
       const { data: filmsData } = await supabase
         .from('films')
-        .select('id, slug, title, year, poster_url, runtime_minutes, average_rating, liked_percent, box_office_gross, genres')
+        .select('id, slug, title, year, poster_url, runtime_minutes, average_rating, liked_percent, box_office_worldwide, box_office_domestic, genres')
         .in('id', sharedFilmIds)
         .order('year', { ascending: false });
 
@@ -373,6 +374,7 @@ export default function AdvancedSearch() {
 
       const enrichedShared = (filmsData || []).map(f => ({
         ...f,
+        box_office_gross: f.box_office_worldwide || f.box_office_domestic || 0,
         p1Credit: c1Map.get(f.id),
         p2Credit: c2Map.get(f.id)
       }));
@@ -406,13 +408,13 @@ export default function AdvancedSearch() {
         supabase.from('films').select(`
           id, slug, title, year, poster_url, backdrop_url, runtime_minutes,
           average_rating, liked_percent, audience_rating, nfvcb_rating,
-          content_type, release_type, streaming_links, box_office_gross, budget, synopsis,
+          content_type, release_type, streaming_links, box_office_worldwide, box_office_domestic, budget, synopsis,
           film_genres!left(genres(name))
         `).ilike('title', `%${f1Title.trim()}%`).limit(1),
         supabase.from('films').select(`
           id, slug, title, year, poster_url, backdrop_url, runtime_minutes,
           average_rating, liked_percent, audience_rating, nfvcb_rating,
-          content_type, release_type, streaming_links, box_office_gross, budget, synopsis,
+          content_type, release_type, streaming_links, box_office_worldwide, box_office_domestic, budget, synopsis,
           film_genres!left(genres(name))
         `).ilike('title', `%${f2Title.trim()}%`).limit(1)
       ]);
@@ -453,10 +455,12 @@ export default function AdvancedSearch() {
         found: true,
         film1: {
           ...film1,
+          box_office_gross: film1.box_office_worldwide || film1.box_office_domestic || 0,
           genres: film1.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
         },
         film2: {
           ...film2,
+          box_office_gross: film2.box_office_worldwide || film2.box_office_domestic || 0,
           genres: film2.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
         },
         sharedCast
@@ -474,12 +478,12 @@ export default function AdvancedSearch() {
   const executeNamesSearch = async () => {
     setIsNamesLoading(true);
     try {
-      let query = supabase.from('people').select('id, name, slug, photo_url, primary_profession, film_count, bio');
+      let query = supabase.from('people').select('id, name, slug, photo_url, known_for_department, film_count, bio');
       if (nameQuery.trim()) {
         query = query.ilike('name', `%${nameQuery.trim()}%`);
       }
       if (nameProfession !== 'all') {
-        query = query.ilike('primary_profession', `%${nameProfession}%`);
+        query = query.ilike('known_for_department', `%${nameProfession}%`);
       }
       if (minFilmsCount) {
         query = query.gte('film_count', parseInt(minFilmsCount, 10));
@@ -1671,11 +1675,11 @@ export default function AdvancedSearch() {
                     className="w-full px-3 py-2 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
                   >
                     <option value="all">Any Profession</option>
-                    <option value="Actor">Actor / Actress</option>
-                    <option value="Director">Director</option>
-                    <option value="Producer">Producer</option>
-                    <option value="Writer">Writer / Screenplay</option>
-                    <option value="Cinematographer">Cinematographer (DoP)</option>
+                    <option value="Act">Actor / Actress</option>
+                    <option value="Direct">Director</option>
+                    <option value="Produc">Producer</option>
+                    <option value="Writ">Writer / Screenplay</option>
+                    <option value="Camera">Cinematographer (DoP)</option>
                   </select>
                 </div>
 
