@@ -493,6 +493,7 @@ export default function DeveloperApi() {
   const [selectedEndpoint, setSelectedEndpoint] = useState(ENDPOINTS[0]);
   const [activeCodeTab, setActiveCodeTab] = useState('curl');
   const [currency, setCurrency] = useState('NGN'); // 'NGN' | 'USD'
+  const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'yearly'
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
   const [copiedQuickstart, setCopiedQuickstart] = useState(false);
@@ -761,7 +762,10 @@ export default function DeveloperApi() {
             {/* Left Column: Category & Endpoint Navigation */}
             <div className="lg:col-span-4 space-y-4">
               {/* Category Pills */}
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/5 overflow-x-auto">
+              <div 
+                className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/5 overflow-x-auto no-scrollbar scrollbar-none"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
                 {categories.map(cat => (
                   <button
                     key={cat}
@@ -997,284 +1001,416 @@ export default function DeveloperApi() {
 
         {/* ── Pricing & Plans Section ── */}
         <section id="pricing" className="scroll-mt-20 space-y-12">
-          <div className="text-center max-w-2xl mx-auto space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-xs font-bold uppercase tracking-wider">
-              <Icon icon="solar:tag-price-bold" />
-              Commercial API Plans
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Transparent Developer Pricing</h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              MuviDB web platform is free for everyone. API access is our dedicated commercial product for developers, streaming apps, and enterprises.
+          <div className="text-center max-w-3xl mx-auto space-y-4">
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+              Flexible plans that grow with you
+            </h2>
+            <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
+              Free for indie developers and personal experiments. Upgrade to high-throughput commercial access when your app scales.
             </p>
 
-            {/* Currency Toggle */}
-            <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-white/[0.05] border border-white/10 text-xs mt-3">
-              <button
-                onClick={() => setCurrency('NGN')}
-                className={`px-3 py-1.5 rounded-lg font-mono font-bold transition ${
-                  currency === 'NGN' ? 'bg-brand text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                NGN (₦)
-              </button>
-              <button
-                onClick={() => setCurrency('USD')}
-                className={`px-3 py-1.5 rounded-lg font-mono font-bold transition ${
-                  currency === 'USD' ? 'bg-brand text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                USD ($)
-              </button>
+            {/* Switchers Row (Billing cycle + Currency) */}
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+              {/* Billing Cycle Switcher */}
+              <div className="inline-flex items-center p-1 rounded-xl bg-white/[0.04] border border-white/10 text-xs shadow-inner">
+                <button
+                  onClick={() => setBillingCycle('monthly')}
+                  className={`px-3.5 py-1.5 rounded-lg font-medium transition ${
+                    billingCycle === 'monthly'
+                      ? 'bg-white/10 text-white shadow-sm font-semibold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingCycle('yearly')}
+                  className={`px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
+                    billingCycle === 'yearly'
+                      ? 'bg-white/10 text-white shadow-sm font-semibold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span>Yearly</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-brand/20 text-brand border border-brand/30">
+                    Save 20%
+                  </span>
+                </button>
+              </div>
+
+              {/* Currency Switcher */}
+              <div className="inline-flex items-center p-1 rounded-xl bg-white/[0.04] border border-white/10 text-xs shadow-inner">
+                <button
+                  onClick={() => setCurrency('NGN')}
+                  className={`px-3 py-1.5 rounded-lg font-mono font-bold transition ${
+                    currency === 'NGN'
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  NGN (₦)
+                </button>
+                <button
+                  onClick={() => setCurrency('USD')}
+                  className={`px-3 py-1.5 rounded-lg font-mono font-bold transition ${
+                    currency === 'USD'
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  USD ($)
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+          {/* 3 Pricing Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
             
-            {/* 1. Community Free */}
-            <div className="rounded-3xl bg-surface/50 border border-white/10 p-8 flex flex-col justify-between relative hover:border-white/20 transition backdrop-blur-xl">
+            {/* 1. Community (Free) */}
+            <div className="rounded-2xl bg-[#0B0E14] border border-white/10 p-7 lg:p-8 flex flex-col justify-between hover:border-white/20 transition relative">
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-white">Community</h3>
-                  <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xl font-bold text-white tracking-tight">Community</h3>
+                  <span className="text-[11px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-white/5 text-slate-300 border border-white/10">
                     Free Forever
                   </span>
                 </div>
-                <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-4xl font-black text-white font-mono">{currency === 'NGN' ? '₦0' : '$0'}</span>
-                  <span className="text-slate-400 text-xs font-mono">/month</span>
-                </div>
-                <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-                  For indie hobbyists, students, and research prototypes testing Nollywood data.
+                <p className="text-xs text-slate-400 mb-6 leading-relaxed min-h-[34px]">
+                  For indie hobbyists, students, and research prototypes exploring Nollywood cinema data.
                 </p>
+                <div className="flex items-baseline gap-1.5 mb-1">
+                  <span className="text-4xl font-extrabold text-white font-mono">
+                    {currency === 'NGN' ? '₦0' : '$0'}
+                  </span>
+                  <span className="text-xs font-medium text-slate-400">/month</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mb-6">No credit card required</p>
 
-                <div className="space-y-3.5 text-xs text-slate-300">
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
+                <button
+                  onClick={() => openKeyModal('free')}
+                  className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/10 transition text-center mb-6"
+                >
+                  Get Free API Key
+                </button>
+
+                <div className="border-t border-white/5 pt-6 space-y-3 text-xs text-slate-300">
+                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">What&apos;s included:</div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0 mt-0.5" />
                     <span><strong>100,000 requests</strong> / month</span>
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0 mt-0.5" />
                     <span><strong>60 req / min</strong> rate limit</span>
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0 mt-0.5" />
                     <span>Preview Catalog (First 500 Films &amp; Talent)</span>
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0" />
-                    <span>Top 10 Cast &amp; Crew preview</span>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0 mt-0.5" />
+                    <span>Top 10 Cast &amp; Crew filmographies</span>
                   </div>
-                  <div className="flex items-center gap-2.5 text-slate-500">
-                    <Icon icon="solar:close-circle-linear" className="text-slate-600 text-base shrink-0" />
-                    <span>No Box Office Gross rankings</span>
+                  <div className="flex items-start gap-2.5 text-slate-400">
+                    <Icon icon="solar:close-circle-linear" className="text-slate-600 text-base shrink-0 mt-0.5" />
+                    <span>No Box Office gross rankings</span>
                   </div>
-                  <div className="flex items-center gap-2.5 text-slate-500">
-                    <Icon icon="solar:close-circle-linear" className="text-slate-600 text-base shrink-0" />
+                  <div className="flex items-start gap-2.5 text-slate-400">
+                    <Icon icon="solar:close-circle-linear" className="text-slate-600 text-base shrink-0 mt-0.5" />
                     <span>Non-commercial license</span>
                   </div>
                 </div>
               </div>
-
-              <div className="pt-8">
-                <button
-                  onClick={() => openKeyModal('free')}
-                  className="w-full py-3.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition text-center"
-                >
-                  Get Instant Free Key
-                </button>
-              </div>
             </div>
 
-            {/* 2. Pro Developer (Featured Commercial Tier) */}
-            <div className="rounded-2xl bg-[#141A22] border-2 border-brand p-8 flex flex-col justify-between relative shadow-lg">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-brand text-white text-[10px] font-bold uppercase tracking-wider">
-                Recommended for Apps &amp; Startups
-              </div>
-
+            {/* 2. Pro Developer */}
+            <div className="rounded-2xl bg-gradient-to-b from-[#141A24] to-[#0A0D13] border border-brand/50 ring-1 ring-brand/30 p-7 lg:p-8 flex flex-col justify-between shadow-2xl relative">
               <div>
-                <div className="flex items-center justify-between mb-4 mt-1">
-                  <h3 className="text-xl font-bold text-white">Pro Developer</h3>
-                  <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-md bg-brand/20 text-brand border border-brand/40">
-                    Commercial
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xl font-bold text-white tracking-tight">Pro Developer</h3>
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-brand/15 text-brand border border-brand/30">
+                    Most Popular
                   </span>
                 </div>
-                <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-4xl font-black text-white font-mono">
-                    {currency === 'NGN' ? '₦45,000' : '$29'}
-                  </span>
-                  <span className="text-slate-400 text-xs font-mono">/month</span>
-                </div>
-                <p className="text-xs text-slate-300 mb-6 leading-relaxed">
+                <p className="text-xs text-slate-300 mb-6 leading-relaxed min-h-[34px]">
                   Full commercial license for mobile apps, entertainment portals, syndication networks, and analytics teams.
                 </p>
-
-                <div className="space-y-3.5 text-xs text-slate-200">
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span><strong>1,500,000 requests</strong> / month</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span><strong>600 req / min</strong> burst limit</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span><strong>Full 12,400+ Films Catalog</strong> (Unrestricted)</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span>Complete Ensemble Cast &amp; Crew filmographies</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span><strong>Box Office Gross Rankings</strong> &amp; weekly admissions</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span><strong>Commercial License</strong> included (White-label)</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0" />
-                    <span>Priority Discord &amp; email support</span>
-                  </div>
+                <div className="flex items-baseline gap-1.5 mb-1">
+                  <span className="text-4xl font-extrabold text-white font-mono">
+                    {currency === 'NGN'
+                      ? (billingCycle === 'yearly' ? '₦36,000' : '₦45,000')
+                      : (billingCycle === 'yearly' ? '$23' : '$29')}
+                  </span>
+                  <span className="text-xs font-medium text-slate-400">/month</span>
                 </div>
-              </div>
+                <p className="text-[11px] text-brand/80 mb-6">
+                  {billingCycle === 'yearly'
+                    ? (currency === 'NGN' ? 'Billed annually at ₦432,000 (Save 20%)' : 'Billed annually at $276 (Save 20%)')
+                    : 'Billed monthly · Cancel anytime'}
+                </p>
 
-              <div className="pt-8">
                 <button
                   onClick={() => openKeyModal('pro')}
-                  className="w-full py-3.5 rounded-xl bg-brand hover:bg-brand/90 text-white font-bold text-xs transition shadow-lg shadow-brand/30 text-center"
+                  className="w-full py-2.5 rounded-xl bg-brand hover:bg-brand/90 text-white font-bold text-xs transition shadow-lg shadow-brand/25 text-center mb-6"
                 >
                   Upgrade to Pro Access
                 </button>
+
+                <div className="border-t border-white/10 pt-6 space-y-3 text-xs text-slate-200">
+                  <div className="text-[11px] font-bold text-brand uppercase tracking-wider mb-2">Everything in Community, plus:</div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0 mt-0.5" />
+                    <span><strong>1,500,000 requests</strong> / month</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0 mt-0.5" />
+                    <span><strong>600 req / min</strong> burst limit</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0 mt-0.5" />
+                    <span><strong>Full 12,400+ Films Catalog</strong> (Unrestricted)</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0 mt-0.5" />
+                    <span>Complete Ensemble Cast &amp; Crew filmographies</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0 mt-0.5" />
+                    <span><strong>Theatrical Box Office Grosses</strong> &amp; weekly admissions</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0 mt-0.5" />
+                    <span><strong>Commercial License</strong> included (White-label)</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0 mt-0.5" />
+                    <span>Priority Discord &amp; email support (sub-12h response)</span>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* 3. Enterprise */}
-            <div className="rounded-3xl bg-surface/50 border border-white/10 p-8 flex flex-col justify-between relative hover:border-white/20 transition backdrop-blur-xl">
+            <div className="rounded-2xl bg-[#0B0E14] border border-white/10 p-7 lg:p-8 flex flex-col justify-between hover:border-white/20 transition relative">
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-white">Enterprise</h3>
-                  <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    High Scale
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xl font-bold text-white tracking-tight">Enterprise</h3>
+                  <span className="text-[11px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    Scale &amp; SLA
                   </span>
                 </div>
-                <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-4xl font-black text-white font-mono">Custom</span>
-                </div>
-                <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+                <p className="text-xs text-slate-400 mb-6 leading-relaxed min-h-[34px]">
                   For major streaming networks, broadcast distributors, telecom VAS, and global aggregators.
                 </p>
-
-                <div className="space-y-3.5 text-xs text-slate-300">
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0" />
-                    <span><strong>2,000+ req / min</strong> or custom rate limit</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0" />
-                    <span>Dedicated database read replica pool</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0" />
-                    <span>Automated daily bulk JSON database dumps</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0" />
-                    <span>Real-time webhook events &amp; delta sync</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0" />
-                    <span><strong>99.98% guaranteed SLA</strong> with contractual credit</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0" />
-                    <span>Dedicated Technical Account Manager</span>
-                  </div>
+                <div className="flex items-baseline gap-1.5 mb-1">
+                  <span className="text-4xl font-extrabold text-white font-mono">Custom</span>
                 </div>
-              </div>
+                <p className="text-[11px] text-slate-400 mb-6">Tailored agreements · Dedicated replica pool</p>
 
-              <div className="pt-8">
                 <button
                   onClick={() => openKeyModal('enterprise')}
-                  className="w-full py-3.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition text-center"
+                  className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/10 transition text-center mb-6"
                 >
                   Contact Enterprise Sales
                 </button>
+
+                <div className="border-t border-white/5 pt-6 space-y-3 text-xs text-slate-300">
+                  <div className="text-[11px] font-bold text-blue-400 uppercase tracking-wider mb-2">Everything in Pro, plus:</div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <span><strong>2,000+ req / min</strong> or custom rate limit</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <span>Dedicated database read replica pool</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <span>Automated daily bulk JSON database dumps</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <span>Real-time webhook events &amp; delta sync</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <span><strong>99.98% guaranteed SLA</strong> with contractual credit</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <span>Dedicated Technical Account Manager &amp; Slack</span>
+                  </div>
+                </div>
               </div>
             </div>
 
           </div>
+
+          {/* Customer Testimonial Quote Banner (Dub.co benchmark standard) */}
+          <div className="py-10 px-6 sm:px-12 rounded-2xl bg-white/[0.02] border border-white/5 max-w-4xl mx-auto text-center space-y-5">
+            <p className="text-base sm:text-lg font-medium text-slate-200 leading-relaxed max-w-2xl mx-auto font-sans">
+              &ldquo;MuviDB has transformed how we ingest and verify African cinema metadata. If you&apos;re building a streaming guide or entertainment application on the continent, I cannot recommend the API enough.&rdquo;
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-brand to-amber-500 text-white font-bold flex items-center justify-center text-xs shadow-md">
+                TO
+              </div>
+              <div className="text-left">
+                <div className="text-xs sm:text-sm font-bold text-white">Tunde Oladipo</div>
+                <div className="text-[11px] text-slate-400">Head of Platform Engineering, StreamAfrik</div>
+              </div>
+            </div>
+          </div>
         </section>
 
-        {/* ── Feature Comparison Table ── */}
-        <section className="space-y-6">
-          <div className="border-b border-white/10 pb-4">
-            <h3 className="text-2xl font-bold text-white">Full Feature Comparison Matrix</h3>
-            <p className="text-xs text-slate-400 mt-1">Detailed entitlement breakdown across all MuviDB Developer tiers.</p>
+        {/* ── Compare Plans Matrix ── */}
+        <section className="space-y-8 scroll-mt-20" id="compare">
+          <div className="text-center max-w-xl mx-auto space-y-2">
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white">Compare plans</h3>
+            <p className="text-xs sm:text-sm text-slate-400">
+              Detailed entitlement breakdown and feature matrix across all MuviDB Developer tiers.
+            </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 overflow-hidden bg-surface/40 backdrop-blur-md">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-white/[0.03] text-slate-400 font-mono">
-                <tr>
-                  <th className="p-4">Capability</th>
-                  <th className="p-4 text-center">Community (Free)</th>
-                  <th className="p-4 text-center text-brand font-bold">Pro Developer</th>
-                  <th className="p-4 text-center">Enterprise</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 text-slate-300">
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">Monthly API Request Quota</td>
-                  <td className="p-4 text-center font-mono">100,000</td>
-                  <td className="p-4 text-center font-mono font-bold text-white">1,500,000</td>
-                  <td className="p-4 text-center font-mono">Custom / Unlimited</td>
-                </tr>
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">Burst Rate Limit</td>
-                  <td className="p-4 text-center font-mono">60 req / min</td>
-                  <td className="p-4 text-center font-mono font-bold text-brand">600 req / min</td>
-                  <td className="p-4 text-center font-mono text-blue-400">2,000+ req / min</td>
-                </tr>
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">Films Catalog Coverage</td>
-                  <td className="p-4 text-center text-amber-400 font-semibold">First 500 Films (Preview)</td>
-                  <td className="p-4 text-center font-bold text-white">Full 12,400+ Films</td>
-                  <td className="p-4 text-center font-bold text-white">Full 12,400+ Films</td>
-                </tr>
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">Talent &amp; Cast Directory</td>
-                  <td className="p-4 text-center text-amber-400 font-semibold">First 500 People (Preview)</td>
-                  <td className="p-4 text-center font-bold text-white">Full 15,000+ People</td>
-                  <td className="p-4 text-center font-bold text-white">Full 15,000+ People</td>
-                </tr>
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">Complete Ensemble Credits</td>
-                  <td className="p-4 text-center text-slate-400">Top 10 Cast &amp; Crew</td>
-                  <td className="p-4 text-center font-bold text-brand">Unrestricted</td>
-                  <td className="p-4 text-center font-bold text-blue-400">Unrestricted</td>
-                </tr>
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">Theatrical Box Office Grosses</td>
-                  <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-slate-600 inline text-base" /></td>
-                  <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-brand inline text-base" /></td>
-                  <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
-                </tr>
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">Commercial Use License</td>
-                  <td className="p-4 text-center text-slate-500">Non-commercial</td>
-                  <td className="p-4 text-center text-emerald-400 font-semibold">Included</td>
-                  <td className="p-4 text-center text-emerald-400 font-semibold">Included</td>
-                </tr>
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 font-semibold text-white">Support Channels</td>
-                  <td className="p-4 text-center text-slate-400">Community Docs</td>
-                  <td className="p-4 text-center text-white">Priority Discord &amp; Email</td>
-                  <td className="p-4 text-center text-blue-400">Dedicated Slack &amp; TAM</td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#0A0D13]/80 backdrop-blur-md">
+            <div className="overflow-x-auto no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              <table className="w-full text-left text-xs min-w-[680px]">
+                <thead>
+                  <tr className="border-b border-white/10 bg-white/[0.02]">
+                    <th className="p-5 w-2/5 font-semibold text-slate-300">Plan Features</th>
+                    <th className="p-5 w-1/5 text-center">
+                      <div className="font-bold text-sm text-white mb-2">Community</div>
+                      <button 
+                        onClick={() => openKeyModal('free')} 
+                        className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-[11px] font-semibold transition"
+                      >
+                        Get Free Key
+                      </button>
+                    </th>
+                    <th className="p-5 w-1/5 text-center bg-brand/[0.03]">
+                      <div className="font-bold text-sm text-brand mb-2">Pro Developer</div>
+                      <button 
+                        onClick={() => openKeyModal('pro')} 
+                        className="px-3 py-1.5 rounded-lg bg-brand hover:bg-brand/90 text-white text-[11px] font-semibold transition shadow-sm"
+                      >
+                        Get Pro Access
+                      </button>
+                    </th>
+                    <th className="p-5 w-1/5 text-center">
+                      <div className="font-bold text-sm text-white mb-2">Enterprise</div>
+                      <button 
+                        onClick={() => openKeyModal('enterprise')} 
+                        className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-[11px] font-semibold transition"
+                      >
+                        Contact Sales
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-slate-300">
+                  {/* Category 1: Usage & Quotas */}
+                  <tr className="bg-white/[0.04]">
+                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-slate-400">
+                      Usage &amp; Quotas
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Monthly Request Quota</td>
+                    <td className="p-4 text-center font-mono">100,000</td>
+                    <td className="p-4 text-center font-mono font-bold text-white bg-brand/[0.02]">1,500,000</td>
+                    <td className="p-4 text-center font-mono">Custom / Unlimited</td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Burst Rate Limit</td>
+                    <td className="p-4 text-center font-mono">60 req / min</td>
+                    <td className="p-4 text-center font-mono font-bold text-brand bg-brand/[0.02]">600 req / min</td>
+                    <td className="p-4 text-center font-mono text-blue-400">2,000+ req / min</td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Global Edge Cache (sub-45ms)</td>
+                    <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
+                    <td className="p-4 text-center bg-brand/[0.02]"><Icon icon="solar:check-circle-bold" className="text-brand inline text-base" /></td>
+                    <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-blue-400 inline text-base" /></td>
+                  </tr>
+
+                  {/* Category 2: Catalog & Metadata */}
+                  <tr className="bg-white/[0.04]">
+                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-slate-400">
+                      Catalog &amp; Metadata
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Films &amp; Series Catalog</td>
+                    <td className="p-4 text-center text-amber-400 font-medium">First 500 (Preview)</td>
+                    <td className="p-4 text-center font-bold text-white bg-brand/[0.02]">Full 12,400+ Films</td>
+                    <td className="p-4 text-center font-bold text-white">Full 12,400+ Films</td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Talent &amp; Cast Directory</td>
+                    <td className="p-4 text-center text-amber-400 font-medium">First 500 (Preview)</td>
+                    <td className="p-4 text-center font-bold text-white bg-brand/[0.02]">Full 15,000+ People</td>
+                    <td className="p-4 text-center font-bold text-white">Full 15,000+ People</td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Ensemble Cast &amp; Crew Credits</td>
+                    <td className="p-4 text-center text-slate-400">Top 10 only</td>
+                    <td className="p-4 text-center font-bold text-brand bg-brand/[0.02]">Complete Filmographies</td>
+                    <td className="p-4 text-center font-bold text-blue-400">Complete Filmographies</td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Theatrical Box Office Grosses</td>
+                    <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-slate-600 inline text-base" /></td>
+                    <td className="p-4 text-center bg-brand/[0.02]"><Icon icon="solar:check-circle-bold" className="text-brand inline text-base" /></td>
+                    <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
+                  </tr>
+
+                  {/* Category 3: Licensing & Architecture */}
+                  <tr className="bg-white/[0.04]">
+                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-slate-400">
+                      Licensing &amp; Architecture
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Commercial Application License</td>
+                    <td className="p-4 text-center text-slate-400">Non-commercial</td>
+                    <td className="p-4 text-center text-emerald-400 font-semibold bg-brand/[0.02]">White-label Commercial</td>
+                    <td className="p-4 text-center text-emerald-400 font-semibold">White-label Commercial</td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Webhook Events &amp; Delta Sync</td>
+                    <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-slate-600 inline text-base" /></td>
+                    <td className="p-4 text-center text-slate-300 bg-brand/[0.02]">Standard Webhooks</td>
+                    <td className="p-4 text-center text-blue-400 font-semibold">Real-time Dedicated</td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Automated Bulk Database Dumps</td>
+                    <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-slate-600 inline text-base" /></td>
+                    <td className="p-4 text-center text-slate-400 bg-brand/[0.02]"><Icon icon="solar:close-circle-linear" className="text-slate-600 inline text-base" /></td>
+                    <td className="p-4 text-center text-emerald-400 font-semibold">Daily JSON &amp; SQL Dumps</td>
+                  </tr>
+
+                  {/* Category 4: Support & SLA */}
+                  <tr className="bg-white/[0.04]">
+                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-slate-400">
+                      Support &amp; SLA
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Support Channels</td>
+                    <td className="p-4 text-center text-slate-400">Community Docs</td>
+                    <td className="p-4 text-center text-white bg-brand/[0.02]">Priority Discord &amp; Email</td>
+                    <td className="p-4 text-center text-blue-400">Dedicated Slack &amp; TAM</td>
+                  </tr>
+                  <tr className="hover:bg-white/[0.02]">
+                    <td className="p-4 px-5 font-medium text-white">Guaranteed Uptime SLA</td>
+                    <td className="p-4 text-center text-slate-400">Best Effort (99.0%)</td>
+                    <td className="p-4 text-center font-medium text-white bg-brand/[0.02]">99.9% Uptime</td>
+                    <td className="p-4 text-center font-bold text-blue-400">99.98% SLA (Contractual)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
