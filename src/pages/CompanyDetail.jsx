@@ -258,7 +258,7 @@ export default function CompanyDetail() {
       if (role.includes('distribut')) distributionCount += 1;
       else productionCount += 1;
 
-      const bo = Number(f.box_office_domestic || f.box_office_worldwide || 0);
+      const bo = Number(f.streaming_links?.box_office?.domestic || f.box_office_domestic || f.box_office_worldwide || 0);
       if (bo > 0) {
         totalBoxOffice += bo;
         boxOfficeReleasesCount += 1;
@@ -290,10 +290,10 @@ export default function CompanyDetail() {
 
     // Top commercial blockbusters ranked (top 4)
     const rankedBlockbusters = [...allFilmsWithRole]
-      .filter((item) => Number(item.film?.box_office_domestic || item.film?.box_office_worldwide || 0) > 0)
+      .filter((item) => Number(item.film?.streaming_links?.box_office?.domestic || item.film?.box_office_domestic || item.film?.box_office_worldwide || 0) > 0)
       .sort((a, b) => {
-        const grossA = Number(a.film?.box_office_domestic || a.film?.box_office_worldwide || 0);
-        const grossB = Number(b.film?.box_office_domestic || b.film?.box_office_worldwide || 0);
+        const grossA = Number(a.film?.streaming_links?.box_office?.domestic || a.film?.box_office_domestic || a.film?.box_office_worldwide || 0);
+        const grossB = Number(b.film?.streaming_links?.box_office?.domestic || b.film?.box_office_domestic || b.film?.box_office_worldwide || 0);
         return grossB - grossA;
       })
       .slice(0, 4);

@@ -56,7 +56,7 @@ export async function loader() {
       const rawFilm = (fc as any).films;
       const film: any = Array.isArray(rawFilm) ? rawFilm[0] : rawFilm;
       if (!film) continue;
-      const bo = Number(film.box_office_domestic || film.box_office_worldwide || 0);
+      const bo = Number(film.streaming_links?.box_office?.domestic || film.box_office_domestic || film.box_office_worldwide || 0);
       const vc = Number(film.view_count || 0);
       if (bo > 0) boxOffice += bo;
       if (vc > 0) views += vc;

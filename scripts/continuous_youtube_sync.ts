@@ -211,6 +211,46 @@ async function main() {
                       continue;
                     }
                     const cleanedTitle = decision.title;
+
+                    // Shield cinema releases: do NOT create duplicate YouTube film entries for cinema titles
+                    const isYorubahood = /yorubahood|yorubanood/i.test(ch.name || '');
+                    const { data: existingCinema } = await supabase
+                      .from('films')
+                      .select('id, title, release_type, box_office_domestic, box_office_source, is_in_cinemas')
+                      .or(`title.ilike.${cleanedTitle},original_title.ilike.%${cleanedTitle}%`)
+                      .limit(1);
+
+                    const matched = existingCinema?.[0];
+                    const isCinema = Boolean(
+                      matched && (
+                        matched.release_type === 'cinema' ||
+                        matched.release_type === 'theatrical' ||
+                        (Number(matched.box_office_domestic) > 0) ||
+                        Boolean(matched.box_office_source) ||
+                        Boolean(matched.is_in_cinemas)
+                      )
+                    );
+
+                    if (isCinema) {
+                      console.log(`⏩ Skipping upload matching cinema release "${matched.title}": "${v.title}"`);
+                      continue;
+                    }
+                    if (isYorubahood) {
+                      const normClean = cleanedTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const { data: cinemaList } = await supabase
+                        .from('films')
+                        .select('id, title')
+                        .or('release_type.eq.cinema,box_office_domestic.gt.0,is_in_cinemas.eq.true')
+                        .limit(200);
+                      const clash = (cinemaList || []).find(cf => 
+                        cf.title.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean
+                      );
+                      if (clash) {
+                        console.log(`⏩ Skipping Yorubahood upload copying cinema title "${clash.title}": "${v.title}"`);
+                        continue;
+                      }
+                    }
+
                     const vidYear = v.published_at ? new Date(v.published_at).getFullYear() : null;
                     const tmdb = await enrichFromTMDB(cleanedTitle, vidYear);
                     filmsToInsert.push({

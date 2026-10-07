@@ -353,10 +353,20 @@ export default function ProDashboard() {
 
   const youtubeViews = Number(youtubeStats.views) || 0;
   const youtubeSubscribers = Number(youtubeStats.subscribers) || 0;
-  const reportedBoxOffice = credits.reduce((sum, credit) => {
+  const uniqueCreditsForBo = useMemo(() => {
+    const seen = new Set();
+    return credits.filter((c) => {
+      const fid = c.films?.id || c.film_id;
+      if (!fid || seen.has(fid)) return false;
+      seen.add(fid);
+      return true;
+    });
+  }, [credits]);
+
+  const reportedBoxOffice = uniqueCreditsForBo.reduce((sum, credit) => {
     const film = credit.films || {};
-    if (!film.box_office_source) return sum;
-    return sum + (Number(film.box_office_domestic || film.box_office_worldwide) || 0);
+    const bo = Number(film.streaming_links?.box_office?.domestic || film.box_office_domestic || film.box_office_worldwide) || 0;
+    return sum + bo;
   }, 0);
 
   // Filtered & Sorted Credits
@@ -877,7 +887,7 @@ export default function ProDashboard() {
               ) : (
                 filteredCredits.map((credit) => {
                   const film = credit.films || {};
-                  const boxOffice = Number(film.box_office_domestic || film.box_office_worldwide) || 0;
+                  const boxOffice = Number(film.streaming_links?.box_office?.domestic || film.box_office_domestic || film.box_office_worldwide) || 0;
                   return (
                     <article key={credit.id} className="rounded-2xl border border-white/10 bg-[#161616] p-3.5 flex gap-3.5 items-start">
                       <img
@@ -961,7 +971,7 @@ export default function ProDashboard() {
                       ) : (
                         filteredCredits.map((credit) => {
                           const film = credit.films || {};
-                          const boxOffice = Number(film.box_office_domestic || film.box_office_worldwide) || 0;
+                          const boxOffice = Number(film.streaming_links?.box_office?.domestic || film.box_office_domestic || film.box_office_worldwide) || 0;
                           return (
                             <tr key={credit.id} className="transition hover:bg-white/[.02]">
                               <td className="py-3 pl-4 pr-2">

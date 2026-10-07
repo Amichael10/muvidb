@@ -609,31 +609,60 @@ export default function PersonDetailV2() {
 
   // ── Impact Stats ──
   const allCredits = person?.credits || []
-  const leadCredits = allCredits.filter(c => {
+  
+  // Deduplicate credits by film so each production's box office is counted once per talent
+  const uniqueFilmCredits = useMemo(() => {
+    const map = new Map()
+    for (const c of allCredits) {
+      const fid = c.films?.id || c.film_id
+      if (!fid) continue
+      const currentBo = getCreditBoxOffice(c)
+      if (!map.has(fid) || currentBo > getCreditBoxOffice(map.get(fid))) {
+        map.set(fid, c)
+      }
+    }
+    return Array.from(map.values())
+  }, [allCredits])
+
+  const leadCredits = uniqueFilmCredits.filter(c => {
     const role = canonicalizeRole(c.role)
     const order = c.billing_order ?? 99
     return (role === 'actor' && order <= 3) || ['producer', 'director'].includes(role)
   })
-  const totalBoxOffice = allCredits.reduce((acc, c) => acc + getCreditBoxOffice(c), 0)
+  const totalBoxOffice = uniqueFilmCredits.reduce((acc, c) => acc + getCreditBoxOffice(c), 0)
   const leadBoxOffice = leadCredits.reduce((acc, c) => acc + getCreditBoxOffice(c), 0)
-  const displayBoxOffice = leadBoxOffice > 0 ? leadBoxOffice : totalBoxOffice
+  // Display total reported theatrical gross across all verified productions
+  const displayBoxOffice = totalBoxOffice
 
   const totalYoutubeViews = allCredits.reduce((acc, c) => {
     const v = c.films?.view_count || 0
     return acc + (typeof v === 'number' ? v : parseInt(v, 10) || 0)
   }, 0) + (channelVideos || []).reduce((acc, v) => acc + (v.view_count || 0), 0)
 
-  const fmtMoney = (num) => {
+  const fmtMoneyDesktop = (num) => {
+    if (num >= 1_000_000_000) return `₦${(num / 1_000_000_000).toFixed(2)} Billion`
+    if (num >= 1_000_000) return `₦${(num / 1_000_000).toFixed(1)} Million`
+    return `₦${num.toLocaleString()}`
+  }
+  const fmtMoneyMobile = (num) => {
     if (num >= 1_000_000_000) return `₦${(num / 1_000_000_000).toFixed(2)}B`
     if (num >= 1_000_000) return `₦${(num / 1_000_000).toFixed(1)}M`
     return `₦${num.toLocaleString()}`
   }
-  const fmtViews = (num) => {
+  const fmtViewsDesktop = (num) => {
+    if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)} Billion`
+    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)} Million`
+    if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`
+    return String(num)
+  }
+  const fmtViewsMobile = (num) => {
     if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`
     if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
     if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`
     return String(num)
   }
+  const fmtMoney = fmtMoneyMobile
+  const fmtViews = fmtViewsMobile
 
   // ── Classic List View Helpers ──
   const getCreditTitle = (credit) => credit.films?.title || credit.video?.title || 'Untitled'
@@ -1103,15 +1132,23 @@ export default function PersonDetailV2() {
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Reported Theatrical Gross</p>
                         <p className="text-2xl font-black font-heading text-brand mt-0.5 tracking-tight">
-                          {fmtMoney(displayBoxOffice)}
+                          <span className="hidden sm:inline">{fmtMoneyDesktop(displayBoxOffice)}</span>
+                          <span className="inline sm:hidden">{fmtMoneyMobile(displayBoxOffice)}</span>
                         </p>
+                        {leadBoxOffice > 0 && leadBoxOffice < totalBoxOffice && (
+                          <p className="text-[10px] text-text-muted font-medium mt-0.5">
+                            <span className="hidden sm:inline">{fmtMoneyDesktop(leadBoxOffice)} in lead roles</span>
+                            <span className="inline sm:hidden">{fmtMoneyMobile(leadBoxOffice)} in lead roles</span>
+                          </p>
+                        )}
                       </div>
                     )}
                     {totalYoutubeViews > 0 && (
                       <div className={displayBoxOffice > 0 ? 'pt-3 border-t border-border/80' : ''}>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Audience Views</p>
                         <p className="text-2xl font-black font-heading text-text-primary mt-0.5 tracking-tight">
-                          {fmtViews(totalYoutubeViews)}
+                          <span className="hidden sm:inline">{fmtViewsDesktop(totalYoutubeViews)}</span>
+                          <span className="inline sm:hidden">{fmtViewsMobile(totalYoutubeViews)}</span>
                         </p>
                       </div>
                     )}
@@ -1439,9 +1476,9 @@ export default function PersonDetailV2() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     {/* Box Office badge */}
-                    {credit.films.box_office_domestic > 0 && (
+                    {getCreditBoxOffice(credit) > 0 && (
                       <div className="absolute top-2 right-2 bg-amber-500/90 text-black text-[9px] font-black px-2 py-0.5 rounded shadow backdrop-blur-md">
-                        🎟️ {fmtMoney(credit.films.box_office_domestic)}
+                        🎟️ {fmtMoney(getCreditBoxOffice(credit))}
                       </div>
                     )}
                   </div>
@@ -1603,9 +1640,9 @@ export default function PersonDetailV2() {
                                 name={film.title}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                               />
-                              {film.box_office_domestic > 0 && (
+                              {getCreditBoxOffice(credit) > 0 && (
                                 <div className="absolute top-2 right-2 bg-amber-500/90 text-black text-[8px] font-black px-1.5 py-0.5 rounded shadow">
-                                  🎟️ {fmtMoney(film.box_office_domestic)}
+                                  🎟️ {fmtMoney(getCreditBoxOffice(credit))}
                                 </div>
                               )}
                             </div>
@@ -1660,9 +1697,9 @@ export default function PersonDetailV2() {
                                 sizes="64px"
                                 loading="lazy"
                               />
-                              {film.box_office_domestic > 0 && (
+                              {getCreditBoxOffice(credit) > 0 && (
                                 <div className="absolute top-1.5 right-1.5 bg-amber-500/90 text-bg text-[7px] font-black px-1 py-0.5 rounded shadow">
-                                  🎟️ {fmtMoney(film.box_office_domestic)}
+                                  🎟️ {fmtMoney(getCreditBoxOffice(credit))}
                                 </div>
                               )}
                               {isYoutubeCredit(credit) && views > 0 && (

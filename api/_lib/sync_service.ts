@@ -704,19 +704,62 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                   });
 
                 } else {
-                  // ── Regular standalone movie ────────────────────────────────────
                   // Dedup: if a film with this title already exists (same movie
                   // re-uploaded by another aggregator channel, or already in the
                   // catalogue), link this video to it instead of creating a copy.
                   const { data: dupFilm } = await supabase
-                    .from('films').select('id')
+                    .from('films').select('id, title, release_type, box_office_domestic, box_office_source, is_in_cinemas')
                     .or(`title.ilike.${cleanedTitle},original_title.ilike.%${cleanedTitle}%`)
                     .order('created_at', { ascending: true })
                     .limit(1);
-                  if (dupFilm?.[0]) {
-                    existingFilmsMap.set(v.video_id, dupFilm[0].id);
+
+                  const matchedFilm = dupFilm?.[0];
+                  const isCinemaFilm = Boolean(
+                    matchedFilm && (
+                      matchedFilm.release_type === 'cinema' ||
+                      matchedFilm.release_type === 'theatrical' ||
+                      (Number(matchedFilm.box_office_domestic) > 0) ||
+                      Boolean(matchedFilm.box_office_source) ||
+                      Boolean(matchedFilm.is_in_cinemas)
+                    )
+                  );
+
+                  const isYorubahood = /yorubahood|yorubanood/i.test(ch.name || '');
+
+                  // 1. Strict Yorubahood Rule:
+                  // Yorubahood copies cinema movie titles to bait YouTube clicks.
+                  // If channel is Yorubahood and the title matches any cinema movie, ignore it completely!
+                  if (isYorubahood && isCinemaFilm) {
+                    console.log(`[sync_service] Skipping Yorubahood upload "${v.title}" which copies cinema film "${matchedFilm.title}"`);
+                    continue;
+                  }
+
+                  // 2. Also check if cleanedTitle matches ANY known cinema title even if dupFilm didn't match directly
+                  if (isYorubahood) {
+                    const normClean = cleanedTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const { data: cinemaFilms } = await supabase
+                      .from('films')
+                      .select('id, title')
+                      .or('release_type.eq.cinema,box_office_domestic.gt.0,is_in_cinemas.eq.true')
+                      .limit(200);
+                    const matchedCinema = (cinemaFilms || []).find(cf => 
+                      cf.title.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean
+                    );
+                    if (matchedCinema) {
+                      console.log(`[sync_service] Skipping Yorubahood upload "${v.title}" matching cinema title "${matchedCinema.title}"`);
+                      continue;
+                    }
+                  }
+
+                  if (matchedFilm) {
+                    // Cinema releases must never be merged with or overwritten by YouTube uploads
+                    if (isCinemaFilm) {
+                      console.log(`[sync_service] YouTube video "${v.title}" matches cinema film "${matchedFilm.title}". Skipping merge.`);
+                      continue;
+                    }
+                    existingFilmsMap.set(v.video_id, matchedFilm.id);
                     if (typeof meta[v.video_id]?.views === 'number' && meta[v.video_id].views > 0) {
-                      await supabase.from('films').update({ view_count: meta[v.video_id].views }).eq('id', dupFilm[0].id);
+                      await supabase.from('films').update({ view_count: meta[v.video_id].views }).eq('id', matchedFilm.id);
                     }
                   } else {
                     const tmdb = await enrichFromTMDB(cleanedTitle, vidYear);
