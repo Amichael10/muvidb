@@ -522,15 +522,23 @@ export default function DeveloperApi() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedKey, setSubmittedKey] = useState(null);
+  const [docsTab, setDocsTab] = useState('reference'); // 'reference' | 'guide'
+  const [searchQuery, setSearchQuery] = useState('');
 
   const categories = useMemo(() => {
     return ['All', ...new Set(ENDPOINTS.map(e => e.category))];
   }, []);
 
   const filteredEndpoints = useMemo(() => {
-    if (selectedCategory === 'All') return ENDPOINTS;
-    return ENDPOINTS.filter(e => e.category === selectedCategory);
-  }, [selectedCategory]);
+    return ENDPOINTS.filter(e => {
+      const matchesCat = selectedCategory === 'All' || e.category === selectedCategory;
+      const matchesSearch = !searchQuery.trim() || 
+        e.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        e.path.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.description.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCat && matchesSearch;
+    });
+  }, [selectedCategory, searchQuery]);
 
   const handleCopy = (text, type) => {
     navigator.clipboard.writeText(typeof text === 'string' ? text : JSON.stringify(text, null, 2));
@@ -618,150 +626,225 @@ export default function DeveloperApi() {
     <div className="min-h-screen bg-[#080A0D] text-slate-100 selection:bg-brand selection:text-white relative overflow-x-hidden font-sans">
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-32 space-y-20">
 
-        {/* ── Navigation Strip ── */}
-        <header className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
-          <div className="flex items-center gap-3">
+        {/* Ambient Top Glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[550px] bg-brand/10 blur-[150px] pointer-events-none rounded-full" />
+
+        {/* ── Top Navigation Bar (Atlas Style) ── */}
+        <header className="flex items-center justify-between gap-4 py-4 border-b border-white/5 relative z-10">
+          <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2 group">
               <span className="font-heading font-black text-xl text-white tracking-tight">Muvi<span className="text-brand">DB</span></span>
             </Link>
-            <span className="text-white/20 font-light">/</span>
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs font-semibold">
+            <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-slate-400">
+              <a href="#reference" className="hover:text-white transition">Docs</a>
+              <a href="#reference" className="hover:text-white transition">API Reference</a>
+              <a href="#pricing" className="hover:text-white transition">Pricing</a>
+              <a href="#architecture" className="hover:text-white transition">Features</a>
+              <a href="#faq" className="hover:text-white transition">FAQ</a>
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs font-semibold">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>v1.0 Production API</span>
+              <span>v1.0 Production</span>
             </div>
-          </div>
-
-          <nav className="flex items-center gap-1 sm:gap-2 text-xs font-semibold text-slate-300">
-            <a href="#console" className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-white/5 transition">Live Console</a>
-            <a href="#endpoints" className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-white/5 transition">Endpoints</a>
-            <a href="#architecture" className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-white/5 transition">Features</a>
-            <a href="#pricing" className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-white/5 transition">Pricing</a>
-            <a href="#faq" className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-white/5 transition">FAQ</a>
-          </nav>
-
-          <div className="flex items-center gap-3">
             <button
               onClick={() => openKeyModal('free')}
-              className="px-4 py-2 rounded-xl bg-brand hover:bg-brand/90 text-white font-bold text-xs transition shadow-lg shadow-brand/20 flex items-center gap-1.5 group"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-200 text-black font-bold text-xs transition shadow-sm"
             >
-              <Icon icon="solar:key-bold" className="text-sm group-hover:rotate-12 transition-transform" />
-              <span>Get API Key</span>
+              Get API key
             </button>
           </div>
         </header>
 
-        {/* ── Hero Section ── */}
-        <section className="text-center max-w-4xl mx-auto space-y-8 pt-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-xs text-slate-300 shadow-inner">
-            <Icon icon="solar:server-square-bold" className="text-brand text-sm" />
-            <span className="text-slate-400 font-mono">Edge CDN Latency:</span>
-            <span className="text-emerald-400 font-mono font-bold">&lt; 42ms</span>
-            <span className="text-white/20">•</span>
-            <span>REST JSON &amp; Webhook Events</span>
+        {/* ── Hero Section (Atlas Split 2-Column Standard) ── */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center pt-8 pb-12 relative z-10">
+          {/* Left: Typography & CTAs */}
+          <div className="lg:col-span-6 space-y-6 text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-xs text-slate-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="font-mono text-emerald-400 font-semibold">MuviDB</span>
+              <span className="text-white/20">•</span>
+              <span className="text-slate-400">v1.0 now live</span>
+            </div>
+
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-[1.06] font-heading">
+              One API for<br />
+              everything your<br />
+              <span className="text-brand">cinema app needs.</span>
+            </h1>
+
+            <p className="text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl">
+              Films, verified ensemble cast &amp; crew, box office grosses, and streaming availability behind a single clean endpoint. Ship in minutes, scale to billions of requests.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4 pt-2">
+              <button
+                onClick={() => openKeyModal('free')}
+                className="px-7 py-3 rounded-full bg-white hover:bg-slate-200 text-black font-bold text-xs tracking-wide transition shadow-xl"
+              >
+                Get API key
+              </button>
+              <a
+                href="#reference"
+                className="px-7 py-3 rounded-full bg-white/[0.06] hover:bg-white/10 border border-white/15 text-white font-medium text-xs tracking-wide transition flex items-center gap-2 group"
+              >
+                <span>Read the docs</span>
+                <span className="text-slate-400 group-hover:translate-x-0.5 transition-transform">→</span>
+              </a>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="pt-4 flex flex-wrap items-center gap-6 text-xs text-slate-400 font-mono border-t border-white/5">
+              <div><strong className="text-white font-bold">12,400+</strong> Films</div>
+              <div className="text-white/20">•</div>
+              <div><strong className="text-white font-bold">15,000+</strong> Talent</div>
+              <div className="text-white/20">•</div>
+              <div><strong className="text-amber-400 font-bold">₦18.5B+</strong> Box Office</div>
+              <div className="text-white/20">•</div>
+              <div><strong className="text-emerald-400 font-bold">&lt; 42ms</strong> Edge Latency</div>
+            </div>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight font-heading text-white leading-[1.08]">
-            The Definitive Data Engine for{' '}
-            <span className="text-brand">African Cinema</span>
-          </h1>
-
-          <p className="text-base sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            Power streaming apps, media intelligence suites, cinema booking engines, and editorial portals with verified Nollywood metadata, ensemble credits, box office grosses, and deep-linked streaming availability.
-          </p>
-
-          {/* Quickstart Command Bar */}
-          <div className="max-w-2xl mx-auto p-2.5 rounded-2xl bg-black/60 border border-white/10 shadow-2xl backdrop-blur-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
-            <div className="flex items-center gap-3 px-3 py-1 text-xs font-mono text-slate-300 overflow-x-auto w-full">
-              <span className="text-brand font-bold select-none">$</span>
-              <span className="text-slate-400 select-none">curl -H &quot;x-api-key: mvd_live_...&quot;</span>
-              <span className="text-emerald-400 whitespace-nowrap">https://muvidb.com/api/v1/films?query=wedding</span>
-            </div>
-            <button
-              onClick={() => handleCopy('curl -H "x-api-key: mvd_live_demo_key" https://muvidb.com/api/v1/films?query=wedding', 'quickstart')}
-              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-mono text-xs font-semibold shrink-0 transition flex items-center justify-center gap-1.5"
-            >
-              <Icon icon={copiedQuickstart ? "solar:check-circle-bold" : "solar:copy-linear"} className={copiedQuickstart ? "text-emerald-400" : ""} />
-              <span>{copiedQuickstart ? 'Copied' : 'Copy'}</span>
-            </button>
-          </div>
-
-          {/* Core Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 max-w-4xl mx-auto">
-            <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-md text-left relative overflow-hidden group hover:border-brand/30 transition">
-              <div className="text-xs font-mono text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Verified Films</span>
-                <Icon icon="solar:videocamera-record-bold" className="text-brand text-sm" />
+          {/* Right: The macOS Interactive Code Terminal (Atlas request.ts card) */}
+          <div className="lg:col-span-6">
+            <div className="rounded-2xl bg-[#090C12] border border-white/10 shadow-2xl overflow-hidden font-mono text-xs text-left">
+              {/* macOS Window Titlebar */}
+              <div className="flex items-center justify-between px-4 py-3 bg-white/[0.02] border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-[#EF4444]" />
+                  <div className="w-3 h-3 rounded-full bg-[#F59E0B]" />
+                  <div className="w-3 h-3 rounded-full bg-[#10B981]" />
+                  <span className="ml-3 text-slate-400 text-xs font-sans font-medium">request.ts</span>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  GET
+                </span>
               </div>
-              <div className="text-3xl font-black text-white font-mono">12,400+</div>
-              <p className="text-[11px] text-slate-500 mt-1">Cross-era Nollywood archive</p>
-            </div>
 
-            <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-md text-left relative overflow-hidden group hover:border-brand/30 transition">
-              <div className="text-xs font-mono text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Actors &amp; Crew</span>
-                <Icon icon="solar:users-group-two-rounded-bold" className="text-blue-400 text-sm" />
+              {/* Request Code Area */}
+              <div className="p-5 space-y-1.5 text-slate-300 leading-relaxed overflow-x-auto no-scrollbar">
+                <div className="text-slate-500">// query Nollywood catalog &amp; box office in one call</div>
+                <div>
+                  <span className="text-purple-400">const</span> res = <span className="text-purple-400">await</span> muvidb.films.<span className="text-blue-400">search</span>(&#123;
+                </div>
+                <div className="pl-4">
+                  <span className="text-slate-400">query:</span> <span className="text-emerald-400">&quot;wedding&quot;</span>,
+                </div>
+                <div className="pl-4">
+                  <span className="text-slate-400">genre:</span> <span className="text-emerald-400">&quot;Romance&quot;</span>,
+                </div>
+                <div className="pl-4">
+                  <span className="text-slate-400">year:</span> <span className="text-amber-400">2024</span>
+                </div>
+                <div>&#125;);</div>
               </div>
-              <div className="text-3xl font-black text-white font-mono">15,000+</div>
-              <p className="text-[11px] text-slate-500 mt-1">Zero-duplicate entity graph</p>
-            </div>
 
-            <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-md text-left relative overflow-hidden group hover:border-brand/30 transition">
-              <div className="text-xs font-mono text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Box Office Tracked</span>
-                <Icon icon="solar:wallet-money-bold" className="text-amber-400 text-sm" />
+              {/* Status Bar */}
+              <div className="px-5 py-2.5 bg-white/[0.02] border-y border-white/5 flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                  <span>← 200 OK</span>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-slate-400">38ms</span>
+                </div>
+                <span className="text-slate-500 text-[10px]">canonical payload</span>
               </div>
-              <div className="text-3xl font-black text-amber-300 font-mono">₦18.5B+</div>
-              <p className="text-[11px] text-slate-500 mt-1">West African cinema grosses</p>
-            </div>
 
-            <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-md text-left relative overflow-hidden group hover:border-brand/30 transition">
-              <div className="text-xs font-mono text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Edge SLA</span>
-                <Icon icon="solar:shield-check-bold" className="text-emerald-400 text-sm" />
+              {/* Response Body */}
+              <div className="p-5 space-y-1 text-slate-300 leading-relaxed overflow-x-auto no-scrollbar max-h-56">
+                <div className="text-slate-500">&#123;</div>
+                <div className="pl-4">
+                  <span className="text-cyan-400">&quot;id&quot;</span>: <span className="text-emerald-400">&quot;the-wedding-party-2016&quot;</span>,
+                </div>
+                <div className="pl-4">
+                  <span className="text-cyan-400">&quot;title&quot;</span>: <span className="text-emerald-400">&quot;The Wedding Party&quot;</span>,
+                </div>
+                <div className="pl-4">
+                  <span className="text-cyan-400">&quot;release_year&quot;</span>: <span className="text-amber-400">2016</span>,
+                </div>
+                <div className="pl-4">
+                  <span className="text-cyan-400">&quot;box_office_gross&quot;</span>: <span className="text-emerald-400">&quot;₦453,000,000&quot;</span>,
+                </div>
+                <div className="pl-4">
+                  <span className="text-cyan-400">&quot;streaming&quot;</span>: [<span className="text-emerald-400">&quot;Netflix&quot;</span>, <span className="text-emerald-400">&quot;Prime Video&quot;</span>],
+                </div>
+                <div className="pl-4">
+                  <span className="text-cyan-400">&quot;status&quot;</span>: <span className="text-emerald-400">&quot;verified&quot;</span>
+                </div>
+                <div className="text-slate-500">&#125;</div>
               </div>
-              <div className="text-3xl font-black text-emerald-400 font-mono">99.98%</div>
-              <p className="text-[11px] text-slate-500 mt-1">Global multi-region failover</p>
             </div>
           </div>
         </section>
 
-        {/* ── Interactive Live API Console / Sandbox ── */}
-        <section id="console" className="scroll-mt-20 space-y-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
-            <div>
-              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand mb-2">
-                <Icon icon="solar:code-circle-bold" className="text-base" />
-                Live Developer Console
-              </div>
-              <h2 className="text-3xl font-extrabold text-white">Interactive Endpoint Playground</h2>
-              <p className="text-sm text-slate-400 mt-1">
-                Customize query parameters, generate production-ready code in 5 languages, and preview canonical responses.
-              </p>
+        {/* ── API Reference & Documentation Explorer (Easypay Style) ── */}
+        <section id="reference" className="scroll-mt-12 space-y-6 relative z-10">
+          {/* Sub-bar with Mode Toggle + Search Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-2xl bg-[#0C0F16] border border-white/10">
+            {/* Toggle Pills: Documentation vs API Reference */}
+            <div className="inline-flex items-center p-1 rounded-xl bg-white/[0.04] border border-white/5 text-xs">
+              <button
+                onClick={() => setDocsTab('reference')}
+                className={`px-3.5 py-1.5 rounded-lg font-medium transition ${
+                  docsTab === 'reference'
+                    ? 'bg-white/10 text-white font-semibold shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                API Reference
+              </button>
+              <button
+                onClick={() => setDocsTab('guide')}
+                className={`px-3.5 py-1.5 rounded-lg font-medium transition ${
+                  docsTab === 'guide'
+                    ? 'bg-white/10 text-white font-semibold shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Documentation
+              </button>
             </div>
 
-            {/* Quick Presets */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono text-slate-400">Presets:</span>
-              {PRESETS.map((preset, idx) => (
+            {/* Search Input Bar (Easypay Search style) */}
+            <div className="flex-1 max-w-md relative">
+              <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+              <input
+                type="text"
+                placeholder="Search endpoints, parameters, methods..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-16 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-brand"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] text-slate-400 font-mono">
+                Ctrl K
+              </div>
+            </div>
+
+            {/* Presets Chips */}
+            <div className="hidden xl:flex items-center gap-1.5">
+              <span className="text-[11px] text-slate-500 font-mono">Quick:</span>
+              {PRESETS.map((p, idx) => (
                 <button
                   key={idx}
-                  onClick={() => handleApplyPreset(preset)}
-                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 hover:text-white transition font-medium"
+                  onClick={() => handleApplyPreset(p)}
+                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-[11px] text-slate-300 hover:text-white transition font-medium"
                 >
-                  {preset.label}
+                  {p.label}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Reference Explorer Grid (2 Columns: Navigation Tree on Left, Details & Live Playground on Right) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
-            {/* Left Column: Category & Endpoint Navigation */}
+            {/* Left Column: Categorized Endpoints Tree */}
             <div className="lg:col-span-4 space-y-4">
-              {/* Category Pills */}
+              {/* Category Filter Pills */}
               <div 
                 className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/5 overflow-x-auto no-scrollbar scrollbar-none"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -781,71 +864,120 @@ export default function DeveloperApi() {
                 ))}
               </div>
 
-              {/* Endpoint Cards */}
-              <div className="space-y-2.5">
+              {/* Endpoints Sidebar Items */}
+              <div className="space-y-2">
                 {filteredEndpoints.map(endpoint => {
                   const isSelected = selectedEndpoint.id === endpoint.id;
                   return (
                     <button
                       key={endpoint.id}
                       onClick={() => setSelectedEndpoint(endpoint)}
-                      className={`w-full text-left p-4 rounded-xl border transition-all flex flex-col gap-2 relative overflow-hidden ${
+                      className={`w-full text-left p-3.5 rounded-xl border transition-all flex flex-col gap-1.5 relative overflow-hidden ${
                         isSelected
-                          ? 'bg-[#141A22] border-brand shadow-sm text-white'
-                          : 'bg-[#0E1217] border-white/10 hover:border-white/20 hover:bg-[#121620]'
+                          ? 'bg-[#121622] border-brand/70 shadow-md text-white'
+                          : 'bg-[#0A0D13] border-white/5 hover:border-white/15 hover:bg-[#0E121A]'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-white">{endpoint.name}</span>
-                        <span className={`text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md border ${endpoint.tierBadgeColor}`}>
+                        <span className="font-semibold text-xs text-white">{endpoint.name}</span>
+                        <span className={`text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded border ${endpoint.tierBadgeColor}`}>
                           {endpoint.tier.includes('Pro') ? 'PRO' : 'FREE'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 font-mono text-xs">
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold">{endpoint.method}</span>
-                        <span className="text-slate-300 truncate">{endpoint.path}</span>
+                      <div className="flex items-center gap-2 font-mono text-[11px]">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold text-[10px]">
+                          {endpoint.method}
+                        </span>
+                        <span className="text-slate-400 truncate">{endpoint.path}</span>
                       </div>
                     </button>
                   );
                 })}
+
+                {filteredEndpoints.length === 0 && (
+                  <div className="p-8 text-center text-xs text-slate-500 rounded-xl bg-white/[0.02] border border-white/5">
+                    No matching endpoints found for &ldquo;{searchQuery}&rdquo;.
+                  </div>
+                )}
               </div>
-
-              {/* Interactive Query Parameter Inputs */}
-              {selectedEndpoint.params && selectedEndpoint.params.length > 0 && (
-                <div className="p-5 rounded-2xl bg-surface/40 border border-white/10 space-y-3.5 backdrop-blur-md">
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                      <Icon icon="solar:tuning-square-2-bold" className="text-brand" />
-                      Configure Parameters
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-mono">Live updates</span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {selectedEndpoint.params.map(param => (
-                      <div key={param.name} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <label className="font-mono text-slate-300 font-semibold">{param.name}</label>
-                          <span className="text-[11px] text-slate-500">{param.type}</span>
-                        </div>
-                        <input
-                          type="text"
-                          value={playgroundParams[param.name] ?? param.example ?? ''}
-                          onChange={(e) => setPlaygroundParams(prev => ({ ...prev, [param.name]: e.target.value }))}
-                          placeholder={param.desc}
-                          className="w-full px-3 py-1.5 rounded-xl bg-black/50 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-brand"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Right Column: Code Snippet & Live Response Console */}
+            {/* Right Column: Endpoint Specification & Interactive Live Console */}
             <div className="lg:col-span-8 space-y-6">
               
-              {/* Code Generator Card */}
+              {/* Endpoint Documentation Card */}
+              <div className="rounded-2xl bg-[#0A0D13] border border-white/10 p-6 space-y-6">
+                {/* Endpoint Header */}
+                <div className="space-y-3 pb-6 border-b border-white/5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 font-bold text-xs border border-emerald-500/20">
+                        {selectedEndpoint.method}
+                      </span>
+                      <span className="text-white text-sm font-semibold">{selectedEndpoint.path}</span>
+                    </div>
+                    <span className={`text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md border ${selectedEndpoint.tierBadgeColor}`}>
+                      {selectedEndpoint.tier}
+                    </span>
+                  </div>
+
+                  <h3 className="text-xl font-bold text-white tracking-tight">{selectedEndpoint.name}</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {selectedEndpoint.description}
+                  </p>
+                </div>
+
+                {/* Base URL & Auth Card (Easypay style) */}
+                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="space-y-1">
+                    <div className="font-semibold text-slate-300">Base Production URL</div>
+                    <div className="font-mono text-slate-400 text-[11px]">https://muvidb.com{selectedEndpoint.path}</div>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(`https://muvidb.com${selectedEndpoint.path}`, 'quickstart')}
+                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-mono transition flex items-center gap-1.5 self-start sm:self-auto"
+                  >
+                    <Icon icon="solar:copy-linear" className="text-xs" />
+                    <span>Copy URL</span>
+                  </button>
+                </div>
+
+                {/* Parameter Tuning Inputs */}
+                {selectedEndpoint.params && selectedEndpoint.params.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Query Parameters</h4>
+                      <span className="text-[11px] text-slate-500 font-mono">Tune live inputs</span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {selectedEndpoint.params.map(param => (
+                        <div key={param.name} className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-white font-semibold">{param.name}</span>
+                              <span className="text-[10px] font-mono text-slate-400">{param.type}</span>
+                              {param.required && (
+                                <span className="text-[10px] text-rose-400 font-mono">required</span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-slate-500">{param.desc}</span>
+                          </div>
+                          <input
+                            type="text"
+                            value={playgroundParams[param.name] ?? param.example ?? ''}
+                            onChange={(e) => setPlaygroundParams(prev => ({ ...prev, [param.name]: e.target.value }))}
+                            placeholder={`Example: ${param.example}`}
+                            className="w-full px-3 py-1.5 rounded-lg bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-brand"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Code Generator & Snippets (Easypay / Stripe right console) */}
               <div className="rounded-2xl bg-[#090C11] border border-white/10 overflow-hidden shadow-2xl">
                 {/* Header with Language Tabs */}
                 <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 border-b border-white/10 bg-white/[0.02]">
@@ -871,15 +1003,13 @@ export default function DeveloperApi() {
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleCopy(activeSnippet, 'code')}
-                      className="px-3 py-1.5 text-xs font-mono text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition flex items-center gap-1.5"
-                    >
-                      <Icon icon={copiedCode ? "solar:check-circle-bold" : "solar:copy-linear"} className={copiedCode ? "text-emerald-400" : ""} />
-                      <span>{copiedCode ? 'Copied Snippet' : 'Copy Code'}</span>
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleCopy(activeSnippet, 'code')}
+                    className="px-3 py-1.5 text-xs font-mono text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition flex items-center gap-1.5"
+                  >
+                    <Icon icon={copiedCode ? "solar:check-circle-bold" : "solar:copy-linear"} className={copiedCode ? "text-emerald-400" : ""} />
+                    <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
+                  </button>
                 </div>
 
                 {/* Code Body */}
@@ -888,19 +1018,19 @@ export default function DeveloperApi() {
                 </div>
               </div>
 
-              {/* Response Inspector Card */}
+              {/* Live Mock Response Inspector Card */}
               <div className="rounded-2xl bg-[#090C11] border border-white/10 overflow-hidden shadow-2xl">
                 <div className="flex items-center justify-between p-3.5 border-b border-white/10 bg-white/[0.02]">
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                       <Icon icon="solar:code-file-bold" className="text-emerald-400 text-sm" />
-                      Mock Response Inspector
+                      Response Preview
                     </span>
                     <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/20">
                       200 OK
                     </span>
                     <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
-                      Time: 38ms • gzip: 1.4KB
+                      Time: 38ms
                     </span>
                   </div>
 
@@ -909,7 +1039,7 @@ export default function DeveloperApi() {
                     className="px-3 py-1.5 text-xs font-mono text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition flex items-center gap-1.5"
                   >
                     <Icon icon={copiedJson ? "solar:check-circle-bold" : "solar:copy-linear"} className={copiedJson ? "text-emerald-400" : ""} />
-                    <span>{copiedJson ? 'Copied JSON' : 'Copy JSON'}</span>
+                    <span>{copiedJson ? 'Copied' : 'Copy JSON'}</span>
                   </button>
                 </div>
 
@@ -1245,22 +1375,6 @@ export default function DeveloperApi() {
               </div>
             </div>
 
-          </div>
-
-          {/* Customer Testimonial Quote Banner (Dub.co benchmark standard) */}
-          <div className="py-10 px-6 sm:px-12 rounded-2xl bg-white/[0.02] border border-white/5 max-w-4xl mx-auto text-center space-y-5">
-            <p className="text-base sm:text-lg font-medium text-slate-200 leading-relaxed max-w-2xl mx-auto font-sans">
-              &ldquo;MuviDB has transformed how we ingest and verify African cinema metadata. If you&apos;re building a streaming guide or entertainment application on the continent, I cannot recommend the API enough.&rdquo;
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-brand to-amber-500 text-white font-bold flex items-center justify-center text-xs shadow-md">
-                TO
-              </div>
-              <div className="text-left">
-                <div className="text-xs sm:text-sm font-bold text-white">Tunde Oladipo</div>
-                <div className="text-[11px] text-slate-400">Head of Platform Engineering, StreamAfrik</div>
-              </div>
-            </div>
           </div>
         </section>
 
