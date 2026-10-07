@@ -655,6 +655,17 @@ export default function CompanyDashboard() {
               <Icon icon="solar:settings-bold" width="18" />
               <span>Studio Profile</span>
             </button>
+
+            <div className="pt-2 border-t border-border/50">
+              <Link
+                to="/advanced-search"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-text-muted hover:text-brand hover:bg-surface-2"
+                title="Search shared filmographies, comparisons & talent discovery"
+              >
+                <Icon icon="solar:tuning-square-2-bold" width="18" className="text-brand" />
+                <span>Advanced Search &amp; Synergy</span>
+              </Link>
+            </div>
           </nav>
         </div>
 

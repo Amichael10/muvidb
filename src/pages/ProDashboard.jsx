@@ -610,6 +610,13 @@ export default function ProDashboard() {
               <Icon icon="solar:add-circle-bold" width="15" /> Add Credit
             </button>
             <Link
+              to="/advanced-search"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
+              title="Search shared filmographies, comparisons & granular talent data"
+            >
+              <Icon icon="solar:tuning-square-2-bold" width="15" className="text-brand" /> Advanced Search
+            </Link>
+            <Link
               to={`/people/${person.slug || person.id}`}
               className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.03] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-muted transition hover:border-white/25 hover:text-white"
             >
