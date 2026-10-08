@@ -37,7 +37,6 @@ const MobileNav = () => {
     { name: 'Theatre', path: '/plays', icon: 'solar:masks-linear' },
     { name: 'Awards', path: '/awards', icon: 'solar:cup-star-linear' },
     { name: 'Companies', path: '/companies', icon: 'solar:case-linear' },
-    { name: 'Support', path: '/support', icon: 'solar:heart-linear' },
   ];
 
   // Check if any drawer route is currently active
