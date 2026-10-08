@@ -99,6 +99,7 @@ export default function Navbar() {
     { name: 'Critics', path: '/critics', icon: 'solar:pen-new-square-linear' },
     { name: 'Theatre Plays', path: '/plays', icon: 'solar:masks-linear' },
     { name: 'Companies', path: '/companies', icon: 'solar:case-linear' },
+    { name: 'Support Us', path: '/support', icon: 'solar:heart-linear' },
   ];
 
   const isMoreActive = moreLinks.some(

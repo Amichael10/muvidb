@@ -8,7 +8,7 @@ const PRESET_AMOUNTS = [
     amount: 1000,
     label: '₦1,000',
     tierName: 'Seed Supporter',
-    tagline: 'Powers daily search & database lookups',
+    tagline: 'Powers daily search and fast database lookups',
     icon: 'solar:cup-bold',
   },
   {
@@ -23,14 +23,14 @@ const PRESET_AMOUNTS = [
     amount: 5000,
     label: '₦5,000',
     tierName: 'Cinema Champion',
-    tagline: 'Funds image optimization & talent archiving',
+    tagline: 'Funds image optimization and talent cataloging',
     icon: 'solar:star-bold',
   },
   {
     amount: 10000,
     label: '₦10,000',
     tierName: 'Heritage Guardian',
-    tagline: 'Maintains historical Nollywood catalog & cloud backups',
+    tagline: 'Maintains historical Nollywood catalog & redundancy',
     icon: 'solar:shield-check-bold',
   },
 ];
@@ -119,7 +119,7 @@ export default function Support() {
         throw new Error(data.error || 'Failed to initialize payment checkout. Please try again.');
       }
 
-      // Seamless redirect to Bachs hosted checkout
+      // Seamless redirect to hosted checkout
       window.location.href = targetUrl;
     } catch (err) {
       console.error('[Support] Checkout error:', err);
@@ -130,15 +130,15 @@ export default function Support() {
 
   return (
     <div className="min-h-screen bg-bg text-text-primary selection:bg-brand selection:text-white pb-24">
-      {/* Decorative ambient gradient */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-rose-500/10 via-amber-500/5 to-transparent blur-3xl pointer-events-none -z-10" />
+      {/* Subtle brand ambiance */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-80 bg-gradient-to-b from-brand/10 via-brand/2 to-transparent blur-3xl pointer-events-none -z-10" />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 sm:pt-14">
         {/* SUCCESS CELEBRATION BANNER */}
         {isSuccess && (
-          <div className="mb-12 p-8 rounded-3xl bg-gradient-to-b from-surface via-surface-2 to-surface border border-emerald-500/30 shadow-[0_20px_50px_rgba(16,185,129,0.15)] text-center animate-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-              <Icon icon="solar:heart-bold" className="w-9 h-9 animate-bounce" />
+          <div className="mb-12 p-8 rounded-2xl bg-surface border border-brand/30 shadow-[0_12px_40px_rgba(255,90,31,0.12)] text-center animate-in zoom-in-95 duration-300">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-brand/15 border border-brand/30 flex items-center justify-center text-brand">
+              <Icon icon="solar:heart-bold" className="w-8 h-8 animate-pulse" />
             </div>
             <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white tracking-tight">
               Thank You for Fueling African Cinema!
@@ -147,7 +147,7 @@ export default function Support() {
               Your contribution directly funds server uptime, credit archiving, and ensures MuviDB remains 100% free for everyone.
             </p>
             {paymentRef && (
-              <div className="mt-4 inline-block px-4 py-1.5 rounded-full bg-black/40 border border-border text-xs font-mono text-text-muted">
+              <div className="mt-4 inline-block px-4 py-1.5 rounded-lg bg-surface-2 border border-border text-xs font-mono text-text-muted">
                 Reference: <span className="text-white font-bold">{paymentRef}</span>
                 {paidAmount && <span> • ₦{Number(paidAmount).toLocaleString()}</span>}
               </div>
@@ -155,13 +155,13 @@ export default function Support() {
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Link
                 to="/"
-                className="px-6 py-2.5 rounded-xl bg-brand text-white font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-opacity"
+                className="px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider transition-colors shadow-md"
               >
                 Back to Archive
               </Link>
               <Link
                 to="/browse"
-                className="px-6 py-2.5 rounded-xl bg-surface-2 border border-border text-white font-bold text-xs uppercase tracking-wider hover:bg-surface transition-colors"
+                className="px-6 py-2.5 rounded-xl bg-surface-2 border border-border text-white font-bold text-xs uppercase tracking-wider hover:bg-surface-3 transition-colors"
               >
                 Discover Films
               </Link>
@@ -170,8 +170,8 @@ export default function Support() {
         )}
 
         {/* HERO HEADER */}
-        <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px] font-bold tracking-widest uppercase mb-4">
+        <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-14">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/25 text-brand text-[11px] font-bold tracking-widest uppercase mb-4">
             <Icon icon="solar:heart-bold" className="w-3.5 h-3.5" />
             <span>Community-Powered Heritage</span>
           </div>
@@ -180,7 +180,7 @@ export default function Support() {
             Keep Nollywood &amp; African Cinema Free For Everyone.
           </h1>
 
-          <p className="mt-4 sm:mt-5 text-sm sm:text-base text-text-secondary leading-relaxed">
+          <p className="mt-4 sm:mt-5 text-sm sm:text-base text-text-secondary leading-relaxed max-w-2xl mx-auto">
             We don’t believe in charging actors for profile representation, putting film credits behind paywalls, or restricting public discovery. MuviDB is open to all.
             Your voluntary contribution keeps our cloud servers online and our archival scanners running.
           </p>
@@ -189,15 +189,15 @@ export default function Support() {
         {/* MAIN BENTO SECTION */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* CONTRIBUTION FORM (7 Cols) */}
-          <div className="lg:col-span-7 bg-surface/90 border border-border rounded-3xl p-6 sm:p-8 backdrop-blur-md shadow-2xl relative">
-            <div className="flex items-center justify-between pb-6 border-b border-border/80 mb-6">
+          <div className="lg:col-span-7 bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-xl relative">
+            <div className="flex items-center justify-between pb-6 border-b border-border mb-6">
               <div>
                 <h2 className="text-lg font-heading font-bold text-white">Choose Your Contribution</h2>
-                <p className="text-xs text-text-muted mt-0.5">Pay securely via Bachs (Cards, Bank Transfer, USSD, Crypto)</p>
+                <p className="text-xs text-text-muted mt-0.5">Pay securely via Cards, Bank Transfer, USSD, or QR</p>
               </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400 font-bold">
-                <Icon icon="solar:shield-check-bold" className="w-3.5 h-3.5" />
-                <span>Bachs Verified</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2 border border-border text-[10px] font-mono text-text-secondary">
+                <Icon icon="solar:shield-check-bold" className="w-3.5 h-3.5 text-brand" />
+                <span>Secure Checkout</span>
               </div>
             </div>
 
@@ -211,14 +211,14 @@ export default function Support() {
                       key={tier.amount}
                       type="button"
                       onClick={() => handlePresetSelect(tier.amount)}
-                      className={`relative p-4 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between ${
+                      className={`relative p-4 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between ${
                         isSelected
-                          ? 'bg-rose-500/10 border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.15)] ring-1 ring-rose-500'
-                          : 'bg-surface-2/60 border-border hover:border-text-muted/40 hover:bg-surface-2'
+                          ? 'bg-brand/10 border-brand shadow-[0_0_20px_rgba(255,90,31,0.15)] ring-1 ring-brand'
+                          : 'bg-surface-2 border-border hover:border-brand/40 hover:bg-surface-3'
                       }`}
                     >
                       {tier.popular && (
-                        <span className="absolute -top-2 right-3 px-2 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                        <span className="absolute -top-2.5 right-3 px-2 py-0.5 rounded-md bg-brand text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
                           Popular
                         </span>
                       )}
@@ -226,10 +226,10 @@ export default function Support() {
                         <div className="flex items-center justify-between mb-2">
                           <Icon
                             icon={tier.icon}
-                            className={`w-5 h-5 ${isSelected ? 'text-rose-400' : 'text-text-muted'}`}
+                            className={`w-5 h-5 ${isSelected ? 'text-brand' : 'text-text-muted'}`}
                           />
                           {isSelected && (
-                            <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-rose-500" />
+                            <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-brand" />
                           )}
                         </div>
                         <div className="text-lg sm:text-xl font-heading font-black text-white">
@@ -239,7 +239,7 @@ export default function Support() {
                           {tier.tierName}
                         </div>
                       </div>
-                      <div className="text-[10px] text-text-muted mt-2 leading-tight">
+                      <div className="text-[11px] text-text-muted mt-2 leading-tight">
                         {tier.tagline}
                       </div>
                     </button>
@@ -248,7 +248,7 @@ export default function Support() {
               </div>
 
               {/* Custom Amount Field */}
-              <div className="pt-2">
+              <div className="pt-1">
                 <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
                   Or Enter a Custom Amount (₦)
                 </label>
@@ -263,18 +263,18 @@ export default function Support() {
                     placeholder="e.g. 15,000"
                     className={`w-full pl-9 pr-4 py-3 rounded-xl bg-surface-2 border text-sm font-bold text-white placeholder-text-muted focus:outline-none transition-all ${
                       isCustom && customAmount
-                        ? 'border-rose-500 ring-1 ring-rose-500'
-                        : 'border-border focus:border-text-muted'
+                        ? 'border-brand ring-1 ring-brand'
+                        : 'border-border focus:border-brand'
                     }`}
                   />
                 </div>
               </div>
 
               {/* Supporter Details */}
-              <div className="space-y-4 pt-2">
+              <div className="space-y-4 pt-1">
                 <div>
                   <label className="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
-                    Your Email <span className="text-rose-400">*</span>
+                    Your Email <span className="text-brand">*</span>
                   </label>
                   <input
                     type="email"
@@ -282,7 +282,7 @@ export default function Support() {
                     value={supporterEmail}
                     onChange={(e) => setSupporterEmail(e.target.value)}
                     placeholder="you@domain.com"
-                    className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-white placeholder-text-muted focus:outline-none focus:border-rose-500"
+                    className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-white placeholder-text-muted focus:outline-none focus:border-brand"
                   />
                 </div>
 
@@ -295,7 +295,7 @@ export default function Support() {
                     value={supporterName}
                     onChange={(e) => setSupporterName(e.target.value)}
                     placeholder="e.g. Adewale K. or Leave blank for Anonymous"
-                    className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-white placeholder-text-muted focus:outline-none focus:border-rose-500"
+                    className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-white placeholder-text-muted focus:outline-none focus:border-brand"
                   />
                 </div>
 
@@ -307,14 +307,14 @@ export default function Support() {
                     rows={2}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Leave a word of encouragement for the team..."
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm text-white placeholder-text-muted focus:outline-none focus:border-rose-500 resize-none"
+                    placeholder="Leave a word of encouragement for the archive..."
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm text-white placeholder-text-muted focus:outline-none focus:border-brand resize-none"
                   />
                 </div>
               </div>
 
               {error && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
                   <Icon icon="solar:danger-triangle-bold" className="w-4 h-4 shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -324,23 +324,24 @@ export default function Support() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-500 via-rose-600 to-amber-600 hover:opacity-95 text-white font-heading font-black text-sm uppercase tracking-wider shadow-[0_10px_30px_rgba(244,63,94,0.3)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-4 px-6 rounded-xl bg-brand hover:bg-brand-hover text-white font-heading font-bold text-sm uppercase tracking-wider shadow-[0_4px_20px_rgba(255,90,31,0.25)] hover:shadow-[0_6px_25px_rgba(255,90,31,0.35)] transition-all duration-200 active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
                     <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    <span>Connecting to Bachs Checkout...</span>
+                    <span>Connecting to Secure Checkout...</span>
                   </>
                 ) : (
                   <>
                     <Icon icon="solar:heart-bold" className="w-5 h-5 text-white" />
-                    <span>Contribute ₦{activeAmount.toLocaleString()} with Bachs</span>
+                    <span>Contribute ₦{activeAmount.toLocaleString()}</span>
                   </>
                 )}
               </button>
 
-              <p className="text-center text-[11px] text-text-muted">
-                Transactions processed securely via Bachs Global Payments.
+              <p className="text-center text-[11px] text-text-muted flex items-center justify-center gap-1.5">
+                <Icon icon="solar:lock-bold" className="w-3.5 h-3.5 text-text-muted" />
+                <span>256-bit encrypted checkout. No recurring charges.</span>
               </p>
             </form>
           </div>
@@ -348,30 +349,30 @@ export default function Support() {
           {/* IMPACT & TRANSPARENCY (5 Cols) */}
           <div className="lg:col-span-5 space-y-6">
             {/* Why Support Card */}
-            <div className="p-6 rounded-3xl bg-surface-2/60 border border-border">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-brand mb-4 flex items-center gap-2">
-                <Icon icon="solar:eye-bold" className="w-4 h-4" />
+            <div className="p-6 rounded-2xl bg-surface border border-border">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-brand mb-4 flex items-center gap-2">
+                <Icon icon="solar:eye-bold" className="w-4 h-4 text-brand" />
                 Where Your Support Goes
               </h3>
               <ul className="space-y-3.5 text-xs text-text-secondary">
                 <li className="flex items-start gap-2.5">
-                  <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-brand shrink-0 mt-0.5" />
                   <span><strong>Zero Paywalls:</strong> Keeps cast discovery, crew contacts, and film history open to aspiring actors, students, and indie filmmakers.</span>
                 </li>
                 <li className="flex items-start gap-2.5">
-                  <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-brand shrink-0 mt-0.5" />
                   <span><strong>OCR Credit Scanners:</strong> Processing video credits directly into accurate, searchable, verified film records.</span>
                 </li>
                 <li className="flex items-start gap-2.5">
-                  <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-brand shrink-0 mt-0.5" />
                   <span><strong>Reliable Infrastructure:</strong> Fast high-availability servers, image CDNs, and daily database redundancy.</span>
                 </li>
               </ul>
             </div>
 
             {/* Other Ways to Help */}
-            <div className="p-6 rounded-3xl bg-surface-2/60 border border-border">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary mb-3">
+            <div className="p-6 rounded-2xl bg-surface border border-border">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-text-primary mb-3">
                 Other Ways to Help
               </h3>
               <p className="text-xs text-text-secondary leading-relaxed mb-4">
@@ -380,7 +381,7 @@ export default function Support() {
               <div className="space-y-2">
                 <Link
                   to="/submit/film"
-                  className="flex items-center justify-between p-3 rounded-xl bg-surface hover:bg-surface/80 border border-border text-xs font-semibold text-white transition-colors"
+                  className="flex items-center justify-between p-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-xs font-semibold text-white transition-colors"
                 >
                   <span className="flex items-center gap-2">
                     <Icon icon="solar:clapperboard-add-bold" className="w-4 h-4 text-brand" />
@@ -390,10 +391,10 @@ export default function Support() {
                 </Link>
                 <Link
                   to="/claim"
-                  className="flex items-center justify-between p-3 rounded-xl bg-surface hover:bg-surface/80 border border-border text-xs font-semibold text-white transition-colors"
+                  className="flex items-center justify-between p-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-xs font-semibold text-white transition-colors"
                 >
                   <span className="flex items-center gap-2">
-                    <Icon icon="solar:user-check-bold" className="w-4 h-4 text-emerald-400" />
+                    <Icon icon="solar:user-check-bold" className="w-4 h-4 text-brand" />
                     Claim &amp; Verify Your Profile
                   </span>
                   <Icon icon="solar:arrow-right-linear" className="w-4 h-4 text-text-muted" />
@@ -402,9 +403,9 @@ export default function Support() {
             </div>
 
             {/* Commercial API Callout */}
-            <div className="p-6 rounded-3xl bg-surface border border-border/80">
+            <div className="p-6 rounded-2xl bg-surface border border-border">
               <div className="flex items-center gap-2 text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
-                <Icon icon="solar:code-square-bold" className="w-4 h-4 text-sky-400" />
+                <Icon icon="solar:code-square-bold" className="w-4 h-4 text-brand" />
                 Building Commercial Apps?
               </div>
               <p className="text-xs text-text-secondary leading-relaxed mb-3">
@@ -412,7 +413,7 @@ export default function Support() {
               </p>
               <Link
                 to="/developers"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-400 hover:text-sky-300 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:text-brand-hover transition-colors"
               >
                 <span>Check Developer API documentation</span>
                 <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5" />
