@@ -13,7 +13,7 @@ export default function SupportFloatingButton() {
   return (
     <Link
       to="/support"
-      className="fixed bottom-20 left-4 sm:bottom-7 sm:left-7 z-40 group flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface/95 hover:bg-brand border border-border hover:border-brand text-white shadow-[0_6px_25px_rgba(0,0,0,0.6)] hover:shadow-[0_8px_30px_rgba(255,90,31,0.4)] backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95"
+      className="fixed bottom-20 left-4 sm:bottom-7 sm:left-7 z-[95] group flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-surface/95 hover:bg-brand border border-border hover:border-brand text-text-primary hover:text-white shadow-[0_6px_25px_rgba(0,0,0,0.5)] hover:shadow-[0_8px_30px_rgba(255,90,31,0.4)] backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95"
       title="Support MuviDB"
       aria-label="Support MuviDB"
     >

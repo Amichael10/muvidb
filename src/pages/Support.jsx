@@ -140,7 +140,7 @@ export default function Support() {
             <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-brand/15 border border-brand/30 flex items-center justify-center text-brand">
               <Icon icon="solar:heart-bold" className="w-8 h-8 animate-pulse" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-text-primary tracking-tight">
               Thank You for Fueling African Cinema!
             </h2>
             <p className="mt-2 text-sm sm:text-base text-text-secondary max-w-xl mx-auto leading-relaxed">
@@ -148,7 +148,7 @@ export default function Support() {
             </p>
             {paymentRef && (
               <div className="mt-4 inline-block px-4 py-1.5 rounded-lg bg-surface-2 border border-border text-xs font-mono text-text-muted">
-                Reference: <span className="text-white font-bold">{paymentRef}</span>
+                Reference: <span className="text-text-primary font-bold">{paymentRef}</span>
                 {paidAmount && <span> • ₦{Number(paidAmount).toLocaleString()}</span>}
               </div>
             )}
@@ -161,7 +161,7 @@ export default function Support() {
               </Link>
               <Link
                 to="/browse"
-                className="px-6 py-2.5 rounded-xl bg-surface-2 border border-border text-white font-bold text-xs uppercase tracking-wider hover:bg-surface-3 transition-colors"
+                className="px-6 py-2.5 rounded-xl bg-surface-2 border border-border text-text-primary font-bold text-xs uppercase tracking-wider hover:bg-surface-3 transition-colors"
               >
                 Discover Films
               </Link>
@@ -176,7 +176,7 @@ export default function Support() {
             <span>Community-Powered Heritage</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-heading font-black tracking-tight text-white leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-heading font-black tracking-tight text-text-primary leading-tight">
             Keep Nollywood &amp; African Cinema Free For Everyone.
           </h1>
 
@@ -192,7 +192,7 @@ export default function Support() {
           <div className="lg:col-span-7 bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-xl relative">
             <div className="flex items-center justify-between pb-6 border-b border-border mb-6">
               <div>
-                <h2 className="text-lg font-heading font-bold text-white">Choose Your Contribution</h2>
+                <h2 className="text-lg font-heading font-bold text-text-primary">Choose Your Contribution</h2>
                 <p className="text-xs text-text-muted mt-0.5">Pay securely via Cards, Bank Transfer, USSD, or QR</p>
               </div>
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2 border border-border text-[10px] font-mono text-text-secondary">
@@ -232,7 +232,7 @@ export default function Support() {
                             <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-brand" />
                           )}
                         </div>
-                        <div className="text-lg sm:text-xl font-heading font-black text-white">
+                        <div className="text-lg sm:text-xl font-heading font-black text-text-primary">
                           {tier.label}
                         </div>
                         <div className="text-xs font-semibold text-text-primary mt-0.5">
@@ -261,7 +261,7 @@ export default function Support() {
                     value={customAmount}
                     onChange={handleCustomChange}
                     placeholder="e.g. 15,000"
-                    className={`w-full pl-9 pr-4 py-3 rounded-xl bg-surface-2 border text-sm font-bold text-white placeholder-text-muted focus:outline-none transition-all ${
+                    className={`w-full pl-9 pr-4 py-3 rounded-xl bg-surface-2 border text-sm font-bold text-text-primary placeholder-text-muted focus:outline-none transition-all ${
                       isCustom && customAmount
                         ? 'border-brand ring-1 ring-brand'
                         : 'border-border focus:border-brand'
@@ -282,7 +282,7 @@ export default function Support() {
                     value={supporterEmail}
                     onChange={(e) => setSupporterEmail(e.target.value)}
                     placeholder="you@domain.com"
-                    className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-white placeholder-text-muted focus:outline-none focus:border-brand"
+                    className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-brand"
                   />
                 </div>
 
@@ -295,7 +295,7 @@ export default function Support() {
                     value={supporterName}
                     onChange={(e) => setSupporterName(e.target.value)}
                     placeholder="e.g. Adewale K. or Leave blank for Anonymous"
-                    className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-white placeholder-text-muted focus:outline-none focus:border-brand"
+                    className="w-full px-4 py-3 rounded-xl bg-surface-2 border border-border text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-brand"
                   />
                 </div>
 
@@ -308,7 +308,7 @@ export default function Support() {
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Leave a word of encouragement for the archive..."
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm text-white placeholder-text-muted focus:outline-none focus:border-brand resize-none"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-2 border border-border text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-brand resize-none"
                   />
                 </div>
               </div>
@@ -381,7 +381,7 @@ export default function Support() {
               <div className="space-y-2">
                 <Link
                   to="/submit/film"
-                  className="flex items-center justify-between p-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-xs font-semibold text-white transition-colors"
+                  className="flex items-center justify-between p-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-xs font-semibold text-text-primary transition-colors"
                 >
                   <span className="flex items-center gap-2">
                     <Icon icon="solar:clapperboard-add-bold" className="w-4 h-4 text-brand" />
@@ -391,7 +391,7 @@ export default function Support() {
                 </Link>
                 <Link
                   to="/claim"
-                  className="flex items-center justify-between p-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-xs font-semibold text-white transition-colors"
+                  className="flex items-center justify-between p-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-xs font-semibold text-text-primary transition-colors"
                 >
                   <span className="flex items-center gap-2">
                     <Icon icon="solar:user-check-bold" className="w-4 h-4 text-brand" />

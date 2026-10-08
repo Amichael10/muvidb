@@ -531,10 +531,10 @@ export default function AdvancedSearch() {
   };
 
   return (
-    <div className="min-h-screen bg-[#080A0D] text-slate-100 selection:bg-brand selection:text-white font-sans pb-32">
+    <div className="min-h-screen bg-bg text-text-primary selection:bg-brand selection:text-white font-sans pb-32">
       
       {/* ── Page Header ── */}
-      <div className="border-b border-white/10 bg-[#0E1217]">
+      <div className="border-b border-border bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -542,7 +542,7 @@ export default function AdvancedSearch() {
                 <Icon icon="solar:tuning-square-2-bold" className="text-sm" />
                 <span>Precision Cinema Discovery</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-black font-heading text-white tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-black font-heading text-text-primary tracking-tight">
                 Advanced Title Search
               </h1>
             </div>
@@ -551,14 +551,14 @@ export default function AdvancedSearch() {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleResetFilters}
-                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-xs font-semibold text-text-secondary hover:text-text-primary transition flex items-center gap-1.5"
               >
                 <Icon icon="solar:restart-bold" />
                 <span>Reset Filters</span>
               </button>
               <Link
                 to="/search"
-                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-xs font-semibold text-text-secondary hover:text-text-primary transition flex items-center gap-1.5"
               >
                 <Icon icon="solar:magnifer-linear" />
                 <span>Standard Search</span>
@@ -566,12 +566,12 @@ export default function AdvancedSearch() {
             </div>
           </div>
 
-          <p className="text-xs sm:text-sm text-slate-400 max-w-3xl leading-relaxed">
+          <p className="text-xs sm:text-sm text-text-secondary max-w-3xl leading-relaxed">
             Discover MuviDB&apos;s robust search engine. Mix and match criteria to find hidden gems, cross-examine talent filmographies, or compare Nollywood titles and collaborators side-by-side.
           </p>
 
           {/* ── Mode Switcher Tabs (IMDb Style: TITLES, NAMES, COLLABORATIONS) ── */}
-          <div className="flex items-center gap-2 pt-2 border-t border-white/5 overflow-x-auto">
+          <div className="flex items-center gap-2 pt-2 border-t border-hairline overflow-x-auto">
             {[
               { id: 'titles', label: 'Titles', icon: 'solar:clapperboard-play-bold' },
               { id: 'collaborations', label: 'Collaborations & Compare', icon: 'solar:users-group-two-rounded-bold' },
@@ -583,7 +583,7 @@ export default function AdvancedSearch() {
                 className={`px-4 py-2.5 rounded-lg text-xs font-bold transition flex items-center gap-2 whitespace-nowrap uppercase tracking-wider ${
                   activeTab === tab.id
                     ? 'bg-brand text-white shadow-sm'
-                    : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border border-white/5'
+                    : 'bg-surface-2 text-text-secondary hover:text-text-primary hover:bg-surface-3 border border-border'
                 }`}
               >
                 <Icon icon={tab.icon} className="text-sm" />
@@ -604,23 +604,23 @@ export default function AdvancedSearch() {
             
             {/* ── Filter Sidebar (Accordion Style matching IMDb) ── */}
             <div className="lg:col-span-4 space-y-4">
-              <div className="bg-[#0E1217] border border-white/10 rounded-xl p-4 space-y-4">
-                <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                  <span className="font-bold text-sm text-white flex items-center gap-2">
+              <div className="bg-surface border border-border rounded-xl p-4 space-y-4">
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <span className="font-bold text-sm text-text-primary flex items-center gap-2">
                     <Icon icon="solar:filter-bold" className="text-brand" />
                     Search Filters
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => expandAllSections(true)}
-                      className="text-[11px] text-slate-400 hover:text-white underline font-mono"
+                      className="text-[11px] text-text-muted hover:text-text-primary underline font-mono"
                     >
                       Expand all
                     </button>
-                    <span className="text-slate-600">•</span>
+                    <span className="text-text-muted">•</span>
                     <button
                       onClick={() => expandAllSections(false)}
-                      className="text-[11px] text-slate-400 hover:text-white underline font-mono"
+                      className="text-[11px] text-text-muted hover:text-text-primary underline font-mono"
                     >
                       Collapse
                     </button>
@@ -628,10 +628,10 @@ export default function AdvancedSearch() {
                 </div>
 
                 {/* 1. Title Name */}
-                <div className="border-b border-white/5 pb-3">
+                <div className="border-b border-hairline pb-3">
                   <button
                     onClick={() => toggleSection('titleName')}
-                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-slate-200 hover:text-white"
+                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-text-primary hover:text-brand"
                   >
                     <span>Title name</span>
                     <Icon icon={collapsedSections.titleName ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} />
@@ -643,7 +643,7 @@ export default function AdvancedSearch() {
                         value={titleQuery}
                         onChange={(e) => setTitleQuery(e.target.value)}
                         placeholder="e.g. Wedding, King, Battle..."
-                        className="w-full px-3 py-2 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                        className="w-full px-3 py-2 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                       />
                       <div className="flex items-center gap-1.5 text-[11px]">
                         {[
@@ -657,7 +657,7 @@ export default function AdvancedSearch() {
                             className={`px-2 py-1 rounded text-[10px] font-semibold transition ${
                               titleMatchType === m.id
                                 ? 'bg-brand text-white'
-                                : 'bg-white/5 text-slate-400 hover:text-white'
+                                : 'bg-surface-2 text-text-secondary hover:text-text-primary border border-border'
                             }`}
                           >
                             {m.label}
@@ -669,10 +669,10 @@ export default function AdvancedSearch() {
                 </div>
 
                 {/* 2. Title Type */}
-                <div className="border-b border-white/5 pb-3">
+                <div className="border-b border-hairline pb-3">
                   <button
                     onClick={() => toggleSection('titleType')}
-                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-slate-200 hover:text-white"
+                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-text-primary hover:text-brand"
                   >
                     <span>Title type</span>
                     <Icon icon={collapsedSections.titleType ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} />
@@ -688,7 +688,7 @@ export default function AdvancedSearch() {
                       ].map(t => {
                         const checked = selectedTypes.includes(t.id);
                         return (
-                          <label key={t.id} className="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer select-none">
+                          <label key={t.id} className="flex items-center gap-2 text-xs text-text-secondary hover:text-text-primary cursor-pointer select-none">
                             <input
                               type="checkbox"
                               checked={checked}
@@ -697,7 +697,7 @@ export default function AdvancedSearch() {
                                   checked ? prev.filter(x => x !== t.id) : [...prev, t.id]
                                 );
                               }}
-                              className="rounded border-white/20 bg-[#141A22] text-brand focus:ring-0"
+                              className="rounded border-border bg-surface-2 text-brand focus:ring-0"
                             />
                             <span>{t.label}</span>
                           </label>
@@ -708,10 +708,10 @@ export default function AdvancedSearch() {
                 </div>
 
                 {/* 3. Release Date / Year */}
-                <div className="border-b border-white/5 pb-3">
+                <div className="border-b border-hairline pb-3">
                   <button
                     onClick={() => toggleSection('releaseDate')}
-                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-slate-200 hover:text-white"
+                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-text-primary hover:text-brand"
                   >
                     <span>Release date &amp; Era</span>
                     <Icon icon={collapsedSections.releaseDate ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} />
@@ -720,23 +720,23 @@ export default function AdvancedSearch() {
                     <div className="mt-2.5 space-y-2.5">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[10px] text-slate-400 font-mono">Min Year</label>
+                          <label className="text-[10px] text-text-muted font-mono">Min Year</label>
                           <input
                             type="number"
                             placeholder="e.g. 2015"
                             value={minYear}
                             onChange={(e) => setMinYear(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] text-slate-400 font-mono">Max Year</label>
+                          <label className="text-[10px] text-text-muted font-mono">Max Year</label>
                           <input
                             type="number"
                             placeholder="e.g. 2024"
                             value={maxYear}
                             onChange={(e) => setMaxYear(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                           />
                         </div>
                       </div>
@@ -752,7 +752,7 @@ export default function AdvancedSearch() {
                             className={`px-2 py-0.5 rounded text-[10px] border transition ${
                               minYear === era.min && maxYear === era.max
                                 ? 'bg-brand text-white border-brand'
-                                : 'bg-[#141A22] text-slate-400 hover:text-white border-white/5'
+                                : 'bg-surface-2 text-text-secondary hover:text-text-primary border-hairline'
                             }`}
                           >
                             {era.label}
@@ -764,10 +764,10 @@ export default function AdvancedSearch() {
                 </div>
 
                 {/* 4. Ratings & Liked % */}
-                <div className="border-b border-white/5 pb-3">
+                <div className="border-b border-hairline pb-3">
                   <button
                     onClick={() => toggleSection('ratings')}
-                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-slate-200 hover:text-white"
+                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-text-primary hover:text-brand"
                   >
                     <span>Audience ratings &amp; score</span>
                     <Icon icon={collapsedSections.ratings ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} />
@@ -776,11 +776,11 @@ export default function AdvancedSearch() {
                     <div className="mt-2.5 space-y-2.5">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[10px] text-slate-400 font-mono">Min Star Rating</label>
+                          <label className="text-[10px] text-text-muted font-mono">Min Star Rating</label>
                           <select
                             value={minRating}
                             onChange={(e) => setMinRating(e.target.value)}
-                            className="w-full px-2 py-1.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                            className="w-full px-2 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary focus:outline-none focus:border-brand"
                           >
                             <option value="">Any Rating</option>
                             <option value="6.0">6.0+ Stars</option>
@@ -790,11 +790,11 @@ export default function AdvancedSearch() {
                           </select>
                         </div>
                         <div>
-                          <label className="text-[10px] text-slate-400 font-mono">Min Liked %</label>
+                          <label className="text-[10px] text-text-muted font-mono">Min Liked %</label>
                           <select
                             value={minLiked}
                             onChange={(e) => setMinLiked(e.target.value)}
-                            className="w-full px-2 py-1.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                            className="w-full px-2 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary focus:outline-none focus:border-brand"
                           >
                             <option value="">Any Liked %</option>
                             <option value="60">60%+ Liked</option>
@@ -809,10 +809,10 @@ export default function AdvancedSearch() {
                 </div>
 
                 {/* 5. Genres (Multi-select) */}
-                <div className="border-b border-white/5 pb-3">
+                <div className="border-b border-hairline pb-3">
                   <button
                     onClick={() => toggleSection('genres')}
-                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-slate-200 hover:text-white"
+                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-text-primary hover:text-brand"
                   >
                     <span>Genres {selectedGenres.length > 0 && `(${selectedGenres.length})`}</span>
                     <Icon icon={collapsedSections.genres ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} />
@@ -832,7 +832,7 @@ export default function AdvancedSearch() {
                             className={`px-2.5 py-1 rounded text-xs transition border ${
                               isSelected
                                 ? 'bg-brand text-white border-brand font-bold'
-                                : 'bg-[#141A22] text-slate-300 hover:text-white border-white/5 hover:border-white/20'
+                                : 'bg-surface-2 text-text-secondary hover:text-text-primary border-hairline hover:border-border'
                             }`}
                           >
                             {g}
@@ -844,10 +844,10 @@ export default function AdvancedSearch() {
                 </div>
 
                 {/* 6. Instant Watch Options */}
-                <div className="border-b border-white/5 pb-3">
+                <div className="border-b border-hairline pb-3">
                   <button
                     onClick={() => toggleSection('streaming')}
-                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-slate-200 hover:text-white"
+                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-text-primary hover:text-brand"
                   >
                     <span>Instant watch options</span>
                     <Icon icon={collapsedSections.streaming ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} />
@@ -857,7 +857,7 @@ export default function AdvancedSearch() {
                       <button
                         onClick={() => setSelectedPlatform('')}
                         className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                          !selectedPlatform ? 'bg-brand text-white' : 'text-slate-300 hover:bg-white/5'
+                          !selectedPlatform ? 'bg-brand text-white' : 'text-text-secondary hover:bg-surface-2'
                         }`}
                       >
                         All Platforms / Any
@@ -867,7 +867,7 @@ export default function AdvancedSearch() {
                           key={p.id}
                           onClick={() => setSelectedPlatform(p.id)}
                           className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                            selectedPlatform === p.id ? 'bg-brand text-white' : 'text-slate-300 hover:bg-white/5'
+                            selectedPlatform === p.id ? 'bg-brand text-white' : 'text-text-secondary hover:bg-surface-2'
                           }`}
                         >
                           <span className="flex items-center gap-2">
@@ -881,10 +881,10 @@ export default function AdvancedSearch() {
                 </div>
 
                 {/* 7. Cast or Crew */}
-                <div className="border-b border-white/5 pb-3">
+                <div className="border-b border-hairline pb-3">
                   <button
                     onClick={() => toggleSection('talent')}
-                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-slate-200 hover:text-white"
+                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-text-primary hover:text-brand"
                   >
                     <span>Cast or crew member</span>
                     <Icon icon={collapsedSections.talent ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} />
@@ -896,7 +896,7 @@ export default function AdvancedSearch() {
                         value={talentQuery}
                         onChange={(e) => setTalentQuery(e.target.value)}
                         placeholder="e.g. Stan Nze, Kemi Adetiba..."
-                        className="w-full px-3 py-2 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                        className="w-full px-3 py-2 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                       />
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {['all', 'Actor', 'Director', 'Writer'].map(r => (
@@ -906,7 +906,7 @@ export default function AdvancedSearch() {
                             className={`py-1 px-2 rounded text-[11px] font-semibold border ${
                               talentRole === r
                                 ? 'bg-brand text-white border-brand'
-                                : 'bg-[#141A22] text-slate-400 border-white/5'
+                                : 'bg-surface-2 text-text-secondary border-hairline'
                             }`}
                           >
                             {r === 'all' ? 'Any Role' : r}
@@ -918,10 +918,10 @@ export default function AdvancedSearch() {
                 </div>
 
                 {/* 8. Box Office Gross */}
-                <div className="border-b border-white/5 pb-3">
+                <div className="border-b border-hairline pb-3">
                   <button
                     onClick={() => toggleSection('boxOffice')}
-                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-slate-200 hover:text-white"
+                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-text-primary hover:text-brand"
                   >
                     <span>Box Office gross</span>
                     <Icon icon={collapsedSections.boxOffice ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} />
@@ -933,7 +933,7 @@ export default function AdvancedSearch() {
                           key={idx}
                           onClick={() => setMinBoxOffice(bo.min)}
                           className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                            Number(minBoxOffice) === bo.min ? 'bg-brand text-white font-bold' : 'text-slate-300 hover:bg-white/5'
+                            Number(minBoxOffice) === bo.min ? 'bg-brand text-white font-bold' : 'text-text-secondary hover:bg-surface-2'
                           }`}
                         >
                           {bo.label}
@@ -944,10 +944,10 @@ export default function AdvancedSearch() {
                 </div>
 
                 {/* 9. Runtime */}
-                <div className="border-b border-white/5 pb-3">
+                <div className="border-b border-hairline pb-3">
                   <button
                     onClick={() => toggleSection('runtime')}
-                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-slate-200 hover:text-white"
+                    className="w-full flex items-center justify-between py-1 text-xs font-bold text-text-primary hover:text-brand"
                   >
                     <span>Runtime</span>
                     <Icon icon={collapsedSections.runtime ? "solar:alt-arrow-down-linear" : "solar:alt-arrow-up-linear"} />
@@ -960,14 +960,14 @@ export default function AdvancedSearch() {
                           placeholder="Min mins"
                           value={minRuntime}
                           onChange={(e) => setMinRuntime(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                         />
                         <input
                           type="number"
                           placeholder="Max mins"
                           value={maxRuntime}
                           onChange={(e) => setMaxRuntime(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                         />
                       </div>
                       <div className="flex flex-wrap gap-1">
@@ -981,7 +981,7 @@ export default function AdvancedSearch() {
                             className={`px-2 py-0.5 rounded text-[10px] border transition ${
                               minRuntime === rp.min && maxRuntime === rp.max
                                 ? 'bg-brand text-white border-brand'
-                                : 'bg-[#141A22] text-slate-400 hover:text-white border-white/5'
+                                : 'bg-surface-2 text-text-secondary hover:text-text-primary border-hairline'
                             }`}
                           >
                             {rp.label}
@@ -995,11 +995,11 @@ export default function AdvancedSearch() {
                 {/* 10. Language & NFVCB */}
                 <div className="pb-1 space-y-3">
                   <div>
-                    <label className="text-xs font-bold text-slate-200 block mb-1.5">Language</label>
+                    <label className="text-xs font-bold text-text-primary block mb-1.5">Language</label>
                     <select
                       value={selectedLanguage}
                       onChange={(e) => setSelectedLanguage(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary focus:outline-none focus:border-brand"
                     >
                       <option value="">Any Language</option>
                       {LANGUAGE_OPTIONS.map(l => (
@@ -1009,7 +1009,7 @@ export default function AdvancedSearch() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-200 block mb-1.5">NFVCB Nigerian Rating</label>
+                    <label className="text-xs font-bold text-text-primary block mb-1.5">NFVCB Nigerian Rating</label>
                     <div className="flex items-center gap-1.5">
                       {NFVCB_OPTIONS.map(r => {
                         const checked = selectedRatings.includes(r);
@@ -1024,7 +1024,7 @@ export default function AdvancedSearch() {
                             className={`flex-1 py-1 rounded text-xs font-mono font-bold border transition ${
                               checked
                                 ? 'bg-brand text-white border-brand'
-                                : 'bg-[#141A22] text-slate-400 border-white/10 hover:text-white'
+                                : 'bg-surface-2 text-text-secondary border-border hover:text-text-primary'
                             }`}
                           >
                             {r}
@@ -1057,13 +1057,13 @@ export default function AdvancedSearch() {
             <div className="lg:col-span-8 space-y-4">
               
               {/* Results Topbar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-[#0E1217] border border-white/10">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-surface border border-border">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-white">
+                  <span className="font-bold text-sm text-text-primary">
                     {isTitlesLoading ? 'Searching catalog...' : `${totalTitlesCount} Titles Found`}
                   </span>
                   {totalTitlesCount > 0 && (
-                    <span className="px-2 py-0.5 rounded bg-white/5 text-[11px] text-slate-400 font-mono">
+                    <span className="px-2 py-0.5 rounded bg-surface-2 text-[11px] text-text-muted font-mono">
                       Page 1
                     </span>
                   )}
@@ -1071,17 +1071,17 @@ export default function AdvancedSearch() {
 
                 <div className="flex items-center gap-3">
                   {/* View Mode Toggle */}
-                  <div className="flex items-center bg-[#141A22] p-1 rounded-lg border border-white/10">
+                  <div className="flex items-center bg-surface-2 p-1 rounded-lg border border-border">
                     <button
                       onClick={() => setViewMode('grid')}
-                      className={`p-1.5 rounded transition ${viewMode === 'grid' ? 'bg-brand text-white' : 'text-slate-400 hover:text-white'}`}
+                      className={`p-1.5 rounded transition ${viewMode === 'grid' ? 'bg-brand text-white' : 'text-text-muted hover:text-text-primary'}`}
                       title="Grid View"
                     >
                       <Icon icon="solar:widget-linear" className="text-sm" />
                     </button>
                     <button
                       onClick={() => setViewMode('detailed')}
-                      className={`p-1.5 rounded transition ${viewMode === 'detailed' ? 'bg-brand text-white' : 'text-slate-400 hover:text-white'}`}
+                      className={`p-1.5 rounded transition ${viewMode === 'detailed' ? 'bg-brand text-white' : 'text-text-muted hover:text-text-primary'}`}
                       title="Detailed List View"
                     >
                       <Icon icon="solar:list-bold" className="text-sm" />
@@ -1089,12 +1089,12 @@ export default function AdvancedSearch() {
                   </div>
 
                   {/* Sort Dropdown */}
-                  <div className="flex items-center gap-1.5 text-xs text-slate-300">
-                    <span className="text-slate-500 font-mono hidden sm:inline">Sort:</span>
+                  <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                    <span className="text-text-muted font-mono hidden sm:inline">Sort:</span>
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand font-medium"
+                      className="px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary focus:outline-none focus:border-brand font-medium"
                     >
                       <option value="views_desc">Popularity (Most Viewed)</option>
                       <option value="rating_desc">Highest User Rating</option>
@@ -1111,41 +1111,41 @@ export default function AdvancedSearch() {
               {/* Active Filter Chips */}
               {(titleQuery || selectedGenres.length > 0 || selectedPlatform || minYear || talentQuery || minBoxOffice > 0) && (
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                  <span className="text-slate-500 font-mono text-[11px]">Active:</span>
+                  <span className="text-text-muted font-mono text-[11px]">Active:</span>
                   {titleQuery && (
-                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
                       Title: {titleQuery}
-                      <button onClick={() => setTitleQuery('')} className="hover:text-white"><Icon icon="solar:close-circle-bold" /></button>
+                      <button onClick={() => setTitleQuery('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
                   {selectedGenres.map(g => (
                     <span key={g} className="px-2 py-0.5 rounded bg-brand/10 border border-brand/20 text-brand flex items-center gap-1">
                       {g}
-                      <button onClick={() => setSelectedGenres(prev => prev.filter(x => x !== g))} className="hover:text-white"><Icon icon="solar:close-circle-bold" /></button>
+                      <button onClick={() => setSelectedGenres(prev => prev.filter(x => x !== g))} className="hover:text-brand"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   ))}
                   {selectedPlatform && (
-                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
                       Platform: {selectedPlatform}
-                      <button onClick={() => setSelectedPlatform('')} className="hover:text-white"><Icon icon="solar:close-circle-bold" /></button>
+                      <button onClick={() => setSelectedPlatform('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
                   {minYear && (
-                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
                       From: {minYear}
-                      <button onClick={() => setMinYear('')} className="hover:text-white"><Icon icon="solar:close-circle-bold" /></button>
+                      <button onClick={() => setMinYear('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
                   {talentQuery && (
-                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
                       With: {talentQuery}
-                      <button onClick={() => setTalentQuery('')} className="hover:text-white"><Icon icon="solar:close-circle-bold" /></button>
+                      <button onClick={() => setTalentQuery('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
                   {minBoxOffice > 0 && (
-                    <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
                       Gross: {formatNaira(minBoxOffice)}+
-                      <button onClick={() => setMinBoxOffice(0)} className="hover:text-white"><Icon icon="solar:close-circle-bold" /></button>
+                      <button onClick={() => setMinBoxOffice(0)} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
                   <button onClick={handleResetFilters} className="text-[11px] text-brand hover:underline font-bold ml-1">
@@ -1174,9 +1174,9 @@ export default function AdvancedSearch() {
                     {titlesResults.map(film => (
                       <div
                         key={film.id}
-                        className="p-4 rounded-xl bg-[#0E1217] border border-white/10 hover:border-white/20 transition flex flex-col sm:flex-row gap-4 items-start"
+                        className="p-4 rounded-xl bg-surface border border-border hover:border-brand/30 transition flex flex-col sm:flex-row gap-4 items-start"
                       >
-                        <Link to={`/films/${film.slug || film.id}`} className="shrink-0 w-24 sm:w-28 aspect-[2/3] rounded-lg overflow-hidden bg-[#141A22] border border-white/5">
+                        <Link to={`/films/${film.slug || film.id}`} className="shrink-0 w-24 sm:w-28 aspect-[2/3] rounded-lg overflow-hidden bg-surface-2 border border-hairline">
                           <ImageWithFallback
                             src={film.poster_url}
                             alt={film.title}
@@ -1190,18 +1190,18 @@ export default function AdvancedSearch() {
                             <div>
                               <Link
                                 to={`/films/${film.slug || film.id}`}
-                                className="font-heading font-bold text-base text-white hover:text-brand transition"
+                                className="font-heading font-bold text-base text-text-primary hover:text-brand transition"
                               >
                                 {formatFilmTitle(film.title)}
                               </Link>
-                              <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                              <div className="flex items-center gap-2 text-xs text-text-muted mt-0.5">
                                 <span>{film.year || '—'}</span>
                                 <span>•</span>
                                 <span>{film.runtime_minutes ? `${film.runtime_minutes}m` : '—'}</span>
                                 {film.nfvcb_rating && (
-                                  <>
+                                   <>
                                     <span>•</span>
-                                    <span className="px-1.5 py-0.2 rounded bg-white/5 border border-white/10 text-[10px] font-mono">
+                                    <span className="px-1.5 py-0.2 rounded bg-surface-2 border border-border text-[10px] font-mono text-text-secondary">
                                       {film.nfvcb_rating}
                                     </span>
                                   </>
@@ -1210,7 +1210,7 @@ export default function AdvancedSearch() {
                             </div>
 
                             {film.average_rating ? (
-                              <div className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#141A22] border border-white/10 font-bold text-xs text-white">
+                              <div className="flex items-center gap-1 px-2.5 py-1 rounded bg-surface-2 border border-border font-bold text-xs text-text-primary">
                                 <Icon icon="solar:star-bold" className="text-amber-400 text-sm" />
                                 <span>{Number(film.average_rating).toFixed(1)}</span>
                               </div>
@@ -1219,20 +1219,20 @@ export default function AdvancedSearch() {
 
                           <div className="flex flex-wrap gap-1">
                             {(film.genres || []).slice(0, 4).map((g, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded bg-white/5 text-[10px] text-slate-300">
+                              <span key={i} className="px-2 py-0.5 rounded bg-surface-2 text-[10px] text-text-secondary">
                                 {g}
                               </span>
                             ))}
                           </div>
 
                           {film.synopsis && (
-                            <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                            <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed">
                               {film.synopsis}
                             </p>
                           )}
 
                           {film.box_office_gross > 0 && (
-                            <div className="text-[11px] font-mono text-emerald-400">
+                            <div className="text-[11px] font-mono text-emerald-500">
                               Box Office: {formatNaira(film.box_office_gross)}
                             </div>
                           )}
@@ -1243,12 +1243,12 @@ export default function AdvancedSearch() {
                 )
               ) : (
                 /* Empty Results State */
-                <div className="text-center py-16 px-4 bg-[#0E1217] border border-white/10 rounded-xl space-y-4">
-                  <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center mx-auto text-2xl">
+                <div className="text-center py-16 px-4 bg-surface border border-border rounded-xl space-y-4">
+                  <div className="w-14 h-14 rounded-full bg-surface-2 border border-border text-text-muted flex items-center justify-center mx-auto text-2xl">
                     <Icon icon="solar:clapperboard-linear" />
                   </div>
-                  <h3 className="font-bold text-lg text-white">No titles match your combined criteria</h3>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                  <h3 className="font-bold text-lg text-text-primary">No titles match your combined criteria</h3>
+                  <p className="text-xs text-text-secondary max-w-md mx-auto leading-relaxed">
                     Try broadening your year range, clearing specific genres, or reducing minimum audience score constraints.
                   </p>
                   <button
@@ -1271,13 +1271,13 @@ export default function AdvancedSearch() {
           <div className="space-y-8 max-w-5xl mx-auto">
             
             {/* Submode Switcher */}
-            <div className="flex items-center justify-center gap-2 p-1.5 rounded-xl bg-[#0E1217] border border-white/10 w-fit mx-auto">
+            <div className="flex items-center justify-center gap-2 p-1.5 rounded-xl bg-surface border border-border w-fit mx-auto">
               <button
                 onClick={() => setCollabMode('people')}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
                   collabMode === 'people'
                     ? 'bg-brand text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <Icon icon="solar:users-group-two-rounded-bold" />
@@ -1288,7 +1288,7 @@ export default function AdvancedSearch() {
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
                   collabMode === 'compare_films'
                     ? 'bg-brand text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 <Icon icon="solar:scale-bold" />
@@ -1299,40 +1299,40 @@ export default function AdvancedSearch() {
             {/* ── Sub-mode A: People Collaborations ── */}
             {collabMode === 'people' && (
               <div className="space-y-6">
-                <div className="p-6 rounded-xl bg-[#0E1217] border border-white/10 space-y-5">
+                <div className="p-6 rounded-xl bg-surface border border-border space-y-5">
                   <div>
-                    <h2 className="text-xl font-bold text-white">Find Joint Projects &amp; Shared Filmographies</h2>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <h2 className="text-xl font-bold text-text-primary">Find Joint Projects &amp; Shared Filmographies</h2>
+                    <p className="text-xs text-text-secondary mt-1">
                       Enter any two Nollywood actors, directors, or producers to discover every film and play where both collaborated.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-mono text-slate-300 block mb-1">Person 1 (Actor / Director)</label>
+                      <label className="text-xs font-mono text-text-secondary block mb-1">Person 1 (Actor / Director)</label>
                       <input
                         type="text"
                         value={person1Input}
                         onChange={(e) => setPerson1Input(e.target.value)}
                         placeholder="e.g. Richard Mofe-Damijo"
-                        className="w-full px-3.5 py-2.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-mono text-slate-300 block mb-1">Person 2 (Co-star / Collaborator)</label>
+                      <label className="text-xs font-mono text-text-secondary block mb-1">Person 2 (Co-star / Collaborator)</label>
                       <input
                         type="text"
                         value={person2Input}
                         onChange={(e) => setPerson2Input(e.target.value)}
                         placeholder="e.g. Sola Sobowale"
-                        className="w-full px-3.5 py-2.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                       />
                     </div>
                   </div>
 
                   {/* Preset Collaboration Buttons */}
                   <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <span className="text-[11px] text-slate-500 font-mono">Popular Partnerships:</span>
+                    <span className="text-[11px] text-text-muted font-mono">Popular Partnerships:</span>
                     {COLLAB_PRESETS.map((p, idx) => (
                       <button
                         key={idx}
@@ -1341,7 +1341,7 @@ export default function AdvancedSearch() {
                           setPerson2Input(p.p2);
                           executeCollaborationsSearch(p.p1, p.p2);
                         }}
-                        className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 hover:text-white transition"
+                        className="px-2.5 py-1 rounded bg-surface-2 hover:bg-surface-3 border border-border text-xs text-text-secondary hover:text-text-primary transition"
                       >
                         {p.label}
                       </button>
@@ -1364,7 +1364,7 @@ export default function AdvancedSearch() {
 
                 {/* Collaboration Results Display */}
                 {isCollabSearching && (
-                  <div className="text-center py-12 text-slate-400 font-mono text-xs">
+                  <div className="text-center py-12 text-text-muted font-mono text-xs">
                     Searching ensemble graph for shared titles...
                   </div>
                 )}
@@ -1372,25 +1372,25 @@ export default function AdvancedSearch() {
                 {collabResults && collabResults.found && (
                   <div className="space-y-6 animate-in fade-in">
                     {/* Header Summary Card */}
-                    <div className="p-6 rounded-xl bg-[#0E1217] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div className="p-6 rounded-xl bg-surface border border-border flex flex-col sm:flex-row items-center justify-between gap-6">
                       <div className="flex items-center gap-4">
                         <div className="flex -space-x-4">
                           <img
                             src={collabResults.person1.photo_url || '/placeholder-avatar.png'}
                             alt={collabResults.person1.name}
-                            className="w-14 h-14 rounded-full border-2 border-brand object-cover bg-[#141A22]"
+                            className="w-14 h-14 rounded-full border-2 border-brand object-cover bg-surface-2"
                           />
                           <img
                             src={collabResults.person2.photo_url || '/placeholder-avatar.png'}
                             alt={collabResults.person2.name}
-                            className="w-14 h-14 rounded-full border-2 border-white/30 object-cover bg-[#141A22]"
+                            className="w-14 h-14 rounded-full border-2 border-border object-cover bg-surface-2"
                           />
                         </div>
                         <div>
-                          <h3 className="font-bold text-lg text-white">
+                          <h3 className="font-bold text-lg text-text-primary">
                             {collabResults.person1.name} &amp; {collabResults.person2.name}
                           </h3>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-text-muted">
                             Shared credit on {collabResults.sharedFilms.length} {collabResults.sharedFilms.length === 1 ? 'title' : 'titles'}
                           </p>
                         </div>
@@ -1398,8 +1398,8 @@ export default function AdvancedSearch() {
 
                       {collabResults.totalGross > 0 && (
                         <div className="text-right">
-                          <span className="text-[11px] font-mono text-slate-400 uppercase">Combined Box Office</span>
-                          <div className="text-xl font-bold font-mono text-emerald-400">
+                          <span className="text-[11px] font-mono text-text-muted uppercase">Combined Box Office</span>
+                          <div className="text-xl font-bold font-mono text-emerald-500">
                             {formatNaira(collabResults.totalGross)}
                           </div>
                         </div>
@@ -1412,9 +1412,9 @@ export default function AdvancedSearch() {
                         {collabResults.sharedFilms.map(film => (
                           <div
                             key={film.id}
-                            className="p-4 rounded-xl bg-[#0E1217] border border-white/10 hover:border-white/20 transition flex gap-4 items-start"
+                            className="p-4 rounded-xl bg-surface border border-border hover:border-brand/30 transition flex gap-4 items-start"
                           >
-                            <Link to={`/films/${film.slug || film.id}`} className="shrink-0 w-20 aspect-[2/3] rounded-lg overflow-hidden bg-[#141A22]">
+                            <Link to={`/films/${film.slug || film.id}`} className="shrink-0 w-20 aspect-[2/3] rounded-lg overflow-hidden bg-surface-2">
                               <ImageWithFallback
                                 src={film.poster_url}
                                 alt={film.title}
@@ -1427,24 +1427,24 @@ export default function AdvancedSearch() {
                               <div>
                                 <Link
                                   to={`/films/${film.slug || film.id}`}
-                                  className="font-bold text-sm text-white hover:text-brand transition"
+                                  className="font-bold text-sm text-text-primary hover:text-brand transition"
                                 >
                                   {formatFilmTitle(film.title)} ({film.year || '—'})
                                 </Link>
-                                <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                                <div className="text-[11px] text-text-muted font-mono mt-0.5">
                                   {film.runtime_minutes ? `${film.runtime_minutes} mins` : ''}
                                   {film.box_office_gross > 0 && ` • ${formatNaira(film.box_office_gross)}`}
                                 </div>
                               </div>
 
-                              <div className="p-2.5 rounded-lg bg-[#141A22] border border-white/5 space-y-1 text-xs">
-                                <div className="flex items-center justify-between text-slate-300">
-                                  <span className="text-slate-400 text-[11px]">{collabResults.person1.name}:</span>
+                              <div className="p-2.5 rounded-lg bg-surface-2 border border-hairline space-y-1 text-xs">
+                                <div className="flex items-center justify-between text-text-secondary">
+                                  <span className="text-text-muted text-[11px]">{collabResults.person1.name}:</span>
                                   <span className="font-semibold text-brand text-right">{film.p1Credit?.character_name || film.p1Credit?.role || 'Credited'}</span>
                                 </div>
-                                <div className="flex items-center justify-between text-slate-300 border-t border-white/5 pt-1">
-                                  <span className="text-slate-400 text-[11px]">{collabResults.person2.name}:</span>
-                                  <span className="font-semibold text-white text-right">{film.p2Credit?.character_name || film.p2Credit?.role || 'Credited'}</span>
+                                <div className="flex items-center justify-between text-text-secondary border-t border-hairline pt-1">
+                                  <span className="text-text-muted text-[11px]">{collabResults.person2.name}:</span>
+                                  <span className="font-semibold text-text-primary text-right">{film.p2Credit?.character_name || film.p2Credit?.role || 'Credited'}</span>
                                 </div>
                               </div>
                             </div>
@@ -1452,9 +1452,9 @@ export default function AdvancedSearch() {
                         ))}
                       </div>
                     ) : (
-                      <div className="p-8 text-center bg-[#0E1217] border border-white/10 rounded-xl space-y-2">
-                        <h4 className="font-bold text-base text-white">No Direct Shared Titles Found</h4>
-                        <p className="text-xs text-slate-400">
+                      <div className="p-8 text-center bg-surface border border-border rounded-xl space-y-2">
+                        <h4 className="font-bold text-base text-text-primary">No Direct Shared Titles Found</h4>
+                        <p className="text-xs text-text-secondary">
                           These two talents have not worked on the same verified movie or play in our archive.
                         </p>
                       </div>
@@ -1467,39 +1467,39 @@ export default function AdvancedSearch() {
             {/* ── Sub-mode B: Film Comparison (Side-by-Side Contrast) ── */}
             {collabMode === 'compare_films' && (
               <div className="space-y-6">
-                <div className="p-6 rounded-xl bg-[#0E1217] border border-white/10 space-y-5">
+                <div className="p-6 rounded-xl bg-surface border border-border space-y-5">
                   <div>
-                    <h2 className="text-xl font-bold text-white">Side-by-Side Film Comparison</h2>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <h2 className="text-xl font-bold text-text-primary">Side-by-Side Film Comparison</h2>
+                    <p className="text-xs text-text-secondary mt-1">
                       Contrast budget, box office earnings, audience ratings, runtime, and discover overlapping cast members between two films.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-mono text-slate-300 block mb-1">Film 1</label>
+                      <label className="text-xs font-mono text-text-secondary block mb-1">Film 1</label>
                       <input
                         type="text"
                         value={film1Input}
                         onChange={(e) => setFilm1Input(e.target.value)}
                         placeholder="e.g. A Tribe Called Judah"
-                        className="w-full px-3.5 py-2.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-mono text-slate-300 block mb-1">Film 2</label>
+                      <label className="text-xs font-mono text-text-secondary block mb-1">Film 2</label>
                       <input
                         type="text"
                         value={film2Input}
                         onChange={(e) => setFilm2Input(e.target.value)}
                         placeholder="e.g. The Wedding Party"
-                        className="w-full px-3.5 py-2.5 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                        className="w-full px-3.5 py-2.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                       />
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <span className="text-[11px] text-slate-500 font-mono">Preset Comparisons:</span>
+                    <span className="text-[11px] text-text-muted font-mono">Preset Comparisons:</span>
                     {COMPARE_PRESETS.map((cp, idx) => (
                       <button
                         key={idx}
@@ -1508,7 +1508,7 @@ export default function AdvancedSearch() {
                           setFilm2Input(cp.f2);
                           executeFilmContrast(cp.f1, cp.f2);
                         }}
-                        className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 hover:text-white transition"
+                        className="px-2.5 py-1 rounded bg-surface-2 hover:bg-surface-3 border border-border text-xs text-text-secondary hover:text-text-primary transition"
                       >
                         {cp.label}
                       </button>
@@ -1533,12 +1533,12 @@ export default function AdvancedSearch() {
                 {compareResults && compareResults.found && (
                   <div className="space-y-6 animate-in fade-in">
                     {/* Side-by-Side Matrix Table */}
-                    <div className="rounded-xl border border-white/10 overflow-hidden bg-[#0E1217]">
+                    <div className="rounded-xl border border-border overflow-hidden bg-surface">
                       <table className="w-full text-left text-xs">
-                        <thead className="bg-[#141A22] text-slate-300 font-mono border-b border-white/10">
+                        <thead className="bg-surface-2 text-text-secondary font-mono border-b border-border">
                           <tr>
                             <th className="p-4 w-1/4">Metric</th>
-                            <th className="p-4 w-3/8 text-white font-bold text-sm">
+                            <th className="p-4 w-3/8 text-text-primary font-bold text-sm">
                               {compareResults.film1.title} ({compareResults.film1.year})
                             </th>
                             <th className="p-4 w-3/8 text-brand font-bold text-sm">
@@ -1546,61 +1546,61 @@ export default function AdvancedSearch() {
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5 text-slate-200">
+                        <tbody className="divide-y divide-hairline text-text-secondary">
                           <tr>
-                            <td className="p-4 font-mono text-slate-400">Artwork</td>
+                            <td className="p-4 font-mono text-text-muted">Artwork</td>
                             <td className="p-4">
                               <img
                                 src={compareResults.film1.poster_url}
                                 alt={compareResults.film1.title}
-                                className="w-20 aspect-[2/3] rounded object-cover border border-white/10"
+                                className="w-20 aspect-[2/3] rounded object-cover border border-border"
                               />
                             </td>
                             <td className="p-4">
                               <img
                                 src={compareResults.film2.poster_url}
                                 alt={compareResults.film2.title}
-                                className="w-20 aspect-[2/3] rounded object-cover border border-white/10"
+                                className="w-20 aspect-[2/3] rounded object-cover border border-border"
                               />
                             </td>
                           </tr>
 
                           <tr>
-                            <td className="p-4 font-mono text-slate-400">Box Office Gross</td>
-                            <td className="p-4 font-mono font-bold text-emerald-400 text-sm">
+                            <td className="p-4 font-mono text-text-muted">Box Office Gross</td>
+                            <td className="p-4 font-mono font-bold text-emerald-500 text-sm">
                               {formatNaira(compareResults.film1.box_office_gross)}
                             </td>
-                            <td className="p-4 font-mono font-bold text-emerald-400 text-sm">
+                            <td className="p-4 font-mono font-bold text-emerald-500 text-sm">
                               {formatNaira(compareResults.film2.box_office_gross)}
                             </td>
                           </tr>
 
                           <tr>
-                            <td className="p-4 font-mono text-slate-400">Audience Rating</td>
-                            <td className="p-4 font-bold">
+                            <td className="p-4 font-mono text-text-muted">Audience Rating</td>
+                            <td className="p-4 font-bold text-text-primary">
                               {compareResults.film1.average_rating ? `⭐ ${Number(compareResults.film1.average_rating).toFixed(1)} / 10` : '—'}
                               {compareResults.film1.liked_percent ? ` (${compareResults.film1.liked_percent}% liked)` : ''}
                             </td>
-                            <td className="p-4 font-bold">
+                            <td className="p-4 font-bold text-text-primary">
                               {compareResults.film2.average_rating ? `⭐ ${Number(compareResults.film2.average_rating).toFixed(1)} / 10` : '—'}
                               {compareResults.film2.liked_percent ? ` (${compareResults.film2.liked_percent}% liked)` : ''}
                             </td>
                           </tr>
 
                           <tr>
-                            <td className="p-4 font-mono text-slate-400">Runtime</td>
+                            <td className="p-4 font-mono text-text-muted">Runtime</td>
                             <td className="p-4">{compareResults.film1.runtime_minutes ? `${compareResults.film1.runtime_minutes} minutes` : '—'}</td>
                             <td className="p-4">{compareResults.film2.runtime_minutes ? `${compareResults.film2.runtime_minutes} minutes` : '—'}</td>
                           </tr>
 
                           <tr>
-                            <td className="p-4 font-mono text-slate-400">Genres</td>
+                            <td className="p-4 font-mono text-text-muted">Genres</td>
                             <td className="p-4">{compareResults.film1.genres.join(', ') || '—'}</td>
                             <td className="p-4">{compareResults.film2.genres.join(', ') || '—'}</td>
                           </tr>
 
                           <tr>
-                            <td className="p-4 font-mono text-slate-400">Classification</td>
+                            <td className="p-4 font-mono text-text-muted">Classification</td>
                             <td className="p-4 font-mono">{compareResults.film1.nfvcb_rating || 'Unrated'}</td>
                             <td className="p-4 font-mono">{compareResults.film2.nfvcb_rating || 'Unrated'}</td>
                           </tr>
@@ -1609,29 +1609,29 @@ export default function AdvancedSearch() {
                     </div>
 
                     {/* Shared Cast Members (Overlapping Actors) */}
-                    <div className="p-6 rounded-xl bg-[#0E1217] border border-white/10 space-y-4">
+                    <div className="p-6 rounded-xl bg-surface border border-border space-y-4">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-base text-white flex items-center gap-2">
+                        <h3 className="font-bold text-base text-text-primary flex items-center gap-2">
                           <Icon icon="solar:users-group-two-rounded-bold" className="text-brand" />
                           <span>Overlapping Cast &amp; Crew ({compareResults.sharedCast.length})</span>
                         </h3>
-                        <span className="text-xs text-slate-400">Actors who appeared in both films</span>
+                        <span className="text-xs text-text-muted">Actors who appeared in both films</span>
                       </div>
 
                       {compareResults.sharedCast.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                           {compareResults.sharedCast.map((item, idx) => (
-                            <div key={idx} className="p-3 rounded-lg bg-[#141A22] border border-white/5 space-y-1 text-xs">
-                              <span className="font-bold text-white block">{item.person?.name}</span>
-                              <div className="text-[11px] text-slate-400">
-                                <div><span className="text-slate-500">{compareResults.film1.title}:</span> {item.roleInFilm1}</div>
-                                <div><span className="text-slate-500">{compareResults.film2.title}:</span> {item.roleInFilm2}</div>
+                            <div key={idx} className="p-3 rounded-lg bg-surface-2 border border-hairline space-y-1 text-xs">
+                              <span className="font-bold text-text-primary block">{item.person?.name}</span>
+                              <div className="text-[11px] text-text-muted">
+                                <div><span className="text-text-muted">{compareResults.film1.title}:</span> {item.roleInFilm1}</div>
+                                <div><span className="text-text-muted">{compareResults.film2.title}:</span> {item.roleInFilm2}</div>
                               </div>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-slate-400">No shared actors found between these two productions.</p>
+                        <p className="text-xs text-text-secondary">No shared actors found between these two productions.</p>
                       )}
                     </div>
                   </div>
@@ -1647,32 +1647,32 @@ export default function AdvancedSearch() {
         {/* ═══════════════════════════════════════════════════ */}
         {activeTab === 'names' && (
           <div className="space-y-6 max-w-5xl mx-auto">
-            <div className="p-6 rounded-xl bg-[#0E1217] border border-white/10 space-y-4">
+            <div className="p-6 rounded-xl bg-surface border border-border space-y-4">
               <div>
-                <h2 className="text-xl font-bold text-white">Advanced Talent &amp; Creative Search</h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <h2 className="text-xl font-bold text-text-primary">Advanced Talent &amp; Creative Search</h2>
+                <p className="text-xs text-text-secondary mt-1">
                   Discover actors, directors, writers, cinematographers, and producers by filmography volume and profession.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-mono text-slate-300 block mb-1">Name Contains</label>
+                  <label className="text-xs font-mono text-text-secondary block mb-1">Name Contains</label>
                   <input
                     type="text"
                     value={nameQuery}
                     onChange={(e) => setNameQuery(e.target.value)}
                     placeholder="e.g. Gabriel, Kunle..."
-                    className="w-full px-3 py-2 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                    className="w-full px-3 py-2 rounded-lg bg-surface-2 border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-brand"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-mono text-slate-300 block mb-1">Profession</label>
+                  <label className="text-xs font-mono text-text-secondary block mb-1">Profession</label>
                   <select
                     value={nameProfession}
                     onChange={(e) => setNameProfession(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                    className="w-full px-3 py-2 rounded-lg bg-surface-2 border border-border text-xs text-text-primary focus:outline-none focus:border-brand"
                   >
                     <option value="all">Any Profession</option>
                     <option value="Act">Actor / Actress</option>
@@ -1684,11 +1684,11 @@ export default function AdvancedSearch() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-mono text-slate-300 block mb-1">Min Filmography Credits</label>
+                  <label className="text-xs font-mono text-text-secondary block mb-1">Min Filmography Credits</label>
                   <select
                     value={minFilmsCount}
                     onChange={(e) => setMinFilmsCount(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[#141A22] border border-white/10 text-xs text-white focus:outline-none focus:border-brand"
+                    className="w-full px-3 py-2 rounded-lg bg-surface-2 border border-border text-xs text-text-primary focus:outline-none focus:border-brand"
                   >
                     <option value="">Any Volume</option>
                     <option value="5">5+ Verified Films</option>
@@ -1715,7 +1715,7 @@ export default function AdvancedSearch() {
 
             {/* Names Results */}
             {isNamesLoading ? (
-              <div className="text-center py-12 text-slate-400 font-mono text-xs">
+              <div className="text-center py-12 text-text-muted font-mono text-xs">
                 Searching verified talent records...
               </div>
             ) : namesResults.length > 0 ? (
@@ -1725,7 +1725,7 @@ export default function AdvancedSearch() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-slate-400 text-xs">
+              <div className="text-center py-12 text-text-muted text-xs">
                 No talents matched the given search filters.
               </div>
             )}

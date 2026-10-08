@@ -623,29 +623,29 @@ export default function DeveloperApi() {
   }, [selectedEndpoint, activeCodeTab, playgroundParams]);
 
   return (
-    <div className="min-h-screen bg-[#080A0D] text-slate-100 selection:bg-brand selection:text-white relative overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-bg text-text-primary selection:bg-brand selection:text-white relative overflow-x-hidden font-sans">
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-32 space-y-20">
 
         {/* Ambient Top Glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1100px] h-[550px] bg-brand/10 blur-[150px] pointer-events-none rounded-full" />
 
         {/* ── Top Navigation Bar (Atlas Style) ── */}
-        <header className="flex items-center justify-between gap-4 py-4 border-b border-white/5 relative z-10">
+        <header className="flex items-center justify-between gap-4 py-4 border-b border-hairline relative z-10">
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2 group">
-              <span className="font-heading font-black text-xl text-white tracking-tight">Muvi<span className="text-brand">DB</span></span>
+              <span className="font-heading font-black text-xl text-text-primary tracking-tight">Muvi<span className="text-brand">DB</span></span>
             </Link>
-            <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-slate-400">
-              <a href="#reference" className="hover:text-white transition">Docs</a>
-              <a href="#reference" className="hover:text-white transition">API Reference</a>
-              <a href="#pricing" className="hover:text-white transition">Pricing</a>
-              <a href="#architecture" className="hover:text-white transition">Features</a>
-              <a href="#faq" className="hover:text-white transition">FAQ</a>
+            <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-text-secondary">
+              <a href="#reference" className="hover:text-text-primary transition">Docs</a>
+              <a href="#reference" className="hover:text-text-primary transition">API Reference</a>
+              <a href="#pricing" className="hover:text-text-primary transition">Pricing</a>
+              <a href="#architecture" className="hover:text-text-primary transition">Features</a>
+              <a href="#faq" className="hover:text-text-primary transition">FAQ</a>
             </nav>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs font-semibold">
+            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 font-mono text-xs font-semibold">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -654,7 +654,7 @@ export default function DeveloperApi() {
             </div>
             <button
               onClick={() => openKeyModal('free')}
-              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-200 text-black font-bold text-xs transition shadow-sm"
+              className="px-4 py-2 rounded-xl bg-brand hover:bg-brand/90 text-white font-bold text-xs transition shadow-sm"
             >
               Get API key
             </button>
@@ -665,54 +665,54 @@ export default function DeveloperApi() {
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center pt-8 pb-12 relative z-10">
           {/* Left: Typography & CTAs */}
           <div className="lg:col-span-6 space-y-6 text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-xs text-slate-300">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-2 border border-border text-xs text-text-secondary">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-mono text-emerald-400 font-semibold">MuviDB</span>
-              <span className="text-white/20">•</span>
-              <span className="text-slate-400">v1.0 now live</span>
+              <span className="font-mono text-emerald-500 dark:text-emerald-400 font-semibold">MuviDB</span>
+              <span className="text-text-muted">•</span>
+              <span className="text-text-secondary">v1.0 now live</span>
             </div>
 
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-[1.06] font-heading">
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-text-primary leading-[1.06] font-heading">
               One API for<br />
               everything your<br />
               <span className="text-brand">cinema app needs.</span>
             </h1>
 
-            <p className="text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl">
+            <p className="text-base sm:text-lg text-text-secondary leading-relaxed max-w-xl">
               Films, verified ensemble cast &amp; crew, box office grosses, and streaming availability behind a single clean endpoint. Ship in minutes, scale to billions of requests.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-2">
               <button
                 onClick={() => openKeyModal('free')}
-                className="px-7 py-3 rounded-full bg-white hover:bg-slate-200 text-black font-bold text-xs tracking-wide transition shadow-xl"
+                className="px-7 py-3 rounded-full bg-brand hover:bg-brand/90 text-white font-bold text-xs tracking-wide transition shadow-lg shadow-brand/20"
               >
                 Get API key
               </button>
               <a
                 href="#reference"
-                className="px-7 py-3 rounded-full bg-white/[0.06] hover:bg-white/10 border border-white/15 text-white font-medium text-xs tracking-wide transition flex items-center gap-2 group"
+                className="px-7 py-3 rounded-full bg-surface-2 hover:bg-surface-3 border border-border text-text-primary font-medium text-xs tracking-wide transition flex items-center gap-2 group"
               >
                 <span>Read the docs</span>
-                <span className="text-slate-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                <span className="text-text-muted group-hover:translate-x-0.5 transition-transform">→</span>
               </a>
             </div>
 
             {/* Quick Metrics Bar */}
-            <div className="pt-4 flex flex-wrap items-center gap-6 text-xs text-slate-400 font-mono border-t border-white/5">
-              <div><strong className="text-white font-bold">12,400+</strong> Films</div>
-              <div className="text-white/20">•</div>
-              <div><strong className="text-white font-bold">15,000+</strong> Talent</div>
-              <div className="text-white/20">•</div>
-              <div><strong className="text-amber-400 font-bold">₦18.5B+</strong> Box Office</div>
-              <div className="text-white/20">•</div>
-              <div><strong className="text-emerald-400 font-bold">&lt; 42ms</strong> Edge Latency</div>
+            <div className="pt-4 flex flex-wrap items-center gap-6 text-xs text-text-secondary font-mono border-t border-hairline">
+              <div><strong className="text-text-primary font-bold">12,400+</strong> Films</div>
+              <div className="text-text-muted">•</div>
+              <div><strong className="text-text-primary font-bold">15,000+</strong> Talent</div>
+              <div className="text-text-muted">•</div>
+              <div><strong className="text-amber-500 dark:text-amber-400 font-bold">₦18.5B+</strong> Box Office</div>
+              <div className="text-text-muted">•</div>
+              <div><strong className="text-emerald-500 dark:text-emerald-400 font-bold">&lt; 42ms</strong> Edge Latency</div>
             </div>
           </div>
 
           {/* Right: The macOS Interactive Code Terminal (Atlas request.ts card) */}
           <div className="lg:col-span-6">
-            <div className="rounded-2xl bg-[#090C12] border border-white/10 shadow-2xl overflow-hidden font-mono text-xs text-left">
+            <div className="rounded-2xl bg-[#090C12] border border-border shadow-2xl overflow-hidden font-mono text-xs text-left">
               {/* macOS Window Titlebar */}
               <div className="flex items-center justify-between px-4 py-3 bg-white/[0.02] border-b border-white/5">
                 <div className="flex items-center gap-2">
@@ -784,15 +784,15 @@ export default function DeveloperApi() {
         {/* ── API Reference & Documentation Explorer (Easypay Style) ── */}
         <section id="reference" className="scroll-mt-12 space-y-6 relative z-10">
           {/* Sub-bar with Mode Toggle + Search Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-2xl bg-[#0C0F16] border border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-2xl bg-surface border border-border">
             {/* Toggle Pills: Documentation vs API Reference */}
-            <div className="inline-flex items-center p-1 rounded-xl bg-white/[0.04] border border-white/5 text-xs">
+            <div className="inline-flex items-center p-1 rounded-xl bg-surface-2 border border-border text-xs">
               <button
                 onClick={() => setDocsTab('reference')}
                 className={`px-3.5 py-1.5 rounded-lg font-medium transition ${
                   docsTab === 'reference'
-                    ? 'bg-white/10 text-white font-semibold shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-surface text-text-primary font-semibold shadow-sm border border-border'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 API Reference
@@ -801,8 +801,8 @@ export default function DeveloperApi() {
                 onClick={() => setDocsTab('guide')}
                 className={`px-3.5 py-1.5 rounded-lg font-medium transition ${
                   docsTab === 'guide'
-                    ? 'bg-white/10 text-white font-semibold shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-surface text-text-primary font-semibold shadow-sm border border-border'
+                    : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 Documentation
@@ -811,27 +811,27 @@ export default function DeveloperApi() {
 
             {/* Search Input Bar (Easypay Search style) */}
             <div className="flex-1 max-w-md relative">
-              <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+              <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-sm" />
               <input
                 type="text"
                 placeholder="Search endpoints, parameters, methods..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-16 py-2 rounded-xl bg-black/40 border border-white/10 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-brand"
+                className="w-full pl-10 pr-16 py-2 rounded-xl bg-surface-2 border border-border text-text-primary text-xs placeholder:text-text-muted focus:outline-none focus:border-brand"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] text-slate-400 font-mono">
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-surface border border-border text-[10px] text-text-muted font-mono">
                 Ctrl K
               </div>
             </div>
 
             {/* Presets Chips */}
             <div className="hidden xl:flex items-center gap-1.5">
-              <span className="text-[11px] text-slate-500 font-mono">Quick:</span>
+              <span className="text-[11px] text-text-muted font-mono">Quick:</span>
               {PRESETS.map((p, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleApplyPreset(p)}
-                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-[11px] text-slate-300 hover:text-white transition font-medium"
+                  className="px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-[11px] text-text-secondary hover:text-text-primary transition font-medium"
                 >
                   {p.label}
                 </button>
@@ -846,7 +846,7 @@ export default function DeveloperApi() {
             <div className="lg:col-span-4 space-y-4">
               {/* Category Filter Pills */}
               <div 
-                className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.03] border border-white/5 overflow-x-auto no-scrollbar scrollbar-none"
+                className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-2 border border-border overflow-x-auto no-scrollbar scrollbar-none"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
               >
                 {categories.map(cat => (
@@ -856,7 +856,7 @@ export default function DeveloperApi() {
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
                       selectedCategory === cat
                         ? 'bg-brand text-white shadow-sm'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-surface'
                     }`}
                   >
                     {cat}
@@ -874,28 +874,28 @@ export default function DeveloperApi() {
                       onClick={() => setSelectedEndpoint(endpoint)}
                       className={`w-full text-left p-3.5 rounded-xl border transition-all flex flex-col gap-1.5 relative overflow-hidden ${
                         isSelected
-                          ? 'bg-[#121622] border-brand/70 shadow-md text-white'
-                          : 'bg-[#0A0D13] border-white/5 hover:border-white/15 hover:bg-[#0E121A]'
+                          ? 'bg-surface-2 border-brand shadow-sm text-text-primary'
+                          : 'bg-surface border-border hover:border-brand/40 hover:bg-surface-2 text-text-secondary'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-xs text-white">{endpoint.name}</span>
+                        <span className="font-semibold text-xs text-text-primary">{endpoint.name}</span>
                         <span className={`text-[9px] uppercase font-mono font-bold px-1.5 py-0.5 rounded border ${endpoint.tierBadgeColor}`}>
                           {endpoint.tier.includes('Pro') ? 'PRO' : 'FREE'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 font-mono text-[11px]">
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold text-[10px]">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 font-bold text-[10px]">
                           {endpoint.method}
                         </span>
-                        <span className="text-slate-400 truncate">{endpoint.path}</span>
+                        <span className="text-text-muted truncate">{endpoint.path}</span>
                       </div>
                     </button>
                   );
                 })}
 
                 {filteredEndpoints.length === 0 && (
-                  <div className="p-8 text-center text-xs text-slate-500 rounded-xl bg-white/[0.02] border border-white/5">
+                  <div className="p-8 text-center text-xs text-text-muted rounded-xl bg-surface-2 border border-border">
                     No matching endpoints found for &ldquo;{searchQuery}&rdquo;.
                   </div>
                 )}
@@ -906,36 +906,36 @@ export default function DeveloperApi() {
             <div className="lg:col-span-8 space-y-6">
               
               {/* Endpoint Documentation Card */}
-              <div className="rounded-2xl bg-[#0A0D13] border border-white/10 p-6 space-y-6">
+              <div className="rounded-2xl bg-surface border border-border p-6 space-y-6">
                 {/* Endpoint Header */}
-                <div className="space-y-3 pb-6 border-b border-white/5">
+                <div className="space-y-3 pb-6 border-b border-hairline">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 font-mono">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 font-bold text-xs border border-emerald-500/20">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 font-bold text-xs border border-emerald-500/20">
                         {selectedEndpoint.method}
                       </span>
-                      <span className="text-white text-sm font-semibold">{selectedEndpoint.path}</span>
+                      <span className="text-text-primary text-sm font-semibold">{selectedEndpoint.path}</span>
                     </div>
                     <span className={`text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-md border ${selectedEndpoint.tierBadgeColor}`}>
                       {selectedEndpoint.tier}
                     </span>
                   </div>
 
-                  <h3 className="text-xl font-bold text-white tracking-tight">{selectedEndpoint.name}</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
+                  <h3 className="text-xl font-bold text-text-primary tracking-tight">{selectedEndpoint.name}</h3>
+                  <p className="text-xs text-text-secondary leading-relaxed">
                     {selectedEndpoint.description}
                   </p>
                 </div>
 
                 {/* Base URL & Auth Card (Easypay style) */}
-                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="p-4 rounded-xl bg-surface-2 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                   <div className="space-y-1">
-                    <div className="font-semibold text-slate-300">Base Production URL</div>
-                    <div className="font-mono text-slate-400 text-[11px]">https://muvidb.com{selectedEndpoint.path}</div>
+                    <div className="font-semibold text-text-primary">Base Production URL</div>
+                    <div className="font-mono text-text-secondary text-[11px]">https://muvidb.com{selectedEndpoint.path}</div>
                   </div>
                   <button
                     onClick={() => handleCopy(`https://muvidb.com${selectedEndpoint.path}`, 'quickstart')}
-                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-mono transition flex items-center gap-1.5 self-start sm:self-auto"
+                    className="px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-3 border border-border text-text-primary text-xs font-mono transition flex items-center gap-1.5 self-start sm:self-auto"
                   >
                     <Icon icon="solar:copy-linear" className="text-xs" />
                     <span>Copy URL</span>
@@ -946,29 +946,29 @@ export default function DeveloperApi() {
                 {selectedEndpoint.params && selectedEndpoint.params.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Query Parameters</h4>
-                      <span className="text-[11px] text-slate-500 font-mono">Tune live inputs</span>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-text-secondary">Query Parameters</h4>
+                      <span className="text-[11px] text-text-muted font-mono">Tune live inputs</span>
                     </div>
 
                     <div className="space-y-2.5">
                       {selectedEndpoint.params.map(param => (
-                        <div key={param.name} className="p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+                        <div key={param.name} className="p-3.5 rounded-xl bg-surface-2 border border-border space-y-2">
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-white font-semibold">{param.name}</span>
-                              <span className="text-[10px] font-mono text-slate-400">{param.type}</span>
+                              <span className="font-mono text-text-primary font-semibold">{param.name}</span>
+                              <span className="text-[10px] font-mono text-text-muted">{param.type}</span>
                               {param.required && (
-                                <span className="text-[10px] text-rose-400 font-mono">required</span>
+                                <span className="text-[10px] text-rose-500 font-mono">required</span>
                               )}
                             </div>
-                            <span className="text-[11px] text-slate-500">{param.desc}</span>
+                            <span className="text-[11px] text-text-secondary">{param.desc}</span>
                           </div>
                           <input
                             type="text"
                             value={playgroundParams[param.name] ?? param.example ?? ''}
                             onChange={(e) => setPlaygroundParams(prev => ({ ...prev, [param.name]: e.target.value }))}
                             placeholder={`Example: ${param.example}`}
-                            className="w-full px-3 py-1.5 rounded-lg bg-black/60 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-brand"
+                            className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border text-text-primary font-mono text-xs focus:outline-none focus:border-brand"
                           />
                         </div>
                       ))}
@@ -978,7 +978,7 @@ export default function DeveloperApi() {
               </div>
 
               {/* Code Generator & Snippets (Easypay / Stripe right console) */}
-              <div className="rounded-2xl bg-[#090C11] border border-white/10 overflow-hidden shadow-2xl">
+              <div className="rounded-2xl bg-[#090C11] border border-border overflow-hidden shadow-2xl">
                 {/* Header with Language Tabs */}
                 <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 border-b border-white/10 bg-white/[0.02]">
                   <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5 text-xs">
@@ -1019,7 +1019,7 @@ export default function DeveloperApi() {
               </div>
 
               {/* Live Mock Response Inspector Card */}
-              <div className="rounded-2xl bg-[#090C11] border border-white/10 overflow-hidden shadow-2xl">
+              <div className="rounded-2xl bg-[#090C11] border border-border overflow-hidden shadow-2xl">
                 <div className="flex items-center justify-between p-3.5 border-b border-white/10 bg-white/[0.02]">
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
@@ -1060,69 +1060,69 @@ export default function DeveloperApi() {
               <Icon icon="solar:graph-bold" />
               Engine Architecture
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white">Why Top Media Teams Rely on MuviDB</h2>
-            <p className="text-sm text-slate-400 leading-relaxed">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-text-primary">Why Top Media Teams Rely on MuviDB</h2>
+            <p className="text-sm text-text-secondary leading-relaxed">
               Engineered from the ground up to solve the fragmented, noisy, and unstructured nature of Nollywood and West African screen entertainment data.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="p-6 rounded-2xl bg-surface/50 border border-white/5 hover:border-brand/40 transition group relative overflow-hidden">
+            <div className="p-6 rounded-2xl bg-surface border border-border hover:border-brand/40 transition group relative overflow-hidden">
               <div className="w-12 h-12 rounded-xl bg-brand/10 border border-brand/20 text-brand flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
                 <Icon icon="solar:users-group-two-rounded-bold" />
               </div>
-              <h3 className="text-base font-bold text-white mb-2">Canonical Nollywood Hierarchy</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <h3 className="text-base font-bold text-text-primary mb-2">Canonical Nollywood Hierarchy</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
                 Guaranteed zero-duplicate talent profiles. Merges aliases, handles OCR title variations from YouTube &amp; theatrical rolls, and maps verified character roles.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-surface/50 border border-white/5 hover:border-amber-400/40 transition group relative overflow-hidden">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
+            <div className="p-6 rounded-2xl bg-surface border border-border hover:border-amber-400/40 transition group relative overflow-hidden">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 dark:text-amber-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
                 <Icon icon="solar:wallet-money-bold" />
               </div>
-              <h3 className="text-base font-bold text-white mb-2">Theatrical Box Office Receipts</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <h3 className="text-base font-bold text-text-primary mb-2">Theatrical Box Office Receipts</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
                 Audited weekend and all-time gross receipts across Nigerian cinema exhibitors (Filmhouse, Genesis, Silverbird, Viva) in NGN and USD with admission estimates.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-surface/50 border border-white/5 hover:border-emerald-400/40 transition group relative overflow-hidden">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
+            <div className="p-6 rounded-2xl bg-surface border border-border hover:border-emerald-400/40 transition group relative overflow-hidden">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
                 <Icon icon="solar:gallery-wide-bold" />
               </div>
-              <h3 className="text-base font-bold text-white mb-2">Strict High-Res Portrait Posters</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <h3 className="text-base font-bold text-text-primary mb-2">Strict High-Res Portrait Posters</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
                 Strict editorial rule ensures only crisp portrait posters (minimum 450x600, 800x1200+ recommended) and high-res backdrops are cataloged — zero low-res banners.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-surface/50 border border-white/5 hover:border-blue-400/40 transition group relative overflow-hidden">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
+            <div className="p-6 rounded-2xl bg-surface border border-border hover:border-blue-400/40 transition group relative overflow-hidden">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-blue-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
                 <Icon icon="solar:tv-bold" />
               </div>
-              <h3 className="text-base font-bold text-white mb-2">Streaming Availability &amp; Showtimes</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <h3 className="text-base font-bold text-text-primary mb-2">Streaming Availability &amp; Showtimes</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
                 Direct watch links for Netflix, Prime Video, YouTube, NolliStream, Docuth, and live cinema showtimes updated twice daily.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-surface/50 border border-white/5 hover:border-purple-400/40 transition group relative overflow-hidden">
-              <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
+            <div className="p-6 rounded-2xl bg-surface border border-border hover:border-purple-400/40 transition group relative overflow-hidden">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-500 dark:text-purple-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
                 <Icon icon="solar:bolt-circle-bold" />
               </div>
-              <h3 className="text-base font-bold text-white mb-2">Global Edge Performance</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <h3 className="text-base font-bold text-text-primary mb-2">Global Edge Performance</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
                 Served through global edge caches with sub-45ms responses. Rate-limited and protected with automated burst buffering.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-surface/50 border border-white/5 hover:border-rose-400/40 transition group relative overflow-hidden">
-              <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
+            <div className="p-6 rounded-2xl bg-surface border border-border hover:border-rose-400/40 transition group relative overflow-hidden">
+              <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 dark:text-rose-400 flex items-center justify-center mb-4 text-2xl group-hover:scale-110 transition-transform">
                 <Icon icon="solar:diploma-verified-bold" />
               </div>
-              <h3 className="text-base font-bold text-white mb-2">Commercial Distribution Rights</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <h3 className="text-base font-bold text-text-primary mb-2">Commercial Distribution Rights</h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
                 Clear licensing terms for mobile apps, entertainment portals, research labs, and streaming guides with transparent pricing.
               </p>
             </div>
@@ -1132,23 +1132,23 @@ export default function DeveloperApi() {
         {/* ── Pricing & Plans Section ── */}
         <section id="pricing" className="scroll-mt-20 space-y-12">
           <div className="text-center max-w-3xl mx-auto space-y-4">
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-text-primary tracking-tight">
               Flexible plans that grow with you
             </h2>
-            <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
+            <p className="text-text-secondary text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
               Free for indie developers and personal experiments. Upgrade to high-throughput commercial access when your app scales.
             </p>
 
             {/* Switchers Row (Billing cycle + Currency) */}
             <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
               {/* Billing Cycle Switcher */}
-              <div className="inline-flex items-center p-1 rounded-xl bg-white/[0.04] border border-white/10 text-xs shadow-inner">
+              <div className="inline-flex items-center p-1 rounded-xl bg-surface-2 border border-border text-xs shadow-inner">
                 <button
                   onClick={() => setBillingCycle('monthly')}
                   className={`px-3.5 py-1.5 rounded-lg font-medium transition ${
                     billingCycle === 'monthly'
-                      ? 'bg-white/10 text-white shadow-sm font-semibold'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-surface text-text-primary shadow-sm font-semibold border border-border'
+                      : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   Monthly
@@ -1157,8 +1157,8 @@ export default function DeveloperApi() {
                   onClick={() => setBillingCycle('yearly')}
                   className={`px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
                     billingCycle === 'yearly'
-                      ? 'bg-white/10 text-white shadow-sm font-semibold'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-surface text-text-primary shadow-sm font-semibold border border-border'
+                      : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   <span>Yearly</span>
@@ -1169,13 +1169,13 @@ export default function DeveloperApi() {
               </div>
 
               {/* Currency Switcher */}
-              <div className="inline-flex items-center p-1 rounded-xl bg-white/[0.04] border border-white/10 text-xs shadow-inner">
+              <div className="inline-flex items-center p-1 rounded-xl bg-surface-2 border border-border text-xs shadow-inner">
                 <button
                   onClick={() => setCurrency('NGN')}
                   className={`px-3 py-1.5 rounded-lg font-mono font-bold transition ${
                     currency === 'NGN'
                       ? 'bg-brand text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   NGN (₦)
@@ -1185,7 +1185,7 @@ export default function DeveloperApi() {
                   className={`px-3 py-1.5 rounded-lg font-mono font-bold transition ${
                     currency === 'USD'
                       ? 'bg-brand text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white'
+                      : 'text-text-secondary hover:text-text-primary'
                   }`}
                 >
                   USD ($)
@@ -1198,56 +1198,56 @@ export default function DeveloperApi() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
             
             {/* 1. Community (Free) */}
-            <div className="rounded-2xl bg-[#0B0E14] border border-white/10 p-7 lg:p-8 flex flex-col justify-between hover:border-white/20 transition relative">
+            <div className="rounded-2xl bg-surface border border-border p-7 lg:p-8 flex flex-col justify-between hover:border-brand/40 transition relative">
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xl font-bold text-white tracking-tight">Community</h3>
-                  <span className="text-[11px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-white/5 text-slate-300 border border-white/10">
+                  <h3 className="text-xl font-bold text-text-primary tracking-tight">Community</h3>
+                  <span className="text-[11px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-surface-2 text-text-secondary border border-border">
                     Free Forever
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mb-6 leading-relaxed min-h-[34px]">
+                <p className="text-xs text-text-secondary mb-6 leading-relaxed min-h-[34px]">
                   For indie hobbyists, students, and research prototypes exploring Nollywood cinema data.
                 </p>
                 <div className="flex items-baseline gap-1.5 mb-1">
-                  <span className="text-4xl font-extrabold text-white font-mono">
+                  <span className="text-4xl font-extrabold text-text-primary font-mono">
                     {currency === 'NGN' ? '₦0' : '$0'}
                   </span>
-                  <span className="text-xs font-medium text-slate-400">/month</span>
+                  <span className="text-xs font-medium text-text-secondary">/month</span>
                 </div>
-                <p className="text-[11px] text-slate-400 mb-6">No credit card required</p>
+                <p className="text-[11px] text-text-muted mb-6">No credit card required</p>
 
                 <button
                   onClick={() => openKeyModal('free')}
-                  className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/10 transition text-center mb-6"
+                  className="w-full py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 text-text-primary font-semibold text-xs border border-border transition text-center mb-6"
                 >
                   Get Free API Key
                 </button>
 
-                <div className="border-t border-white/5 pt-6 space-y-3 text-xs text-slate-300">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">What&apos;s included:</div>
+                <div className="border-t border-hairline pt-6 space-y-3 text-xs text-text-secondary">
+                  <div className="text-[11px] font-bold text-text-primary uppercase tracking-wider mb-2">What&apos;s included:</div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-500 text-base shrink-0 mt-0.5" />
                     <span><strong>100,000 requests</strong> / month</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-500 text-base shrink-0 mt-0.5" />
                     <span><strong>60 req / min</strong> rate limit</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-500 text-base shrink-0 mt-0.5" />
                     <span>Preview Catalog (First 500 Films &amp; Talent)</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-500 text-base shrink-0 mt-0.5" />
                     <span>Top 10 Cast &amp; Crew filmographies</span>
                   </div>
-                  <div className="flex items-start gap-2.5 text-slate-400">
-                    <Icon icon="solar:close-circle-linear" className="text-slate-600 text-base shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2.5 text-text-muted">
+                    <Icon icon="solar:close-circle-linear" className="text-text-muted text-base shrink-0 mt-0.5" />
                     <span>No Box Office gross rankings</span>
                   </div>
-                  <div className="flex items-start gap-2.5 text-slate-400">
-                    <Icon icon="solar:close-circle-linear" className="text-slate-600 text-base shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-2.5 text-text-muted">
+                    <Icon icon="solar:close-circle-linear" className="text-text-muted text-base shrink-0 mt-0.5" />
                     <span>Non-commercial license</span>
                   </div>
                 </div>
@@ -1255,26 +1255,26 @@ export default function DeveloperApi() {
             </div>
 
             {/* 2. Pro Developer */}
-            <div className="rounded-2xl bg-gradient-to-b from-[#141A24] to-[#0A0D13] border border-brand/50 ring-1 ring-brand/30 p-7 lg:p-8 flex flex-col justify-between shadow-2xl relative">
+            <div className="rounded-2xl bg-surface-2 border border-brand/50 ring-1 ring-brand/30 p-7 lg:p-8 flex flex-col justify-between shadow-2xl relative">
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xl font-bold text-white tracking-tight">Pro Developer</h3>
+                  <h3 className="text-xl font-bold text-text-primary tracking-tight">Pro Developer</h3>
                   <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-brand/15 text-brand border border-brand/30">
                     Most Popular
                   </span>
                 </div>
-                <p className="text-xs text-slate-300 mb-6 leading-relaxed min-h-[34px]">
+                <p className="text-xs text-text-secondary mb-6 leading-relaxed min-h-[34px]">
                   Full commercial license for mobile apps, entertainment portals, syndication networks, and analytics teams.
                 </p>
                 <div className="flex items-baseline gap-1.5 mb-1">
-                  <span className="text-4xl font-extrabold text-white font-mono">
+                  <span className="text-4xl font-extrabold text-text-primary font-mono">
                     {currency === 'NGN'
                       ? (billingCycle === 'yearly' ? '₦36,000' : '₦45,000')
                       : (billingCycle === 'yearly' ? '$23' : '$29')}
                   </span>
-                  <span className="text-xs font-medium text-slate-400">/month</span>
+                  <span className="text-xs font-medium text-text-secondary">/month</span>
                 </div>
-                <p className="text-[11px] text-brand/80 mb-6">
+                <p className="text-[11px] text-brand mb-6 font-medium">
                   {billingCycle === 'yearly'
                     ? (currency === 'NGN' ? 'Billed annually at ₦432,000 (Save 20%)' : 'Billed annually at $276 (Save 20%)')
                     : 'Billed monthly · Cancel anytime'}
@@ -1287,7 +1287,7 @@ export default function DeveloperApi() {
                   Upgrade to Pro Access
                 </button>
 
-                <div className="border-t border-white/10 pt-6 space-y-3 text-xs text-slate-200">
+                <div className="border-t border-hairline pt-6 space-y-3 text-xs text-text-secondary">
                   <div className="text-[11px] font-bold text-brand uppercase tracking-wider mb-2">Everything in Community, plus:</div>
                   <div className="flex items-start gap-2.5">
                     <Icon icon="solar:check-circle-bold" className="text-brand text-base shrink-0 mt-0.5" />
@@ -1322,53 +1322,53 @@ export default function DeveloperApi() {
             </div>
 
             {/* 3. Enterprise */}
-            <div className="rounded-2xl bg-[#0B0E14] border border-white/10 p-7 lg:p-8 flex flex-col justify-between hover:border-white/20 transition relative">
+            <div className="rounded-2xl bg-surface border border-border p-7 lg:p-8 flex flex-col justify-between hover:border-brand/40 transition relative">
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xl font-bold text-white tracking-tight">Enterprise</h3>
-                  <span className="text-[11px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <h3 className="text-xl font-bold text-text-primary tracking-tight">Enterprise</h3>
+                  <span className="text-[11px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400 border border-blue-500/20">
                     Scale &amp; SLA
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mb-6 leading-relaxed min-h-[34px]">
+                <p className="text-xs text-text-secondary mb-6 leading-relaxed min-h-[34px]">
                   For major streaming networks, broadcast distributors, telecom VAS, and global aggregators.
                 </p>
                 <div className="flex items-baseline gap-1.5 mb-1">
-                  <span className="text-4xl font-extrabold text-white font-mono">Custom</span>
+                  <span className="text-4xl font-extrabold text-text-primary font-mono">Custom</span>
                 </div>
-                <p className="text-[11px] text-slate-400 mb-6">Tailored agreements · Dedicated replica pool</p>
+                <p className="text-[11px] text-text-muted mb-6">Tailored agreements · Dedicated replica pool</p>
 
                 <button
                   onClick={() => openKeyModal('enterprise')}
-                  className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/10 transition text-center mb-6"
+                  className="w-full py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 text-text-primary font-semibold text-xs border border-border transition text-center mb-6"
                 >
                   Contact Enterprise Sales
                 </button>
 
-                <div className="border-t border-white/5 pt-6 space-y-3 text-xs text-slate-300">
-                  <div className="text-[11px] font-bold text-blue-400 uppercase tracking-wider mb-2">Everything in Pro, plus:</div>
+                <div className="border-t border-hairline pt-6 space-y-3 text-xs text-text-secondary">
+                  <div className="text-[11px] font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wider mb-2">Everything in Pro, plus:</div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-blue-500 dark:text-blue-400 text-base shrink-0 mt-0.5" />
                     <span><strong>2,000+ req / min</strong> or custom rate limit</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-blue-500 dark:text-blue-400 text-base shrink-0 mt-0.5" />
                     <span>Dedicated database read replica pool</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-blue-500 dark:text-blue-400 text-base shrink-0 mt-0.5" />
                     <span>Automated daily bulk JSON database dumps</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-blue-500 dark:text-blue-400 text-base shrink-0 mt-0.5" />
                     <span>Real-time webhook events &amp; delta sync</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-blue-500 dark:text-blue-400 text-base shrink-0 mt-0.5" />
                     <span><strong>99.98% guaranteed SLA</strong> with contractual credit</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <Icon icon="solar:check-circle-bold" className="text-blue-400 text-base shrink-0 mt-0.5" />
+                    <Icon icon="solar:check-circle-bold" className="text-blue-500 dark:text-blue-400 text-base shrink-0 mt-0.5" />
                     <span>Dedicated Technical Account Manager &amp; Slack</span>
                   </div>
                 </div>
@@ -1381,28 +1381,28 @@ export default function DeveloperApi() {
         {/* ── Compare Plans Matrix ── */}
         <section className="space-y-8 scroll-mt-20" id="compare">
           <div className="text-center max-w-xl mx-auto space-y-2">
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-white">Compare plans</h3>
-            <p className="text-xs sm:text-sm text-slate-400">
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-text-primary">Compare plans</h3>
+            <p className="text-xs sm:text-sm text-text-secondary">
               Detailed entitlement breakdown and feature matrix across all MuviDB Developer tiers.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 overflow-hidden bg-[#0A0D13]/80 backdrop-blur-md">
+          <div className="rounded-2xl border border-border overflow-hidden bg-surface">
             <div className="overflow-x-auto no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <table className="w-full text-left text-xs min-w-[680px]">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/[0.02]">
-                    <th className="p-5 w-2/5 font-semibold text-slate-300">Plan Features</th>
+                  <tr className="border-b border-border bg-surface-2">
+                    <th className="p-5 w-2/5 font-semibold text-text-primary">Plan Features</th>
                     <th className="p-5 w-1/5 text-center">
-                      <div className="font-bold text-sm text-white mb-2">Community</div>
+                      <div className="font-bold text-sm text-text-primary mb-2">Community</div>
                       <button 
                         onClick={() => openKeyModal('free')} 
-                        className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-[11px] font-semibold transition"
+                        className="px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-3 text-text-primary border border-border text-[11px] font-semibold transition"
                       >
                         Get Free Key
                       </button>
                     </th>
-                    <th className="p-5 w-1/5 text-center bg-brand/[0.03]">
+                    <th className="p-5 w-1/5 text-center bg-brand/[0.04]">
                       <div className="font-bold text-sm text-brand mb-2">Pro Developer</div>
                       <button 
                         onClick={() => openKeyModal('pro')} 
@@ -1412,115 +1412,115 @@ export default function DeveloperApi() {
                       </button>
                     </th>
                     <th className="p-5 w-1/5 text-center">
-                      <div className="font-bold text-sm text-white mb-2">Enterprise</div>
+                      <div className="font-bold text-sm text-text-primary mb-2">Enterprise</div>
                       <button 
                         onClick={() => openKeyModal('enterprise')} 
-                        className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-[11px] font-semibold transition"
+                        className="px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-3 text-text-primary border border-border text-[11px] font-semibold transition"
                       >
                         Contact Sales
                       </button>
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-slate-300">
+                <tbody className="divide-y divide-hairline text-text-secondary">
                   {/* Category 1: Usage & Quotas */}
-                  <tr className="bg-white/[0.04]">
-                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-slate-400">
+                  <tr className="bg-surface-2/60">
+                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-text-muted">
                       Usage &amp; Quotas
                     </td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Monthly Request Quota</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Monthly Request Quota</td>
                     <td className="p-4 text-center font-mono">100,000</td>
-                    <td className="p-4 text-center font-mono font-bold text-white bg-brand/[0.02]">1,500,000</td>
+                    <td className="p-4 text-center font-mono font-bold text-text-primary bg-brand/[0.03]">1,500,000</td>
                     <td className="p-4 text-center font-mono">Custom / Unlimited</td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Burst Rate Limit</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Burst Rate Limit</td>
                     <td className="p-4 text-center font-mono">60 req / min</td>
-                    <td className="p-4 text-center font-mono font-bold text-brand bg-brand/[0.02]">600 req / min</td>
-                    <td className="p-4 text-center font-mono text-blue-400">2,000+ req / min</td>
+                    <td className="p-4 text-center font-mono font-bold text-brand bg-brand/[0.03]">600 req / min</td>
+                    <td className="p-4 text-center font-mono text-blue-500 dark:text-blue-400">2,000+ req / min</td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Global Edge Cache (sub-45ms)</td>
-                    <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
-                    <td className="p-4 text-center bg-brand/[0.02]"><Icon icon="solar:check-circle-bold" className="text-brand inline text-base" /></td>
-                    <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-blue-400 inline text-base" /></td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Global Edge Cache (sub-45ms)</td>
+                    <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-500 text-base inline" /></td>
+                    <td className="p-4 text-center bg-brand/[0.03]"><Icon icon="solar:check-circle-bold" className="text-brand inline text-base" /></td>
+                    <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-blue-500 dark:text-blue-400 inline text-base" /></td>
                   </tr>
 
                   {/* Category 2: Catalog & Metadata */}
-                  <tr className="bg-white/[0.04]">
-                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-slate-400">
+                  <tr className="bg-surface-2/60">
+                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-text-muted">
                       Catalog &amp; Metadata
                     </td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Films &amp; Series Catalog</td>
-                    <td className="p-4 text-center text-amber-400 font-medium">First 500 (Preview)</td>
-                    <td className="p-4 text-center font-bold text-white bg-brand/[0.02]">Full 12,400+ Films</td>
-                    <td className="p-4 text-center font-bold text-white">Full 12,400+ Films</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Films &amp; Series Catalog</td>
+                    <td className="p-4 text-center text-amber-500 dark:text-amber-400 font-medium">First 500 (Preview)</td>
+                    <td className="p-4 text-center font-bold text-text-primary bg-brand/[0.03]">Full 12,400+ Films</td>
+                    <td className="p-4 text-center font-bold text-text-primary">Full 12,400+ Films</td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Talent &amp; Cast Directory</td>
-                    <td className="p-4 text-center text-amber-400 font-medium">First 500 (Preview)</td>
-                    <td className="p-4 text-center font-bold text-white bg-brand/[0.02]">Full 15,000+ People</td>
-                    <td className="p-4 text-center font-bold text-white">Full 15,000+ People</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Talent &amp; Cast Directory</td>
+                    <td className="p-4 text-center text-amber-500 dark:text-amber-400 font-medium">First 500 (Preview)</td>
+                    <td className="p-4 text-center font-bold text-text-primary bg-brand/[0.03]">Full 15,000+ People</td>
+                    <td className="p-4 text-center font-bold text-text-primary">Full 15,000+ People</td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Ensemble Cast &amp; Crew Credits</td>
-                    <td className="p-4 text-center text-slate-400">Top 10 only</td>
-                    <td className="p-4 text-center font-bold text-brand bg-brand/[0.02]">Complete Filmographies</td>
-                    <td className="p-4 text-center font-bold text-blue-400">Complete Filmographies</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Ensemble Cast &amp; Crew Credits</td>
+                    <td className="p-4 text-center text-text-secondary">Top 10 only</td>
+                    <td className="p-4 text-center font-bold text-brand bg-brand/[0.03]">Complete Filmographies</td>
+                    <td className="p-4 text-center font-bold text-blue-500 dark:text-blue-400">Complete Filmographies</td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Theatrical Box Office Grosses</td>
-                    <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-slate-600 inline text-base" /></td>
-                    <td className="p-4 text-center bg-brand/[0.02]"><Icon icon="solar:check-circle-bold" className="text-brand inline text-base" /></td>
-                    <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-400 inline text-base" /></td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Theatrical Box Office Grosses</td>
+                    <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-text-muted inline text-base" /></td>
+                    <td className="p-4 text-center bg-brand/[0.03]"><Icon icon="solar:check-circle-bold" className="text-brand inline text-base" /></td>
+                    <td className="p-4 text-center"><Icon icon="solar:check-circle-bold" className="text-emerald-500 text-base inline" /></td>
                   </tr>
 
                   {/* Category 3: Licensing & Architecture */}
-                  <tr className="bg-white/[0.04]">
-                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-slate-400">
+                  <tr className="bg-surface-2/60">
+                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-text-muted">
                       Licensing &amp; Architecture
                     </td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Commercial Application License</td>
-                    <td className="p-4 text-center text-slate-400">Non-commercial</td>
-                    <td className="p-4 text-center text-emerald-400 font-semibold bg-brand/[0.02]">White-label Commercial</td>
-                    <td className="p-4 text-center text-emerald-400 font-semibold">White-label Commercial</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Commercial Application License</td>
+                    <td className="p-4 text-center text-text-secondary">Non-commercial</td>
+                    <td className="p-4 text-center text-emerald-500 dark:text-emerald-400 font-semibold bg-brand/[0.03]">White-label Commercial</td>
+                    <td className="p-4 text-center text-emerald-500 dark:text-emerald-400 font-semibold">White-label Commercial</td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Webhook Events &amp; Delta Sync</td>
-                    <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-slate-600 inline text-base" /></td>
-                    <td className="p-4 text-center text-slate-300 bg-brand/[0.02]">Standard Webhooks</td>
-                    <td className="p-4 text-center text-blue-400 font-semibold">Real-time Dedicated</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Webhook Events &amp; Delta Sync</td>
+                    <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-text-muted inline text-base" /></td>
+                    <td className="p-4 text-center text-text-secondary bg-brand/[0.03]">Standard Webhooks</td>
+                    <td className="p-4 text-center text-blue-500 dark:text-blue-400 font-semibold">Real-time Dedicated</td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Automated Bulk Database Dumps</td>
-                    <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-slate-600 inline text-base" /></td>
-                    <td className="p-4 text-center text-slate-400 bg-brand/[0.02]"><Icon icon="solar:close-circle-linear" className="text-slate-600 inline text-base" /></td>
-                    <td className="p-4 text-center text-emerald-400 font-semibold">Daily JSON &amp; SQL Dumps</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Automated Bulk Database Dumps</td>
+                    <td className="p-4 text-center"><Icon icon="solar:close-circle-linear" className="text-text-muted inline text-base" /></td>
+                    <td className="p-4 text-center text-text-secondary bg-brand/[0.03]"><Icon icon="solar:close-circle-linear" className="text-text-muted inline text-base" /></td>
+                    <td className="p-4 text-center text-emerald-500 dark:text-emerald-400 font-semibold">Daily JSON &amp; SQL Dumps</td>
                   </tr>
 
                   {/* Category 4: Support & SLA */}
-                  <tr className="bg-white/[0.04]">
-                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-slate-400">
+                  <tr className="bg-surface-2/60">
+                    <td colSpan={4} className="p-3 px-5 font-bold text-[11px] uppercase tracking-wider text-text-muted">
                       Support &amp; SLA
                     </td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Support Channels</td>
-                    <td className="p-4 text-center text-slate-400">Community Docs</td>
-                    <td className="p-4 text-center text-white bg-brand/[0.02]">Priority Discord &amp; Email</td>
-                    <td className="p-4 text-center text-blue-400">Dedicated Slack &amp; TAM</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Support Channels</td>
+                    <td className="p-4 text-center text-text-secondary">Community Docs</td>
+                    <td className="p-4 text-center text-text-primary bg-brand/[0.03]">Priority Discord &amp; Email</td>
+                    <td className="p-4 text-center text-blue-500 dark:text-blue-400">Dedicated Slack &amp; TAM</td>
                   </tr>
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 px-5 font-medium text-white">Guaranteed Uptime SLA</td>
-                    <td className="p-4 text-center text-slate-400">Best Effort (99.0%)</td>
-                    <td className="p-4 text-center font-medium text-white bg-brand/[0.02]">99.9% Uptime</td>
-                    <td className="p-4 text-center font-bold text-blue-400">99.98% SLA (Contractual)</td>
+                  <tr className="hover:bg-surface-2/40">
+                    <td className="p-4 px-5 font-medium text-text-primary">Guaranteed Uptime SLA</td>
+                    <td className="p-4 text-center text-text-secondary">Best Effort (99.0%)</td>
+                    <td className="p-4 text-center font-medium text-text-primary bg-brand/[0.03]">99.9% Uptime</td>
+                    <td className="p-4 text-center font-bold text-blue-500 dark:text-blue-400">99.98% SLA (Contractual)</td>
                   </tr>
                 </tbody>
               </table>
@@ -1531,8 +1531,8 @@ export default function DeveloperApi() {
         {/* ── FAQ Accordion ── */}
         <section id="faq" className="max-w-3xl mx-auto space-y-6 scroll-mt-20">
           <div className="text-center">
-            <h3 className="text-2xl font-bold text-white">Frequently Asked Questions</h3>
-            <p className="text-xs text-slate-400 mt-1">Everything you need to know about integrating MuviDB&apos;s Developer API.</p>
+            <h3 className="text-2xl font-bold text-text-primary">Frequently Asked Questions</h3>
+            <p className="text-xs text-text-secondary mt-1">Everything you need to know about integrating MuviDB&apos;s Developer API.</p>
           </div>
 
           <div className="space-y-3">
@@ -1558,12 +1558,12 @@ export default function DeveloperApi() {
                 a: "Our core movie and talent databases are synchronized continuously through automated scrapers, OCR credit passes, and editorial curation. Cinema box office grosses are audited and updated every Monday and Wednesday."
               }
             ].map((faq, i) => (
-              <details key={i} className="group p-5 rounded-2xl bg-surface/50 border border-white/5 open:border-white/15 transition">
-                <summary className="font-bold text-sm text-white cursor-pointer list-none flex items-center justify-between">
+              <details key={i} className="group p-5 rounded-2xl bg-surface border border-border open:border-brand/40 transition">
+                <summary className="font-bold text-sm text-text-primary cursor-pointer list-none flex items-center justify-between">
                   <span>{faq.q}</span>
-                  <Icon icon="solar:alt-arrow-down-linear" className="text-slate-400 group-open:rotate-180 transition-transform" />
+                  <Icon icon="solar:alt-arrow-down-linear" className="text-text-muted group-open:rotate-180 transition-transform" />
                 </summary>
-                <p className="text-xs text-slate-300 leading-relaxed mt-3 pt-3 border-t border-white/5">
+                <p className="text-xs text-text-secondary leading-relaxed mt-3 pt-3 border-t border-hairline">
                   {faq.a}
                 </p>
               </details>
@@ -1572,12 +1572,12 @@ export default function DeveloperApi() {
         </section>
 
         {/* ── Bottom CTA ── */}
-        <section className="rounded-2xl bg-[#0E1217] border border-white/10 p-8 sm:p-12 text-center space-y-6 relative overflow-hidden">
+        <section className="rounded-2xl bg-surface border border-border p-8 sm:p-12 text-center space-y-6 relative overflow-hidden">
           <div className="max-w-2xl mx-auto space-y-3">
-            <h2 className="text-3xl sm:text-4xl font-black text-white font-heading">
+            <h2 className="text-3xl sm:text-4xl font-black text-text-primary font-heading">
               Ready to Build with African Cinema Data?
             </h2>
-            <p className="text-sm text-slate-300 leading-relaxed">
+            <p className="text-sm text-text-secondary leading-relaxed">
               Start building fast, accurate, and richly detailed cinema experiences. Get your free developer credentials in seconds.
             </p>
           </div>
@@ -1590,7 +1590,7 @@ export default function DeveloperApi() {
             </button>
             <button
               onClick={() => openKeyModal('pro')}
-              className="px-8 py-3.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-sm transition"
+              className="px-8 py-3.5 rounded-xl bg-surface-2 hover:bg-surface-3 text-text-primary font-bold text-sm border border-border transition"
             >
               Start Pro Plan
             </button>
@@ -1602,14 +1602,14 @@ export default function DeveloperApi() {
       {/* ── API Key Request & Instant Generation Modal ── */}
       {showKeyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="w-full max-w-lg bg-[#0E121A] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl relative space-y-6 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-lg bg-surface border border-border rounded-3xl p-6 sm:p-8 shadow-2xl relative space-y-6 max-h-[90vh] overflow-y-auto">
             
             <button
               onClick={() => {
                 setShowKeyModal(false);
                 setSubmittedKey(null);
               }}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-white/5 transition"
+              className="absolute top-5 right-5 text-text-muted hover:text-text-primary p-1.5 rounded-xl hover:bg-surface-2 transition"
             >
               <Icon icon="solar:close-circle-linear" className="text-2xl" />
             </button>
@@ -1621,15 +1621,15 @@ export default function DeveloperApi() {
                     <Icon icon="solar:key-bold" />
                     Developer Credentials
                   </div>
-                  <h3 className="text-2xl font-bold text-white">Generate Your API Key</h3>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <h3 className="text-2xl font-bold text-text-primary">Generate Your API Key</h3>
+                  <p className="text-xs text-text-secondary mt-1">
                     Select your tier to get access credentials immediately.
                   </p>
                 </div>
 
                 {/* Tier Switcher in Modal */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Select Tier</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1.5">Select Tier</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
                       { id: 'free', label: 'Community ($0)' },
@@ -1646,7 +1646,7 @@ export default function DeveloperApi() {
                         className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition text-center ${
                           modalForm.tier === t.id
                             ? 'bg-brand/20 border-brand text-brand'
-                            : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+                            : 'bg-surface-2 border-border text-text-secondary hover:text-text-primary'
                         }`}
                       >
                         {t.label}
@@ -1656,60 +1656,60 @@ export default function DeveloperApi() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Application Name *</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Application Name *</label>
                   <input
                     type="text"
                     required
                     value={modalForm.appName}
                     onChange={(e) => setModalForm({ ...modalForm, appName: e.target.value })}
                     placeholder="e.g. Lagos Cinema Radar, CineStream App"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-brand"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-text-primary text-xs focus:outline-none focus:border-brand"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">Your Name</label>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">Your Name</label>
                     <input
                       type="text"
                       value={modalForm.developerName}
                       onChange={(e) => setModalForm({ ...modalForm, developerName: e.target.value })}
                       placeholder="e.g. Alex Okafor"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-brand"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-text-primary text-xs focus:outline-none focus:border-brand"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">Developer Email *</label>
+                    <label className="block text-xs font-semibold text-text-secondary mb-1">Developer Email *</label>
                     <input
                       type="email"
                       required
                       value={modalForm.email}
                       onChange={(e) => setModalForm({ ...modalForm, email: e.target.value })}
                       placeholder="developer@company.com"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-brand"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-text-primary text-xs focus:outline-none focus:border-brand"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Company / Organization (Optional)</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Company / Organization (Optional)</label>
                   <input
                     type="text"
                     value={modalForm.company}
                     onChange={(e) => setModalForm({ ...modalForm, company: e.target.value })}
                     placeholder="e.g. MediaTech Global, University of Ibadan"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-brand"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-text-primary text-xs focus:outline-none focus:border-brand"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Intended Use Case</label>
+                  <label className="block text-xs font-semibold text-text-secondary mb-1">Intended Use Case</label>
                   <textarea
                     rows={2}
                     value={modalForm.useCase}
                     onChange={(e) => setModalForm({ ...modalForm, useCase: e.target.value })}
                     placeholder="Briefly describe what you are building..."
-                    className="w-full px-3.5 py-2 rounded-xl bg-black/50 border border-white/10 text-white text-xs focus:outline-none focus:border-brand resize-none"
+                    className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border text-text-primary text-xs focus:outline-none focus:border-brand resize-none"
                   />
                 </div>
 
@@ -1735,12 +1735,12 @@ export default function DeveloperApi() {
               </form>
             ) : (
               <div className="text-center py-4 space-y-5">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 flex items-center justify-center mx-auto">
                   <Icon icon="solar:check-circle-bold" className="text-3xl" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold text-white">Credentials Ready!</h3>
-                  <p className="text-xs text-slate-300 mt-1 max-w-sm mx-auto">
+                  <h3 className="text-2xl font-bold text-text-primary">Credentials Ready!</h3>
+                  <p className="text-xs text-text-secondary mt-1 max-w-sm mx-auto">
                     {submittedKey === 'pending_review'
                       ? 'Your commercial application has been dispatched to our engineering desk. You will receive active credentials via email shortly.'
                       : 'Here is your active sandbox key. You can use it immediately in the live console or your code.'}
@@ -1748,9 +1748,9 @@ export default function DeveloperApi() {
                 </div>
 
                 {submittedKey !== 'pending_review' && (
-                  <div className="p-4 rounded-2xl bg-black/60 border border-white/10 text-left space-y-2">
-                    <span className="text-[11px] font-mono text-slate-400">Your API Key:</span>
-                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white/5 border border-white/5 font-mono text-xs text-emerald-300">
+                  <div className="p-4 rounded-2xl bg-surface-2 border border-border text-left space-y-2">
+                    <span className="text-[11px] font-mono text-text-muted">Your API Key:</span>
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-surface border border-border font-mono text-xs text-emerald-500 dark:text-emerald-300">
                       <span className="truncate">{submittedKey}</span>
                       <button
                         onClick={() => handleCopy(submittedKey, 'code')}
@@ -1768,7 +1768,7 @@ export default function DeveloperApi() {
                       setShowKeyModal(false);
                       setSubmittedKey(null);
                     }}
-                    className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition"
+                    className="w-full py-3 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-text-primary font-bold text-xs transition"
                   >
                     Done &amp; Explore Docs
                   </button>

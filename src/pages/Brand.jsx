@@ -73,14 +73,14 @@ const WORDMARK_ASSETS = [
     title: 'Wordmark (Dark Mode)',
     desc: 'White letterforms for dark slate and black cinematic backgrounds.',
     recommended: true,
-    bgClass: 'bg-[#080A0D] border-white/10',
+    bgClass: 'bg-[#080A0D] border-border',
     svgUrl: '/brand/wordmark-dark.svg',
     pngUrl: '/brand/wordmark-dark.png',
   },
   {
     title: 'Wordmark (Light Mode)',
     desc: 'Deep black letterforms for light editorial sheets and white backgrounds.',
-    bgClass: 'bg-[#F9FAFB] border-black/10',
+    bgClass: 'bg-[#F9FAFB] border-border',
     svgUrl: '/brand/wordmark-light.svg',
     pngUrl: '/brand/wordmark-light.png',
     isLightCard: true,
@@ -88,7 +88,7 @@ const WORDMARK_ASSETS = [
   {
     title: 'Wordmark (Signature Orange)',
     desc: 'High-energy brand orange letterforms for hero moments and posters.',
-    bgClass: 'bg-[#0E1217] border-white/10',
+    bgClass: 'bg-[#0E1217] border-border',
     svgUrl: '/brand/wordmark-orange.svg',
     pngUrl: '/brand/wordmark-orange.png',
   },
@@ -99,14 +99,14 @@ const LOGO_ASSETS = [
     title: 'Film Reel Symbol (White)',
     desc: 'Crisp white emblem for dark headers, app splash screens, and stamps.',
     recommended: true,
-    bgClass: 'bg-[#080A0D] border-white/10',
+    bgClass: 'bg-[#080A0D] border-border',
     svgUrl: '/brand/icon-dark.svg',
     pngUrl: '/brand/icon-dark.png',
   },
   {
     title: 'Film Reel Symbol (Black)',
     desc: 'Solid dark emblem for white paper, editorial prints, and light mode.',
-    bgClass: 'bg-[#F9FAFB] border-black/10',
+    bgClass: 'bg-[#F9FAFB] border-border',
     svgUrl: '/brand/icon-light.svg',
     pngUrl: '/brand/icon-light.png',
     isLightCard: true,
@@ -114,14 +114,14 @@ const LOGO_ASSETS = [
   {
     title: 'Film Reel Symbol (Brand Orange)',
     desc: 'The iconic MuviDB orange emblem representing the golden reel.',
-    bgClass: 'bg-[#0E1217] border-white/10',
+    bgClass: 'bg-[#0E1217] border-border',
     svgUrl: '/brand/icon.svg',
     pngUrl: '/brand/icon.png',
   },
   {
     title: 'Film Reel Symbol (Crimson)',
     desc: 'Special edition red variant for cinematic trailers and badges.',
-    bgClass: 'bg-[#080A0D] border-white/10',
+    bgClass: 'bg-[#080A0D] border-border',
     svgUrl: '/brand/icon-red.svg',
     pngUrl: '/brand/icon-red.png',
   },
@@ -255,16 +255,16 @@ export default function Brand() {
   };
 
   return (
-    <div className="min-h-screen bg-[#080A0D] text-white selection:bg-brand selection:text-white">
+    <div className="min-h-screen bg-bg text-text-primary selection:bg-brand selection:text-white">
       {/* =========================================================================
           HERO SECTION: DUB.CO STYLE WITH DOT MATRIX & WATERMARK LOGO BACKGROUND
          ========================================================================= */}
-      <section className="relative overflow-hidden bg-black pt-16 pb-24 md:pt-20 md:pb-32 border-b border-white/10">
+      <section className="relative overflow-hidden bg-surface pt-16 pb-24 md:pt-20 md:pb-32 border-b border-border">
         {/* Architect Dot Matrix Background with Radial Fade */}
         <div 
           className="absolute inset-0 pointer-events-none opacity-40 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_45%,#000_30%,transparent_100%)]"
           style={{
-            backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.25) 1.5px, transparent 1.5px)',
+            backgroundImage: 'radial-gradient(var(--color-grid) 1.5px, transparent 1.5px)',
             backgroundSize: '28px 28px',
           }}
           aria-hidden="true"
@@ -278,25 +278,30 @@ export default function Brand() {
 
         {/* Giant Watermark Logo Motion Graphic in Background */}
         <div 
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[160%] max-w-[1400px] opacity-[0.07] pointer-events-none select-none -z-10 filter blur-[0.5px]"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[160%] max-w-[1400px] opacity-[0.06] pointer-events-none select-none -z-10 filter blur-[0.5px]"
           aria-hidden="true"
         >
           <img 
             src="/brand/wordmark-dark.svg" 
             alt="MuviDB watermark" 
-            className="w-full h-auto object-contain"
+            className="w-full h-auto object-contain dark:block hidden"
+          />
+          <img 
+            src="/brand/wordmark-light.svg" 
+            alt="MuviDB watermark" 
+            className="w-full h-auto object-contain dark:hidden block"
           />
         </div>
 
         {/* Hero Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           {/* Subtle Pill Tag */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/15 text-xs font-mono text-white/80 mb-6 backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-2 border border-border text-xs font-mono text-text-secondary mb-6 backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
             <span>Official Identity &amp; Assets</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-heading font-black tracking-tight text-white leading-[1.08]">
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-heading font-black tracking-tight text-text-primary leading-[1.08]">
             MuviDB Brand Kit
           </h1>
 
@@ -309,16 +314,16 @@ export default function Brand() {
             <button
               onClick={downloadAllAssetsZip}
               disabled={isZipping}
-              className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-white text-black hover:bg-neutral-200 font-heading font-bold text-sm uppercase tracking-wider shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:shadow-[0_0_35px_rgba(255,255,255,0.35)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              className="inline-flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-brand hover:bg-brand-hover text-white font-heading font-bold text-sm uppercase tracking-wider shadow-[0_4px_20px_rgba(255,90,31,0.25)] hover:shadow-[0_6px_25px_rgba(255,90,31,0.35)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >
               {isZipping ? (
                 <>
-                  <div className="w-4 h-4 rounded-full border-2 border-black/30 border-t-black animate-spin" />
+                  <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                   <span>Packaging ZIP...</span>
                 </>
               ) : (
                 <>
-                  <Icon icon="solar:download-square-bold" className="w-5 h-5" />
+                  <Icon icon="solar:download-square-bold" className="w-5 h-5 text-white" />
                   <span>Download Brand Kit (ZIP)</span>
                 </>
               )}
@@ -327,7 +332,7 @@ export default function Brand() {
             <a
               href="#wordmark"
               onClick={(e) => scrollToSection(e, 'wordmark')}
-              className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-surface-2 border border-white/15 text-white hover:bg-surface-3 hover:border-white/30 font-heading font-bold text-sm tracking-wide transition-all"
+              className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-surface-2 border border-border text-text-primary hover:bg-surface-3 hover:border-brand/40 font-heading font-bold text-sm tracking-wide transition-all"
             >
               <Icon icon="solar:eye-bold" className="w-4 h-4 text-brand" />
               <span>Explore Guidelines</span>
@@ -337,17 +342,17 @@ export default function Brand() {
           {/* Asset Counter Meta */}
           <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-xs font-mono text-text-muted">
             <span className="flex items-center gap-1.5">
-              <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-400" />
+              <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-500" />
               Vector SVGs Included
             </span>
             <span>•</span>
             <span className="flex items-center gap-1.5">
-              <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-400" />
+              <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-500" />
               High-Res Transparent PNGs
             </span>
             <span>•</span>
             <span className="flex items-center gap-1.5">
-              <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-400" />
+              <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-emerald-500" />
               Free Commercial Use
             </span>
           </div>
@@ -357,10 +362,10 @@ export default function Brand() {
       {/* =========================================================================
           MAIN CONTAINER WITH STICKY SCROLLSPY SIDEBAR & ARCHITECTURAL GRID
          ========================================================================= */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-hairline">
         <div className="grid grid-cols-1 lg:grid-cols-12 min-h-screen">
           {/* STICKY SIDEBAR (3 COLS) */}
-          <aside className="hidden lg:block lg:col-span-3 border-r border-white/10 pr-6 py-12">
+          <aside className="hidden lg:block lg:col-span-3 border-r border-hairline pr-6 py-12">
             <div className="sticky top-28 space-y-6">
               <div className="text-[11px] font-mono uppercase tracking-widest text-text-muted font-bold px-3">
                 Contents
@@ -376,7 +381,7 @@ export default function Brand() {
                       className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                         isActive
                           ? 'bg-brand/10 text-brand font-bold border border-brand/25 translate-x-1'
-                          : 'text-text-secondary hover:text-white hover:bg-white/5'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
                       }`}
                     >
                       <Icon
@@ -389,10 +394,10 @@ export default function Brand() {
                 })}
               </nav>
 
-              <div className="pt-6 border-t border-white/10 px-3">
+              <div className="pt-6 border-t border-border px-3">
                 <button
                   onClick={downloadAllAssetsZip}
-                  className="w-full py-2.5 px-3 rounded-lg bg-surface-2 hover:bg-surface-3 border border-white/10 text-xs font-bold text-white flex items-center justify-center gap-2 transition-colors"
+                  className="w-full py-2.5 px-3 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-xs font-bold text-text-primary flex items-center justify-center gap-2 transition-colors"
                 >
                   <Icon icon="solar:download-bold" className="w-3.5 h-3.5 text-brand" />
                   <span>Download ZIP Bundle</span>
@@ -402,7 +407,7 @@ export default function Brand() {
           </aside>
 
           {/* MOBILE TABS HEADER */}
-          <div className="lg:hidden sticky top-16 z-30 bg-[#080A0D]/95 backdrop-blur-md -mx-4 px-4 py-3 border-b border-white/10 overflow-x-auto no-scrollbar flex items-center gap-2">
+          <div className="lg:hidden sticky top-16 z-30 bg-surface/95 backdrop-blur-md -mx-4 px-4 py-3 border-b border-border overflow-x-auto no-scrollbar flex items-center gap-2">
             {SECTIONS.map((section) => {
               const isActive = activeSection === section.id;
               return (
@@ -413,7 +418,7 @@ export default function Brand() {
                   className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
                     isActive
                       ? 'bg-brand text-white'
-                      : 'bg-surface-2 text-text-secondary border border-white/10'
+                      : 'bg-surface-2 text-text-secondary border border-border'
                   }`}
                 >
                   {section.label}
@@ -423,14 +428,14 @@ export default function Brand() {
           </div>
 
           {/* MAIN CONTENT AREA (9 COLS) */}
-          <main className="lg:col-span-9 divide-y divide-white/10 lg:pl-10">
+          <main className="lg:col-span-9 divide-y divide-hairline lg:pl-10">
             {/* 1. NAMING SECTION */}
             <section id="naming" className="py-12 sm:py-16 scroll-mt-24">
               <div className="flex items-center gap-2 text-brand text-xs font-bold uppercase tracking-wider mb-2">
                 <Icon icon="solar:text-bold" className="w-4 h-4" />
                 <span>Nomenclature</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">
+              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-text-primary">
                 Naming &amp; Casing
               </h2>
               <p className="mt-3 text-sm sm:text-base text-text-secondary leading-relaxed">
@@ -441,11 +446,11 @@ export default function Brand() {
               {/* Casing Rules Grid */}
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
-                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider mb-2">
+                  <div className="flex items-center gap-2 text-emerald-500 font-bold text-xs uppercase tracking-wider mb-2">
                     <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
                     <span>Correct Usage</span>
                   </div>
-                  <div className="text-xl font-heading font-black text-white font-mono">
+                  <div className="text-xl font-heading font-black text-text-primary font-mono">
                     MuviDB
                   </div>
                   <p className="mt-2 text-xs text-text-secondary">
@@ -471,10 +476,10 @@ export default function Brand() {
               </div>
 
               {/* Informational Callout */}
-              <div className="mt-6 p-4 sm:p-5 rounded-2xl bg-surface-2 border border-white/10 flex items-start gap-3.5">
+              <div className="mt-6 p-4 sm:p-5 rounded-2xl bg-surface-2 border border-border flex items-start gap-3.5">
                 <Icon icon="solar:info-circle-bold" className="w-5 h-5 text-brand shrink-0 mt-0.5" />
                 <div className="text-xs sm:text-sm text-text-secondary leading-relaxed">
-                  <strong className="text-white">What does MuviDB stand for?</strong> MuviDB stands for <em>Movie Database</em>, specifically built to serve as the unified, open archival authority for Nollywood and the broader African motion picture industry.
+                  <strong className="text-text-primary">What does MuviDB stand for?</strong> MuviDB stands for <em>Movie Database</em>, specifically built to serve as the unified, open archival authority for Nollywood and the broader African motion picture industry.
                 </div>
               </div>
             </section>
@@ -491,7 +496,7 @@ export default function Brand() {
                 </span>
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">
+              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-text-primary">
                 Wordmark
               </h2>
               <p className="mt-3 text-sm sm:text-base text-text-secondary leading-relaxed">
@@ -521,7 +526,7 @@ export default function Brand() {
                     </div>
 
                     {/* Metadata & Actions */}
-                    <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
                         <div className={`text-sm font-bold ${asset.isLightCard ? 'text-black' : 'text-white'}`}>
                           {asset.title}
@@ -534,7 +539,11 @@ export default function Brand() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => copySvgCode(asset.svgUrl, asset.title)}
-                          className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-mono font-medium transition-colors flex items-center gap-1.5"
+                          className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors flex items-center gap-1.5 ${
+                            asset.isLightCard
+                              ? 'bg-black/5 hover:bg-black/10 text-neutral-800'
+                              : 'bg-white/10 hover:bg-white/20 text-white'
+                          }`}
                           title="Copy SVG XML to clipboard"
                         >
                           <Icon icon="solar:copy-bold" className="w-3.5 h-3.5" />
@@ -553,7 +562,11 @@ export default function Brand() {
                         <a
                           href={asset.pngUrl}
                           download
-                          className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold transition-colors flex items-center gap-1.5"
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                            asset.isLightCard
+                              ? 'bg-black/5 hover:bg-black/10 text-neutral-800'
+                              : 'bg-white/10 hover:bg-white/20 text-white'
+                          }`}
                         >
                           <Icon icon="solar:file-bold" className="w-3.5 h-3.5" />
                           <span>PNG</span>
@@ -571,7 +584,7 @@ export default function Brand() {
                 <Icon icon="solar:clapperboard-play-bold" className="w-4 h-4" />
                 <span>Logomark</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">
+              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-text-primary">
                 Film Reel Symbol
               </h2>
               <p className="mt-3 text-sm sm:text-base text-text-secondary leading-relaxed">
@@ -595,7 +608,7 @@ export default function Brand() {
                     </div>
 
                     {/* Metadata & Actions */}
-                    <div className="pt-4 border-t border-white/10">
+                    <div className="pt-4 border-t border-border">
                       <div className={`text-sm font-bold ${asset.isLightCard ? 'text-black' : 'text-white'}`}>
                         {asset.title}
                       </div>
@@ -606,7 +619,11 @@ export default function Brand() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => copySvgCode(asset.svgUrl, asset.title)}
-                          className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-mono font-medium transition-colors flex items-center gap-1.5"
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors flex items-center gap-1.5 ${
+                            asset.isLightCard
+                              ? 'bg-black/5 hover:bg-black/10 text-neutral-800'
+                              : 'bg-white/10 hover:bg-white/20 text-white'
+                          }`}
                           title="Copy SVG XML"
                         >
                           <Icon icon="solar:copy-bold" className="w-3.5 h-3.5" />
@@ -625,7 +642,11 @@ export default function Brand() {
                         <a
                           href={asset.pngUrl}
                           download
-                          className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold transition-colors flex items-center gap-1"
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 ${
+                            asset.isLightCard
+                              ? 'bg-black/5 hover:bg-black/10 text-neutral-800'
+                              : 'bg-white/10 hover:bg-white/20 text-white'
+                          }`}
                         >
                           <span>PNG</span>
                         </a>
@@ -642,7 +663,7 @@ export default function Brand() {
                 <Icon icon="solar:palette-bold" className="w-4 h-4" />
                 <span>Palette</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">
+              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-text-primary">
                 Color System
               </h2>
               <p className="mt-3 text-sm sm:text-base text-text-secondary leading-relaxed">
@@ -654,7 +675,7 @@ export default function Brand() {
                 {COLOR_SWATCHES.map((color) => (
                   <div
                     key={color.name}
-                    className="rounded-2xl border border-white/10 bg-surface-2 p-4 flex flex-col justify-between hover:border-white/25 transition-all group"
+                    className="rounded-2xl border border-border bg-surface-2 p-4 flex flex-col justify-between hover:border-brand/40 transition-all group"
                   >
                     <div>
                       {/* Swatch Preview */}
@@ -669,7 +690,7 @@ export default function Brand() {
                       </div>
 
                       <div className="mt-4">
-                        <div className="text-sm font-bold text-white">{color.name}</div>
+                        <div className="text-sm font-bold text-text-primary">{color.name}</div>
                         <div className="text-[11px] font-mono text-brand mt-0.5">{color.role}</div>
                         <p className="text-xs text-text-muted mt-2 leading-relaxed">
                           {color.desc}
@@ -678,10 +699,10 @@ export default function Brand() {
                     </div>
 
                     {/* Copy Buttons */}
-                    <div className="mt-4 pt-3 border-t border-white/10 flex items-center gap-2">
+                    <div className="mt-4 pt-3 border-t border-border flex items-center gap-2">
                       <button
                         onClick={() => copyToClipboard(color.hex, `${color.name} HEX`)}
-                        className="flex-1 py-1.5 px-2 rounded-lg bg-white/5 hover:bg-white/15 text-xs font-mono text-text-secondary hover:text-white transition-colors flex items-center justify-center gap-1.5"
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-surface hover:bg-surface-3 border border-border text-xs font-mono text-text-secondary hover:text-text-primary transition-colors flex items-center justify-center gap-1.5"
                       >
                         <Icon icon="solar:copy-bold" className="w-3.5 h-3.5" />
                         <span>{color.hex}</span>
@@ -689,7 +710,7 @@ export default function Brand() {
 
                       <button
                         onClick={() => copyToClipboard(color.rgb, `${color.name} RGB`)}
-                        className="py-1.5 px-2.5 rounded-lg bg-white/5 hover:bg-white/15 text-xs font-mono text-text-secondary hover:text-white transition-colors"
+                        className="py-1.5 px-2.5 rounded-lg bg-surface hover:bg-surface-3 border border-border text-xs font-mono text-text-secondary hover:text-text-primary transition-colors"
                         title="Copy RGB"
                       >
                         RGB
@@ -706,7 +727,7 @@ export default function Brand() {
                 <Icon icon="solar:text-field-bold" className="w-4 h-4" />
                 <span>Typefaces</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">
+              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-text-primary">
                 Typography
               </h2>
               <p className="mt-3 text-sm sm:text-base text-text-secondary leading-relaxed">
@@ -715,13 +736,13 @@ export default function Brand() {
 
               <div className="mt-8 space-y-6">
                 {/* Heading Specimen */}
-                <div className="p-6 sm:p-8 rounded-2xl bg-surface-2 border border-white/10">
+                <div className="p-6 sm:p-8 rounded-2xl bg-surface-2 border border-border">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-mono text-brand font-bold uppercase">Display &amp; Headings</span>
                     <span className="text-xs font-mono text-text-muted">Libre Franklin / Franklin Gothic</span>
                   </div>
-                  <div className="text-2xl sm:text-4xl font-heading font-black text-white tracking-tight uppercase">
-                    THE DEFINITIVE NOLlywood ARCHIVE
+                  <div className="text-2xl sm:text-4xl font-heading font-black text-text-primary tracking-tight uppercase">
+                    THE DEFINITIVE NOLLYWOOD ARCHIVE
                   </div>
                   <p className="mt-3 text-xs sm:text-sm text-text-muted font-heading">
                     Used across billboard titles, feature headlines, box office charts, and platform section headers.
@@ -729,7 +750,7 @@ export default function Brand() {
                 </div>
 
                 {/* Body Specimen */}
-                <div className="p-6 sm:p-8 rounded-2xl bg-surface-2 border border-white/10">
+                <div className="p-6 sm:p-8 rounded-2xl bg-surface-2 border border-border">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-mono text-brand font-bold uppercase">Interface &amp; Body</span>
                     <span className="text-xs font-mono text-text-muted">Inter (Google Fonts)</span>
@@ -740,9 +761,9 @@ export default function Brand() {
                   <div className="mt-4 flex flex-wrap items-center gap-3 text-xs font-mono text-text-muted">
                     <span>Regular 400</span>
                     <span>•</span>
-                    <span className="font-semibold text-white">SemiBold 600</span>
+                    <span className="font-semibold text-text-primary">SemiBold 600</span>
                     <span>•</span>
-                    <span className="font-bold text-white">Bold 700</span>
+                    <span className="font-bold text-text-primary">Bold 700</span>
                   </div>
                 </div>
               </div>
@@ -754,7 +775,7 @@ export default function Brand() {
                 <Icon icon="solar:shield-check-bold" className="w-4 h-4" />
                 <span>Best Practices</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">
+              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-text-primary">
                 Brand Integrity &amp; Rules
               </h2>
               <p className="mt-3 text-sm sm:text-base text-text-secondary leading-relaxed">
@@ -764,21 +785,21 @@ export default function Brand() {
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {/* DO's */}
                 <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-500 flex items-center gap-2">
                     <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
                     <span>Always Do</span>
                   </h3>
                   <ul className="space-y-3 text-xs sm:text-sm text-text-secondary">
                     <li className="flex items-start gap-2">
-                      <Icon icon="solar:check-read-bold" className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <Icon icon="solar:check-read-bold" className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                       <span>Maintain clear space around the logo equal to at least half the height of the mark.</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Icon icon="solar:check-read-bold" className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <Icon icon="solar:check-read-bold" className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                       <span>Use high-contrast versions (white mark on dark backgrounds, black mark on light backgrounds).</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Icon icon="solar:check-read-bold" className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <Icon icon="solar:check-read-bold" className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                       <span>Always scale proportionally using vector SVG files whenever possible.</span>
                     </li>
                   </ul>
@@ -786,21 +807,21 @@ export default function Brand() {
 
                 {/* DONT's */}
                 <div className="p-6 rounded-2xl bg-red-500/5 border border-red-500/20 space-y-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-red-400 flex items-center gap-2">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-red-500 flex items-center gap-2">
                     <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
                     <span>Never Do</span>
                   </h3>
                   <ul className="space-y-3 text-xs sm:text-sm text-text-secondary">
                     <li className="flex items-start gap-2">
-                      <Icon icon="solar:forbidden-circle-bold" className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <Icon icon="solar:forbidden-circle-bold" className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                       <span>Do not rotate, tilt, or stretch the logo or symbol out of proportion.</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Icon icon="solar:forbidden-circle-bold" className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <Icon icon="solar:forbidden-circle-bold" className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                       <span>Do not recolor the logo with gradients or unapproved rainbow palettes.</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Icon icon="solar:forbidden-circle-bold" className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <Icon icon="solar:forbidden-circle-bold" className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                       <span>Do not add drop shadows, outer glows, bevels, or outlines to the letterforms.</span>
                     </li>
                   </ul>
@@ -814,7 +835,7 @@ export default function Brand() {
                 <Icon icon="solar:document-text-bold" className="w-4 h-4" />
                 <span>Media Kit</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-white">
+              <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-text-primary">
                 Press Boilerplate &amp; Contact
               </h2>
               <p className="mt-3 text-sm sm:text-base text-text-secondary leading-relaxed">
@@ -822,7 +843,7 @@ export default function Brand() {
               </p>
 
               {/* Boilerplate Box */}
-              <div className="mt-6 p-6 rounded-2xl bg-surface-2 border border-white/10 relative">
+              <div className="mt-6 p-6 rounded-2xl bg-surface-2 border border-border relative">
                 <button
                   onClick={() =>
                     copyToClipboard(
@@ -830,7 +851,7 @@ export default function Brand() {
                       "Press Boilerplate"
                     )
                   }
-                  className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-mono text-white transition-colors flex items-center gap-1.5"
+                  className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-3 border border-border text-xs font-mono text-text-primary transition-colors flex items-center gap-1.5"
                 >
                   <Icon icon="solar:copy-bold" className="w-3.5 h-3.5" />
                   <span>Copy Text</span>
@@ -845,14 +866,14 @@ export default function Brand() {
               </div>
 
               {/* Press Contact Info */}
-              <div className="mt-8 flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl bg-surface border border-white/10">
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl bg-surface border border-border">
                 <div>
-                  <div className="text-sm font-bold text-white">Press &amp; Partnership Inquiries</div>
+                  <div className="text-sm font-bold text-text-primary">Press &amp; Partnership Inquiries</div>
                   <div className="text-xs text-text-muted mt-0.5">Reach our communications team for interviews, high-res assets, or data inquiries.</div>
                 </div>
                 <a
                   href="mailto:contact@muvidb.com"
-                  className="px-4 py-2 rounded-xl bg-surface-2 hover:bg-surface-3 border border-white/15 text-xs font-bold text-white transition-colors flex items-center gap-2"
+                  className="px-4 py-2 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-xs font-bold text-text-primary transition-colors flex items-center gap-2"
                 >
                   <Icon icon="solar:letter-bold" className="w-4 h-4 text-brand" />
                   <span>contact@muvidb.com</span>
