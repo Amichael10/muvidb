@@ -31,6 +31,7 @@ const footerGroups = [
     links: [
       { label: 'About Us', to: '/about' },
       { label: 'Developer API', to: '/developers', isNew: true },
+      { label: 'Brand Kit', to: '/brand', isNew: true },
       { label: 'Title Search', to: '/tools/title-checker', isNew: true },
       { label: 'Support the Archive', to: '/support' },
       { label: 'Add a Film', to: '/submit/film' },

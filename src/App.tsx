@@ -78,6 +78,7 @@ const PlaysList = lazyWithRetry(() => import('./pages/PlaysList'));
 const PlayDetail = lazyWithRetry(() => import('./pages/PlayDetail'));
 const TitleChecker = lazyWithRetry(() => import('./pages/TitleChecker'));
 const Support = lazyWithRetry(() => import('./pages/Support'));
+const Brand = lazyWithRetry(() => import('./pages/Brand'));
 
 // Lazy admin pages — kept entirely out of the public bundle
 const AdminLayout = lazyWithRetry(() => import('./pages/admin/AdminLayout'));
@@ -373,6 +374,8 @@ export default function App() {
                 <Route path="/title-checker" element={<TitleChecker />} />
                 <Route path="/support" element={<Support />} />
                 <Route path="/support-us" element={<Support />} />
+                <Route path="/brand" element={<Brand />} />
+                <Route path="/brand-kit" element={<Brand />} />
 
                 {/* Onboarding */}
                 <Route path="/waitlist" element={<Waitlist />} />

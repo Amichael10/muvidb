@@ -63,6 +63,8 @@ export default [
   route('api-docs', 'pages/DeveloperApi.jsx', { id: 'api-docs-alias' }),
   route('support', 'pages/Support.jsx'),
   route('support-us', 'pages/Support.jsx', { id: 'support-us-alias' }),
+  route('brand', 'pages/Brand.jsx'),
+  route('brand-kit', 'pages/Brand.jsx', { id: 'brand-kit-alias' }),
   route('waitlist', 'pages/Waitlist.tsx'),
   route('run-scanners', 'routes/api.run-scanners.tsx'),
   // ---- Authenticated ----
