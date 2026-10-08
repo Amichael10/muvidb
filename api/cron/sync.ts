@@ -219,12 +219,13 @@ async function runAIMaintenance() {
     results.extract_cast = { error: err.message };
   }
 
-  // 2. Cleanup Titles (strips marketing noise)
-  try {
-    results.cleanup_titles = await runTitleCleanup();
-  } catch (err: any) {
-    results.cleanup_titles = { error: err.message };
-  }
+  // 2. Title Cleaner Retired (titles are cleaned directly on video import)
+  results.cleanup_titles = {
+    status: 'retired',
+    message: 'Background title cleaner is retired; titles are cleaned directly on video import.',
+    analyzed: 0,
+    applied: 0,
+  };
 
   // 3. Cohere Synopses (generates factual 2-sentence loglines for films missing synopses)
   try {
@@ -236,8 +237,8 @@ async function runAIMaintenance() {
 
   return {
     task: 'ai_maintenance',
-    processed: (results.extract_cast?.analyzed || 0) + (results.cleanup_titles?.analyzed || 0) + (results.cohere_synopses?.updated || 0),
-    upserted: (results.extract_cast?.applied || 0) + (results.cleanup_titles?.applied || 0) + (results.cohere_synopses?.updated || 0),
+    processed: (results.extract_cast?.analyzed || 0) + (results.cohere_synopses?.updated || 0),
+    upserted: (results.extract_cast?.applied || 0) + (results.cohere_synopses?.updated || 0),
     ...results
   };
 }

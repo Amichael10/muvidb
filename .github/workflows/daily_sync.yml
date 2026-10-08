@@ -299,11 +299,11 @@ jobs:
           FEED_DELTA_URL: ${{ secrets.FEED_DELTA_URL }}
           FEED_DELTA_BASE_URL: ${{ secrets.FEED_DELTA_BASE_URL }}
 
-      - name: AI Maintenance (Extract Cast + Title Cleanup)
+      - name: AI Maintenance (Extract Cast + Synopses)
         if: github.event.schedule == '0 2,14 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'ai_maintenance'))
         timeout-minutes: 30
         run: |
-          echo "Running AI Maintenance directly (Extract Cast → Title Cleanup → Synopses)..."
+          echo "Running AI Maintenance directly (Extract Cast → Synopses)..."
           npx tsx scripts/run-ai-maintenance.ts
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

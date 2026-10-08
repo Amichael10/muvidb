@@ -177,7 +177,7 @@ function ComparisonRow({ comparison, disabled, onApply, compareLocal }) {
           }
           finally { setSaving(false); }
         }} 
-        className={`w-full rounded-lg px-3 py-2 text-xs font-black flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 ${
+        className={`w-full rounded-lg px-3 py-2.5 text-xs font-black flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 min-h-[40px] ${
           targetId === '__new__'
             ? 'bg-blue-500/15 text-blue-400 hover:bg-blue-500/25'
             : 'bg-brand/15 text-brand hover:bg-brand/25 border border-brand/30'
@@ -226,7 +226,7 @@ export default function CreditScreenshotComparison({ preview, disabled, onApply,
 
   return (
     <section className="space-y-3" aria-label="Screenshot comparison results">
-      <div className="flex items-center justify-between gap-2 border-b border-border pb-2.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border pb-2.5">
         <div>
           <h4 className="text-xs font-black text-text-primary">
             Comparison Results ({preview.comparisons.length} detected)
@@ -241,7 +241,7 @@ export default function CreditScreenshotComparison({ preview, disabled, onApply,
             type="button"
             disabled={disabled || applyingAll}
             onClick={handleApplyAll}
-            className="px-3 py-1.5 rounded-lg bg-brand text-white text-[11px] font-black hover:opacity-90 transition-opacity flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+            className="w-full sm:w-auto px-3 py-2 rounded-lg bg-brand text-white text-[11px] font-black hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 min-h-[38px] sm:min-h-0"
           >
             {applyingAll ? (
               <Icon icon="solar:refresh-linear" className="w-3.5 h-3.5 animate-spin" />

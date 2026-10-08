@@ -1,6 +1,6 @@
 import { getSupabase } from '../api/_lib/supabase.js';
 import { runVideosSync, purgeStaleUnmappedChannelVideos } from '../api/_lib/sync_service.js';
-import { runCastExtraction, runTitleCleanup } from '../api/_lib/ai_maintenance.js';
+import { runCastExtraction } from '../api/_lib/ai_maintenance.js';
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -73,12 +73,10 @@ async function main() {
   console.log('\n=== YouTube Sync Execution Result ===');
   console.log(JSON.stringify(result, null, 2));
 
-  console.log('\n--- Step 4: Post-sync AI maintenance (Cast extraction & Title cleanup) ---');
+  console.log('\n--- Step 4: Post-sync AI maintenance (Cast extraction) ---');
   try {
     const castResult = await runCastExtraction({ limit: 100 });
-    const titleResult = await runTitleCleanup({ limit: 150 });
     console.log('Cast extraction result:', castResult);
-    console.log('Title cleanup result:', titleResult);
   } catch (err: any) {
     console.warn('Post-sync AI maintenance notice:', err?.message);
   }

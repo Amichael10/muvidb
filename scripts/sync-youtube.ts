@@ -3,7 +3,7 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 import { purgeStaleUnmappedChannelVideos, runVideosSync, refreshYouTubeViewCounts } from '../api/_lib/sync_service.js';
-import { runCastExtraction, runTitleCleanup } from '../api/_lib/ai_maintenance.js';
+import { runCastExtraction } from '../api/_lib/ai_maintenance.js';
 
 async function main() {
   console.log("Checking for newly added YouTube channels to backfill...");
@@ -21,11 +21,10 @@ async function main() {
       console.warn("Views refresh failed:", e?.message || e);
     }
 
-    // Only run AI title/cast maintenance if newly backfilled channels were imported
+    // Only run AI cast extraction if newly backfilled channels were imported
     if (result.processed && result.processed > 0) {
       const castResult = await runCastExtraction({ limit: 60 });
-      const titleResult = await runTitleCleanup({ limit: 150 });
-      console.log('Post-backfill AI maintenance:', JSON.stringify({ castResult, titleResult }, null, 2));
+      console.log('Post-backfill AI maintenance (cast extraction):', JSON.stringify({ castResult }, null, 2));
     }
 
     // Keep the unmapped buffer from growing forever — drop signals nobody

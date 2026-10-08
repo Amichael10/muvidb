@@ -165,7 +165,7 @@ function CandidatePersonNameCell({
       />
 
       {open && !disabled && String(candidate.raw_name || '').trim().length >= 2 && (
-        <div className="absolute left-0 top-full mt-1 w-[min(24rem,90vw)] min-w-[18rem] max-h-72 overflow-y-auto bg-surface border border-border rounded-lg shadow-2xl z-50 ring-1 ring-black/5">
+        <div className="absolute left-0 top-full mt-1 w-[min(24rem,calc(100vw-2.5rem))] max-w-[calc(100vw-2.5rem)] max-h-72 overflow-y-auto bg-surface border border-border rounded-lg shadow-2xl z-50 ring-1 ring-black/5">
           {searching ? (
             <div className="px-3 py-3 text-[10px] font-bold text-text-muted uppercase tracking-widest">
               Searching profiles…
@@ -252,6 +252,7 @@ export default function AdminCreditHarvest() {
   const [screenshots, setScreenshots] = useState([]); // [{ id, name, base64, size }]
   const [activeScreenshotIndex, setActiveScreenshotIndex] = useState(0);
   const [isScreenshotSplitOpen, setIsScreenshotSplitOpen] = useState(false);
+  const [mobileStudioTab, setMobileStudioTab] = useState('studio'); // 'studio' | 'candidates'
   const [ocrTarget, setOcrTarget] = useState('actor'); // 'actor' | 'crew'
   const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [isExtractingScreenshot, setIsExtractingScreenshot] = useState(false);
@@ -265,6 +266,7 @@ export default function AdminCreditHarvest() {
     setScreenshots([]);
     setScreenshotPreview(null);
     setActiveScreenshotIndex(0);
+    setMobileStudioTab('studio');
   }, [groups[0]?.film?.id]);
 
   const fetchFilmCandidateRows = async (filmId) => {
@@ -1281,6 +1283,7 @@ export default function AdminCreditHarvest() {
 
       setScreenshots((prev) => [...prev, ...loadedShots]);
       setIsScreenshotSplitOpen(true);
+      setMobileStudioTab('studio');
       toast.success(`Loaded ${validFiles.length} screenshot(s)`);
     } catch (err) {
       toast.error(err.message || 'Error loading screenshots');
@@ -1710,22 +1713,22 @@ export default function AdminCreditHarvest() {
   };
 
   const moviePager = () => (
-    <div className="card-cal px-4 py-3 flex items-center justify-between gap-4">
+    <div className="card-cal p-2.5 sm:px-4 sm:py-3 flex items-center justify-between gap-2 sm:gap-4">
       <button
         type="button"
         disabled={loading || moviePage === 0}
         onClick={() => setMoviePage((current) => Math.max(0, current - 1))}
-        className="text-xs font-black px-3 py-2 rounded-lg border border-border text-text-primary hover:bg-surface-2 disabled:opacity-35 disabled:cursor-not-allowed flex items-center gap-1.5"
+        className="text-xs font-black px-2.5 sm:px-3 py-2 rounded-lg border border-border text-text-primary hover:bg-surface-2 disabled:opacity-35 disabled:cursor-not-allowed flex items-center gap-1 sm:gap-1.5 shrink-0"
       >
         <Icon icon="solar:alt-arrow-left-linear" className="w-4 h-4" />
-        Previous movie
+        <span className="hidden xs:inline sm:inline">Prev</span>
       </button>
 
-      <div className="text-center">
-        <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">
+      <div className="text-center min-w-0 px-1">
+        <div className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-text-muted truncate">
           Review progress
         </div>
-        <div className="text-sm font-black text-text-primary">
+        <div className="text-xs sm:text-sm font-black text-text-primary whitespace-nowrap">
           Movie {totalMovies ? moviePage + 1 : 0} of {totalMovies}
         </div>
       </div>
@@ -1734,9 +1737,9 @@ export default function AdminCreditHarvest() {
         type="button"
         disabled={loading || moviePage + 1 >= totalMovies}
         onClick={() => setMoviePage((current) => current + 1)}
-        className="text-xs font-black px-3 py-2 rounded-lg border border-border text-text-primary hover:bg-surface-2 disabled:opacity-35 disabled:cursor-not-allowed flex items-center gap-1.5"
+        className="text-xs font-black px-2.5 sm:px-3 py-2 rounded-lg border border-border text-text-primary hover:bg-surface-2 disabled:opacity-35 disabled:cursor-not-allowed flex items-center gap-1 sm:gap-1.5 shrink-0"
       >
-        Next movie
+        <span className="hidden xs:inline sm:inline">Next</span>
         <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4" />
       </button>
     </div>
@@ -1854,7 +1857,7 @@ export default function AdminCreditHarvest() {
 
       {/* Pipeline progress — what the worker machine is doing */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5 sm:gap-3">
           {[
             ['Queued', stats.pending, 'text-text-primary'],
             ['Running', stats.running, 'text-brand'],
@@ -1927,8 +1930,8 @@ export default function AdminCreditHarvest() {
             )}
           </label>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-xs text-text-muted">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3">
+            <label className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-text-muted min-w-0">
               Status
               <select
                 value={statusFilter}
@@ -1936,7 +1939,7 @@ export default function AdminCreditHarvest() {
                   setStatusFilter(event.target.value);
                   setMoviePage(0);
                 }}
-                className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                className="w-full sm:w-auto bg-surface border border-border rounded-lg px-2.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
               >
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
@@ -1944,7 +1947,7 @@ export default function AdminCreditHarvest() {
               </select>
             </label>
 
-            <label className="flex items-center gap-2 text-xs text-text-muted">
+            <label className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-text-muted min-w-0">
               Type
               <select
                 value={creditTypeFilter}
@@ -1952,7 +1955,7 @@ export default function AdminCreditHarvest() {
                   setCreditTypeFilter(event.target.value);
                   setMoviePage(0);
                 }}
-                className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                className="w-full sm:w-auto bg-surface border border-border rounded-lg px-2.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
               >
                 <option value="all">All</option>
                 <option value="actor">Actors</option>
@@ -1960,7 +1963,7 @@ export default function AdminCreditHarvest() {
               </select>
             </label>
 
-            <label className="flex items-center gap-2 text-xs text-text-muted">
+            <label className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-text-muted min-w-0">
               Year
               <input
                 type="number"
@@ -1973,19 +1976,19 @@ export default function AdminCreditHarvest() {
                   setMoviePage(0);
                 }}
                 placeholder="Any"
-                className="w-24 bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                className="w-full sm:w-24 bg-surface border border-border rounded-lg px-2.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
               />
             </label>
 
-            <label className="flex items-center gap-2 text-xs text-text-muted">
-              Min confidence
+            <label className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-text-muted min-w-0">
+              Confidence
               <select
                 value={minConfidence}
                 onChange={(event) => {
                   setMinConfidence(Number(event.target.value));
                   setMoviePage(0);
                 }}
-                className="bg-surface border border-border rounded-lg px-2 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                className="w-full sm:w-auto bg-surface border border-border rounded-lg px-2 py-2 text-xs text-text-primary focus:border-brand outline-none"
               >
                 <option value={0}>Any</option>
                 <option value={0.5}>0.5+</option>
@@ -1995,44 +1998,44 @@ export default function AdminCreditHarvest() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="text-[10px] font-bold text-text-muted">
-            {totalMovies} movie{totalMovies === 1 ? '' : 's'} match
+        <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] font-bold text-text-muted">
+              {totalMovies} movie{totalMovies === 1 ? '' : 's'} match
+            </div>
+            {hasReviewFilters && (
+              <button
+                type="button"
+                onClick={clearReviewFilters}
+                className="text-[10px] font-black px-2 py-1 rounded-md border border-border text-text-primary hover:bg-surface-2 flex items-center gap-1"
+              >
+                <Icon icon="solar:restart-linear" className="w-3 h-3" />
+                Clear
+              </button>
+            )}
           </div>
-          {hasReviewFilters && (
-            <button
-              type="button"
-              onClick={clearReviewFilters}
-              className="text-[10px] font-black px-2.5 py-1.5 rounded-md border border-border text-text-primary hover:bg-surface-2 flex items-center gap-1.5"
-            >
-              <Icon icon="solar:restart-linear" className="w-3.5 h-3.5" />
-              Clear filters
-            </button>
-          )}
-
-          <div className="flex-1" />
 
           {selCount > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-text-muted">{selCount} selected</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end pt-1 sm:pt-0">
+              <span className="text-xs font-bold text-text-muted mr-auto sm:mr-0">{selCount} selected</span>
               <button
                 disabled={busy || autoResolving}
                 onClick={() => approve(selectedRows())}
-                className="text-xs font-black px-3 py-2 rounded-lg bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-40"
+                className="text-xs font-black px-3 py-2 rounded-lg bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-40 min-h-[36px]"
               >
                 Approve
               </button>
               <button
                 disabled={busy || autoResolving}
                 onClick={() => reject(selectedRows())}
-                className="text-xs font-black px-3 py-2 rounded-lg bg-surface-2 text-text-primary border border-border hover:bg-surface-3 disabled:opacity-40"
+                className="text-xs font-black px-3 py-2 rounded-lg bg-surface-2 text-text-primary border border-border hover:bg-surface-3 disabled:opacity-40 min-h-[36px]"
               >
                 Reject
               </button>
               <button
                 disabled={busy || autoResolving}
                 onClick={() => remove(selectedRows())}
-                className="text-xs font-black px-3 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-40"
+                className="text-xs font-black px-3 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-40 min-h-[36px]"
               >
                 Delete
               </button>
@@ -2060,151 +2063,160 @@ export default function AdminCreditHarvest() {
         <div className="space-y-4">
           {groups.map((group) => {
             const renderCandidate = (c) => (
-                        <div key={c.id} className="px-4 py-3 hover:bg-surface-2/30">
-                          <div className="flex items-end gap-3">
-                            <input
-                              type="checkbox"
-                              checked={selected.has(c.id)}
-                              onChange={() => toggle(c.id)}
-                              className="w-4 h-4 mb-2 accent-[color:var(--color-brand)]"
-                            />
+              <div key={c.id} className="p-3 sm:px-4 sm:py-3 hover:bg-surface-2/30 transition-colors">
+                <div className="flex flex-col md:flex-row md:items-end gap-2.5 md:gap-3">
+                  {/* Row 1 on mobile / Col 1 on desktop: Checkbox & Person Name */}
+                  <div className="flex items-center gap-2.5 min-w-0 md:flex-[2]">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(c.id)}
+                      onChange={() => toggle(c.id)}
+                      className="w-4 h-4 md:mb-2 accent-[color:var(--color-brand)] shrink-0"
+                    />
 
-                            <div className="min-w-0 flex-[2]">
-                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                                Person name
-                              </span>
-                              <CandidatePersonNameCell
-                                candidate={c}
-                                disabled={statusFilter !== 'pending'}
-                                onTextChange={(name) => editCandidate(c.id, { raw_name: name })}
-                                onAutoLink={(person) => linkCandidateFamily(c.id, person)}
-                                onPickPerson={(person) => linkCandidateFamily(c.id, person, {
-                                  canonicalName: true,
-                                })}
-                              />
-                            </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                        Person name
+                      </span>
+                      <CandidatePersonNameCell
+                        candidate={c}
+                        disabled={statusFilter !== 'pending'}
+                        onTextChange={(name) => editCandidate(c.id, { raw_name: name })}
+                        onAutoLink={(person) => linkCandidateFamily(c.id, person)}
+                        onPickPerson={(person) => linkCandidateFamily(c.id, person, {
+                          canonicalName: true,
+                        })}
+                      />
+                    </div>
+                  </div>
 
-                            <label className="w-28 shrink-0">
-                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                                Type
-                              </span>
-                              <select
-                                value={c.credit_type}
-                                disabled={statusFilter !== 'pending'}
-                                onChange={(e) => editCandidate(c.id, { credit_type: e.target.value })}
-                                className="w-full bg-surface border border-border rounded-md px-2 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand disabled:opacity-70"
-                              >
-                                <option value="actor">Actor</option>
-                                <option value="crew">Crew</option>
-                              </select>
-                            </label>
+                  {/* Row 2 on mobile / Cols 2 & 3 on desktop: Type & Role/Character */}
+                  <div className="grid grid-cols-[110px_minmax(0,1fr)] md:contents gap-2 min-w-0 md:flex-[3]">
+                    <label className="md:w-28 shrink-0">
+                      <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                        Type
+                      </span>
+                      <select
+                        value={c.credit_type}
+                        disabled={statusFilter !== 'pending'}
+                        onChange={(e) => editCandidate(c.id, { credit_type: e.target.value })}
+                        className="w-full bg-surface border border-border rounded-md px-2 py-2 text-xs font-bold text-text-primary outline-none focus:border-brand disabled:opacity-70 min-h-[38px] md:min-h-0"
+                      >
+                        <option value="actor">Actor</option>
+                        <option value="crew">Crew</option>
+                      </select>
+                    </label>
 
-                            <label className="min-w-0 flex-[2]">
-                              <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
-                                {c.credit_type === 'actor' ? 'Character' : 'Crew role'}
-                              </span>
-                              <input
-                                value={c.role_or_character || ''}
-                                disabled={statusFilter !== 'pending'}
-                                onChange={(e) => editCandidate(c.id, { role_or_character: e.target.value })}
-                                placeholder={c.credit_type === 'actor' ? 'Character name' : 'e.g. Director'}
-                                className="w-full bg-surface border border-border rounded-md px-2.5 py-2 text-xs text-text-primary outline-none focus:border-brand disabled:opacity-70"
-                              />
-                            </label>
+                    <label className="min-w-0 md:flex-[2]">
+                      <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
+                        {c.credit_type === 'actor' ? 'Character' : 'Crew role'}
+                      </span>
+                      <input
+                        value={c.role_or_character || ''}
+                        disabled={statusFilter !== 'pending'}
+                        onChange={(e) => editCandidate(c.id, { role_or_character: e.target.value })}
+                        placeholder={c.credit_type === 'actor' ? 'Character name' : 'e.g. Director'}
+                        className="w-full bg-surface border border-border rounded-md px-2.5 py-2 text-xs text-text-primary outline-none focus:border-brand disabled:opacity-70 min-h-[38px] md:min-h-0"
+                      />
+                    </label>
+                  </div>
 
-                            <div className="flex items-center gap-2 pb-1.5 shrink-0">
-                              {c.people ? (
-                                <span
-                                  className="max-w-36 text-[10px] font-bold text-green-400 flex items-center gap-1"
-                                  title={`Linked to existing profile: ${c.people.name}`}
-                                >
-                                  <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5" />
-                                  <span className="truncate">{c.people.name}</span>
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold text-text-muted" title="Will create a new person on approve">
-                                  new person
-                                </span>
-                              )}
-                              {c._autoLinked && (
-                                <span
-                                  className="text-[9px] font-black uppercase text-brand bg-brand/10 border border-brand/20 rounded px-1.5 py-0.5"
-                                  title="Matched by safe auto-link"
-                                >
-                                  auto
-                                </span>
-                              )}
+                  {/* Row 3 on mobile / Col 4 on desktop: Match badge, Confidence %, and Action Buttons */}
+                  <div className="flex items-center justify-between md:justify-start gap-2 pt-1 md:pt-0 md:pb-1.5 shrink-0 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {c.people ? (
+                        <span
+                          className="max-w-36 text-[10px] font-bold text-green-400 flex items-center gap-1 bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20"
+                          title={`Linked to existing profile: ${c.people.name}`}
+                        >
+                          <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{c.people.name}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border" title="Will create a new person on approve">
+                          new person
+                        </span>
+                      )}
+                      {c._autoLinked && (
+                        <span
+                          className="text-[9px] font-black uppercase text-brand bg-brand/10 border border-brand/20 rounded px-1.5 py-0.5"
+                          title="Matched by safe auto-link"
+                        >
+                          auto
+                        </span>
+                      )}
 
-                              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${confidenceStyle(c.confidence)}`}>
-                                {Math.round(c.confidence * 100)}%
-                              </span>
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${confidenceStyle(c.confidence)}`}>
+                        {Math.round(c.confidence * 100)}%
+                      </span>
+                    </div>
 
-                              {statusFilter === 'pending' && (
-                                <div className="flex items-center gap-1">
-                                  {c._dirty && (
-                                    <button
-                                      disabled={busy || autoResolving}
-                                      onClick={() => saveCandidate(c)}
-                                      title="Save edits"
-                                      className="w-7 h-7 rounded flex items-center justify-center text-brand hover:bg-brand/15 disabled:opacity-40"
-                                    >
-                                      <Icon icon="solar:diskette-linear" className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                  <button
-                                    disabled={busy || autoResolving}
-                                    onClick={() => approve([c])}
-                                    title="Approve"
-                                    className="w-7 h-7 rounded flex items-center justify-center text-green-400 hover:bg-green-500/15 disabled:opacity-40"
-                                  >
-                                    <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    disabled={busy || autoResolving}
-                                    onClick={() => reject([c])}
-                                    title="Reject"
-                                    className="w-7 h-7 rounded flex items-center justify-center text-text-muted hover:bg-surface-3 disabled:opacity-40"
-                                  >
-                                    <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    disabled={busy || autoResolving}
-                                    onClick={() => remove([c])}
-                                    title="Delete"
-                                    className="w-7 h-7 rounded flex items-center justify-center text-red-400 hover:bg-red-500/15 disabled:opacity-40"
-                                  >
-                                    <Icon icon="solar:trash-bin-trash-linear" className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                    {statusFilter === 'pending' && (
+                      <div className="flex items-center gap-1 ml-auto md:ml-0">
+                        {c._dirty && (
+                          <button
+                            disabled={busy || autoResolving}
+                            onClick={() => saveCandidate(c)}
+                            title="Save edits"
+                            className="w-8 h-8 md:w-7 md:h-7 rounded flex items-center justify-center text-brand hover:bg-brand/15 bg-brand/5 border border-brand/20 disabled:opacity-40"
+                          >
+                            <Icon icon="solar:diskette-linear" className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          disabled={busy || autoResolving}
+                          onClick={() => approve([c])}
+                          title="Approve"
+                          className="w-8 h-8 md:w-7 md:h-7 rounded flex items-center justify-center text-green-400 hover:bg-green-500/15 bg-green-500/5 border border-green-500/20 disabled:opacity-40"
+                        >
+                          <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
+                        </button>
+                        <button
+                          disabled={busy || autoResolving}
+                          onClick={() => reject([c])}
+                          title="Reject"
+                          className="w-8 h-8 md:w-7 md:h-7 rounded flex items-center justify-center text-text-muted hover:bg-surface-3 bg-surface border border-border disabled:opacity-40"
+                        >
+                          <Icon icon="solar:close-circle-linear" className="w-4 h-4" />
+                        </button>
+                        <button
+                          disabled={busy || autoResolving}
+                          onClick={() => remove([c])}
+                          title="Delete"
+                          className="w-8 h-8 md:w-7 md:h-7 rounded flex items-center justify-center text-red-400 hover:bg-red-500/15 bg-red-500/5 border border-red-500/20 disabled:opacity-40"
+                        >
+                          <Icon icon="solar:trash-bin-trash-linear" className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                          <div className="ml-7 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-text-muted">
-                            <span>
-                              OCR {Math.round((c.ocr_confidence ?? c.confidence) * 100)}%
-                            </span>
-                            <span>{c.frame_support || 1} frame{c.frame_support === 1 ? '' : 's'}</span>
-                            {c.source_layout?.mode && <span>{c.source_layout.mode}</span>}
-                            {c.source_ocr_text && (
-                              <code className="max-w-xl truncate text-[10px] text-text-primary bg-surface-2 border border-border rounded px-1.5 py-0.5">
-                                {c.source_ocr_text}
-                              </code>
-                            )}
-                            {sourceUrl(group.film, c) && (
-                              <a
-                                href={sourceUrl(group.film, c)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-bold text-brand hover:underline"
-                              >
-                                Open source at {Number.isFinite(c.source_video_sec)
-                                  ? `${Math.floor(c.source_video_sec / 60)}:${String(Math.round(c.source_video_sec % 60)).padStart(2, '0')}`
-                                  : 'video'}
-                              </a>
-                            )}
-                          </div>
-                        </div>
+                <div className="ml-0 md:ml-7 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-text-muted">
+                  <span>
+                    OCR {Math.round((c.ocr_confidence ?? c.confidence) * 100)}%
+                  </span>
+                  <span>{c.frame_support || 1} frame{c.frame_support === 1 ? '' : 's'}</span>
+                  {c.source_layout?.mode && <span>{c.source_layout.mode}</span>}
+                  {c.source_ocr_text && (
+                    <code className="max-w-xl truncate text-[10px] text-text-primary bg-surface-2 border border-border rounded px-1.5 py-0.5">
+                      {c.source_ocr_text}
+                    </code>
+                  )}
+                  {sourceUrl(group.film, c) && (
+                    <a
+                      href={sourceUrl(group.film, c)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-bold text-brand hover:underline"
+                    >
+                      Open source at {Number.isFinite(c.source_video_sec)
+                        ? `${Math.floor(c.source_video_sec / 60)}:${String(Math.round(c.source_video_sec % 60)).padStart(2, '0')}`
+                        : 'video'}
+                    </a>
+                  )}
+                </div>
+              </div>
             );
             const exactRepeats = duplicateCreditGroups(group.candidates).reduce((total, rows) => total + rows.length - 1, 0);
             const ids = group.candidates.map((c) => c.id);
@@ -2214,56 +2226,61 @@ export default function AdminCreditHarvest() {
             )).length;
             return (
               <div key={group.film?.id || Math.random()} className="card-cal overflow-visible">
-                <div className="flex items-center gap-3 p-4 border-b border-border bg-surface-2/30">
-                  <input
-                    type="checkbox"
-                    checked={allOn}
-                    onChange={() => toggleFilm(group)}
-                    className="w-4 h-4 accent-[color:var(--color-brand)]"
-                  />
-                  {group.film?.poster_url && (
-                    <img src={group.film.poster_url} alt="" className="w-8 h-11 object-cover rounded border border-border" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      to={`/films/${group.film?.slug || group.film?.id}`}
-                      target="_blank"
-                      className="text-sm font-bold text-text-primary hover:text-brand truncate block"
-                    >
-                      {group.film?.title || 'Unknown film'}
-                    </Link>
-                    <div className="text-[10px] text-text-muted">
-                      {group.film?.year || '—'} · {group.candidates.length} candidate{group.candidates.length === 1 ? '' : 's'}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 border-b border-border bg-surface-2/30">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={allOn}
+                      onChange={() => toggleFilm(group)}
+                      className="w-4 h-4 accent-[color:var(--color-brand)] shrink-0"
+                    />
+                    {group.film?.poster_url && (
+                      <img src={group.film.poster_url} alt="" className="w-8 h-11 object-cover rounded border border-border shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        to={`/films/${group.film?.slug || group.film?.id}`}
+                        target="_blank"
+                        className="text-sm font-bold text-text-primary hover:text-brand truncate block"
+                      >
+                        {group.film?.title || 'Unknown film'}
+                      </Link>
+                      <div className="text-[10px] text-text-muted">
+                        {group.film?.year || '—'} · {group.candidates.length} candidate{group.candidates.length === 1 ? '' : 's'}
+                      </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    disabled={busy || autoResolving || statusFilter !== 'pending' || pendingUnmatched === 0}
-                    onClick={() => resolveSafeMatchesForRows(group.candidates, {
-                      useCohere: true,
-                    })}
-                    className="text-[10px] font-black px-2.5 py-1.5 rounded-md bg-brand/15 text-brand border border-brand/30 hover:bg-brand/25 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                    title="Link safe existing-person matches before approval; uses AI ranking for harder names"
-                  >
-                    <Icon
-                      icon={autoResolving ? 'solar:refresh-linear' : 'solar:link-circle-linear'}
-                      className={`w-3.5 h-3.5 ${autoResolving ? 'animate-spin' : ''}`}
-                    />
-                    {autoResolving
-                      ? 'Matching…'
-                      : pendingUnmatched
-                        ? `Auto-link ${pendingUnmatched}`
-                        : 'All linked'}
-                  </button>
-                  <button
-                    disabled={busy || autoResolving}
-                    onClick={() => approve(group.candidates)}
-                    className="text-[10px] font-black px-2.5 py-1.5 rounded-md bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-40"
-                  >
-                    {approvalProgress
-                      ? `Approving ${approvalProgress.done}/${approvalProgress.total}`
-                      : `Approve all ${group.candidates.length}`}
-                  </button>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap sm:flex-nowrap">
+                    <button
+                      type="button"
+                      disabled={busy || autoResolving || statusFilter !== 'pending' || pendingUnmatched === 0}
+                      onClick={() => resolveSafeMatchesForRows(group.candidates, {
+                        useCohere: true,
+                      })}
+                      className="flex-1 sm:flex-initial text-[10px] font-black px-2.5 py-2 sm:py-1.5 rounded-md bg-brand/15 text-brand border border-brand/30 hover:bg-brand/25 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 min-h-[36px]"
+                      title="Link safe existing-person matches before approval; uses AI ranking for harder names"
+                    >
+                      <Icon
+                        icon={autoResolving ? 'solar:refresh-linear' : 'solar:link-circle-linear'}
+                        className={`w-3.5 h-3.5 ${autoResolving ? 'animate-spin' : ''}`}
+                      />
+                      {autoResolving
+                        ? 'Matching…'
+                        : pendingUnmatched
+                          ? `Auto-link ${pendingUnmatched}`
+                          : 'All linked'}
+                    </button>
+                    <button
+                      disabled={busy || autoResolving}
+                      onClick={() => approve(group.candidates)}
+                      className="flex-1 sm:flex-initial text-[10px] font-black px-2.5 py-2 sm:py-1.5 rounded-md bg-green-500/15 text-green-400 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-40 flex items-center justify-center min-h-[36px]"
+                    >
+                      {approvalProgress
+                        ? `Approving ${approvalProgress.done}/${approvalProgress.total}`
+                        : `Approve all ${group.candidates.length}`}
+                    </button>
+                  </div>
                 </div>
 
                 {statusFilter === 'pending' && exactRepeats > 0 && (
@@ -2370,7 +2387,7 @@ export default function AdminCreditHarvest() {
                       />
                     </label>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                       <label>
                         <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
                           Release year
@@ -2450,7 +2467,7 @@ export default function AdminCreditHarvest() {
                         </select>
                       </label>
 
-                      <label className="col-span-2">
+                      <label className="col-span-1 sm:col-span-2">
                         <span className="block text-[9px] font-black uppercase tracking-wider text-text-muted mb-1">
                           Language
                         </span>
@@ -2539,13 +2556,13 @@ export default function AdminCreditHarvest() {
                 </div>
 
                 {/* Candidate Action Toolbar */}
-                <div className="p-3.5 bg-surface-2/40 border-b border-border flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <div className="p-3 sm:p-3.5 bg-surface-2/40 border-b border-border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+                  <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => handleAddManualCandidate(group, 'actor')}
-                      className="text-xs font-black px-3 py-1.5 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-brand/5 text-text-primary flex items-center gap-1.5"
+                      className="text-xs font-black px-3 py-2 sm:py-1.5 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-brand/5 text-text-primary flex items-center justify-center gap-1.5 min-h-[38px] sm:min-h-0"
                     >
                       <Icon icon="solar:user-plus-bold" className="w-3.5 h-3.5 text-brand" />
                       + Add Cast
@@ -2554,14 +2571,14 @@ export default function AdminCreditHarvest() {
                       type="button"
                       disabled={busy}
                       onClick={() => handleAddManualCandidate(group, 'crew')}
-                      className="text-xs font-black px-3 py-1.5 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-brand/5 text-text-primary flex items-center gap-1.5"
+                      className="text-xs font-black px-3 py-2 sm:py-1.5 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-brand/5 text-text-primary flex items-center justify-center gap-1.5 min-h-[38px] sm:min-h-0"
                     >
                       <Icon icon="solar:clapperboard-play-bold" className="w-3.5 h-3.5 text-amber-400" />
                       + Add Crew
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                     <input
                       ref={screenshotInputRef}
                       type="file"
@@ -2573,15 +2590,18 @@ export default function AdminCreditHarvest() {
                     <button
                       type="button"
                       onClick={() => screenshotInputRef.current?.click()}
-                      className="text-xs font-black px-3 py-1.5 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-surface-2 text-text-primary flex items-center gap-1.5"
+                      className="text-xs font-black px-3 py-2 sm:py-1.5 rounded-lg bg-surface border border-border hover:border-brand/40 hover:bg-surface-2 text-text-primary flex items-center justify-center gap-1.5 min-h-[38px] sm:min-h-0"
                     >
                       <Icon icon="solar:camera-add-linear" className="w-3.5 h-3.5 text-brand" />
-                      Upload Screenshot(s)
+                      Upload Screen(s)
                     </button>
                     <button
                       type="button"
-                      onClick={() => setIsScreenshotSplitOpen((prev) => !prev)}
-                      className={`text-xs font-black px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-colors ${
+                      onClick={() => {
+                        setIsScreenshotSplitOpen((prev) => !prev);
+                        setMobileStudioTab('studio');
+                      }}
+                      className={`text-xs font-black px-3 py-2 sm:py-1.5 rounded-lg border flex items-center justify-center gap-1.5 transition-colors min-h-[38px] sm:min-h-0 ${
                         isScreenshotSplitOpen || screenshots.length > 0
                           ? 'bg-brand/15 text-brand border-brand/40'
                           : 'bg-surface border-border text-text-muted hover:text-text-primary'
@@ -2590,7 +2610,7 @@ export default function AdminCreditHarvest() {
                       <Icon icon="solar:slider-vertical-linear" className="w-3.5 h-3.5" />
                       {isScreenshotSplitOpen ? 'Hide Studio' : 'Split Studio'}
                       {screenshots.length > 0 && (
-                        <span className="w-4 h-4 rounded-full bg-brand text-white text-[9px] font-black flex items-center justify-center ml-1">
+                        <span className="w-4 h-4 rounded-full bg-brand text-white text-[9px] font-black flex items-center justify-center ml-0.5">
                           {screenshots.length}
                         </span>
                       )}
@@ -2598,10 +2618,60 @@ export default function AdminCreditHarvest() {
                   </div>
                 </div>
 
+                {/* Mobile View Switcher (< xl screens) */}
+                {(isScreenshotSplitOpen || screenshots.length > 0) && (
+                  <div className="xl:hidden border-b border-border bg-surface-2/90 backdrop-blur p-2 sticky top-0 z-20">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setMobileStudioTab('studio')}
+                        className={`px-3 py-2 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 transition-all min-h-[40px] ${
+                          mobileStudioTab === 'studio'
+                            ? 'bg-brand text-white shadow-sm ring-1 ring-brand/30'
+                            : 'bg-surface text-text-muted hover:text-text-primary border border-border'
+                        }`}
+                      >
+                        <Icon icon="solar:camera-bold" className="w-4 h-4" />
+                        <span>OCR Studio</span>
+                        {screenshots.length > 0 && (
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                            mobileStudioTab === 'studio' ? 'bg-white/20 text-white' : 'bg-brand text-white'
+                          }`}>
+                            {screenshots.length}
+                          </span>
+                        )}
+                        {screenshotPreview?.comparisons?.length > 0 && (
+                          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse ml-0.5" title="Comparisons ready" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setMobileStudioTab('candidates')}
+                        className={`px-3 py-2 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 transition-all min-h-[40px] ${
+                          mobileStudioTab === 'candidates'
+                            ? 'bg-brand text-white shadow-sm ring-1 ring-brand/30'
+                            : 'bg-surface text-text-muted hover:text-text-primary border border-border'
+                        }`}
+                      >
+                        <Icon icon="solar:checklist-bold" className="w-4 h-4" />
+                        <span>Candidates</span>
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                          mobileStudioTab === 'candidates' ? 'bg-white/20 text-white' : 'bg-surface-2 text-text-primary border border-border'
+                        }`}>
+                          {group.candidates.length}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Split comparison layout vs Single column */}
                 <div className={isScreenshotSplitOpen || screenshots.length > 0 ? 'grid grid-cols-1 xl:grid-cols-2 gap-0 divide-y xl:divide-y-0 xl:divide-x divide-border' : ''}>
                   {/* Left Column: Candidates list */}
-                  <div className="divide-y divide-border min-w-0">
+                  <div className={`divide-y divide-border min-w-0 ${
+                    (isScreenshotSplitOpen || screenshots.length > 0) && mobileStudioTab !== 'candidates' ? 'hidden xl:block' : 'block'
+                  }`}>
                     {group.candidates.length === 0 ? (
                       <div className="p-8 text-center text-xs text-text-muted">
                         No candidates in this list yet. Click <strong>+ Add Cast</strong> or <strong>+ Add Crew</strong> above, or upload a screenshot to extract them.
@@ -2623,7 +2693,9 @@ export default function AdminCreditHarvest() {
 
                   {/* Right Column: Screenshot Comparison & OCR Studio */}
                   {(isScreenshotSplitOpen || screenshots.length > 0) && (
-                    <div className="p-4 bg-surface/90 border-l border-border flex flex-col gap-3.5 sticky top-4 h-fit max-h-[88vh] overflow-y-auto rounded-xl">
+                    <div className={`p-3 sm:p-4 bg-surface/90 border-t xl:border-t-0 xl:border-l border-border flex flex-col gap-3.5 xl:sticky xl:top-4 h-fit xl:max-h-[88vh] xl:overflow-y-auto rounded-xl ${
+                      mobileStudioTab !== 'studio' ? 'hidden xl:flex' : 'flex'
+                    }`}>
                       {/* Studio Top Header */}
                       <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
                         <div className="flex items-center gap-2">
@@ -2714,7 +2786,7 @@ export default function AdminCreditHarvest() {
                                 type="button"
                                 disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
                                 onClick={() => handleExtractFromScreenshot(group, 'ai', 'all')}
-                                className="w-full px-3 py-2.5 rounded-lg bg-brand text-white text-xs font-black hover:brightness-110 flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-brand/20 transition-all"
+                                className="w-full px-3 py-3 sm:py-2.5 rounded-lg bg-brand text-white text-xs font-black hover:brightness-110 flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-brand/20 transition-all min-h-[44px]"
                               >
                                 {isExtractingScreenshot ? (
                                   <Icon icon="solar:refresh-linear" className="w-4 h-4 animate-spin" />
@@ -2724,12 +2796,12 @@ export default function AdminCreditHarvest() {
                                 Extract & Compare All ({screenshots.length}) Images (AI Vision)
                               </button>
 
-                              <div className="grid grid-cols-2 gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <button
                                   type="button"
                                   disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
                                   onClick={() => handleExtractFromScreenshot(group, 'local', 'all')}
-                                  className="px-2.5 py-1.5 rounded-lg bg-surface border border-border hover:bg-surface-2 text-text-primary text-[10px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                  className="px-2.5 py-2 sm:py-1.5 rounded-lg bg-surface border border-border hover:bg-surface-2 text-text-primary text-[10px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 min-h-[38px] sm:min-h-0"
                                 >
                                   <Icon icon="solar:text-square-linear" className="w-3.5 h-3.5 text-brand" />
                                   Local OCR (All)
@@ -2739,7 +2811,7 @@ export default function AdminCreditHarvest() {
                                   type="button"
                                   disabled={isExtractingScreenshot || busy || statusFilter !== 'pending'}
                                   onClick={() => handleExtractFromScreenshot(group, 'ai', 'single')}
-                                  className="px-2.5 py-1.5 rounded-lg bg-surface border border-border hover:bg-surface-2 text-text-primary text-[10px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                  className="px-2.5 py-2 sm:py-1.5 rounded-lg bg-surface border border-border hover:bg-surface-2 text-text-primary text-[10px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50 min-h-[38px] sm:min-h-0"
                                 >
                                   <Icon icon="solar:eye-bold" className="w-3.5 h-3.5 text-amber-400" />
                                   Extract Active Frame Only

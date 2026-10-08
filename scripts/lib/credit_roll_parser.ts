@@ -263,15 +263,24 @@ const COMMON_FIRST_NAMES = new Set([
   'MERCY', 'CHIDI', 'GENEVIEVE', 'RAMSEY', 'OMOTOLA', 'ZUBBY', 'YUL', 'KEN', 'DESTINY',
   'JIM', 'RITA', 'INI', 'REGINA', 'FUNKE', 'TOYIN', 'NKEM', 'PETE', 'PATIENCE', 'ODUNLADE',
   'LATEEF', 'IBRAHIM', 'FEMI', 'GABRIEL', 'BOLANLE', 'FREDRICK', 'FREDERICK', 'MAJID',
-  'JOHN', 'PETER', 'PAUL', 'MARY', 'STELLA', 'CHINWE', 'NGOZI', 'EMEKA', 'CHUKWU',
-  'OKONKWO', 'NWOSU', 'OKAFOR', 'EZE', 'OBI', 'ANYANWU', 'ADEBAYO', 'OGUN', 'AFOLABI',
-  'MICHAEL', 'DANIEL', 'DAVID', 'JAMES', 'JOSEPH', 'SAMUEL', 'ALEX', 'CHRIS', 'SONIA',
+  'PETER', 'PAUL', 'MARY', 'STELLA', 'CHINWE', 'NGOZI', 'EMEKA',
+  'MICHAEL', 'DANIEL', 'DAVID', 'JAMES', 'JOSEPH', 'SAMUEL', 'ALEX', 'SONIA',
   'NKECHI', 'UCHE', 'CHINELO', 'KELECHI', 'NONSO', 'KAZIM', 'SOLOMON', 'RICHARD'
 ]);
 
 function splitConcatenatedName(word: string): string {
   if (word.length < 8) return word;
   const upper = word.toUpperCase();
+  // Do not split well-known single given names or compound names
+  if (upper.startsWith('CHRIST') || upper === 'JOHNPAUL') return word;
+  if (upper.startsWith('CHRIS') && upper.length >= 8) {
+    const rest = word.slice(5);
+    return `${word.slice(0, 5)} ${rest}`;
+  }
+  if (upper.startsWith('JOHN') && upper.length >= 7) {
+    const rest = word.slice(4);
+    return `${word.slice(0, 4)} ${rest}`;
+  }
   for (const fn of COMMON_FIRST_NAMES) {
     if (upper.startsWith(fn) && upper.length >= fn.length + 3) {
       const rest = word.slice(fn.length);
@@ -1167,6 +1176,23 @@ export function parseCreditFrame(
               personBox: boxFor(twoCol.words),
               separatorX: Math.round(contextualSeparator),
             },
+          });
+          continue;
+        }
+      }
+      if (currentCastCharacter === 'Actor') {
+        const merged = splitMergedActorCharacter(line);
+        if (merged) {
+          observations.push({
+            name: merged.name,
+            roleOrCharacter: merged.character,
+            creditType: 'actor',
+            frameIndex,
+            frameSec,
+            videoSec,
+            ocrConfidence: averageConfidence(merged.words),
+            evidenceText: line.text,
+            layout: { mode: 'two-column-cast', personBox: boxFor(merged.words) },
           });
           continue;
         }

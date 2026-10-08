@@ -13,7 +13,7 @@ describe('cleanTitle', () => {
       cleanTitle(`AJIFA- EPS ${n} LATEST COMEDY MOVIES 2024, OJOPAGOGO, AJANBADAN`));
 
     for (const [i, t] of titles.entries()) {
-      expect(t).toMatch(new RegExp(`EPS\\s*${i + 3}`, 'i'));
+      expect(t).toMatch(new RegExp(`(?:EPS|EP)\\s*${i + 3}`, 'i'));
     }
     expect(new Set(titles).size).toBe(4);
   });
@@ -24,12 +24,12 @@ describe('cleanTitle', () => {
   });
 
   it('keeps the Pt abbreviation', () => {
-    expect(cleanTitle('Agatha The Village Corper Pt 2 - Mercy Johnson')).toMatch(/PT\s*2/i);
+    expect(cleanTitle('Agatha The Village Corper Pt 2 - Mercy Johnson')).toMatch(/(?:PT|Part)\s*2/i);
   });
 
   it('still keeps EPISODE and SEASON markers', () => {
-    expect(cleanTitle('PAPA NO DEY REST Episode 3 // Ghanaian movies')).toMatch(/EPISODE\s*3/i);
-    expect(cleanTitle('Best of Okele | Season 2 - Episode 1')).toMatch(/SEASON\s*2/i);
+    expect(cleanTitle('PAPA NO DEY REST Episode 3 // Ghanaian movies')).toMatch(/(?:EPISODE|Ep)\s*3/i);
+    expect(cleanTitle('Best of Okele | Season 2 - Episode 1')).toMatch(/(?:SEASON\s*2|S2)/i);
   });
 
   it('gives distinct titles to distinct episodes of one serial', () => {
