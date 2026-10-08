@@ -1543,7 +1543,7 @@ export default function DeveloperApi() {
               },
               {
                 q: "What payment methods are supported for Pro API access?",
-                a: "We support instant Nigerian local payments via OPay, Paystack, and Nigerian bank transfers (in NGN), as well as international Visa, Mastercard, and Stripe cards (in USD)."
+                a: "We support instant Nigerian local payments via Bachs, Nigerian bank transfers, cards (in NGN), as well as international Visa, Mastercard, and USDT stablecoins."
               },
               {
                 q: "What happens if our app exceeds the tier burst limit?",

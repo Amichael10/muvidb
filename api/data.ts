@@ -77,6 +77,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handlePersonMedia } = await import('./_lib/person_media_handler.js');
       return handlePersonMedia(req, res);
     }
+    if (key === 'bachs' || key === 'webhooks/bachs') {
+      const { handleBachs } = await import('./_lib/bachs_handler.js');
+      return handleBachs(req, res);
+    }
     if (key === 'opay' || key === 'webhooks/opay') {
       const { handleOpay } = await import('./_lib/opay_handler.js');
       return handleOpay(req, res);

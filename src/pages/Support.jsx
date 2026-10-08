@@ -98,18 +98,15 @@ export default function Support() {
       const returnUrl = `${window.location.origin}/support?status=success`;
       const cancelUrl = `${window.location.origin}/support`;
 
-      const res = await fetch('/api/opay/cashier/create', {
+      const res = await fetch('/api/data?key=bachs&op=initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: activeAmount,
+          currency: 'NGN',
           planType: 'support',
-          customerName: supporterName || 'Anonymous Cinephile',
-          customerEmail: supporterEmail,
-          productName: 'MuviDB Archive Supporter Contribution',
-          productDescription: message 
-            ? `Voluntary contribution: ${message.slice(0, 100)}` 
-            : 'Voluntary contribution to keep MuviDB open and free for African Cinema',
+          userName: supporterName || 'Anonymous Cinephile',
+          userEmail: supporterEmail,
           returnUrl,
           cancelUrl,
         }),
@@ -117,12 +114,13 @@ export default function Support() {
 
       const data = await res.json();
 
-      if (!res.ok || !data.success || !data.cashierUrl) {
-        throw new Error(data.error || 'Failed to initialize payment cashier. Please try again.');
+      const targetUrl = data.checkoutUrl || data.cashierUrl;
+      if (!res.ok || !data.success || !targetUrl) {
+        throw new Error(data.error || 'Failed to initialize payment checkout. Please try again.');
       }
 
-      // Seamless redirect to OPay cashier (or sandbox cashier on dev)
-      window.location.href = data.cashierUrl;
+      // Seamless redirect to Bachs hosted checkout
+      window.location.href = targetUrl;
     } catch (err) {
       console.error('[Support] Checkout error:', err);
       setError(err.message || 'Payment service is temporarily unavailable. Please try again in a moment.');
@@ -195,11 +193,11 @@ export default function Support() {
             <div className="flex items-center justify-between pb-6 border-b border-border/80 mb-6">
               <div>
                 <h2 className="text-lg font-heading font-bold text-white">Choose Your Contribution</h2>
-                <p className="text-xs text-text-muted mt-0.5">Pay securely via OPay (Cards, Bank Transfer, USSD)</p>
+                <p className="text-xs text-text-muted mt-0.5">Pay securely via Bachs (Cards, Bank Transfer, USSD, Crypto)</p>
               </div>
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400 font-bold">
                 <Icon icon="solar:shield-check-bold" className="w-3.5 h-3.5" />
-                <span>OPay Verified</span>
+                <span>Bachs Verified</span>
               </div>
             </div>
 
@@ -331,18 +329,18 @@ export default function Support() {
                 {loading ? (
                   <>
                     <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    <span>Connecting to OPay Cashier...</span>
+                    <span>Connecting to Bachs Checkout...</span>
                   </>
                 ) : (
                   <>
                     <Icon icon="solar:heart-bold" className="w-5 h-5 text-white" />
-                    <span>Contribute ₦{activeAmount.toLocaleString()} with OPay</span>
+                    <span>Contribute ₦{activeAmount.toLocaleString()} with Bachs</span>
                   </>
                 )}
               </button>
 
               <p className="text-center text-[11px] text-text-muted">
-                Transactions processed securely via OPay International Payment Gateway.
+                Transactions processed securely via Bachs Global Payments.
               </p>
             </form>
           </div>

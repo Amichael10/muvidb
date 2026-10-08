@@ -183,6 +183,14 @@
       "destination": "/api/data?_r=person-media"
     },
     {
+      "source": "/api/bachs/:path*",
+      "destination": "/api/data?_r=bachs&path=:path*"
+    },
+    {
+      "source": "/api/webhooks/bachs",
+      "destination": "/api/data?_r=webhooks/bachs"
+    },
+    {
       "source": "/api/opay/:path*",
       "destination": "/api/data?_r=opay&path=:path*"
     },
