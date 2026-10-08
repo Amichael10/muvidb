@@ -42,6 +42,18 @@ function helpText() {
   return [
     'MuviDB ops bot (you only)',
     '',
+    '🤖 AI Studio & Publishing:',
+    '/aistudio <prompt> — instruct AI Copilot across your entire database',
+    '/queue or /briefing — review & approve today\'s 3 scheduled posts',
+    '/outreach — review today\'s queued artist outreach candidates',
+    '',
+    '🎬 Database Lookup & Tools:',
+    '/film <title> — search films, streaming platforms, and posters',
+    '/people <name> — search actors, directors, credits & social handles',
+    '/critics <query> — search Nollywood critic reviews and ratings',
+    '/stageplay [query] — search upcoming or running Nigerian theatre plays',
+    '',
+    '🛡️ IP & Security:',
     '/block <ip> — refuse SSR + public API for this IP',
     '/unblock <ip> — remove from blocklist',
     '/allow <ip> — whitelist (no alerts, cannot block)',
@@ -49,17 +61,9 @@ function helpText() {
     '/allowed — list whitelisted IPs',
     '/hits [ip] — recent scrape buckets (or top offenders)',
     '/blocked — list blocked IPs',
-    '/briefing — preview & approve today\'s 3 scheduled social posts',
-    '/outreach — review today\'s queued artist outreach candidates',
     '/help — this message',
     '',
-    'YouTube: new film-length uploads alert here before auto-import.',
-    'Use Hide on the alert to skip a video on the next sync.',
-    '',
-    'Content intake: forward a YouTube Short, social link, screenshot, review, poster, or video.',
-    'The bot can return playable Shorts and prepare films, critic reviews, credits, news, and social drafts for admin approval.',
-    '',
-    'Tip: browse muvidb.com, then /hits to find your home IP → /allow <ip>',
+    'Forward any link, short, video, review or image to process media through intake wizards.',
   ].join('\n');
 }
 
@@ -209,6 +213,201 @@ async function handleCommand(chatId: string | number, text: string) {
     const { sendMorningOutreachBriefing } = await import('./outreach/morning_outreach_briefing.js');
     await reply(chatId, '⏳ Checking today\'s outreach queue…');
     await sendMorningOutreachBriefing(chatId);
+    return;
+  }
+
+  if (cmd === '/queue') {
+    const { sendMorningSocialBriefing } = await import('./editorial/morning_social_briefing.js');
+    await reply(chatId, "⏳ Fetching today's social schedule & queue…");
+    await sendMorningSocialBriefing(chatId);
+    return;
+  }
+
+  if (cmd === '/aistudio' || cmd === '/copilot' || cmd === '/ai') {
+    if (!arg) {
+      await reply(
+        chatId,
+        [
+          '🤖 *MuviDB AI Studio Copilot*',
+          '',
+          'Give me any instruction across your database and publishing tools!',
+          '',
+          'Examples:',
+          '• `/aistudio schedule posts for 5 latest streaming movies with portrait posters`',
+          '• `/aistudio what posts are scheduled or drafted right now?`',
+          '• `/aistudio look up Timini Egbuson and draft an actor spotlight post`',
+          '• `/aistudio check critic reviews for A Tribe Called Judah and create a discussion post`',
+        ].join('\n')
+      );
+      return;
+    }
+
+    await reply(chatId, `🧠 *AI Copilot* thinking…\n\n_${arg}_`);
+    try {
+      const { runStudioCopilotChat } = await import('./copilot/cohere_studio_copilot.js');
+      const result = await runStudioCopilotChat({
+        message: arg,
+        chatHistory: [],
+        actor: { email: 'admin@muvidb.com', role: 'admin' },
+      });
+      const responseText = result.response || 'Task completed successfully.';
+      await reply(chatId, responseText);
+    } catch (err: any) {
+      await reply(chatId, `⚠️ AI Studio Error: ${err.message || String(err)}`);
+    }
+    return;
+  }
+
+  if (cmd === '/film' || cmd === '/movie') {
+    if (!arg) {
+      await reply(
+        chatId,
+        '🎬 *Film Lookup & Editor*\n\nUsage: `/film <title>`\nExample: `/film Jagun Jagun`\n\nForward any poster image, video, or link to this bot to launch the full film intake wizard.'
+      );
+      return;
+    }
+    const { data: films, error } = await supabase
+      .from('films')
+      .select('id, title, year, synopsis, poster_url, release_date, is_in_cinemas, streaming_links, genres, slug')
+      .ilike('title', `%${arg.trim()}%`)
+      .limit(3);
+
+    if (error) {
+      await reply(chatId, `⚠️ Database error: ${error.message}`);
+      return;
+    }
+    if (!films || films.length === 0) {
+      await reply(chatId, `🔍 No film found matching "${arg}". Forward a poster or link to create it.`);
+      return;
+    }
+
+    const siteUrl = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+    for (const f of films) {
+      const genresList = Array.isArray(f.genres) ? f.genres.join(', ') : f.genres || 'Nollywood';
+      const statusText = f.is_in_cinemas ? '🎬 In Cinemas' : (f.streaming_links && Object.keys(f.streaming_links).length > 0) ? '📺 Streaming' : 'Released';
+      const lines = [
+        `🎬 *${f.title}* (${f.year || '?'})`,
+        `🎭 Genres: ${genresList}`,
+        `📍 Status: ${statusText}`,
+        f.synopsis ? `📝 ${f.synopsis.slice(0, 180)}…` : '',
+        `🔗 ${siteUrl}/movie/${f.slug || f.id}`,
+      ].filter(Boolean).join('\n');
+
+      if (f.poster_url && f.poster_url.startsWith('http')) {
+        await sendTelegramPhoto({ photo: f.poster_url, caption: lines.slice(0, 1024), chatId: String(chatId) });
+      } else {
+        await reply(chatId, lines);
+      }
+    }
+    return;
+  }
+
+  if (cmd === '/people' || cmd === '/person' || cmd === '/actor') {
+    if (!arg) {
+      await reply(chatId, '👤 *People Lookup & Editor*\n\nUsage: `/people <name>`\nExample: `/people Funke Akindele`');
+      return;
+    }
+    const { data: people, error } = await supabase
+      .from('people')
+      .select('id, name, known_for_department, bio, photo_url, instagram_url, twitter_url, slug')
+      .ilike('name', `%${arg.trim()}%`)
+      .limit(3);
+
+    if (error) {
+      await reply(chatId, `⚠️ Database error: ${error.message}`);
+      return;
+    }
+    if (!people || people.length === 0) {
+      await reply(chatId, `🔍 No talent found matching "${arg}".`);
+      return;
+    }
+
+    const siteUrl = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+    for (const p of people) {
+      const insta = p.instagram_url ? `📸 @${p.instagram_url.replace(/.*instagram\.com\//, '').replace(/\/$/, '')}` : 'No Instagram';
+      const lines = [
+        `👤 *${p.name}*`,
+        `🎭 Role: ${p.known_for_department || 'Actor & Filmmaker'}`,
+        `📱 ${insta}`,
+        p.bio ? `📝 ${p.bio.slice(0, 180)}…` : '',
+        `🔗 ${siteUrl}/person/${p.slug || p.id}`,
+      ].filter(Boolean).join('\n');
+
+      if (p.photo_url && p.photo_url.startsWith('http')) {
+        await sendTelegramPhoto({ photo: p.photo_url, caption: lines.slice(0, 1024), chatId: String(chatId) });
+      } else {
+        await reply(chatId, lines);
+      }
+    }
+    return;
+  }
+
+  if (cmd === '/critics' || cmd === '/review') {
+    if (!arg) {
+      await reply(chatId, '⭐ *Critic Reviews Lookup*\n\nUsage: `/critics <film title or critic name>`\nExample: `/critics Jagun Jagun`');
+      return;
+    }
+    const { data: reviews, error } = await supabase
+      .from('critic_reviews')
+      .select('id, critic_name, critic_title, quote, rating, review_url, films(title, year)')
+      .or(`critic_name.ilike.%${arg.trim()}%,quote.ilike.%${arg.trim()}%`)
+      .limit(5);
+
+    if (error) {
+      await reply(chatId, `⚠️ Database error: ${error.message}`);
+      return;
+    }
+    if (!reviews || reviews.length === 0) {
+      await reply(chatId, `🔍 No critic review matching "${arg}".`);
+      return;
+    }
+
+    const reviewLines = reviews.map((r: any) => {
+      const filmTitle = r.films?.title ? ` for *${r.films.title}*` : '';
+      const score = r.rating ? ` (${r.rating}/10)` : '';
+      return `⭐ *${r.critic_name || 'Critic'}*${score}${filmTitle}:\n💬 _"${r.quote || ''}"_\n🔗 ${r.review_url || ''}`;
+    });
+    await reply(chatId, `🍿 *Critic Reviews (${reviews.length}):*\n\n${reviewLines.join('\n\n')}`);
+    return;
+  }
+
+  if (cmd === '/stageplay' || cmd === '/theatre' || cmd === '/play') {
+    let query = supabase
+      .from('plays')
+      .select('id, title, venue, city, run_start_date, run_end_date, synopsis, poster_url, ticket_link');
+
+    if (arg) {
+      query = query.or(`title.ilike.%${arg.trim()}%,venue.ilike.%${arg.trim()}%,city.ilike.%${arg.trim()}%`);
+    } else {
+      query = query.order('run_start_date', { ascending: false }).limit(4);
+    }
+
+    const { data: plays, error } = await query.limit(4);
+    if (error) {
+      await reply(chatId, `⚠️ Database error: ${error.message}`);
+      return;
+    }
+    if (!plays || plays.length === 0) {
+      await reply(chatId, arg ? `🔍 No stage play matching "${arg}".` : '🎭 No stage plays found.');
+      return;
+    }
+
+    for (const pl of plays) {
+      const dates = pl.run_start_date ? `📅 ${pl.run_start_date} to ${pl.run_end_date || 'Ongoing'}` : '';
+      const lines = [
+        `🎭 *${pl.title}*`,
+        `📍 ${pl.venue || 'Venue TBD'}, ${pl.city || 'Lagos'}`,
+        dates,
+        pl.synopsis ? `📝 ${pl.synopsis.slice(0, 160)}…` : '',
+        pl.ticket_link ? `🎟️ Tickets: ${pl.ticket_link}` : '',
+      ].filter(Boolean).join('\n');
+
+      if (pl.poster_url && pl.poster_url.startsWith('http')) {
+        await sendTelegramPhoto({ photo: pl.poster_url, caption: lines.slice(0, 1024), chatId: String(chatId) });
+      } else {
+        await reply(chatId, lines);
+      }
+    }
     return;
   }
 

@@ -25,6 +25,11 @@ const STARTER_PROMPTS = [
     prompt: 'Check critic reviews for A Tribe Called Judah or Jagun Jagun, quote a top critic, and write a debate caption asking the audience their take.',
   },
   {
+    icon: 'solar:calendar-add-bold',
+    label: 'Schedule 5 Latest Streaming/YT Films',
+    prompt: 'Schedule posts for the 5 latest youtube, streaming platforms movie with portrait poster in our db.',
+  },
+  {
     icon: 'solar:calendar-mark-bold',
     label: 'Inspect My Queue & Schedule',
     prompt: 'What posts do we have scheduled or drafted in the queue right now? Give me a quick summary.',
@@ -127,7 +132,13 @@ What would you like to create or explore today?`,
         },
       ]);
 
-      if (actions.some((a) => a.tool === 'create_social_draft')) {
+      const createdDrafts = actions.filter((a) => a.tool === 'create_social_draft');
+      const batchScheduled = actions.filter((a) => a.tool === 'batch_schedule_posts');
+      if (batchScheduled.length > 0) {
+        const total = batchScheduled.reduce((acc, a) => acc + (a.result?.count || 0), 0);
+        toast.success(`🚀 Scheduled ${total} posts across upcoming calendar slots!`);
+        if (onRefreshStudioData) onRefreshStudioData();
+      } else if (createdDrafts.length > 0) {
         toast.success('Social post drafted successfully!');
         if (onRefreshStudioData) onRefreshStudioData();
       }
@@ -291,6 +302,62 @@ What would you like to create or explore today?`,
                                 <span>Edit in Composer</span>
                               </button>
                             )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (act.tool === 'batch_schedule_posts' && act.result?.success) {
+                      const items = act.result.scheduled_items || [];
+                      return (
+                        <div
+                          key={idx}
+                          className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-3.5 text-xs"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="flex items-center gap-1.5 font-bold text-indigo-400">
+                              <Icon icon="solar:calendar-mark-bold" width="16" />
+                              {act.result.count} Posts Scheduled in Studio
+                            </span>
+                            <span className="rounded-md bg-indigo-500/20 px-2 py-0.5 text-[10px] font-black uppercase text-indigo-300">
+                              {act.result.status || 'scheduled'}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5 mb-3">
+                            {items.map((item, itemIdx) => (
+                              <div key={itemIdx} className="flex items-center justify-between bg-black/40 rounded-lg px-2.5 py-1.5">
+                                <span className="font-semibold text-white truncate max-w-[65%]">
+                                  {item.film_title || item.title}
+                                </span>
+                                <span className="text-[10px] font-mono text-indigo-300 shrink-0">
+                                  {item.scheduled_date} {item.scheduled_time?.slice(0, 5) || ''} WAT
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onSwitchToTab) onSwitchToTab('calendar');
+                              }}
+                              className="flex items-center gap-1 rounded-lg bg-indigo-500/20 px-3 py-1.5 font-bold text-indigo-300 hover:bg-indigo-500/30 transition-all"
+                            >
+                              <Icon icon="solar:calendar-bold" width="13" />
+                              <span>View Calendar</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onSwitchToTab) onSwitchToTab('drafts');
+                              }}
+                              className="flex items-center gap-1 rounded-lg border border-white/10 bg-surface px-3 py-1.5 font-bold text-text-primary hover:bg-surface-3 transition-all"
+                            >
+                              <Icon icon="solar:posts-carousel-vertical-bold" width="13" />
+                              <span>View in Queue</span>
+                            </button>
                           </div>
                         </div>
                       );

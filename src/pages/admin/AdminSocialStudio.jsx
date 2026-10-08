@@ -658,23 +658,47 @@ export default function AdminSocialStudio() {
     if (!silent) setDraftsLoading(true);
     setDraftsError('');
     try {
-      const { data, error } = await supabase
-        .from('social_content_items')
-        .select(`
-          id,
-          title,
-          status,
-          content_type,
-          created_at,
-          rejection_reason,
-          social_platform_variants(id,platform,status,caption,title,hashtags,selected_asset_id,platform_options,scheduled_for,published_at,last_error_code,last_error_message),
-          social_assets(id,public_url,format,width,height)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(30);
+      // Fetch both scheduled items and recent items so scheduled posts are never crowded out
+      const [scheduledRes, recentRes] = await Promise.all([
+        supabase
+          .from('social_content_items')
+          .select(`
+            id,
+            title,
+            status,
+            content_type,
+            created_at,
+            rejection_reason,
+            social_platform_variants(id,platform,status,caption,title,hashtags,selected_asset_id,platform_options,scheduled_for,published_at,last_error_code,last_error_message),
+            social_assets(id,public_url,format,width,height)
+          `)
+          .eq('status', 'scheduled')
+          .limit(50),
+        supabase
+          .from('social_content_items')
+          .select(`
+            id,
+            title,
+            status,
+            content_type,
+            created_at,
+            rejection_reason,
+            social_platform_variants(id,platform,status,caption,title,hashtags,selected_asset_id,platform_options,scheduled_for,published_at,last_error_code,last_error_message),
+            social_assets(id,public_url,format,width,height)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(100),
+      ]);
 
-      if (error) throw error;
-      setDrafts(asRelationArray(data).map(normalizeSocialContentItem));
+      if (recentRes.error) throw recentRes.error;
+      const combined = [...asRelationArray(scheduledRes.data), ...asRelationArray(recentRes.data)];
+      const seen = new Set();
+      const unique = combined.filter(item => {
+        if (!item?.id || seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+      setDrafts(unique.map(normalizeSocialContentItem));
     } catch (err) {
       console.warn('Failed to load social drafts:', err.message);
       setDraftsError('We could not load your drafts and scheduled posts right now. Please try again.');
@@ -1923,6 +1947,9 @@ export default function AdminSocialStudio() {
 
   const filteredDrafts = useMemo(() => {
     if (queueFilterStatus === 'all') return drafts;
+    if (queueFilterStatus === 'scheduled') {
+      return drafts.filter(d => d.status === 'scheduled' || asRelationArray(d.social_platform_variants).some(v => v.status === 'scheduled'));
+    }
     return drafts.filter(d => d.status === queueFilterStatus);
   }, [drafts, queueFilterStatus]);
 

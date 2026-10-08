@@ -23,60 +23,60 @@ export async function sendMorningSocialBriefing(overrideChatId?: string | number
   const startIso = new Date(`${todayStr}T00:00:00+01:00`).toISOString();
   const endIso = new Date(`${todayStr}T23:59:59+01:00`).toISOString();
 
-  const { data: initialItems } = await supabase
-    .from('social_content_items')
-    .select(`
-      id,
-      title,
-      status,
-      content_type,
-      scheduled_for,
-      metadata,
-      social_platform_variants (
+  async function fetchTodayItems() {
+    const { data: variants, error } = await supabase
+      .from('social_platform_variants')
+      .select(`
         id,
+        content_item_id,
         platform,
         status,
         caption,
         title,
-        hashtags
-      )
-    `)
-    .gte('scheduled_for', startIso)
-    .lte('scheduled_for', endIso)
-    .neq('status', 'rejected')
-    .order('scheduled_for', { ascending: true });
+        hashtags,
+        scheduled_for,
+        social_content_items (
+          id,
+          title,
+          status,
+          content_type,
+          source_snapshot
+        )
+      `)
+      .gte('scheduled_for', startIso)
+      .lte('scheduled_for', endIso)
+      .order('scheduled_for', { ascending: true });
 
-  let items = initialItems || [];
+    if (error || !variants || variants.length === 0) return [];
+
+    const itemMap = new Map<string, any>();
+    for (const v of variants) {
+      const rawItem = (v as any).social_content_items;
+      if (!rawItem || !v.content_item_id) continue;
+      if (!itemMap.has(v.content_item_id)) {
+        itemMap.set(v.content_item_id, {
+          ...rawItem,
+          scheduled_for: v.scheduled_for,
+          metadata: rawItem.source_snapshot || {},
+          social_platform_variants: [],
+        });
+      }
+      const grouped = itemMap.get(v.content_item_id);
+      grouped.social_platform_variants.push(v);
+      if (!grouped.scheduled_for && v.scheduled_for) {
+        grouped.scheduled_for = v.scheduled_for;
+      }
+    }
+    return Array.from(itemMap.values());
+  }
+
+  let items = await fetchTodayItems();
 
   if (!items || items.length === 0) {
     try {
       const { generateDailyScheduleDrafts } = await import('./calendar_service.js');
       await generateDailyScheduleDrafts({ daysAhead: 1, startDate: todayStr });
-      const { data: generatedItems } = await supabase
-        .from('social_content_items')
-        .select(`
-          id,
-          title,
-          status,
-          content_type,
-          scheduled_for,
-          metadata,
-          social_platform_variants (
-            id,
-            platform,
-            status,
-            caption,
-            title,
-            hashtags
-          )
-        `)
-        .gte('scheduled_for', startIso)
-        .lte('scheduled_for', endIso)
-        .neq('status', 'rejected')
-        .order('scheduled_for', { ascending: true });
-      if (generatedItems && generatedItems.length > 0) {
-        items = generatedItems;
-      }
+      items = await fetchTodayItems();
     } catch (genErr) {
       console.warn('[morning_social_briefing] Auto-draft fallback failed:', genErr);
     }

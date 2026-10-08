@@ -23,6 +23,11 @@ vi.mock('./supabase.js', () => ({
       const chain: any = {
         insert: vi.fn((row: any) => { inserted.push(row); return chain; }),
         select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        ilike: vi.fn(() => chain),
+        order: vi.fn(() => chain),
+        limit: vi.fn(() => chain),
+        maybeSingle: vi.fn(async () => ({ data: { id: 'event-uuid' }, error: null })),
         single: vi.fn(async () => ({ data: { id: 'event-uuid' }, error: null })),
       };
       return chain;
@@ -113,9 +118,9 @@ describe('Telegram content intake', () => {
     expect(keyboard).toEqual(expect.arrayContaining([
       expect.objectContaining({ callback_data: 'intake_download:event-uuid' }),
       expect.objectContaining({ callback_data: 'intake_draft:event-uuid' }),
-      expect.objectContaining({ callback_data: 'intake_film:event-uuid' }),
-      expect.objectContaining({ callback_data: 'intake_review:event-uuid' }),
-      expect.objectContaining({ callback_data: 'intake_credits:event-uuid' }),
+      expect.objectContaining({ callback_data: 'wiz_extract:film:event-uuid' }),
+      expect.objectContaining({ callback_data: 'wiz_extract:review:event-uuid' }),
+      expect.objectContaining({ callback_data: 'wiz_extract:person:event-uuid' }),
       expect.objectContaining({ callback_data: 'intake_news:event-uuid' }),
       expect.objectContaining({ callback_data: 'intake_ignore:event-uuid' }),
     ]));
@@ -155,7 +160,7 @@ describe('Telegram content intake', () => {
     expect(keyboard).toEqual(expect.arrayContaining([
       expect.objectContaining({ callback_data: 'intake_download:event-uuid' }),
       expect.objectContaining({ callback_data: 'intake_draft:event-uuid' }),
-      expect.objectContaining({ callback_data: 'intake_film:event-uuid' }),
+      expect.objectContaining({ callback_data: 'wiz_extract:film:event-uuid' }),
     ]));
   });
 

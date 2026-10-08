@@ -2,8 +2,8 @@ name: Social Studio Publisher & Morning Briefings
 
 on:
   schedule:
-    # 08:00 WAT (07:00 UTC) — Morning Telegram Briefing (Social 3-Post Review & Outreach Digest)
-    - cron: "0 7 * * *"
+    # 07:00 WAT (06:00 UTC) — Morning Telegram Briefing (Social 3-Post Review & Outreach Digest)
+    - cron: "0 6 * * *"
     # 09:00 WAT (08:00 UTC) — Slot 1 (Graphic: Spotlight / Streaming Guide)
     - cron: "0 8 * * *"
     # 12:00 WAT (11:00 UTC) — Slot 2 (Graphic: Recent Movie Critic Review)
@@ -66,8 +66,8 @@ jobs:
           current_hour="$(date -u +%H)"
           current_minute="$(date -u +%M)"
 
-          # At 07:00 UTC (08:00 WAT), run morning briefing
-          if [ "$current_hour" = "07" ]; then
+          # At 06:00 UTC (07:00 WAT), run morning briefing
+          if [ "$current_hour" = "06" ]; then
             echo "task=morning_briefing" >> "$GITHUB_OUTPUT"
           else
             echo "task=social_publish" >> "$GITHUB_OUTPUT"

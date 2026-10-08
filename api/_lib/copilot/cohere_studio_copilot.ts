@@ -1,9 +1,51 @@
 import dotenv from 'dotenv';
 import { supabase } from '../supabase.js';
-import { createUniversalSocialPost, defaultContentTypeForSeries, defaultTemplateSlugForSeries } from '../social_studio.js';
+import {
+  createUniversalSocialPost,
+  generateSocialDraft,
+  scheduleContentItem,
+  reviewContentItem,
+  defaultContentTypeForSeries,
+  defaultTemplateSlugForSeries,
+} from '../social_studio.js';
 import { searchCandidates, derivePlayStatus } from '../editorial/candidate_service.js';
+import { isLikelyLandscapeOrThumbnailUrl, resolveFilmPlatform } from '../editorial/candidate_strategy.js';
 
 dotenv.config();
+
+const PLATFORM_DISPLAY_NAMES: Record<string, string> = {
+  nollistream: 'NolliStream',
+  docuth: 'Docuth',
+  ebonylife: 'EbonyLife ON Plus',
+  kava: 'Kava',
+  circuits: 'Circuits.tv',
+  netflix: 'Netflix',
+  prime_video: 'Prime Video',
+  youtube: 'YouTube',
+  cinema: 'In Cinemas',
+};
+
+async function checkPosterIsPortrait(url: string | null | undefined): Promise<boolean> {
+  if (!url || typeof url !== 'string' || !url.trim()) return false;
+  // Fast negative filter: reject YouTube 16:9 thumbnails and landscape banner markers
+  if (isLikelyLandscapeOrThumbnailUrl(url)) return false;
+  try {
+    const cleanUrl = url.trim();
+    const res = await fetch(cleanUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!res.ok) return !isLikelyLandscapeOrThumbnailUrl(cleanUrl);
+    const buf = Buffer.from(await res.arrayBuffer());
+    const sharp = (await import('sharp')).default;
+    const m = await sharp(buf).metadata();
+    const width = m.width || 0;
+    const height = m.height || 0;
+    return height > width && width >= 300;
+  } catch {
+    return !isLikelyLandscapeOrThumbnailUrl(url);
+  }
+}
 
 function collectKeys(base: string): string[] {
   const raw: (string | undefined)[] = [process.env[base]];
@@ -205,6 +247,58 @@ export const COPILOT_TOOLS = [
       days: {
         description: 'Number of upcoming days to inspect (default: 7)',
         type: 'int',
+        required: false,
+      },
+    },
+  },
+  {
+    name: 'get_latest_films',
+    description: 'Fetch the latest Nollywood and African movies from MuviDB, filtered by destination (YouTube, streaming platforms such as NolliStream, Docuth, EbonyLife, Netflix, Prime Video, or Cinemas) with verified portrait posters (strictly excluding landscape 16:9 YouTube video thumbnails or wide backdrops).',
+    parameterDefinitions: {
+      platform: {
+        description: 'Filter destination: "all", "youtube", "streaming", or "cinema" (default: "all")',
+        type: 'str',
+        required: false,
+      },
+      limit: {
+        description: 'Maximum number of films to return (default: 5)',
+        type: 'int',
+        required: false,
+      },
+      require_portrait_poster: {
+        description: 'If true (default), strictly filters for films with verified vertical portrait posters (height > width, not a landscape video thumbnail)',
+        type: 'bool',
+        required: false,
+      },
+      days: {
+        description: 'Optional filter: only include films released or updated within the last N days (e.g. 30)',
+        type: 'int',
+        required: false,
+      },
+    },
+  },
+  {
+    name: 'batch_schedule_posts',
+    description: 'Batch schedule or draft social media posts for multiple movies or stage plays into upcoming Social Studio calendar slots. Automatically formats engaging Nollywood captions, handles actor/director credits and @handles, uses verified portrait posters, and assigns optimal posting slots (e.g., 09:00 WAT, 12:00 WAT, 15:30 WAT, 18:00 WAT, 20:30 WAT) starting from today or tomorrow.',
+    parameterDefinitions: {
+      film_ids: {
+        description: 'Array or comma-separated UUIDs of the films to schedule',
+        type: 'str',
+        required: true,
+      },
+      start_date: {
+        description: 'Optional date to start scheduling from (YYYY-MM-DD). If omitted, starts from tomorrow.',
+        type: 'str',
+        required: false,
+      },
+      platforms: {
+        description: 'Comma-separated target platforms: "instagram,threads,facebook,tiktok" (default: all four)',
+        type: 'str',
+        required: false,
+      },
+      status: {
+        description: '"scheduled" (default) or "draft"',
+        type: 'str',
         required: false,
       },
     },
@@ -527,6 +621,221 @@ export async function executeCopilotTool(
       };
     }
 
+    case 'get_latest_films': {
+      const platformFilter = String(params.platform || 'all').toLowerCase();
+      const limit = Math.min(Math.max(Number(params.limit || 5), 1), 20);
+      const requirePortrait = params.require_portrait_poster !== false;
+      const days = params.days ? Number(params.days) : null;
+
+      const filmSelect = `
+        id, title, slug, year, synopsis, tagline, poster_url, backdrop_url,
+        release_date, release_type, source, streaming_links, youtube_watch_url,
+        genres, imdb_rating, liked_percent, view_count, is_in_cinemas, coming_soon,
+        credits (
+          id, role, character_name, billing_order,
+          people ( id, name, instagram_url, twitter_url )
+        )
+      `;
+
+      let query = supabase.from('films').select(filmSelect).not('poster_url', 'is', null);
+
+      if (days && days > 0) {
+        const cutoffDate = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString().slice(0, 10);
+        query = query.gte('release_date', cutoffDate);
+      }
+
+      if (platformFilter === 'youtube') {
+        query = query.not('youtube_watch_url', 'is', null);
+      } else if (platformFilter === 'streaming') {
+        query = query.or('release_type.in.(nollistream,docuth,ebonylife,kava,circuits,netflix,prime_video),source.in.(nollistream,docuth,ebonylife,kava,circuits),streaming_links.neq.{}');
+      } else if (platformFilter === 'cinema') {
+        query = query.or('is_in_cinemas.eq.true,release_type.eq.cinema');
+      } else {
+        // 'all': YouTube or Streaming platforms
+        query = query.or('youtube_watch_url.not.is.null,release_type.neq.cinema,streaming_links.neq.{}');
+      }
+
+      // Query candidate pool ordered by newest release date and creation time
+      const { data: rawFilms, error } = await query
+        .order('release_date', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(limit * 5);
+
+      if (error) return { error: error.message };
+
+      const matched: any[] = [];
+      for (const film of rawFilms || []) {
+        if (requirePortrait) {
+          const isPortrait = await checkPosterIsPortrait(film.poster_url);
+          if (!isPortrait) continue;
+        }
+
+        const platform = resolveFilmPlatform(film);
+        const platformName = platform
+          ? (PLATFORM_DISPLAY_NAMES[platform] || platform)
+          : film.is_in_cinemas
+            ? 'In Cinemas'
+            : 'Catalogue';
+
+        const topCast = (film.credits || []).map((c: any) => ({
+          name: c.people?.name,
+          role: c.role,
+          handle: c.people?.instagram_url,
+        })).slice(0, 4);
+
+        matched.push({
+          id: film.id,
+          title: film.title,
+          year: film.year,
+          release_date: film.release_date,
+          platform: platformName,
+          platform_id: platform,
+          poster_url: film.poster_url,
+          is_portrait_poster: true,
+          synopsis: film.synopsis ? (film.synopsis.slice(0, 180) + '...') : null,
+          top_cast: topCast,
+          youtube_watch_url: film.youtube_watch_url,
+          streaming_links: film.streaming_links,
+        });
+
+        if (matched.length >= limit) break;
+      }
+
+      return {
+        count: matched.length,
+        platform_filter: platformFilter,
+        require_portrait_poster: requirePortrait,
+        films: matched,
+      };
+    }
+
+    case 'batch_schedule_posts': {
+      let rawFilmIds = params.film_ids;
+      if (typeof rawFilmIds === 'string') {
+        try {
+          const parsed = JSON.parse(rawFilmIds);
+          if (Array.isArray(parsed)) rawFilmIds = parsed;
+          else rawFilmIds = rawFilmIds.split(',').map((s: string) => s.trim());
+        } catch {
+          rawFilmIds = rawFilmIds.split(',').map((s: string) => s.trim());
+        }
+      }
+      const filmIds: string[] = (Array.isArray(rawFilmIds) ? rawFilmIds : [rawFilmIds]).filter(Boolean);
+      if (!filmIds.length) {
+        return { error: 'Please provide at least one film_id to schedule' };
+      }
+
+      const VALID_PLATFORMS = new Set(['instagram', 'facebook', 'threads', 'tiktok', 'youtube']);
+      const rawPlatforms = String(params.platforms || 'instagram,threads,facebook,tiktok')
+        .split(',')
+        .map((p) => p.trim().toLowerCase())
+        .map((p) => (p === 'x' || p === 'twitter' ? 'threads' : p))
+        .filter((p) => VALID_PLATFORMS.has(p));
+      const finalPlatforms: any[] = rawPlatforms.length ? rawPlatforms : ['instagram', 'threads'];
+
+      const status = params.status === 'draft' ? 'draft' : 'scheduled';
+
+      // Schedule start date (tomorrow if omitted)
+      const now = new Date();
+      let startYear = now.getUTCFullYear();
+      let startMonth = now.getUTCMonth();
+      let startDay = now.getUTCDate() + 1; // start tomorrow by default
+
+      if (params.start_date && /^\d{4}-\d{2}-\d{2}$/.test(params.start_date)) {
+        const parts = params.start_date.split('-').map(Number);
+        startYear = parts[0];
+        startMonth = parts[1] - 1;
+        startDay = parts[2];
+      }
+
+      const DAILY_TIMES = ['09:00:00', '12:00:00', '15:30:00', '18:00:00', '20:30:00'];
+      const scheduledItems: any[] = [];
+
+      for (let i = 0; i < filmIds.length; i++) {
+        const filmId = filmIds[i];
+        const dayOffset = Math.floor(i / DAILY_TIMES.length);
+        const slotIdx = i % DAILY_TIMES.length;
+        const timeSlot = DAILY_TIMES[slotIdx];
+
+        const targetDate = new Date(Date.UTC(startYear, startMonth, startDay + dayOffset));
+        const dateStr = targetDate.toISOString().split('T')[0];
+        const scheduledFor = `${dateStr}T${timeSlot}+01:00`;
+
+        try {
+          const { data: film } = await supabase
+            .from('films')
+            .select('id, title, poster_url, coming_soon, release_date')
+            .eq('id', filmId)
+            .maybeSingle();
+
+          if (!film) {
+            console.warn(`[Copilot batch_schedule] Film not found: ${filmId}`);
+            continue;
+          }
+
+          const isUpcoming = film.coming_soon || (film.release_date && new Date(film.release_date).getTime() > Date.now());
+          const contentType = isUpcoming ? 'upcoming_movie' : 'where_to_watch';
+          const templateSlug = isUpcoming ? 'upcoming-movie-v1' : 'now-showing-cinemas-v1';
+
+          const draft = await generateSocialDraft(
+            {
+              contentType: contentType as any,
+              sourceEntityId: film.id,
+              templateSlug,
+              platforms: finalPlatforms,
+            },
+            actor as any,
+          );
+
+          const contentItemId = draft.contentItem.id;
+
+          if (status === 'scheduled') {
+            await reviewContentItem({ contentItemId, action: 'submit' }, actor as any);
+            await reviewContentItem({ contentItemId, action: 'approve' }, actor as any);
+            await scheduleContentItem({ contentItemId, scheduledFor }, actor as any);
+
+            await supabase
+              .from('social_content_items')
+              .update({
+                scheduled_for: scheduledFor,
+                status: 'scheduled',
+                metadata: {
+                  scheduled_date: dateStr,
+                  scheduled_time: timeSlot,
+                  auto_scheduled: true,
+                  copilot_scheduled: true,
+                },
+              })
+              .eq('id', contentItemId);
+          }
+
+          scheduledItems.push({
+            content_item_id: contentItemId,
+            title: draft.contentItem.title,
+            film_title: film.title,
+            status,
+            scheduled_for: scheduledFor,
+            scheduled_date: dateStr,
+            scheduled_time: timeSlot,
+            platforms: finalPlatforms,
+          });
+        } catch (itemErr: any) {
+          console.error(`[Copilot batch_schedule] Failed to schedule film ${filmId}:`, itemErr.message);
+          scheduledItems.push({
+            film_id: filmId,
+            error: itemErr.message,
+          });
+        }
+      }
+
+      return {
+        success: true,
+        count: scheduledItems.filter((s) => !s.error).length,
+        status,
+        scheduled_items: scheduledItems,
+      };
+    }
+
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }
@@ -543,14 +852,27 @@ Your Capabilities:
 1. Search and inspect the database for Nigerian and African films, actors, directors, critic reviews, and stage plays.
 2. Formulate witty, culturally resonant, engaging social media copy tailored for Instagram, Threads, TikTok, Facebook, and X.
 3. Automatically look up authentic Instagram/Twitter handles (@username) for Nigerian actors and directors from our database and include them in captions.
-4. Directly create drafts in the Social Studio Queue or schedule them into the calendar when requested by the user.
-5. Provide intelligent answers, trivia, release schedules, box office context, and industry insights like a top Nollywood insider and ChatGPT-style assistant.
+4. Discover the newest films with verified vertical portrait posters using get_latest_films.
+5. Batch schedule or draft social media posts into the Social Studio calendar queue using batch_schedule_posts or create individual posts using create_social_draft.
+6. Provide intelligent answers, trivia, release schedules, box office context, and industry insights like a top Nollywood insider.
+
+Handling Scheduling & Portrait Poster Requests:
+- When the user asks to schedule posts for the latest YouTube or streaming platform movies with portrait posters:
+  Step 1: Call get_latest_films with platform="all" (or "youtube" / "streaming" as requested), limit=5 (or requested count), and require_portrait_poster=true.
+  Step 2: Take the returned film IDs and call batch_schedule_posts with status="scheduled" (or "draft" if user asked for drafts).
+  Step 3: Respond to the user with a stylish, celebratory confirmation detailing:
+    - Each film title and its destination platform (e.g. YouTube, NolliStream, Docuth, Netflix, Prime Video)
+    - The scheduled date and time slot for each post
+    - Confirmation that each film has a verified crisp portrait poster attached (no 16:9 YouTube video thumbnails or landscape banners)
+    - A friendly note that they can view them in the Studio Queue or Calendar tab.
+
+Theatres & Stage Plays Guidelines:
+- Remember that in MuviDB, theatre stage plays (What's On Stage) are strictly upcoming or currently running live productions with verified portrait posters, ordered chronologically by nearest performance date. If asked about theatre or stage plays, use get_stage_plays with upcoming_only=true.
 
 Tone & Style:
 - Culturally attuned, confident, stylish, and knowledgeable.
 - Use natural Nigerian cinematic parlance where appropriate (e.g. Nollywood royalty, cinema blockbuster, stage magic, powerhouse performance).
-- Always ensure film titles, actor names, and streaming platform destinations (Netflix, Prime Video, YouTube, Cinemas) are factually grounded in database queries.
-- When the user asks you to create or schedule a post, execute the necessary lookup tools, then call create_social_draft to save it, and let the user know what you've done.`;
+- Always ensure film titles, actor names, and streaming platform destinations are factually grounded in database queries.`;
 
 export async function runStudioCopilotChat(input: {
   message: string;
