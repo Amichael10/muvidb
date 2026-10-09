@@ -6,7 +6,7 @@ import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
-import { PLATFORMS, isFilmOnPlatform } from '../lib/platforms';
+import { PLATFORMS, isFilmOnPlatform, platformFilter } from '../lib/platforms';
 import { formatFilmTitle, toTitleCase } from '../utils/format';
 import { AFRICAN_COUNTRY_NAMES } from '../utils/africanCountries';
 
@@ -111,6 +111,44 @@ export default function AdvancedSearch() {
   const [isTitlesLoading, setIsTitlesLoading] = useState(false);
   const [totalTitlesCount, setTotalTitlesCount] = useState(0);
 
+  // Debounced input states for live auto-filtering without lag
+  const [debouncedTitleQuery, setDebouncedTitleQuery] = useState(titleQuery);
+  const [debouncedTalentQuery, setDebouncedTalentQuery] = useState(talentQuery);
+  const [debouncedMinYear, setDebouncedMinYear] = useState(minYear);
+  const [debouncedMaxYear, setDebouncedMaxYear] = useState(maxYear);
+  const [debouncedMinRuntime, setDebouncedMinRuntime] = useState(minRuntime);
+  const [debouncedMaxRuntime, setDebouncedMaxRuntime] = useState(maxRuntime);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTitleQuery(titleQuery), 300);
+    return () => clearTimeout(t);
+  }, [titleQuery]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTalentQuery(talentQuery), 300);
+    return () => clearTimeout(t);
+  }, [talentQuery]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMinYear(minYear), 200);
+    return () => clearTimeout(t);
+  }, [minYear]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMaxYear(maxYear), 200);
+    return () => clearTimeout(t);
+  }, [maxYear]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMinRuntime(minRuntime), 200);
+    return () => clearTimeout(t);
+  }, [minRuntime]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMaxRuntime(maxRuntime), 200);
+    return () => clearTimeout(t);
+  }, [maxRuntime]);
+
   // Accordion toggle state on sidebar
   const [collapsedSections, setCollapsedSections] = useState({
     titleName: false,
@@ -169,10 +207,16 @@ export default function AdvancedSearch() {
   // TAB 3: TALENT / NAMES FILTER STATE
   // ----------------------------------------------------
   const [nameQuery, setNameQuery] = useState('');
+  const [debouncedNameQuery, setDebouncedNameQuery] = useState('');
   const [nameProfession, setNameProfession] = useState('all');
   const [minFilmsCount, setMinFilmsCount] = useState('');
   const [namesResults, setNamesResults] = useState([]);
   const [isNamesLoading, setIsNamesLoading] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedNameQuery(nameQuery), 300);
+    return () => clearTimeout(t);
+  }, [nameQuery]);
 
   // ----------------------------------------------------
   // EXECUTE TITLES SEARCH
@@ -180,17 +224,21 @@ export default function AdvancedSearch() {
   const executeTitlesSearch = useCallback(async () => {
     setIsTitlesLoading(true);
     try {
+      const genresJoin = selectedGenres.length > 0
+        ? 'film_genres!inner(genres!inner(name))'
+        : 'film_genres!left(genres(name))';
+
       let query = supabase.from('films').select(`
         id, slug, title, poster_url, backdrop_url, year, language, languages,
         runtime_minutes, view_count, average_rating, liked_percent, audience_rating,
         tmdb_rating, nfvcb_rating, content_type, release_type, streaming_links, source,
         countries, budget, box_office_worldwide, box_office_domestic, synopsis,
-        film_genres!left(genres(name))
+        ${genresJoin}
       `, { count: 'exact' });
 
       // Title Name Filter
-      if (titleQuery.trim()) {
-        const clean = titleQuery.trim();
+      if (debouncedTitleQuery.trim()) {
+        const clean = debouncedTitleQuery.trim();
         if (titleMatchType === 'starts') {
           query = query.ilike('title', `${clean}%`);
         } else if (titleMatchType === 'exact') {
@@ -202,20 +250,56 @@ export default function AdvancedSearch() {
 
       // Title Type
       if (selectedTypes.length > 0) {
-        query = query.in('content_type', selectedTypes);
+        const typeMap = {
+          movie: ['movie', 'feature_film'],
+          series: ['series', 'mini_series', 'tv_show'],
+          short: ['short', 'short_film'],
+          documentary: ['documentary'],
+          skit: ['skit']
+        };
+        const expandedTypes = [...new Set(selectedTypes.flatMap(t => typeMap[t] || [t]))];
+        query = query.in('content_type', expandedTypes);
       }
 
       // Year Range
-      if (minYear) query = query.gte('year', parseInt(minYear, 10));
-      if (maxYear) query = query.lte('year', parseInt(maxYear, 10));
+      if (debouncedMinYear) {
+        const minY = parseInt(debouncedMinYear, 10);
+        if (!isNaN(minY)) query = query.gte('year', minY);
+      }
+      if (debouncedMaxYear) {
+        const maxY = parseInt(debouncedMaxYear, 10);
+        if (!isNaN(maxY)) query = query.lte('year', maxY);
+      }
 
       // Ratings
-      if (minRating) query = query.gte('average_rating', parseFloat(minRating));
-      if (minLiked) query = query.gte('liked_percent', parseInt(minLiked, 10));
+      if (minRating) {
+        const minR = parseFloat(minRating);
+        if (!isNaN(minR)) query = query.gte('average_rating', minR);
+      }
+      if (minLiked) {
+        const minL = parseInt(minLiked, 10);
+        if (!isNaN(minL)) query = query.gte('liked_percent', minL);
+      }
 
-      // Language & Country
-      if (selectedLanguage) query = query.eq('language', selectedLanguage);
-      if (selectedCountry) query = query.contains('countries', [selectedCountry]);
+      // Genres (filtered directly at DB level via inner join)
+      if (selectedGenres.length > 0) {
+        query = query.in('film_genres.genres.name', selectedGenres);
+      }
+
+      // Platform (filtered directly in DB via platformFilter)
+      if (selectedPlatform) {
+        query = query.or(platformFilter(selectedPlatform));
+      }
+
+      // Language
+      if (selectedLanguage) {
+        query = query.or(`language.ilike.%${selectedLanguage}%,languages.cs.{"${selectedLanguage}"}`);
+      }
+
+      // Country
+      if (selectedCountry) {
+        query = query.contains('countries', [selectedCountry]);
+      }
 
       // NFVCB Rating
       if (selectedRatings.length > 0) {
@@ -223,8 +307,14 @@ export default function AdvancedSearch() {
       }
 
       // Runtime
-      if (minRuntime) query = query.gte('runtime_minutes', parseInt(minRuntime, 10));
-      if (maxRuntime) query = query.lte('runtime_minutes', parseInt(maxRuntime, 10));
+      if (debouncedMinRuntime) {
+        const minRt = parseInt(debouncedMinRuntime, 10);
+        if (!isNaN(minRt)) query = query.gte('runtime_minutes', minRt);
+      }
+      if (debouncedMaxRuntime) {
+        const maxRt = parseInt(debouncedMaxRuntime, 10);
+        if (!isNaN(maxRt)) query = query.lte('runtime_minutes', maxRt);
+      }
 
       // Box Office
       if (minBoxOffice && Number(minBoxOffice) > 0) {
@@ -232,11 +322,11 @@ export default function AdvancedSearch() {
       }
 
       // Talent Filtering (Actor / Director / Writer)
-      if (talentQuery.trim()) {
+      if (debouncedTalentQuery.trim()) {
         const { data: matchedPeople } = await supabase
           .from('people')
           .select('id')
-          .ilike('name', `%${talentQuery.trim()}%`)
+          .ilike('name', `%${debouncedTalentQuery.trim()}%`)
           .limit(10);
 
         if (matchedPeople && matchedPeople.length > 0) {
@@ -245,17 +335,21 @@ export default function AdvancedSearch() {
           if (talentRole !== 'all') {
             creditQuery = creditQuery.ilike('role', `%${talentRole}%`);
           }
-          const { data: creditRows } = await creditQuery.limit(200);
+          const { data: creditRows } = await creditQuery.limit(300);
           const filmIds = [...new Set((creditRows || []).map(c => c.film_id).filter(Boolean))];
           if (filmIds.length > 0) {
             query = query.in('id', filmIds);
           } else {
-            // No films found for this talent
             setTitlesResults([]);
             setTotalTitlesCount(0);
             setIsTitlesLoading(false);
             return;
           }
+        } else {
+          setTitlesResults([]);
+          setTotalTitlesCount(0);
+          setIsTitlesLoading(false);
+          return;
         }
       }
 
@@ -271,47 +365,57 @@ export default function AdvancedSearch() {
       }[sortBy] || { col: 'view_count', asc: false };
 
       query = query.order(sortConfig.col, { ascending: sortConfig.asc, nullsFirst: false });
-      query = query.limit(60);
+      query = query.range(0, 59);
 
       const { data, count, error } = await query;
       if (error) throw error;
 
-      let processed = (data || []).map(f => ({
+      const processed = (data || []).map(f => ({
         ...f,
         box_office_gross: f.box_office_worldwide || f.box_office_domestic || 0,
         genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || (Array.isArray(f.genres) ? f.genres : [])
       }));
 
-      // In-memory filters for platform and genres if specified
-      if (selectedGenres.length > 0) {
-        processed = processed.filter(f => 
-          selectedGenres.every(g => f.genres.some(fg => fg.toLowerCase() === g.toLowerCase()))
-        );
-      }
-
-      if (selectedPlatform) {
-        processed = processed.filter(f => isFilmOnPlatform(f, selectedPlatform));
-      }
-
       setTitlesResults(processed);
-      setTotalTitlesCount(count || processed.length);
+      setTotalTitlesCount(count !== null && count !== undefined ? count : processed.length);
     } catch (err) {
       console.error('Error executing advanced title search:', err);
     } finally {
       setIsTitlesLoading(false);
     }
   }, [
-    titleQuery, titleMatchType, selectedTypes, minYear, maxYear, minRating, minLiked,
-    selectedGenres, selectedPlatform, talentQuery, talentRole, selectedLanguage,
-    selectedCountry, selectedRatings, minRuntime, maxRuntime, minBoxOffice, sortBy
+    debouncedTitleQuery, titleMatchType, selectedTypes, debouncedMinYear, debouncedMaxYear,
+    minRating, minLiked, selectedGenres, selectedPlatform, debouncedTalentQuery, talentRole,
+    selectedLanguage, selectedCountry, selectedRatings, debouncedMinRuntime, debouncedMaxRuntime,
+    minBoxOffice, sortBy
   ]);
 
-  // Sync state to URL and execute on mount or explicit search
+  // Live auto-trigger when any filter changes, on mount, or on sort change
   useEffect(() => {
     if (activeTab === 'titles') {
       executeTitlesSearch();
     }
-  }, [activeTab, sortBy]);
+  }, [
+    activeTab,
+    sortBy,
+    debouncedTitleQuery,
+    titleMatchType,
+    selectedTypes,
+    debouncedMinYear,
+    debouncedMaxYear,
+    minRating,
+    minLiked,
+    selectedGenres,
+    selectedPlatform,
+    debouncedTalentQuery,
+    talentRole,
+    selectedLanguage,
+    selectedCountry,
+    selectedRatings,
+    debouncedMinRuntime,
+    debouncedMaxRuntime,
+    minBoxOffice
+  ]);
 
   // ----------------------------------------------------
   // EXECUTE COLLABORATIONS SEARCH
@@ -475,12 +579,12 @@ export default function AdvancedSearch() {
   // ----------------------------------------------------
   // EXECUTE NAMES / TALENT SEARCH
   // ----------------------------------------------------
-  const executeNamesSearch = async () => {
+  const executeNamesSearch = useCallback(async () => {
     setIsNamesLoading(true);
     try {
       let query = supabase.from('people').select('id, name, slug, photo_url, known_for_department, film_count, bio');
-      if (nameQuery.trim()) {
-        query = query.ilike('name', `%${nameQuery.trim()}%`);
+      if (debouncedNameQuery.trim()) {
+        query = query.ilike('name', `%${debouncedNameQuery.trim()}%`);
       }
       if (nameProfession !== 'all') {
         query = query.ilike('known_for_department', `%${nameProfession}%`);
@@ -498,13 +602,13 @@ export default function AdvancedSearch() {
     } finally {
       setIsNamesLoading(false);
     }
-  };
+  }, [debouncedNameQuery, nameProfession, minFilmsCount]);
 
   useEffect(() => {
     if (activeTab === 'names') {
       executeNamesSearch();
     }
-  }, [activeTab, nameProfession]);
+  }, [activeTab, debouncedNameQuery, nameProfession, minFilmsCount, executeNamesSearch]);
 
   // Reset all filters in Titles tab
   const handleResetFilters = () => {
@@ -528,6 +632,12 @@ export default function AdvancedSearch() {
     setMinBoxOffice(0);
     setHasCriticsOnly(false);
     setSortBy('views_desc');
+    setSearchParams(prev => {
+      const p = new URLSearchParams();
+      const tab = prev.get('tab');
+      if (tab) p.set('tab', tab);
+      return p;
+    }, { replace: true });
   };
 
   return (
@@ -992,7 +1102,7 @@ export default function AdvancedSearch() {
                   )}
                 </div>
 
-                {/* 10. Language & NFVCB */}
+                {/* 10. Language & Country & NFVCB */}
                 <div className="pb-1 space-y-3">
                   <div>
                     <label className="text-xs font-bold text-text-primary block mb-1.5">Language</label>
@@ -1004,6 +1114,20 @@ export default function AdvancedSearch() {
                       <option value="">Any Language</option>
                       {LANGUAGE_OPTIONS.map(l => (
                         <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-text-primary block mb-1.5">Country / Region</label>
+                    <select
+                      value={selectedCountry}
+                      onChange={(e) => setSelectedCountry(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-xs text-text-primary focus:outline-none focus:border-brand"
+                    >
+                      <option value="">Any African Country</option>
+                      {AFRICAN_COUNTRY_NAMES.map(c => (
+                        <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
                   </div>
@@ -1109,45 +1233,120 @@ export default function AdvancedSearch() {
               </div>
 
               {/* Active Filter Chips */}
-              {(titleQuery || selectedGenres.length > 0 || selectedPlatform || minYear || talentQuery || minBoxOffice > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+              {Boolean(
+                titleQuery ||
+                selectedTypes.length > 0 ||
+                minYear ||
+                maxYear ||
+                minRating ||
+                minLiked ||
+                selectedGenres.length > 0 ||
+                selectedPlatform ||
+                talentQuery ||
+                minBoxOffice > 0 ||
+                minRuntime ||
+                maxRuntime ||
+                selectedLanguage ||
+                selectedCountry ||
+                selectedRatings.length > 0
+              ) && (
+                <div className="flex flex-wrap items-center gap-1.5 text-xs py-1">
                   <span className="text-text-muted font-mono text-[11px]">Active:</span>
+
                   {titleQuery && (
                     <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
-                      Title: {titleQuery}
+                      Title: {titleQuery} ({titleMatchType})
                       <button onClick={() => setTitleQuery('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
+
+                  {selectedTypes.map(t => {
+                    const label = { movie: 'Feature Film', series: 'TV Series', short: 'Short Film', documentary: 'Documentary', skit: 'Skit' }[t] || t;
+                    return (
+                      <span key={t} className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
+                        Type: {label}
+                        <button onClick={() => setSelectedTypes(prev => prev.filter(x => x !== t))} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
+                      </span>
+                    );
+                  })}
+
+                  {(minYear || maxYear) && (
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
+                      {minYear && maxYear ? `Era: ${minYear} – ${maxYear}` : minYear ? `From: ${minYear}` : `To: ${maxYear}`}
+                      <button onClick={() => { setMinYear(''); setMaxYear(''); }} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
+                    </span>
+                  )}
+
+                  {minRating && (
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
+                      ★ {minRating}+
+                      <button onClick={() => setMinRating('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
+                    </span>
+                  )}
+
+                  {minLiked && (
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
+                      Liked: {minLiked}%+
+                      <button onClick={() => setMinLiked('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
+                    </span>
+                  )}
+
                   {selectedGenres.map(g => (
                     <span key={g} className="px-2 py-0.5 rounded bg-brand/10 border border-brand/20 text-brand flex items-center gap-1">
                       {g}
                       <button onClick={() => setSelectedGenres(prev => prev.filter(x => x !== g))} className="hover:text-brand"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   ))}
+
                   {selectedPlatform && (
                     <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
-                      Platform: {selectedPlatform}
+                      Platform: {PLATFORMS.find(p => p.id === selectedPlatform)?.name || selectedPlatform}
                       <button onClick={() => setSelectedPlatform('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
-                  {minYear && (
-                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
-                      From: {minYear}
-                      <button onClick={() => setMinYear('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
-                    </span>
-                  )}
+
                   {talentQuery && (
                     <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
-                      With: {talentQuery}
+                      With: {talentQuery} {talentRole !== 'all' && `(${talentRole})`}
                       <button onClick={() => setTalentQuery('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
+
                   {minBoxOffice > 0 && (
                     <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
                       Gross: {formatNaira(minBoxOffice)}+
                       <button onClick={() => setMinBoxOffice(0)} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
+
+                  {(minRuntime || maxRuntime) && (
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
+                      {minRuntime && maxRuntime ? `Runtime: ${minRuntime}–${maxRuntime}m` : minRuntime ? `Min: ${minRuntime}m` : `Max: ${maxRuntime}m`}
+                      <button onClick={() => { setMinRuntime(''); setMaxRuntime(''); }} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
+                    </span>
+                  )}
+
+                  {selectedLanguage && (
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
+                      Lang: {selectedLanguage}
+                      <button onClick={() => setSelectedLanguage('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
+                    </span>
+                  )}
+
+                  {selectedCountry && (
+                    <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
+                      Country: {selectedCountry}
+                      <button onClick={() => setSelectedCountry('')} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
+                    </span>
+                  )}
+
+                  {selectedRatings.map(r => (
+                    <span key={r} className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1 font-mono">
+                      NFVCB: {r}
+                      <button onClick={() => setSelectedRatings(prev => prev.filter(x => x !== r))} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
+                    </span>
+                  ))}
+
                   <button onClick={handleResetFilters} className="text-[11px] text-brand hover:underline font-bold ml-1">
                     Clear all
                   </button>
