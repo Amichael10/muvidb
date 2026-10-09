@@ -24,7 +24,7 @@ const GEMINI_TEXT_MODELS = (process.env.GEMINI_TEXT_MODELS || process.env.GEMINI
   .split(',')
   .map((model) => model.trim())
   .filter(Boolean);
-const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-2.5-flash,gemini-3.6-flash,gemini-3.5-flash-lite')
+const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash')
   .split(',')
   .map((model) => model.trim())
   .filter(Boolean);
@@ -43,10 +43,22 @@ function isGeminiQuotaError(err: any): boolean {
   );
 }
 
-/** A revoked/typo'd Gemini key (401). Drop it for the life of this process. */
+/** A revoked/typo'd Gemini key (401/403). Drop it for the life of this process. */
 function isDeadGeminiKeyError(err: any): boolean {
   const msg = (err?.message || '').toLowerCase();
-  return err?.status === 401 || /api key not valid|invalid.?api.?key|unauthorized|\b401\b|permission.?denied/.test(msg);
+  return (
+    err?.status === 401 ||
+    err?.status === 403 ||
+    /api key not valid|invalid.?api.?key|unauthorized|forbidden|\b401\b|\b403\b|permission.?denied/.test(msg)
+  );
+}
+
+function isGeminiUnsupportedModelError(err: any): boolean {
+  const msg = (err?.message || '').toLowerCase();
+  return (
+    err?.status === 404 ||
+    /not found|is not found for api version|unsupported model|\b404\b/.test(msg)
+  );
 }
 const deadGeminiKeys = new Set<string>();
 
@@ -63,13 +75,18 @@ async function withGeminiRotation(model: string, fn: (m: any) => Promise<any>): 
     } catch (err: any) {
       lastErr = err;
       if (isDeadGeminiKeyError(err) && GEMINI_KEYS.length > 1) {
-        console.warn(`[gemini] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} is INVALID — dropping it`);
+        console.warn(`[gemini] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} is INVALID/FORBIDDEN — dropping it`);
         deadGeminiKeys.add(GEMINI_KEYS[geminiKeyIdx]);
         geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
         continue;
       }
       if (isGeminiQuotaError(err) && GEMINI_KEYS.length > 1) {
         console.warn(`[gemini] key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length} quota hit, rotating…`);
+        geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
+        continue;
+      }
+      if (isGeminiUnsupportedModelError(err) && GEMINI_KEYS.length > 1) {
+        console.warn(`[gemini] model "${model}" not found for key #${geminiKeyIdx + 1}/${GEMINI_KEYS.length}, rotating…`);
         geminiKeyIdx = (geminiKeyIdx + 1) % GEMINI_KEYS.length;
         continue;
       }

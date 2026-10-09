@@ -680,39 +680,717 @@ export const AWARD_ORGS = [
     submitLabel: 'ELOY Official Portal',
     tags: ['Lagos', 'Women in Film', 'Exquisite Magazine', 'Nollywood', 'Television', 'Empowerment'],
   },
+  {
+    id: 'CITY_PEOPLE',
+    label: 'City People Movie Awards',
+    full: 'City People Entertainment & Movie Awards',
+    tagline: 'Spotlighting Mainstream & Indigenous Excellence in Nigerian Cinema',
+    category: 'academy',
+    location: 'Lagos / Ogun State, Nigeria',
+    frequency: 'Annual (October / November)',
+    founded: 2009,
+    accent: '#EA580C',
+    about:
+      'Founded by Dr. Seye Kehinde and the City People Media Group, the City People Movie Awards (formerly City People Entertainment Awards) is one of Nigeria’s premier and longest-running cinema honours. It celebrates artistic and commercial breakthroughs across mainstream English Nollywood, Yoruba cinema, and Kannywood, honoring both veteran icons and emerging stars.',
+    when:
+      'Annual gala ceremony held in the fourth quarter (October to December) in Lagos or Ogun State.',
+    submissions:
+      'Nominations are curated by the City People entertainment editorial board alongside public voting across performance, directing, production, and lifetime recognition categories.',
+    entryPlan: {
+      fees: 'Editorial & Public Nominations',
+      eligibility: 'Nigerian and African feature films, indigenous productions, actors, directors, and producers released during the award cycle.',
+      formats: 'Cinema and streaming releases; physical and digital screeners.',
+      categoriesCount: '35+ Film, Indigenous & Acting Categories',
+      platform: 'City People Magazine & Online Channels',
+    },
+    submitUrl: 'https://citypeopleonline.com/',
+    submitLabel: 'City People Official Portal',
+    tags: ['City People', 'Lagos', 'Nollywood', 'Yoruba Cinema', 'Kannywood', 'Seye Kehinde', 'Annual Gala'],
+  },
+  {
+    id: 'AMBO',
+    label: 'AMBO',
+    full: 'Amstel Malta Box Office',
+    tagline: 'The Historic Nollywood Talent Incubator & Feature Film Initiative',
+    category: 'industry',
+    location: 'Lagos, Nigeria',
+    frequency: 'Historic Editions (2005–2011)',
+    founded: 2005,
+    accent: '#D97706',
+    about:
+      'Created by Nigerian Breweries Plc, Amstel Malta Box Office (AMBO) was a landmark Nigerian television reality initiative and film production platform that launched the breakout careers of Nollywood icons including OC Ukeje, Azizat Sadiq, Bhaira Mcwizu, and Wole Ojo. Each edition produced major cinematic feature films such as White Waters, Sitanda, and The Child.',
+    when:
+      'Ran iconic annual seasons that culminated in theatrical Nollywood feature premieres and academy acting contracts.',
+    submissions:
+      'Contestants were selected through nationwide acting auditions, followed by academy residency and professional feature casting.',
+    entryPlan: {
+      fees: 'Audition Entry',
+      eligibility: 'Aspiring Nigerian screen actors and creative performers.',
+      formats: 'Live auditions and screen tests.',
+      categoriesCount: 'Grand Prize & Production Contracts',
+      platform: 'Amstel Malta / Nigerian Breweries',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Nollywood History', 'Amstel Malta', 'Talent Incubator', 'OC Ukeje', 'Wole Ojo', 'Lagos'],
+  },
+  {
+    id: 'CNN_AFRICAN_VOICES',
+    label: 'CNN African Voices',
+    full: 'CNN African Voices Changemakers',
+    tagline: 'Spotlighting Africa’s Visionary Storytellers & Cultural Luminaries',
+    category: 'impact',
+    location: 'Atlanta, USA / Pan-African',
+    frequency: 'Weekly Global Feature & Annual Honours',
+    founded: 2009,
+    accent: '#DC2626',
+    about:
+      'CNN International’s flagship documentary series and cultural recognition platform, celebrating influential African creators, filmmakers, directors, and cultural innovators who are shaping contemporary cinema, arts, and global cultural dialogue across the continent.',
+    when:
+      'Broadcast continuously on CNN International, featuring special retrospectives and cultural spotlights.',
+    submissions:
+      'Curated by CNN International’s editorial and documentary production teams based on continental impact and artistic breakthrough.',
+    entryPlan: {
+      fees: 'Editorial Selection',
+      eligibility: 'African filmmakers, cultural trailblazers, and creative icons with distinguished international impact.',
+      formats: 'Broadcast documentary feature.',
+      categoriesCount: 'Global Cultural Spotlights',
+      platform: 'CNN International',
+    },
+    submitUrl: 'https://edition.cnn.com/specials/africa/african-voices-changemakers',
+    submitLabel: 'CNN African Voices Portal',
+    tags: ['CNN', 'Global Recognition', 'Documentary', 'Directors', 'Pan-African', 'Cultural Impact'],
+  },
+  {
+    id: 'AFRIFF',
+    label: 'AFRIFF',
+    full: 'Africa International Film Festival',
+    tagline: 'Africa’s Premier International Film Festival Hub',
+    category: 'festival',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual (November)',
+    founded: 2010,
+    accent: '#9333EA',
+    about:
+      'Founded in 2010 by Chioma Ude, the Africa International Film Festival (AFRIFF) is one of the continent’s most influential cinema gatherings. Hosted annually in Lagos, it unites African and global filmmakers through world premieres, industry masterclasses, talent labs, and the prestigious AFRIFF Globe Awards celebrating excellence in directing, acting, screenwriting, and documentary craft.',
+    when:
+      'Held annually in November in Lagos, Nigeria.',
+    submissions:
+      'Submissions open through FilmFreeway across feature films, shorts, documentaries, student projects, and animations.',
+    entryPlan: {
+      fees: 'Standard Entry ($20 – $50 on FilmFreeway)',
+      eligibility: 'African, diaspora, and international features, documentaries, and shorts completed within 2 years.',
+      formats: 'HD / 4K screener; DCP for festival screenings.',
+      categoriesCount: '18 AFRIFF Globe Awards',
+      platform: 'FilmFreeway & AFRIFF Official Portal',
+    },
+    submitUrl: 'https://afriff.com/',
+    submitLabel: 'AFRIFF Official Portal',
+    tags: ['Lagos', 'Film Festival', 'Chioma Ude', 'Globe Awards', 'International', 'Masterclasses', 'Nollywood'],
+  },
+  {
+    id: 'GIAMA',
+    label: 'GIAMA',
+    full: 'Golden Icons Academy Movie Awards',
+    tagline: 'Celebrating African Cinema Excellence in the North American Diaspora',
+    category: 'academy',
+    location: 'Houston, Texas, USA',
+    frequency: 'Annual',
+    founded: 2012,
+    accent: '#D97706',
+    about:
+      'Founded by Bode Ojo, the Golden Icons Academy Movie Awards (GIAMA) was established in Houston, Texas, to celebrate the highest achievements of African cinema and Nollywood in the diaspora. The annual red-carpet gala brought together top African film stars, directors, and North American film executives across competitive and honorary categories.',
+    when:
+      'Annual gala ceremony hosted in Houston, Texas.',
+    submissions:
+      'Films were entered through the GIAMA Academy portal across theatrical features, diaspora productions, and technical craft categories.',
+    entryPlan: {
+      fees: 'Academy Entry',
+      eligibility: 'African and diaspora narrative features released during the award cycle.',
+      formats: 'Digital screener and theatrical prints.',
+      categoriesCount: '25+ Acting, Directing & Technical Prizes',
+      platform: 'GIAMA Academy Portal',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Houston', 'Diaspora', 'USA', 'Red Carpet', 'Academy', 'Nollywood Excellence'],
+  },
+  {
+    id: 'NEA',
+    label: 'NEA Awards',
+    full: 'Nigeria Entertainment Awards',
+    tagline: 'The Landmark New York Honors for Nigerian Screen & Music Talents',
+    category: 'industry',
+    location: 'New York City, USA',
+    frequency: 'Annual (September)',
+    founded: 2006,
+    accent: '#2563EB',
+    about:
+      'The Nigeria Entertainment Awards (NEA) is an annual award ceremony established in New York City in 2006. Dedicated to recognizing Nigerian and African contributions to motion pictures, television, music, and diaspora entertainment, it honors outstanding actors, directors, producers, and musicians on a prominent American stage.',
+    when:
+      'Held annually during Labor Day weekend in September in New York City.',
+    submissions:
+      'Nominations curated by the NEA steering committee with public and academy voting.',
+    entryPlan: {
+      fees: 'Committee & Public Nominations',
+      eligibility: 'Nigerian and African feature films, actors, directors, and entertainment figures.',
+      formats: 'Screeners and released works.',
+      categoriesCount: '20+ Cinema and Entertainment Awards',
+      platform: 'NEA Official Platform',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['New York', 'Diaspora', 'Nollywood in USA', 'Acting', 'Cinema & Music'],
+  },
+  {
+    id: 'NMA',
+    label: 'Nollywood Movies Awards',
+    full: 'Nollywood Movies Awards',
+    tagline: 'Peer-Reviewed Excellence in Nigerian Motion Picture Craft',
+    category: 'academy',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual',
+    founded: 2012,
+    accent: '#7C3AED',
+    about:
+      'Founded by the Nollywood Movies Network and Alfred Soroh, the Nollywood Movies Awards (NMA) was designed to honor technical and artistic excellence in Nigerian cinema. With peer-reviewed jury deliberations across cinematography, sound design, editing, original screenplay, and acting, NMA celebrated the cinematic elevation of Nollywood.',
+    when:
+      'Annual ceremony held in Lagos, Nigeria.',
+    submissions:
+      'Film producers and distributors entered feature films for jury review.',
+    entryPlan: {
+      fees: 'Producer Entry',
+      eligibility: 'Nigerian theatrical and home video feature films released within the eligibility period.',
+      formats: 'Digital screener or DVD preview.',
+      categoriesCount: '22 Craft & Performance Categories',
+      platform: 'NMA Secretariat',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Lagos', 'Nollywood Craft', 'Screenwriting', 'Cinematography', 'Acting', 'Jury Awards'],
+  },
+  {
+    id: 'NAFCA',
+    label: 'NAFCA (African Oscars)',
+    full: 'Nollywood & African Film Critics Awards',
+    tagline: 'The Prestigious African Film Critics Honours in North America',
+    category: 'academy',
+    location: 'Los Angeles / Washington D.C., USA',
+    frequency: 'Annual (September)',
+    founded: 2011,
+    accent: '#059669',
+    about:
+      'Founded by Dr. Victor Olatoye, the Nollywood & African Film Critics Awards (widely known as NAFCA or The African Oscars) recognizes outstanding achievements in African and diaspora film, culture, and humanitarian leadership. Judged by a panel of international film critics and scholars, it bridges African motion pictures with global audiences.',
+    when:
+      'Held annually in the United States (Los Angeles, California / Washington D.C.).',
+    submissions:
+      'Submissions accepted from African and diaspora producers across narrative films, documentaries, and shorts.',
+    entryPlan: {
+      fees: 'Critics Association Entry',
+      eligibility: 'African and diaspora motion pictures released theatrically or on streaming.',
+      formats: 'Online screener / DVD screener.',
+      categoriesCount: '28 Film & Humanitarian Categories',
+      platform: 'NAFCA Secretariat',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['African Oscars', 'Critics Awards', 'USA', 'Los Angeles', 'Diaspora', 'Humanitarian'],
+  },
+  {
+    id: 'PAFF',
+    label: 'PAFF',
+    full: 'Pan African Film & Arts Festival',
+    tagline: 'America’s Largest & Longest-Running Black Film Festival',
+    category: 'festival',
+    location: 'Los Angeles, California, USA',
+    frequency: 'Annual (February)',
+    founded: 1992,
+    accent: '#EA580C',
+    about:
+      'Founded in 1992 by Hollywood actor Danny Glover, Emmy-winner Ja’Net DuBois, and Ayuko Babu, the Pan African Film & Arts Festival (PAFF) in Los Angeles is the largest Black film and cultural festival in the United States. An official Academy Award® (Oscar) qualifying festival, PAFF showcases over 200 films annually from Africa, the Caribbean, and the diaspora.',
+    when:
+      'Held annually in February during Black History Month in Los Angeles, California.',
+    submissions:
+      'Open to feature narratives, shorts, documentaries, and animations via FilmFreeway.',
+    entryPlan: {
+      fees: 'Standard Entry ($35 – $75 on FilmFreeway)',
+      eligibility: 'Black and African diaspora films showcasing cultural authenticity and cinematic vision.',
+      formats: 'DCP / Online Screener.',
+      categoriesCount: 'Oscar-Qualifying & Jury Awards',
+      platform: 'FilmFreeway & PAFF Official Portal',
+    },
+    submitUrl: 'https://www.paff.org/',
+    submitLabel: 'PAFF Official Website',
+    tags: ['Los Angeles', 'Oscar-Qualifying', 'Danny Glover', 'Black Cinema', 'FilmFreeway', 'Diaspora'],
+  },
+  {
+    id: 'FESPACO',
+    label: 'FESPACO',
+    full: 'Panafrican Film and Television Festival of Ouagadougou',
+    tagline: 'The Historic Mother of African Cinema & Étalon de Yennenga Honours',
+    category: 'festival',
+    location: 'Ouagadougou, Burkina Faso',
+    frequency: 'Biennial (February / March)',
+    founded: 1969,
+    accent: '#CA8A04',
+    about:
+      'Founded in 1969, FESPACO is the oldest, largest, and most historic film festival on the African continent. Hosted biennially in Ouagadougou, Burkina Faso, the festival crowns the prestigious Étalon de Yennenga (Golden Stallion of Yennenga), universally revered as the supreme cultural prize of African motion pictures.',
+    when:
+      'Held biennially in February/March in Ouagadougou, Burkina Faso.',
+    submissions:
+      'Open to films directed by African filmmakers or directors of African descent.',
+    entryPlan: {
+      fees: 'Free Official Entry',
+      eligibility: 'Feature fiction, documentaries, shorts, animations, and TV series directed by creators of African descent.',
+      formats: 'DCP with French and English subtitles.',
+      categoriesCount: 'Étalon de Yennenga & Official Competition',
+      platform: 'FESPACO Secretariat',
+    },
+    submitUrl: 'https://fespaco.bf/',
+    submitLabel: 'FESPACO Official Portal',
+    tags: ['Burkina Faso', 'Ouagadougou', 'Historic', 'Étalon de Yennenga', 'Pan-African', 'Mother of African Cinema'],
+  },
+  {
+    id: 'DIFF',
+    label: 'DIFF',
+    full: 'Durban International Film Festival',
+    tagline: 'Southern Africa’s Longest-Running International Festival & Market',
+    category: 'festival',
+    location: 'Durban, South Africa',
+    frequency: 'Annual (July)',
+    founded: 1979,
+    accent: '#0D9488',
+    about:
+      'Organized by the Centre for Creative Arts at the University of KwaZulu-Natal, the Durban International Film Festival (DIFF) is South Africa\'s longest-running film festival. It hosts premiere screenings of ground-breaking African and world cinema alongside the Durban FilmMart, awarding top prizes for Best Feature, Best Director, Best African Film, and documentary craft.',
+    when:
+      'Held annually in July in Durban, South Africa.',
+    submissions:
+      'Submissions accepted via FilmFreeway across features, documentaries, and shorts.',
+    entryPlan: {
+      fees: 'Standard Entry via FilmFreeway',
+      eligibility: 'African and international productions completed within the previous calendar year.',
+      formats: 'DCP / Full HD Digital Screener.',
+      categoriesCount: '15 Competitive Jury Awards',
+      platform: 'FilmFreeway & DIFF Portal',
+    },
+    submitUrl: 'https://ccadiff.ukzn.ac.za/',
+    submitLabel: 'DIFF Official Portal',
+    tags: ['South Africa', 'Durban', 'Film Festival', 'FilmFreeway', 'Durban FilmMart', 'African Cinema'],
+  },
+  {
+    id: 'SUNDANCE',
+    label: 'Sundance',
+    full: 'Sundance Film Festival',
+    tagline: 'The World’s Premier Independent Film Showcase',
+    category: 'festival',
+    location: 'Park City, Utah, USA',
+    frequency: 'Annual (January)',
+    founded: 1978,
+    accent: '#F59E0B',
+    about:
+      'Founded by Robert Redford and run by the Sundance Institute, the Sundance Film Festival is the ultimate global launchpad for independent cinema. Landmark Nollywood and African cinematic masterworks, including CJ Obasi\'s Mami Wata (Special Jury Award for Cinematography), have garnered global acclaim and awards at Sundance.',
+    when:
+      'Held annually in January in Park City and Salt Lake City, Utah.',
+    submissions:
+      'Competitive global submissions via FilmFreeway and Sundance Portal.',
+    entryPlan: {
+      fees: 'Standard Entry via FilmFreeway',
+      eligibility: 'World and US independent feature narratives, documentaries, and shorts.',
+      formats: 'DCP with open/closed captions.',
+      categoriesCount: 'World Cinema Dramatic & Grand Jury Prizes',
+      platform: 'Sundance Institute',
+    },
+    submitUrl: 'https://festival.sundance.org/',
+    submitLabel: 'Sundance Official Portal',
+    tags: ['Sundance', 'USA', 'Park City', 'Independent Cinema', 'World Cinema Dramatic', 'Global Prestige'],
+  },
+  {
+    id: 'TIFF',
+    label: 'TIFF',
+    full: 'Toronto International Film Festival',
+    tagline: 'One of the World’s Leading Film Festivals & Champions of Nollywood',
+    category: 'festival',
+    location: 'Toronto, Ontario, Canada',
+    frequency: 'Annual (September)',
+    founded: 1976,
+    accent: '#EF4444',
+    about:
+      'The Toronto International Film Festival (TIFF) is one of the most prestigious and widely attended public film festivals globally. In 2016, TIFF historicized African cinema by dedicating its prestigious "City to City" programme to Lagos, spotlighting landmark Nollywood films and launching Nigerian storytellers onto global distribution platforms.',
+    when:
+      'Held annually in September in Toronto, Canada.',
+    submissions:
+      'Open to Canadian and international films across feature and short sections via FilmFreeway.',
+    entryPlan: {
+      fees: 'International Submission Fee',
+      eligibility: 'World and international premieres; features and shorts.',
+      formats: 'DCP with English subtitles.',
+      categoriesCount: 'People’s Choice & Platform Awards',
+      platform: 'TIFF Official Portal',
+    },
+    submitUrl: 'https://www.tiff.net/',
+    submitLabel: 'TIFF Official Portal',
+    tags: ['Toronto', 'Canada', 'TIFF', 'City to City Lagos', 'World Premieres', 'Global Hub'],
+  },
+  {
+    id: 'ZAFAA',
+    label: 'ZAFAA Global Awards',
+    full: 'Zulu African Film Academy Awards',
+    tagline: 'The Largest African Film Awards Gala in Europe & the UK',
+    category: 'academy',
+    location: 'London, United Kingdom / Lagos, Nigeria',
+    frequency: 'Annual (October / November)',
+    founded: 2006,
+    accent: '#8B5CF6',
+    about:
+      'Founded in 2006 by Sam Anwuzia, the ZAFAA Global Awards (Zulu African Film Academy Awards) is Europe’s largest annual celebration of Nollywood and African movie excellence. Staged in prestigious venues across London and global host cities, ZAFAA honours outstanding directors, screenwriters, actors, and technicians.',
+    when:
+      'Held annually in late autumn in London, UK and partner cities.',
+    submissions:
+      'Open to African filmmakers and diaspora producers.',
+    entryPlan: {
+      fees: 'Academy Entry',
+      eligibility: 'African and diaspora feature films released within the eligible period.',
+      formats: 'HD Screener / Preview copy.',
+      categoriesCount: '24 Film & Craft Prizes',
+      platform: 'ZAFAA Academy',
+    },
+    submitUrl: 'https://zafaa.org/',
+    submitLabel: 'ZAFAA Official Portal',
+    tags: ['London', 'United Kingdom', 'Diaspora', 'Sam Anwuzia', 'Nollywood in UK', 'Red Carpet'],
+  },
+  {
+    id: 'GMAA',
+    label: 'Golden Movie Awards Africa',
+    full: 'Golden Movie Awards Africa (GMAA)',
+    tagline: 'Honouring Film & Television Craft Across West & Pan-Africa',
+    category: 'academy',
+    location: 'Accra, Ghana',
+    frequency: 'Annual',
+    founded: 2015,
+    accent: '#EAB308',
+    about:
+      'Founded by NMJ Filmhouse and Mimi Andani Michaels in Accra, Ghana, the Golden Movie Awards Africa (GMAA) is an annual cinema awards body dedicated to recognizing top performances, directing, cinematography, and screenwriting across Ghana, Nigeria, and the wider African continent.',
+    when:
+      'Held annually in Accra, Ghana.',
+    submissions:
+      'Filmmakers and producers submit feature films, documentaries, and short films for jury consideration.',
+    entryPlan: {
+      fees: 'Free / Administrative Entry',
+      eligibility: 'African feature films, comedy films, shorts, and TV series produced in Africa.',
+      formats: 'Full HD digital screener.',
+      categoriesCount: '20+ Golden Craft & Performance Categories',
+      platform: 'GMAA Secretariat',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Ghana', 'Accra', 'West Africa', 'Golden Actor', 'Cinema Craft', 'Pan-African'],
+  },
+  {
+    id: 'NAGA',
+    label: 'NAGA',
+    full: 'Nigerian Academy of Golden Awards',
+    tagline: 'Celebrating Discipline, Craft & Lifetime Achievements in Nollywood',
+    category: 'industry',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual',
+    founded: 2018,
+    accent: '#047857',
+    about:
+      'The Nigerian Academy of Golden Awards (NAGA) is an entertainment and screen honors platform in Nigeria recognizing seasoned practitioners, veteran icons, and emerging performers for their dedication, artistic discipline, and enduring contributions to the motion picture industry.',
+    when:
+      'Annual gala ceremony in Lagos, Nigeria.',
+    submissions:
+      'Curated through industry nomination panels and guild peer assessments.',
+    entryPlan: {
+      fees: 'Guild & Peer Nomination',
+      eligibility: 'Active Nigerian cinema and television practitioners.',
+      formats: 'Performance reels and film screeners.',
+      categoriesCount: '15 Screen & Craft Accolades',
+      platform: 'NAGA Secretariat',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Lagos', 'Nollywood', 'Discipline & Craft', 'Veterans', 'Merit Honours'],
+  },
+  {
+    id: 'HER_NETWORK',
+    label: 'Her Network',
+    full: 'Her Network Woman of the Year Awards',
+    tagline: 'Championing Inspiring Women in Entertainment & Screen Industries',
+    category: 'impact',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual (December)',
+    founded: 2017,
+    accent: '#EC4899',
+    about:
+      'Founded in 2017 by Nkem Onwudiwe, the Her Network Woman of the Year (HNWOTY) Awards celebrate extraordinary women who exhibit exceptional leadership, creative resilience, and social impact in film, television, media, technology, and public service across Africa.',
+    when:
+      'Held annually in December in Lagos, Nigeria.',
+    submissions:
+      'Public nominations followed by an independent judging panel assessment.',
+    entryPlan: {
+      fees: 'Free Public Nomination',
+      eligibility: 'Women of African descent who have made tangible impacts in entertainment, media, and arts.',
+      formats: 'Nomination dossier and portfolio.',
+      categoriesCount: '12 Impact Categories',
+      platform: 'Her Network Portal',
+    },
+    submitUrl: 'https://hernetwork.co/',
+    submitLabel: 'Her Network Portal',
+    tags: ['Lagos', 'Women in Film', 'Empowerment', 'Leadership', 'Impact', 'Osas Ighodaro'],
+  },
+  {
+    id: 'GREEN_OCTOBER',
+    label: 'Green October Event',
+    full: 'Green October Event by La Mode Magazine',
+    tagline: 'Humanitarian & Arts Recognition Championing Disability Inclusion',
+    category: 'impact',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual (October 1st)',
+    founded: 2015,
+    accent: '#16A34A',
+    about:
+      'Founded in 2015 by Sandra Odige and La Mode Magazine, the Green October Event is a prestigious annual humanitarian and creative arts gala held on Nigeria’s Independence Day (October 1st). The initiative raises awareness and support for persons living with disabilities while honoring filmmakers, actors, and public figures for humanitarian impact.',
+    when:
+      'Held annually on October 1st (Nigeria Independence Day) in Lagos, Nigeria.',
+    submissions:
+      'Nominations open to the public and vetted by the La Mode humanitarian committee.',
+    entryPlan: {
+      fees: 'Public & Humanitarian Nomination',
+      eligibility: 'Filmmakers, actors, philanthropists, and fashion leaders supporting social causes.',
+      formats: 'Portfolio and impact brief.',
+      categoriesCount: 'Humanitarian & Creative Honours',
+      platform: 'La Mode Magazine',
+    },
+    submitUrl: 'https://lamodespot.com/',
+    submitLabel: 'La Mode Magazine',
+    tags: ['Lagos', 'Humanitarian', 'Disability Inclusion', 'Independence Day', 'Philanthropy'],
+  },
+  {
+    id: 'EMMY',
+    label: 'International Emmy',
+    full: 'International Emmy Awards',
+    tagline: 'Global Television Excellence & International Directorate Honours',
+    category: 'academy',
+    location: 'New York City, USA',
+    frequency: 'Annual (November)',
+    founded: 1973,
+    accent: '#B45309',
+    about:
+      'Administered by the International Academy of Television Arts & Sciences, the International Emmy Awards recognise excellence in television programming produced initially outside the United States. Landmark African media pioneers, including EbonyLife Media founder Mo Abudu, have been bestowed the prestigious Directorate Award at the ceremony.',
+    when:
+      'Held annually in November in New York City.',
+    submissions:
+      'Competitive entry across international broadcast and streaming television categories.',
+    entryPlan: {
+      fees: 'International Academy Entry Fee',
+      eligibility: 'Television programmes and series produced outside the United States.',
+      formats: 'Broadcast master / digital screener.',
+      categoriesCount: 'International Academy Categories',
+      platform: 'International Academy of Television Arts & Sciences',
+    },
+    submitUrl: 'https://www.iemmys.tv/',
+    submitLabel: 'International Emmy Portal',
+    tags: ['New York', 'Television Academy', 'Global Honours', 'Directorate Award', 'Mo Abudu'],
+  },
+  {
+    id: 'VENICE',
+    label: 'Venice Biennale Honours',
+    full: 'Venice International Film Festival Parallel Awards (Bisato d’Oro / Venice Days)',
+    tagline: 'Independent Critics & Festival Accolades at the World’s Oldest Film Festival',
+    category: 'festival',
+    location: 'Venice, Italy',
+    frequency: 'Annual (August / September)',
+    founded: 1932,
+    accent: '#BE185D',
+    about:
+      'Prestigious parallel jury and independent critics’ accolades awarded during the historic Venice International Film Festival (La Biennale di Venezia) in Italy, including the Bisato d’Oro (Premio della Critica Indipendente), Giornate degli Autori (Venice Days), and CICT-UNESCO Enrico Fulchignoni awards celebrating exceptional ensemble performances and visionary directorial storytelling.',
+    when:
+      'Held annually in late summer on the Lido di Venezia, Italy.',
+    submissions:
+      'Official and independent festival sidebar selections.',
+    entryPlan: {
+      fees: 'Festival Selection Entry',
+      eligibility: 'Feature narratives and documentaries selected for Venice parallel sections.',
+      formats: 'Theatrical DCP.',
+      categoriesCount: 'Independent Critics & Cultural Awards',
+      platform: 'La Biennale di Venezia',
+    },
+    submitUrl: 'https://www.labiennale.org/en/cinema',
+    submitLabel: 'La Biennale di Venezia',
+    tags: ['Venice', 'Italy', 'Biennale', 'Bisato d’Oro', 'Independent Critics', 'International Cinema'],
+  },
+  {
+    id: 'AFRICA_CHOICE',
+    label: 'Africa Choice Awards',
+    full: 'Africa Choice Awards',
+    tagline: 'Celebrating Outstanding Creative Talent Across African Entertainment',
+    category: 'industry',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual',
+    founded: 2020,
+    accent: '#0891B2',
+    about:
+      'The Africa Choice Awards is an annual continental entertainment awards platform that recognizes the achievements of African performers, filmmakers, musicians, and influencers who inspire and impact contemporary creative culture across Africa.',
+    when:
+      'Annual gala ceremony in Lagos, Nigeria.',
+    submissions:
+      'Public nominations followed by online continental fan voting.',
+    entryPlan: {
+      fees: 'Free Public Nomination',
+      eligibility: 'African actors, media stars, filmmakers, and digital creatives.',
+      formats: 'Nomination profile and public voting.',
+      categoriesCount: '20+ Pan-African Categories',
+      platform: 'Africa Choice Awards Portal',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Pan-African', 'Lagos', 'Audience Choice', 'Entertainment', 'Acting'],
+  },
+  {
+    id: 'YMAA',
+    label: 'YMAA',
+    full: 'Yoruba Movie Academy Awards',
+    tagline: 'Celebrating Outstanding Performances & Cultural Heritage in Yoruba Cinema',
+    category: 'indigenous',
+    location: 'Ibadan / Lagos, Nigeria',
+    frequency: 'Annual',
+    founded: 2010,
+    accent: '#D97706',
+    about:
+      'The Yoruba Movie Academy Awards (YMAA) is a premier indigenous film awards ceremony dedicated to recognizing excellence in Yoruba-language cinema. Celebrating superior performances, directing, cinematography, cultural authenticity, and screenwriting, YMAA honors both veteran legends and contemporary stars.',
+    when:
+      'Annual gala celebration held in Ibadan or Lagos, Nigeria.',
+    submissions:
+      'Indigenous movie producers and practitioners submit titles released within the award window.',
+    entryPlan: {
+      fees: 'Free / Producer Submission',
+      eligibility: 'Yoruba-language feature films and productions.',
+      formats: 'Digital screener or DVD master.',
+      categoriesCount: '20+ Acting & Technical Prizes',
+      platform: 'YMAA Secretariat',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Yoruba Cinema', 'Indigenous', 'Ibadan', 'Acting', 'Cultural Heritage', 'Nollywood'],
+  },
+  {
+    id: 'NIGERIA_ACHIEVERS',
+    label: 'Nigeria Achievers Awards',
+    full: 'Nigeria Achievers & Women Achievers Awards',
+    tagline: 'Recognizing Excellence & Leadership Across Nollywood & Enterprise',
+    category: 'industry',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual',
+    founded: 2018,
+    accent: '#4F46E5',
+    about:
+      'Annual national awards gala celebrating outstanding achievers, screen actors, producers, business leaders, and cultural figures making significant impacts in Nollywood, television, entrepreneurship, and community building across Nigeria.',
+    when:
+      'Annual awards gala held in Lagos, Nigeria.',
+    submissions:
+      'Nominations submitted by industry peers and the public.',
+    entryPlan: {
+      fees: 'Public & Peer Nomination',
+      eligibility: 'Nigerian actors, filmmakers, and leaders with recognized contributions.',
+      formats: 'Nomination dossier and public voting.',
+      categoriesCount: '15+ Film & Leadership Awards',
+      platform: 'Secretariat Portal',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Lagos', 'Achievers', 'Nollywood Supporting Actors', 'Leadership'],
+  },
+  {
+    id: 'MISS_BLACK_USA',
+    label: 'Miss Black USA',
+    full: 'Miss Black USA Pageant & Cultural Honours',
+    tagline: 'Celebrating Scholastic Achievement, Arts & Cultural Ambassadorship',
+    category: 'impact',
+    location: 'Washington D.C., USA',
+    frequency: 'Annual',
+    founded: 1986,
+    accent: '#9333EA',
+    about:
+      'Founded in 1986 by Karen Arrington, Miss Black USA is the premier scholarship pageant and cultural honours platform for young women of color in the United States, championing education, health advocacy, and arts careers (with alumni including prominent Nollywood and international screen star Osas Ighodaro).',
+    when:
+      'Held annually in August in Washington D.C.',
+    submissions:
+      'State delegate applications and pageant competitions.',
+    entryPlan: {
+      fees: 'Delegate Application',
+      eligibility: 'Women of African descent demonstrating scholastic and leadership excellence.',
+      formats: 'Live competition and interview.',
+      categoriesCount: 'Scholarship & National Crown',
+      platform: 'Miss Black USA Official Portal',
+    },
+    submitUrl: 'https://www.missblackusa.org/',
+    submitLabel: 'Miss Black USA Portal',
+    tags: ['USA', 'Scholarship', 'Cultural Ambassadorship', 'Osas Ighodaro', 'Leadership'],
+  },
+  {
+    id: 'PEAK',
+    label: 'Peak Awards',
+    full: 'Peak Nollywood Talent Awards',
+    tagline: 'Celebrating Outstanding Performance & Emerging Screen Talent',
+    category: 'industry',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual',
+    founded: 2010,
+    accent: '#0284C7',
+    about:
+      'Annual screen performance recognition initiative celebrating breakthrough acting roles, charismatic screen presence, and artistic dedication among Nigerian television and movie performers.',
+    when:
+      'Annual ceremony in Lagos, Nigeria.',
+    submissions:
+      'Curated by entertainment media panels and talent casting committees.',
+    entryPlan: {
+      fees: 'Talent Committee Nomination',
+      eligibility: 'Nollywood screen actors in feature films and television series.',
+      formats: 'Performance reels.',
+      categoriesCount: 'Acting & Performance Prizes',
+      platform: 'Peak Honours Board',
+    },
+    submitUrl: null,
+    submitLabel: null,
+    tags: ['Lagos', 'Nollywood', 'Breakthrough Actors', 'Acting Honors'],
+  },
 ];
 
 export function getAwardOrg(id) {
   if (!id) return null;
+  const cleanId = String(id).trim();
   const match =
-    AWARD_ORGS.find((o) => o.id.toLowerCase() === String(id).toLowerCase()) ||
-    AWARD_ORGS.find((o) => o.label.toLowerCase() === String(id).toLowerCase()) ||
-    AWARD_ORGS.find((o) => o.full.toLowerCase().includes(String(id).toLowerCase()));
+    AWARD_ORGS.find((o) => o.id.toLowerCase() === cleanId.toLowerCase()) ||
+    AWARD_ORGS.find((o) => o.label.toLowerCase() === cleanId.toLowerCase()) ||
+    AWARD_ORGS.find((o) => o.full.toLowerCase().includes(cleanId.toLowerCase()));
   if (match) return match;
 
+  const cleanLabel = cleanId.replace(/_/g, ' ');
+
   return {
-    id,
-    label: id,
-    full: id,
-    tagline: 'African Cinema Honours & Recognition',
+    id: cleanId,
+    label: cleanLabel,
+    full: cleanLabel,
+    tagline: 'African & International Cinema Honours',
     category: 'academy',
     location: 'Nigeria / Africa',
     frequency: 'Annual',
     founded: null,
     accent: 'var(--color-brand)',
-    about: 'A recognized film, television, or cultural awards body in the MuviDB catalogue.',
+    about: `Honours, film festival accolades, and cultural achievement awards celebrating cinematic excellence and artistic craft recorded in the MuviDB catalogue for ${cleanLabel}.`,
     when: 'Dates and ceremony timelines vary by edition.',
-    submissions: 'Submissions are administered by the organising body each season.',
+    submissions: 'Submissions and selections are administered by the organising body each season.',
     entryPlan: {
       fees: 'Check with organisers',
       eligibility: 'African and international film productions.',
       formats: 'Digital screener.',
-      categoriesCount: 'Multiple Categories',
-      platform: 'Official Portal',
+      categoriesCount: 'Competitive Categories',
+      platform: 'Official Channel',
     },
     submitUrl: null,
     submitLabel: null,
-    tags: ['African Cinema', 'Honours'],
+    tags: ['Cinema', 'Honours', 'Recognition'],
   };
 }
 
@@ -723,6 +1401,7 @@ export function normOrg(raw) {
   if (upper.includes('YOMAFA') || upper.includes('YOMAFA GLOBAL')) return 'YOMAFA';
   if (upper.includes('AMVCA') || upper.includes('AFRICA MAGIC')) return 'AMVCA';
   if (upper.includes('AMAA') || upper.includes('AFRICA MOVIE ACADEMY')) return 'AMAA';
+  if (upper.includes('CITY PEOPLE') || upper.includes('CITY_PEOPLE')) return 'CITY_PEOPLE';
   if (upper.includes('TINFF') || upper.includes('INDUSTRY NOLLYWOOD')) return 'TINFF';
   if (upper.includes('BINFF') || upper.includes('BRAMPTON INTERNATIONAL') || upper.includes('BRAMPTON NOLLYWOOD')) return 'BINFF';
   if (upper.includes('DIYMA') || upper.includes('DISTINCT INDIGENOUS')) return 'DIYMA';
@@ -743,10 +1422,33 @@ export function normOrg(raw) {
   if (upper.includes('BIFF') || upper.includes('BAYELSA INTERNATIONAL') || upper.includes('BAYELSA FILM')) return 'BIFF';
   if (upper.includes('BCFF') || upper.includes('BENIN CITY FILM') || upper.includes('BENIN FILM')) return 'BCFF';
   if (upper.includes('LIFANIMA') || upper.includes('ANIMATION FESTIVAL') || upper.includes('LAGOS INTERNATIONAL FESTIVAL OF ANIMATION')) return 'LIFANIMA';
-  if (upper.includes('EKO STAR')) return 'EKO_STAR';
+  if (upper.includes('EKO STAR') || upper.includes('EKO_STAR')) return 'EKO_STAR';
   if (upper.includes('SEPTIMIUS')) return 'SEPTIMIUS';
-  if (upper.includes('OAFP') || upper.includes('ODUNLADE ADEKOLA')) return 'OAFP';
   if (upper.includes('ELOY') || upper.includes('EXQUISITE LADY')) return 'ELOY';
+  if (upper.includes('AFRIFF') || upper.includes('AFRICA INTERNATIONAL FILM FESTIVAL')) return 'AFRIFF';
+  if (upper.includes('GIAMA') || upper.includes('GOLDEN ICONS')) return 'GIAMA';
+  if (upper.includes('NEA') || upper.includes('NIGERIA ENTERTAINMENT AWARDS')) return 'NEA';
+  if (upper.includes('NMA') || upper.includes('NOLLYWOOD MOVIES AWARDS')) return 'NMA';
+  if (upper.includes('NAFCA') || upper.includes('AFRICAN OSCARS') || upper.includes('NOLLYWOOD & AFRICAN FILM CRITICS') || upper.includes('FILM CRITICS')) return 'NAFCA';
+  if (upper.includes('PAFF') || upper.includes('PAN AFRICAN FILM')) return 'PAFF';
+  if (upper.includes('FESPACO')) return 'FESPACO';
+  if (upper.includes('DIFF') || upper.includes('DURBAN INTERNATIONAL')) return 'DIFF';
+  if (upper.includes('SUNDANCE')) return 'SUNDANCE';
+  if (upper === 'TIFF' || upper.includes('TORONTO INTERNATIONAL')) return 'TIFF';
+  if (upper.includes('ZAFAA') || upper.includes('ZULU AFRICAN')) return 'ZAFAA';
+  if (upper.includes('GMAA') || upper.includes('GOLDEN MOVIE AWARDS')) return 'GMAA';
+  if (upper.includes('NAGA') || upper.includes('ACADEMY OF GOLDEN AWARDS')) return 'NAGA';
+  if (upper.includes('AMBO') || upper.includes('AMSTEL MALTA')) return 'AMBO';
+  if (upper.includes('CNN') || upper.includes('AFRICAN VOICES')) return 'CNN_AFRICAN_VOICES';
+  if (upper.includes('HER NETWORK')) return 'HER_NETWORK';
+  if (upper.includes('GREEN OCTOBER') || upper.includes('LA MODE')) return 'GREEN_OCTOBER';
+  if (upper.includes('EMMY')) return 'EMMY';
+  if (upper.includes('VENICE') || upper.includes('BISATO D\'ORO') || upper.includes('GIORNATE DEGLI AUTORI') || upper.includes('EUROPA CINEMAS')) return 'VENICE';
+  if (upper.includes('AFRICA CHOICE')) return 'AFRICA_CHOICE';
+  if (upper.includes('YMAA') || upper.includes('YORUBA MOVIE GIST') || upper.includes('YORUBA MOVIE ACADEMY')) return 'YMAA';
+  if (upper.includes('NIGERIA ACHIEVERS') || upper.includes('NIGERIA WOMEN ACHIEVERS')) return 'NIGERIA_ACHIEVERS';
+  if (upper.includes('MISS BLACK USA')) return 'MISS_BLACK_USA';
+  if (upper.includes('PEAK AWARDS') || upper === 'PEAK') return 'PEAK';
   return s;
 }
 

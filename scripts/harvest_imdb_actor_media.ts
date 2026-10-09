@@ -52,7 +52,6 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: { persistSession: false }
 });
 
-const firecrawlKey = process.env.FIRECRAWL_API_KEY || process.env.VITE_FIRECRAWL_API_KEY || '';
 const tmdbKey = process.env.VITE_TMDB_API_KEY || process.env.TMDB_API_KEY || '';
 const CACHE_FILE = path.resolve('scripts/data/actor_imdb_cache.json');
 
@@ -136,81 +135,65 @@ function saveCache(cache: Record<string, string>) {
   } catch {}
 }
 
-async function scrapeUrlWithFirecrawl(url: string): Promise<{ html?: string; markdown?: string }> {
-  if (!firecrawlKey) {
-    throw new Error('FIRECRAWL_API_KEY is not configured in .env');
-  }
-
-  const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${firecrawlKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      url,
-      formats: ['html', 'markdown'],
-      onlyMainContent: false,
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Firecrawl scrape error (${res.status}): ${errText}`);
-  }
-
-  const json = await res.json();
-  if (!json.success || !json.data) {
-    throw new Error(json.error || 'Firecrawl failed to scrape page');
-  }
-
-  return { html: json.data.html || '', markdown: json.data.markdown || '' };
-}
-
 /**
- * Resolve IMDb NM ID via TMDB external_ids or IMDb search
+ * Resolve IMDb NM ID via TMDB external_ids or free IMDb Suggestion API
  */
 async function resolveImdbIdForPerson(person: { id: string; name: string; tmdb_id?: number | null }): Promise<string | null> {
   const cache = loadCache();
   if (cache[person.id]) return cache[person.id];
   if (cache[person.name]) return cache[person.name];
 
-  // 1. Check TMDB external_ids if person has tmdb_id
-  if (person.tmdb_id && tmdbKey) {
+  // 1. Check TMDB external_ids if person has tmdb_id, or search TMDB
+  if (tmdbKey) {
     try {
-      const tmdbUrl = `https://api.themoviedb.org/3/person/${person.tmdb_id}/external_ids?api_key=${tmdbKey}`;
-      const res = await fetch(tmdbUrl);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.imdb_id) {
-          cache[person.id] = data.imdb_id;
-          cache[person.name] = data.imdb_id;
-          saveCache(cache);
-          return data.imdb_id;
+      let tmdbPersonId = person.tmdb_id;
+      if (!tmdbPersonId) {
+        const sRes = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${tmdbKey}&query=${encodeURIComponent(person.name)}`);
+        if (sRes.ok) {
+          const sData = await sRes.json();
+          if (sData.results?.[0]?.id) {
+            tmdbPersonId = sData.results[0].id;
+          }
+        }
+      }
+
+      if (tmdbPersonId) {
+        const tmdbUrl = `https://api.themoviedb.org/3/person/${tmdbPersonId}/external_ids?api_key=${tmdbKey}`;
+        const res = await fetch(tmdbUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.imdb_id) {
+            cache[person.id] = data.imdb_id;
+            cache[person.name] = data.imdb_id;
+            saveCache(cache);
+            return data.imdb_id;
+          }
         }
       }
     } catch (e: any) {
-      console.warn(`  ⚠️ TMDB external_ids error for ${person.name}:`, e.message);
+      console.warn(`  ⚠️ TMDB lookup error for ${person.name}:`, e.message);
     }
   }
 
-  // 2. Search IMDb via Firecrawl
-  if (firecrawlKey) {
-    try {
-      console.log(`  🔎 Searching IMDb for: "${person.name}"...`);
-      const searchUrl = `https://www.imdb.com/find/?q=${encodeURIComponent(person.name)}&s=nm`;
-      const { html = '', markdown = '' } = await scrapeUrlWithFirecrawl(searchUrl);
-      const match = html.match(/\/name\/(nm\d+)\//) || markdown.match(/\/name\/(nm\d+)\//);
+  // 2. Query free IMDb Suggestion API (Free, Instant JSON, $0)
+  try {
+    const cleanQuery = encodeURIComponent(person.name.trim());
+    const res = await fetch(`https://v3.sg.media-imdb.com/suggestion/x/${cleanQuery}.json`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const match = (data.d || []).find((item: any) => item.id?.startsWith('nm'));
       if (match) {
-        const imdbId = match[1];
+        const imdbId = match.id;
         cache[person.id] = imdbId;
         cache[person.name] = imdbId;
         saveCache(cache);
         return imdbId;
       }
-    } catch (e: any) {
-      console.warn(`  ⚠️ IMDb search error for ${person.name}:`, e.message);
     }
+  } catch (e: any) {
+    console.warn(`  ⚠️ IMDb Suggest API lookup error for ${person.name}:`, e.message);
   }
 
   return null;
@@ -242,185 +225,100 @@ interface ExtractedMedia {
 }
 
 /**
- * Scrapes an IMDb video detail page (vi...) using Firecrawl rawHtml to extract
- * full MP4 streaming URLs, thumbnail, title, and film connection from __NEXT_DATA__.
+ * Harvests high-resolution actor media (Headshots, Stills, Tagged Photos)
+ * completely free from TMDB API and IMDb public CDN endpoints.
  */
-async function scrapeImdbVideoPage(viId: string): Promise<ExtractedMedia | null> {
-  const url = `https://www.imdb.com/video/${viId}/`;
-  try {
-    const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${firecrawlKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url, formats: ['rawHtml'] }),
-    });
-
-    if (!res.ok) return null;
-    const jsonRes = await res.json();
-    const rawHtml = jsonRes.data?.rawHtml || '';
-    const nextDataMatch = rawHtml.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-    if (!nextDataMatch) return null;
-
-    const parsed = JSON.parse(nextDataMatch[1]);
-    const videoData = parsed.props?.pageProps?.videoPlaybackData?.video;
-    if (!videoData) return null;
-
-    const videoName = videoData.name?.value || 'Video Clip';
-    const filmTitle = videoData.primaryTitle?.titleText?.text || '';
-    const contentType = videoData.contentType?.displayName?.value || 'Clip';
-    const thumbnail = videoData.thumbnail?.url || null;
-    const description = videoData.description?.value || '';
-
-    // Extract playback stream URLs (prefer direct MP4 stream)
-    const playbackURLs = videoData.playbackURLs || [];
-    const mp4Streams = playbackURLs.filter((p: any) => p.mimeType === 'video/mp4');
-    const streamUrl = mp4Streams[0]?.url || playbackURLs[0]?.url || null;
-
-    const fullTitle = filmTitle ? `${filmTitle} - ${videoName}` : videoName;
-
-    return {
-      url: streamUrl || `https://www.imdb.com/video/${viId}/`,
-      title: fullTitle,
-      description: description || `IMDb video: ${fullTitle}`,
-      category: 'scene_clip',
-      media_type: 'video',
-      thumbnail_url: thumbnail,
-      embed_provider: streamUrl ? 'imdb' : 'imdb',
-      embed_id: viId,
-    };
-  } catch (e: any) {
-    console.warn(`    ⚠️ Failed scraping video ${viId}:`, e.message);
-    return null;
-  }
-}
-
-/**
- * Scrapes IMDb profile, mediaindex gallery, and video galleries for all media assets
- */
-async function fetchActorImdbMedia(imdbId: string, actorName: string): Promise<ExtractedMedia[]> {
+async function fetchActorImdbMedia(imdbId: string, actorName: string, tmdbPersonId?: number | null): Promise<ExtractedMedia[]> {
   const mediaList: ExtractedMedia[] = [];
   const seenUrls = new Set<string>();
 
-  // 1. Scrape main IMDb Name page
-  const profileUrl = `https://www.imdb.com/name/${imdbId}/`;
-  console.log(`  📄 Scraping profile: ${profileUrl}...`);
-  const profileData = await scrapeUrlWithFirecrawl(profileUrl);
-  const $profile = cheerio.load(profileData.html || '');
+  console.log(`  📸 Fetching high-resolution media for "${actorName}" via TMDB & IMDb CDN ($0)...`);
 
-  // A. Primary Hero Photo / Poster
-  let heroPhoto =
-    $profile('[data-testid="hero-media__poster"] img.ipc-image').attr('src') ||
-    $profile('img[data-testid="hero-media__poster"]').attr('src') ||
-    ($profile('meta[property="og:image"]').attr('content') || '');
-
-  if (heroPhoto && !heroPhoto.includes('imdb_logo') && !heroPhoto.includes('amazon-adsystem')) {
-    const fullRes = toHighResImdbImage(heroPhoto);
-    if (!seenUrls.has(fullRes)) {
-      seenUrls.add(fullRes);
-      mediaList.push({
-        url: fullRes,
-        title: `${actorName} - Official IMDb Portrait`,
-        description: `Official actor profile headshot from IMDb (${imdbId}).`,
-        category: 'headshot',
-        media_type: 'photo',
-        is_primary: true,
-      });
-    }
-  }
-
-  // B. Known For and Featured Still Posters
-  const md = profileData.markdown || '';
-  const mdImageMatches = [...md.matchAll(/!\[(.*?)\]\((https:\/\/m\.media-amazon\.com\/images\/.*?)\)/g)];
-  for (const match of mdImageMatches) {
-    const alt = (match[1] || '').trim();
-    let imgUrl = match[2];
-    if (imgUrl.includes('amazon-adsystem') || imgUrl.includes('imdb_logo') || imgUrl.includes('Base64')) continue;
-    imgUrl = toHighResImdbImage(imgUrl);
-
-    if (!seenUrls.has(imgUrl)) {
-      seenUrls.add(imgUrl);
-      const isStill = alt.toLowerCase().includes('still') || alt.toLowerCase().includes('scene');
-      mediaList.push({
-        url: imgUrl,
-        title: alt ? `Still: ${alt}` : `${actorName} - Film Still`,
-        description: alt ? `Promotional media still for ${alt}.` : `Production media from IMDb for ${actorName}.`,
-        category: isStill ? 'production_still' : 'headshot',
-        media_type: 'photo',
-      });
-    }
-  }
-
-  // 2. Discover and scrape all Video assets from IMDb
-  const rawVideoMatches = [
-    ...(profileData.html?.matchAll(/\/video\/(vi\d+)/g) || []),
-    ...(profileData.markdown?.matchAll(/\/video\/(vi\d+)/g) || []),
-  ].map((m) => m[1]);
-
-  // Also query video gallery for additional reels & trailers
-  try {
-    const vidGalleryUrl = `https://www.imdb.com/name/${imdbId}/videogallery/`;
-    const vidGalleryData = await scrapeUrlWithFirecrawl(vidGalleryUrl);
-    const galleryVidMatches = [
-      ...(vidGalleryData.html?.matchAll(/\/video\/(vi\d+)/g) || []),
-      ...(vidGalleryData.markdown?.matchAll(/\/video\/(vi\d+)/g) || []),
-    ].map((m) => m[1]);
-    rawVideoMatches.push(...galleryVidMatches);
-  } catch {}
-
-  const uniqueVideoIds = [...new Set(rawVideoMatches)].slice(0, 6);
-  if (uniqueVideoIds.length > 0) {
-    console.log(`  🎬 Discovered ${uniqueVideoIds.length} video assets for actor on IMDb...`);
-    for (const viId of uniqueVideoIds) {
-      console.log(`    🔍 Extracting video playback data for viId: ${viId}...`);
-      const videoItem = await scrapeImdbVideoPage(viId);
-      if (videoItem && !seenUrls.has(videoItem.url)) {
-        seenUrls.add(videoItem.url);
-        mediaList.push(videoItem);
-        console.log(`    ✅ Extracted video: "${videoItem.title}" [${videoItem.category}]`);
+  // 1. Fetch TMDB Master Image Galleries (Up to 2000x3000px crystal-clear studio portraits)
+  if (tmdbKey) {
+    try {
+      let resolvedTmdbId = tmdbPersonId;
+      if (!resolvedTmdbId) {
+        const sRes = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${tmdbKey}&query=${encodeURIComponent(actorName)}`);
+        if (sRes.ok) {
+          const sData = await sRes.json();
+          resolvedTmdbId = sData.results?.[0]?.id;
+        }
       }
-    }
-  }
 
-  // 3. Scrape IMDb Media Gallery (/mediaindex/) for photos
-  try {
-    const mediaIndexUrl = `https://www.imdb.com/name/${imdbId}/mediaindex/`;
-    console.log(`  🖼️ Scraping photo gallery: ${mediaIndexUrl}...`);
-    const galleryData = await scrapeUrlWithFirecrawl(mediaIndexUrl);
-    const $gallery = cheerio.load(galleryData.html || '');
-
-    // Extract all media items from the media gallery
-    $gallery('img.ipc-image, .media_index_thumb_list img').each((_, el) => {
-      let src = $gallery(el).attr('src');
-      const alt = ($gallery(el).attr('alt') || '').trim();
-      if (!src || src.includes('amazon-adsystem') || src.includes('imdb_logo')) return;
-
-      src = toHighResImdbImage(src);
-      if (!seenUrls.has(src)) {
-        seenUrls.add(src);
-
-        let category: ExtractedMedia['category'] = 'production_still';
-        const lowerAlt = alt.toLowerCase();
-        if (lowerAlt.includes('headshot') || lowerAlt.includes('portrait')) {
-          category = 'headshot';
-        } else if (lowerAlt.includes('premiere') || lowerAlt.includes('red carpet') || lowerAlt.includes('event')) {
-          category = 'red_carpet';
-        } else if (lowerAlt.includes('behind the scenes') || lowerAlt.includes('bts')) {
-          category = 'behind_the_scenes';
+      if (resolvedTmdbId) {
+        // A. Profile Headshots
+        const imgRes = await fetch(`https://api.themoviedb.org/3/person/${resolvedTmdbId}/images?api_key=${tmdbKey}`);
+        if (imgRes.ok) {
+          const imgData = await imgRes.json();
+          for (const p of imgData.profiles || []) {
+            const fullUrl = `https://image.tmdb.org/t/p/original${p.file_path}`;
+            if (!seenUrls.has(fullUrl)) {
+              seenUrls.add(fullUrl);
+              mediaList.push({
+                url: fullUrl,
+                title: `${actorName} - Official Portrait`,
+                description: `High-resolution studio portrait for ${actorName} (${p.width}x${p.height}).`,
+                category: 'headshot',
+                media_type: 'photo',
+                is_primary: mediaList.length === 0,
+              });
+            }
+          }
         }
 
-        mediaList.push({
-          url: src,
-          title: alt || `${actorName} - Production Still`,
-          description: alt ? `IMDb gallery asset: ${alt}` : `Media still for ${actorName}.`,
-          category,
-          media_type: 'photo',
-        });
+        // B. Tagged Production Stills (Actor in movies / BTS / Red Carpet)
+        const tagRes = await fetch(`https://api.themoviedb.org/3/person/${resolvedTmdbId}/tagged_images?api_key=${tmdbKey}`);
+        if (tagRes.ok) {
+          const tagData = await tagRes.json();
+          for (const t of tagData.results || []) {
+            if (t.file_path) {
+              const fullUrl = `https://image.tmdb.org/t/p/original${t.file_path}`;
+              if (!seenUrls.has(fullUrl)) {
+                seenUrls.add(fullUrl);
+                const title = t.media?.title || t.media?.name || `${actorName} - Production Still`;
+                mediaList.push({
+                  url: fullUrl,
+                  title: `Still: ${title}`,
+                  description: `Production media still from ${title}.`,
+                  category: 'production_still',
+                  media_type: 'photo',
+                });
+              }
+            }
+          }
+        }
       }
+    } catch (e: any) {
+      console.warn(`  ⚠️ TMDB media extraction error for ${actorName}:`, e.message);
+    }
+  }
+
+  // 2. Fetch IMDb Public CDN Headshot via free Suggestion API
+  try {
+    const res = await fetch(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(actorName.trim())}.json`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
     });
-  } catch (err: any) {
-    console.warn(`  ⚠️ Could not fetch mediaindex for ${imdbId}:`, err.message);
+    if (res.ok) {
+      const data = await res.json();
+      const match = (data.d || []).find((item: any) => item.id === imdbId || item.l?.toLowerCase() === actorName.toLowerCase());
+      if (match?.i?.imageUrl) {
+        const highRes = toHighResImdbImage(match.i.imageUrl);
+        if (!seenUrls.has(highRes)) {
+          seenUrls.add(highRes);
+          mediaList.push({
+            url: highRes,
+            title: `${actorName} - IMDb Master Portrait`,
+            description: `High-resolution headshot from IMDb (${match.id}).`,
+            category: 'headshot',
+            media_type: 'photo',
+            is_primary: mediaList.length === 0,
+          });
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn(`  ⚠️ IMDb Suggest image fetch error:`, e.message);
   }
 
   return mediaList;
@@ -520,8 +418,8 @@ async function harvestActor(person: { id: string; name: string; tmdb_id?: number
   const existingTitles = new Set((existingMedia || []).map((m) => m.title?.toLowerCase()).filter(Boolean));
   const hasPhotos = (existingMedia || []).some((m) => m.media_type === 'photo');
 
-  // Scrape all media (photos and videos) from IMDb
-  const items = await fetchActorImdbMedia(imdbId, person.name);
+  // Fetch high-resolution media (photos, stills, tagged images) via TMDB & IMDb CDN ($0)
+  const items = await fetchActorImdbMedia(imdbId, person.name, person.tmdb_id);
   const seenUrls = new Set<string>(items.map((i) => i.url));
 
   // Also query actor's films from Supabase for official trailers & videos

@@ -92,7 +92,7 @@ export default function Footer() {
           <div className="max-w-sm space-y-4">
             <Link to="/" className="inline-flex items-center">
               <img
-                src={theme === 'dark' ? '/images/MuviDB Brand/White Wordmark.svg' : '/images/MuviDB Brand/Black Wordmark.svg'}
+                src={theme === 'light' ? "/images/MuviDB Brand/Wordmark.svg" : "/images/MuviDB Brand/White Wordmark.svg"}
                 alt="MuviDB"
                 className="h-7 w-auto object-contain"
               />

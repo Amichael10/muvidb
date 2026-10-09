@@ -116,7 +116,7 @@ export default function Navbar() {
         {/* Left: Logo */}
         <Link to="/" className="flex items-center group shrink-0">
           <img 
-            src={theme === 'dark' ? "/images/MuviDB Brand/White Wordmark.svg" : "/images/MuviDB Brand/Black Wordmark.svg"}
+            src={theme === 'light' ? "/images/MuviDB Brand/Wordmark.svg" : "/images/MuviDB Brand/White Wordmark.svg"}
             alt="MuviDB" 
             className="h-9 object-contain group-hover:scale-105 transition-all duration-500" 
           />

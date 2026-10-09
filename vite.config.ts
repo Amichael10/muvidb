@@ -581,6 +581,49 @@ export default defineConfig(({ mode, isSsrBuild }) => {
             return false;
           },
         },
+        '/api/ai': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            if (req.method === 'OPTIONS') {
+              res.statusCode = 204;
+              res.end();
+              return false;
+            }
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              let body = {};
+              if (req.method === 'POST') {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                const raw = Buffer.concat(chunks).toString('utf8');
+                body = raw ? JSON.parse(raw) : {};
+              }
+              const { default: handler } = await import('./api/ai.js');
+              await handler(
+                { headers: req.headers, query: Object.fromEntries(url.searchParams), body, method: req.method, url: req.url },
+                {
+                  statusCode: 200,
+                  status: function (code) {
+                    this.statusCode = code;
+                    return this;
+                  },
+                  json: (data) => {
+                    res.statusCode = res.statusCode || 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(data));
+                  },
+                  setHeader: (k, v) => res.setHeader(k, v),
+                  end: () => res.end(),
+                }
+              );
+            } catch (err: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
+          },
+        },
         '/api': {
           target: 'http://localhost:3001',
           bypass: (req, res) => {
