@@ -1,8 +1,10 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { SOCIAL_LINKS } from '../../config/socialLinks';
+import { supabase } from '../../lib/supabase';
 
 const footerGroups = [
   {
@@ -51,16 +53,74 @@ const footerGroups = [
   },
 ];
 
-const DATABASE_METRICS = [
-  { label: 'Films Cataloged', val: '12,400+' },
-  { label: 'Box Office Tracked', val: '₦18.5B+' },
-  { label: 'Filmmaker Credits', val: '1,200+' },
-  { label: 'Cinemas & Streaming', val: '50+' },
+const DEFAULT_METRICS = [
+  { label: 'Films Cataloged', val: '17,500+' },
+  { label: 'Box Office Tracked', val: '₦35.5B+' },
+  { label: 'Filmmaker Credits', val: '100,000+' },
+  { label: 'Cinemas & Streaming', val: '180+' },
 ];
 
 export default function Footer() {
   const { theme } = useTheme();
   const { isAuthenticated } = useAuth();
+  const [metrics, setMetrics] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('muvidb_live_metrics_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.metrics && Date.now() - parsed.timestamp < 30 * 60 * 1000) {
+          return parsed.metrics;
+        }
+      }
+    } catch (_) {}
+    return DEFAULT_METRICS;
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchLiveMetrics() {
+      try {
+        const [filmsRes, creditsRes, cinemasRes, boRes] = await Promise.all([
+          supabase.from('films').select('*', { count: 'exact', head: true }),
+          supabase.from('credits').select('*', { count: 'exact', head: true }),
+          supabase.from('cinemas').select('*', { count: 'exact', head: true }),
+          supabase.from('films').select('box_office_domestic').not('box_office_domestic', 'is', null),
+        ]);
+
+        const filmsCount = filmsRes.count || 17584;
+        const creditsCount = creditsRes.count || 103782;
+        const cinemasCount = cinemasRes.count || 185;
+
+        let totalBo = 0;
+        boRes.data?.forEach(r => {
+          totalBo += (Number(r.box_office_domestic) || 0);
+        });
+        const boFormatted = totalBo > 0 ? `₦${(totalBo / 1e9).toFixed(1)}B+` : '₦35.5B+';
+
+        const updated = [
+          { label: 'Films Cataloged', val: `${filmsCount.toLocaleString()}+` },
+          { label: 'Box Office Tracked', val: boFormatted },
+          { label: 'Filmmaker Credits', val: `${creditsCount.toLocaleString()}+` },
+          { label: 'Cinemas & Streaming', val: `${cinemasCount}+` },
+        ];
+
+        if (isMounted) {
+          setMetrics(updated);
+          try {
+            sessionStorage.setItem('muvidb_live_metrics_cache', JSON.stringify({
+              metrics: updated,
+              timestamp: Date.now()
+            }));
+          } catch (_) {}
+        }
+      } catch (e) {
+        // Fallback to initial defaults if network fails
+      }
+    }
+
+    fetchLiveMetrics();
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <footer className="relative bg-bg text-text-secondary border-t border-border select-none transition-colors duration-200">
@@ -74,11 +134,11 @@ export default function Footer() {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] text-text-secondary">
-            {DATABASE_METRICS.map((metric, idx) => (
+            {metrics.map((metric, idx) => (
               <div key={metric.label} className="flex items-center gap-1.5">
                 <span className="text-text-primary font-bold">{metric.val}</span>
                 <span className="text-text-muted">{metric.label}</span>
-                {idx < DATABASE_METRICS.length - 1 && (
+                {idx < metrics.length - 1 && (
                   <span className="hidden sm:inline text-text-muted/40 ml-4">•</span>
                 )}
               </div>

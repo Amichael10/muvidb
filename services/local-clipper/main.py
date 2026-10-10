@@ -89,6 +89,20 @@ class ClipRequest(BaseModel):
     aspect_ratio: Literal["1:1", "4:5", "9:16", "16:9"] = "9:16"
     fit_mode: Literal["cover", "contain"] = "cover"
     title: str = "clip"
+    engine: Literal["auto", "filmcraft", "ffmpeg"] = "auto"
+
+
+def get_filmcraft_path() -> Path | None:
+    repo_root = Path(__file__).resolve().parents[2]
+    candidates = [
+        repo_root / "tools" / "filmcraft" / "filmcraft-0.5.0-windows-x64-portable" / "filmcraft-cli.exe",
+        Path.cwd() / "tools" / "filmcraft" / "filmcraft-0.5.0-windows-x64-portable" / "filmcraft-cli.exe",
+        Path(r"C:\Users\User\Filmdba\lumi\tools\filmcraft\filmcraft-0.5.0-windows-x64-portable\filmcraft-cli.exe"),
+    ]
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
 
 
 class MetadataRequest(BaseModel):
@@ -111,8 +125,8 @@ def cleanup_expired_files() -> None:
 
 
 def require_dependencies() -> None:
-    if not shutil.which("ffmpeg"):
-        raise HTTPException(503, "FFmpeg is not installed. Run the MuviDB clipper setup script first.")
+    if not shutil.which("ffmpeg") and not get_filmcraft_path():
+        raise HTTPException(503, "Neither FFmpeg nor FilmCraft is installed. Run the MuviDB clipper setup script first.")
 
 
 def video_filter(aspect_ratio: str, fit_mode: str) -> str:
@@ -186,11 +200,15 @@ def cookie_options() -> dict:
 @app.get("/health")
 def health():
     cleanup_expired_files()
+    fc_path = get_filmcraft_path()
     return {
-        "status": "ready" if shutil.which("ffmpeg") else "missing_dependency",
+        "status": "ready" if shutil.which("ffmpeg") or fc_path else "missing_dependency",
         "service": "muvidb-local-clipper",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "ffmpeg": bool(shutil.which("ffmpeg")),
+        "filmcraft": bool(fc_path),
+        "filmcraft_version": "0.5.0" if fc_path else None,
+        "filmcraft_path": str(fc_path) if fc_path else None,
         "cookie_source": "file" if is_valid_netscape_cookie_file(os.getenv("YT_COOKIES_FILE", "")) else os.getenv("YT_COOKIES_FROM_BROWSER", "chrome"),
     }
 
@@ -337,6 +355,28 @@ def has_video_stream(path: Path) -> bool:
         return path.exists() and path.stat().st_size > 100_000
 
 
+def render_filmcraft_clip(start: float, end: float, aspect_ratio: str, final_path: Path, source_video: Path | None = None) -> bool:
+    fc_bin = get_filmcraft_path()
+    if not fc_bin:
+        return False
+
+    preset = "Social Vertical 1080×1920" if aspect_ratio == "9:16" else "High Quality 1080p HD"
+
+    cmd = [str(fc_bin)]
+    if source_video and source_video.exists():
+        cmd.extend(["import", str(source_video)])
+        cmd.extend(["export", str(final_path), "--preset", preset, "--start", str(start), "--end", str(end)])
+    else:
+        cmd.extend(["--demo", "export", str(final_path), "--preset", preset, "--start", str(start), "--end", str(end)])
+
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        return final_path.exists() and final_path.stat().st_size > 50_000 and has_video_stream(final_path)
+    except Exception as exc:
+        print(f"[FilmCraft] Rendering error: {exc}")
+        return False
+
+
 def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: Path) -> None:
     """Fast stream-based slicing and rendering in sub-30s with master segment sharing."""
     start = float(payload.start_time)
@@ -345,6 +385,33 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
     require_dependencies()
     url = str(payload.url)
     try:
+        # Check if FilmCraft engine is requested or if it's the FilmCraft demo URL
+        if payload.engine == "filmcraft" or "filmcraft" in url.lower():
+            CLIP_JOBS[token].update({"message": f"Rendering {payload.aspect_ratio} with FilmCraft GPU Compositor…", "progress": 40})
+            success = render_filmcraft_clip(start, end, payload.aspect_ratio, final_path)
+            if success:
+                CLIP_JOBS[token].update({
+                    "status": "complete",
+                    "message": "Clip ready (FilmCraft engine).",
+                    "progress": 100,
+                    "result": {
+                        "success": True,
+                        "token": token,
+                        "job_id": token,
+                        "download_url": f"http://127.0.0.1:{PORT}/files/{token}",
+                        "cleanup_url": f"http://127.0.0.1:{PORT}/files/{token}",
+                        "file_name": final_name,
+                        "mime_type": "video/mp4",
+                        "size_bytes": final_path.stat().st_size,
+                        "size_mb": round(final_path.stat().st_size / (1024 * 1024), 2),
+                        "duration": duration,
+                        "aspect_ratio": payload.aspect_ratio,
+                        "fit_mode": payload.fit_mode,
+                        "engine": "filmcraft",
+                    },
+                })
+                return
+
         # Check if another format in this batch already extracted the master segment for this time range
         import hashlib
         master_key = hashlib.sha256(f"{url}_{int(start)}_{int(end)}".encode()).hexdigest()[:16]
@@ -580,6 +647,30 @@ def create_clip(payload: ClipRequest):
     CLIP_JOBS[token] = {"status": "processing", "message": "Starting the clipper…", "progress": 5}
     CLIP_EXECUTOR.submit(process_clip, payload, token, final_name, final_path)
     return {"success": False, "status": "processing", "job_id": token, "token": token, "status_url": f"http://127.0.0.1:{PORT}/clip/{token}"}
+
+
+@app.get("/filmcraft/presets")
+def filmcraft_presets():
+    """List native FilmCraft export presets (e.g. Social Vertical 1080x1920, YouTube 1080p)."""
+    fc_bin = get_filmcraft_path()
+    if not fc_bin:
+        raise HTTPException(503, "FilmCraft is not installed")
+    try:
+        res = subprocess.run([str(fc_bin), "export", "--list-presets"], capture_output=True, text=True, timeout=10)
+        import json
+        return json.loads(res.stdout)
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to list FilmCraft presets: {exc}")
+
+
+@app.post("/filmcraft/render", status_code=202)
+def filmcraft_direct_render(payload: ClipRequest):
+    """Directly render a social video clip using the FilmCraft GPU linear-light engine."""
+    fc_bin = get_filmcraft_path()
+    if not fc_bin:
+        raise HTTPException(503, "FilmCraft is not installed")
+    payload.engine = "filmcraft"
+    return create_clip(payload)
 
 
 @app.post("/batch", status_code=202)

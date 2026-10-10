@@ -37,7 +37,67 @@ const KNOWN_ALIASES: Record<string, string[]> = {
   'kunle afolayan': ['Kunle Afolayan'],
   'nkem owoh': ['Nkem Owoh', 'Osuofia'],
   'genevieve nnaji': ['Genevieve Nnaji'],
+  'saga adeolu': ['Saga Adeolu', 'Saga Deolu', 'Adeolu Okusaga', 'Adeoluwa Okusaga', 'Okusaga Adeolu'],
+  'adeoluwa okusaga': ['Saga Adeolu', 'Saga Deolu', 'Adeolu Okusaga', 'Adeoluwa Okusaga', 'Okusaga Adeolu'],
 };
+
+function getAllAliases(name: string): string[] {
+  const norm = cleanTitle(name).toLowerCase();
+  const set = new Set<string>([cleanTitle(name)]);
+  for (const [key, list] of Object.entries(KNOWN_ALIASES)) {
+    const listNorm = list.map(a => a.toLowerCase().trim());
+    if (key === norm || listNorm.includes(norm)) {
+      list.forEach(a => set.add(a));
+      set.add(key);
+    }
+  }
+  return Array.from(set);
+}
+
+// Strict African country codes to prevent Hollywood/European contamination
+const AFRICAN_ISO_CODES = new Set([
+  'NG', 'GH', 'ZA', 'KE', 'UG', 'TZ', 'CM', 'RW', 'ZW', 'SN',
+  'EG', 'MA', 'ET', 'CI', 'ZM', 'MW', 'MZ', 'AO', 'CD', 'CG',
+  'SL', 'LR', 'GM', 'BF', 'NE', 'ML', 'BJ', 'TG', 'GA', 'BW',
+  'NA', 'SZ', 'LS', 'MU', 'SC', 'TN', 'DZ', 'LY', 'SD', 'SS'
+]);
+
+const AFRICAN_LANGUAGES = new Set([
+  'yo', 'ig', 'ha', 'sw', 'zu', 'xh', 'tw', 'ak', 'sn', 'st', 'am', 'so', 'rw', 'ny'
+]);
+
+const AFRICAN_KEYWORDS = [
+  'nigeria', 'ghana', 'south africa', 'kenya', 'uganda', 'tanzania', 'cameroon',
+  'rwanda', 'zimbabwe', 'senegal', 'zambia', 'egypt', 'morocco', 'ethiopia',
+  'liberia', 'sierra leone', 'nollywood', 'yoruba', 'igbo', 'hausa', 'kannywood',
+  'ghallywood', 'lagos', 'accra', 'ibadan', 'enugu', 'benin city', 'abuja', 'jos'
+];
+
+// Names and tokens distinctive to African / Nollywood talents
+const AFRICAN_TALENT_TOKENS = new Set([
+  'uche', 'nancy', 'kadiri', 'okereke', 'kosoko', 'edochie', 'agu', 'erics', 'akindele',
+  'chinedu', 'emeka', 'chidi', 'kanayo', 'osita', 'ebere', 'chiwetalu', 'lancelot', 'tchidi',
+  'chatta', 'afolayan', 'ogunde', 'salami', 'quadri', 'balogun', 'lawal', 'adekola', 'adebayo',
+  'aigbe', 'remi', 'ademoye', 'sobowale', 'hassan', 'bakre', 'falz', 'falana', 'macaroni',
+  'adedayo', 'njubigbo', 'odoputa', 'imasuen', 'babalola', 'irele', 'ajayi', 'okanlawon',
+  'okpocha', 'achufusi', 'awolowo', 'bachor', 'akpore', 'russet', 'nnaji', 'buari', 'ezuruonye',
+  'nnebe', 'genevieve', 'omotola', 'iniedo', 'esien', 'esin', 'lazarus', 'isokpan', 'adunni',
+  'ade', 'mba', 'ojo', 'dike', 'alabi', 'animashaun', 'badmus', 'belo', 'bello', 'chima',
+  'chigozie', 'chukwu', 'eze', 'ibrahim', 'idris', 'iyabo', 'kalu', 'muhammad', 'nwosu',
+  'obinna', 'odi', 'odunlade', 'ogbonna', 'ogungbe', 'olamide', 'olowo', 'omoni', 'onwuka',
+  'osahon', 'oyeleke', 'somkele', 'taiwo', 'tolu', 'tope', 'yakubu', 'yekini', 'yomi',
+  'zack', 'zubby', 'destiny', 'etiko', 'pete', 'kelechi', 'ike', 'somadina', 'regina',
+  'daniels', 'mercy', 'johnson', 'infinix', 'nollywood', 'yoruba', 'igbo', 'hausa',
+  'iyk', 'iyke', 'fredrick', 'leonard', 'ken', 'muna', 'obio', 'oluebube',
+  'sonia', 'chinenye', 'uchegbu', 'onyeabor', 'anodebe', 'ani', 'uchenna', 'chinwe',
+  'ngozi', 'patience', 'ozokwor', 'nkem', 'owoh', 'sam', 'loco', 'efe', 'bimbo',
+  'ronke', 'fathia', 'williams', 'iheme', 'aki', 'pawpaw', 'okolie', 'ebuka',
+  'stanley', 'odeh', 'etuk', 'eneaji', 'eneng', 'uzoeshi', 'ejike', 'ibedilo',
+  'osifo', 'uka', 'ujams', 'ihebie', 'reginald', 'chisom', 'nnaebue', 'nnanna',
+  'maduka', 'billion', 'nnadi', 'nkechinyere', 'jombo', 'ifeanyi', 'edward',
+  'cbriel', 'blessed', 'okey', 'rita', 'charles', 'omoni', 'oboli', 'kemi',
+  'adetiba', 'jade', 'osiberu', 'chikere', 'biodun', 'stephen', 'mo', 'abudu'
+]);
 
 // Genre name to ID cache
 let genreCache: Map<string, string> | null = null;
@@ -191,17 +251,26 @@ async function getOrCreatePerson(
     }
   }
 
-  // 3. Match by name
-  const { data: byName } = await supabase.from('people').select('id, name, tmdb_id, imdb_id, photo_url').ilike('name', normName).maybeSingle();
-  if (byName) {
-    const updates: any = {};
-    if (extra.tmdbId && !byName.tmdb_id) updates.tmdb_id = extra.tmdbId;
-    if (extra.imdbId && !byName.imdb_id) updates.imdb_id = extra.imdbId;
-    if (extra.photoUrl && !byName.photo_url) updates.photo_url = extra.photoUrl;
-    if (Object.keys(updates).length > 0) {
-      await supabase.from('people').update(updates).eq('id', byName.id);
+  // 3. Match by name and all known aliases
+  const aliasList = getAllAliases(normName);
+  let matchedPerson: any = null;
+  for (const alias of aliasList) {
+    const { data: byName } = await supabase.from('people').select('id, name, tmdb_id, imdb_id, photo_url').ilike('name', alias).maybeSingle();
+    if (byName) {
+      matchedPerson = byName;
+      break;
     }
-    return byName.id;
+  }
+
+  if (matchedPerson) {
+    const updates: any = {};
+    if (extra.tmdbId && !matchedPerson.tmdb_id) updates.tmdb_id = extra.tmdbId;
+    if (extra.imdbId && !matchedPerson.imdb_id) updates.imdb_id = extra.imdbId;
+    if (extra.photoUrl && !matchedPerson.photo_url) updates.photo_url = extra.photoUrl;
+    if (Object.keys(updates).length > 0) {
+      await supabase.from('people').update(updates).eq('id', matchedPerson.id);
+    }
+    return matchedPerson.id;
   }
 
   // 4. Insert new person
@@ -267,6 +336,32 @@ async function syncFilmAndEnsemble(
   const mediaDetails = await fetchTmdbMediaEnsemble(tmdbId, mediaType);
   if (!mediaDetails) return { filmId: '', wasCreated: false, ensembleAdded: 0 };
 
+  const originCountries: string[] = (mediaDetails.origin_country || []).map((c: string) => c.toUpperCase());
+  const prodCountries: string[] = (mediaDetails.production_countries || []).map((c: any) => (c.iso_3166_1 || '').toUpperCase());
+  const allCountries = [...originCountries, ...prodCountries];
+  const isAfricanCountry = allCountries.some(c => AFRICAN_ISO_CODES.has(c));
+  const isAfricanLang = AFRICAN_LANGUAGES.has((mediaDetails.original_language || '').toLowerCase());
+  const text = `${title} ${mediaDetails.overview || tmdbCredit.overview || ''}`.toLowerCase();
+  const hasAfricanKeyword = AFRICAN_KEYWORDS.some(k => text.includes(k));
+
+  // Check if cast/crew indicates African / Nollywood production (overcoming TMDB "US" mislabeling)
+  const rawCast = mediaDetails.credits?.cast || [];
+  const rawCrew = mediaDetails.credits?.crew || [];
+  const samplePeople = [...rawCast.slice(0, 15), ...rawCrew.slice(0, 10)];
+  let africanTalentCount = 0;
+  for (const person of samplePeople) {
+    const pName = (person.name || '').toLowerCase();
+    const parts = pName.split(/\s+/);
+    if (parts.some((part: string) => AFRICAN_TALENT_TOKENS.has(part))) {
+      africanTalentCount++;
+    }
+  }
+  const hasAfricanCastOrCrew =
+    africanTalentCount >= 2 ||
+    (samplePeople.length > 0 && africanTalentCount >= 1 && (samplePeople.length <= 15 || africanTalentCount / samplePeople.length >= 0.1));
+
+  const isAfricanOrigin = isAfricanCountry || isAfricanLang || hasAfricanKeyword || hasAfricanCastOrCrew;
+
   const imdbId = mediaDetails.external_ids?.imdb_id || mediaDetails.imdb_id || null;
   const synopsis = mediaDetails.overview || tmdbCredit.overview || null;
   const posterPath = mediaDetails.poster_path || tmdbCredit.poster_path;
@@ -303,6 +398,12 @@ async function syncFilmAndEnsemble(
       .lte('year', year + 1)
       .maybeSingle();
     if (byTitleYear) filmId = byTitleYear.id;
+  }
+
+  // Guard: If film does not already exist in Muvidb, NEVER create it unless it is genuine African!
+  if (!filmId && !isAfricanOrigin) {
+    console.log(`   ⏭️ Skipping foreign non-African title: "${title}" (${allCountries.join(', ') || 'foreign'})`);
+    return { filmId: '', wasCreated: false, ensembleAdded: 0 };
   }
 
   if (filmId) {
@@ -395,75 +496,86 @@ async function syncFilmAndEnsemble(
     }
   }
 
-  // 4. Ingest Whole Ensemble Cast (top 20)
+  // 4. Ingest Whole Ensemble Cast (top 25) - ONLY for genuine African titles
   let ensembleAdded = 0;
-  const rawCast = mediaDetails.credits?.cast || [];
-  const topCast = rawCast.slice(0, 25);
+  if (isAfricanOrigin) {
+    const rawCast = mediaDetails.credits?.cast || [];
+    const topCast = rawCast.slice(0, 25);
 
-  for (const c of topCast) {
-    if (!c.name) continue;
-    const actorPhoto = c.profile_path ? `https://image.tmdb.org/t/p/w500${c.profile_path}` : null;
-    const personId = await getOrCreatePerson(c.name, {
-      tmdbId: c.id,
-      photoUrl: actorPhoto,
-    });
+    for (const c of topCast) {
+      if (!c.name) continue;
+      const actorPhoto = c.profile_path ? `https://image.tmdb.org/t/p/w500${c.profile_path}` : null;
+      const personId = await getOrCreatePerson(c.name, {
+        tmdbId: c.id,
+        photoUrl: actorPhoto,
+      });
 
-    if (personId) {
-      const characterName = c.character ? c.character.trim() : null;
-      const billingOrder = typeof c.order === 'number' ? c.order : 99;
+      if (personId) {
+        const characterName = c.character ? c.character.trim() : null;
+        const billingOrder = typeof c.order === 'number' ? c.order : 99;
 
-      // Check existing credit to ensure Zero-Duplicate Actor Guarantee
-      const { data: existingCredit } = await supabase
-        .from('credits')
-        .select('id, character_name, billing_order')
-        .eq('film_id', filmId)
-        .eq('person_id', personId)
-        .maybeSingle();
+        // Check existing credit to ensure Zero-Duplicate Actor Guarantee
+        const { data: existingCredit } = await supabase
+          .from('credits')
+          .select('id, character_name, billing_order')
+          .eq('film_id', filmId)
+          .eq('person_id', personId)
+          .maybeSingle();
 
-      if (existingCredit) {
-        // Update in-place if character name was missing or more specific
-        if (!existingCredit.character_name && characterName) {
-          await supabase
-            .from('credits')
-            .update({ character_name: characterName, billing_order: billingOrder })
-            .eq('id', existingCredit.id);
+        if (existingCredit) {
+          // Update in-place if character name was missing or more specific
+          if (!existingCredit.character_name && characterName) {
+            await supabase
+              .from('credits')
+              .update({ character_name: characterName, billing_order: billingOrder })
+              .eq('id', existingCredit.id);
+          }
+        } else {
+          // Insert credit
+          const { error: credErr } = await supabase.from('credits').insert({
+            film_id: filmId,
+            person_id: personId,
+            role: 'Actor',
+            character_name: characterName,
+            billing_order: billingOrder,
+            source: 'tmdb',
+          });
+          if (!credErr) ensembleAdded++;
         }
-      } else {
-        // Insert credit
-        const { error: credErr } = await supabase.from('credits').insert({
-          film_id: filmId,
-          person_id: personId,
-          role: 'Actor',
-          character_name: characterName,
-          billing_order: billingOrder,
-          source: 'tmdb',
-        });
-        if (!credErr) ensembleAdded++;
       }
     }
-  }
 
-  // Also ingest Director from Crew
-  const directors = (mediaDetails.credits?.crew || []).filter((c: any) => c.job === 'Director');
-  for (const dir of directors) {
-    if (!dir.name) continue;
-    const dirPersonId = await getOrCreatePerson(dir.name, { tmdbId: dir.id });
-    if (dirPersonId) {
-      const { data: existingDir } = await supabase
-        .from('credits')
-        .select('id')
-        .eq('film_id', filmId)
-        .eq('person_id', dirPersonId)
-        .eq('role', 'Director')
-        .maybeSingle();
+    // Also ingest key Crew (Director, Producer, Writer, Costume Designer)
+    const keyCrewJobs = new Set([
+      'Director', 'Producer', 'Executive Producer', 'Writer', 'Screenplay',
+      'Costume Design', 'Costumer', 'Production Manager'
+    ]);
+    const keyCrew = (mediaDetails.credits?.crew || []).filter((c: any) => keyCrewJobs.has(c.job));
+    for (const crewMember of keyCrew) {
+      if (!crewMember.name) continue;
+      const roleName = crewMember.job === 'Costumer' ? 'Costume Design' : crewMember.job;
+      const crewPersonId = await getOrCreatePerson(crewMember.name, {
+        tmdbId: crewMember.id,
+        photoUrl: crewMember.profile_path ? `https://image.tmdb.org/t/p/w500${crewMember.profile_path}` : null,
+      });
+      if (crewPersonId) {
+        const { data: existingCrew } = await supabase
+          .from('credits')
+          .select('id')
+          .eq('film_id', filmId)
+          .eq('person_id', crewPersonId)
+          .ilike('role', roleName)
+          .maybeSingle();
 
-      if (!existingDir) {
-        await supabase.from('credits').insert({
-          film_id: filmId,
-          person_id: dirPersonId,
-          role: 'Director',
-          source: 'tmdb',
-        });
+        if (!existingCrew) {
+          const { error: crewErr } = await supabase.from('credits').insert({
+            film_id: filmId,
+            person_id: crewPersonId,
+            role: roleName,
+            source: 'tmdb',
+          });
+          if (!crewErr) ensembleAdded++;
+        }
       }
     }
   }
@@ -491,8 +603,14 @@ export async function syncPersonMaster(
     const { data } = await supabase.from('people').select('*').eq('imdb_id', personQuery.imdbId).maybeSingle();
     personRow = data;
   } else {
-    const { data } = await supabase.from('people').select('*').ilike('name', cleanTitle(personQuery.name)).maybeSingle();
-    personRow = data;
+    const searchAliases = getAllAliases(personQuery.name);
+    for (const alias of searchAliases) {
+      const { data } = await supabase.from('people').select('*').ilike('name', alias).maybeSingle();
+      if (data) {
+        personRow = data;
+        break;
+      }
+    }
   }
 
   // If still not in DB, create person
@@ -547,8 +665,14 @@ export async function syncPersonMaster(
   if (masterImdbId && masterImdbId !== personRow.imdb_id) personUpdates.imdb_id = masterImdbId;
   if (imdbSuggest.photoUrl && !personRow.photo_url) personUpdates.photo_url = imdbSuggest.photoUrl;
 
-  // 4. Collect combined credits across all TMDB profiles
-  const allCastCredits: any[] = [];
+  // 4. Collect combined credits across all TMDB profiles (Cast and Crew)
+  interface CombinedCreditItem {
+    credit: any;
+    role: string;
+    characterName: string | null;
+    billingOrder: number;
+  }
+  const allCreditsToIngest: CombinedCreditItem[] = [];
   const seenCreditMedia = new Set<string>();
 
   for (const tId of tmdbPersonIds) {
@@ -568,11 +692,33 @@ export async function syncPersonMaster(
         personUpdates.imdb_id = masterImdbId;
       }
 
+      // Collect Cast credits
       for (const c of data.credits?.cast || []) {
-        const key = `${c.media_type || 'movie'}_${c.id}`;
+        const key = `${c.media_type || 'movie'}_${c.id}_Actor`;
         if (!seenCreditMedia.has(key)) {
           seenCreditMedia.add(key);
-          allCastCredits.push(c);
+          allCreditsToIngest.push({
+            credit: c,
+            role: 'Actor',
+            characterName: c.character ? c.character.trim() : null,
+            billingOrder: typeof c.order === 'number' ? c.order : 50,
+          });
+        }
+      }
+
+      // Collect Crew credits (Producer, Director, Writer, Costume Design, etc.)
+      for (const c of data.credits?.crew || []) {
+        const rawJob = c.job || c.department || 'Crew';
+        const role = rawJob === 'Costumer' ? 'Costume Design' : rawJob;
+        const key = `${c.media_type || 'movie'}_${c.id}_${role}`;
+        if (!seenCreditMedia.has(key)) {
+          seenCreditMedia.add(key);
+          allCreditsToIngest.push({
+            credit: c,
+            role,
+            characterName: null,
+            billingOrder: 99,
+          });
         }
       }
     } catch (err: any) {
@@ -585,19 +731,20 @@ export async function syncPersonMaster(
     console.log(`  ✓ Updated person metadata (IMDb: ${masterImdbId || 'N/A'}, Photo: ${!!personUpdates.photo_url})`);
   }
 
-  console.log(`🎞️ Total combined unique TMDB credits to ingest: ${allCastCredits.length}`);
+  console.log(`🎞️ Total combined unique TMDB credits to ingest: ${allCreditsToIngest.length}`);
 
   let createdFilmsCount = 0;
   let totalEnsembleAdded = 0;
   let personalCreditsLinked = 0;
 
   // 5. Ingest each film, ensemble, and person's credit
-  for (let i = 0; i < allCastCredits.length; i++) {
-    const c = allCastCredits[i];
+  for (let i = 0; i < allCreditsToIngest.length; i++) {
+    const item = allCreditsToIngest[i];
+    const c = item.credit;
     const title = c.title || c.name || 'Untitled';
     const year = (c.release_date || c.first_air_date || '').substring(0, 4);
 
-    process.stdout.write(`  [${i + 1}/${allCastCredits.length}] "${title}" (${year || 'N/A'})... `);
+    process.stdout.write(`  [${i + 1}/${allCreditsToIngest.length}] "${title}" (${year || 'N/A'}) [${item.role}]... `);
 
     try {
       const { filmId, wasCreated, ensembleAdded } = await syncFilmAndEnsemble(c, genresMap);
@@ -605,28 +752,26 @@ export async function syncPersonMaster(
       totalEnsembleAdded += ensembleAdded;
 
       if (filmId) {
-        // Link target actor's credit
-        const characterName = c.character ? c.character.trim() : null;
-        const billingOrder = typeof c.order === 'number' ? c.order : 50;
-
+        // Link target person's credit with their designated role
         const { data: existingCredit } = await supabase
           .from('credits')
-          .select('id, character_name')
+          .select('id, character_name, role')
           .eq('film_id', filmId)
           .eq('person_id', personId)
+          .ilike('role', item.role)
           .maybeSingle();
 
         if (existingCredit) {
-          if (!existingCredit.character_name && characterName) {
-            await supabase.from('credits').update({ character_name: characterName }).eq('id', existingCredit.id);
+          if (!existingCredit.character_name && item.characterName) {
+            await supabase.from('credits').update({ character_name: item.characterName }).eq('id', existingCredit.id);
           }
         } else {
           await supabase.from('credits').insert({
             film_id: filmId,
             person_id: personId,
-            role: 'Actor',
-            character_name: characterName,
-            billing_order: billingOrder,
+            role: item.role,
+            character_name: item.characterName,
+            billing_order: item.billingOrder,
             source: 'tmdb',
           });
           personalCreditsLinked++;
@@ -707,16 +852,25 @@ async function main() {
   }
 
   if (topArgIdx !== -1 || isAuto) {
-    const limit = topArgIdx !== -1 ? parseInt(args[topArgIdx + 1], 10) || 50 : 500;
-    console.log(`🚀 Starting Master Filmography Enrichment Pipeline (Queue: ${limit} talents)...`);
+    const limit = topArgIdx !== -1 ? parseInt(args[topArgIdx + 1], 10) || 50 : 200;
+    const offsetArgIdx = args.indexOf('--offset');
+    const offset = offsetArgIdx !== -1 ? parseInt(args[offsetArgIdx + 1], 10) || 0 : 0;
+    const isAsc = args.includes('--asc');
+    const verifiedOnly = args.includes('--verified');
+    console.log(`🚀 Starting Master Filmography Enrichment Pipeline (Queue: ${limit} talents, offset: ${offset}, order: ${isAsc ? 'ASC' : 'DESC (popular first)'}, verifiedOnly: ${verifiedOnly})...`);
 
-    // Fetch popular talents, prioritizing verified or spotlight ones, or thin filmographies
-    const { data: people } = await supabase
+    // Fetch talents, prioritizing verified or spotlight ones with existing African credits
+    let peopleQuery = supabase
       .from('people')
-      .select('id, name, imdb_id, tmdb_id, film_count')
-      .order('film_count', { ascending: true }) // Start with thinnest or most needing credit backfills
+      .select('id, name, imdb_id, tmdb_id, film_count, is_verified')
       .not('name', 'is', null)
-      .limit(limit);
+      .order('film_count', { ascending: isAsc });
+
+    if (verifiedOnly) {
+      peopleQuery = peopleQuery.eq('is_verified', true);
+    }
+
+    const { data: people } = await peopleQuery.range(offset, offset + limit - 1);
 
     if (!people || people.length === 0) {
       console.log('No people found to enrich.');

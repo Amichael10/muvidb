@@ -10,6 +10,7 @@ import AwardsEditor from '../../components/admin/AwardsEditor';
 import { syncFilmAwardsToPeople } from '../../lib/awardsSync';
 import CriticReviewsEditor from '../../components/admin/CriticReviewsEditor';
 import YouTubeFilmImport from '../../components/admin/YouTubeFilmImport';
+import CompanyListEditor from '../../components/admin/CompanyListEditor';
 import { ALL_ROLES, canonicalizeRole } from '../../lib/creditRoles';
 import { searchPeopleByName } from '../../lib/peopleSearch';
 import { extractYoutubeId } from '../../lib/youtube';
@@ -137,20 +138,13 @@ export default function AdminFilms() {
     }
   };
 
-  // Company Search States
-  const [companySearch, setCompanySearch] = useState('');
-  const [companyResults, setCompanyResults] = useState([]);
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  const [isSearchingCompanies, setIsSearchingCompanies] = useState(false);
-  const [isCreatingCompany, setIsCreatingCompany] = useState(false);
+  // Multi-Company States (Production & Distribution)
+  const [productionCompanies, setProductionCompanies] = useState([{ id: null, name: '', logo_url: null }]);
+  const [distributionCompanies, setDistributionCompanies] = useState([{ id: null, name: '', logo_url: null }]);
 
-  // Distributor Search States
-  const [distributorSearch, setDistributorSearch] = useState('');
-  const [distributorResults, setDistributorResults] = useState([]);
-  const [selectedDistributorCompany, setSelectedDistributorCompany] = useState(null);
-  const [isSearchingDistributors, setIsSearchingDistributors] = useState(false);
-  const [isCreatingDistributorCompany, setIsCreatingDistributorCompany] = useState(false);
-  const distributorSearchTimeout = useRef(null);
+  // Derived primary company/distributor for backward compatibility
+  const selectedCompany = useMemo(() => productionCompanies.find(p => p.id) || productionCompanies[0] || null, [productionCompanies]);
+  const selectedDistributorCompany = useMemo(() => distributionCompanies.find(d => d.id) || distributionCompanies[0] || null, [distributionCompanies]);
 
   // YouTube Channel Linking States in Drawer
   const [selectedChannel, setSelectedChannel] = useState(null);
@@ -209,7 +203,15 @@ export default function AdminFilms() {
   const [episodeSearchQuery, setEpisodeSearchQuery] = useState('');
 
   const draftKey = isDrawerOpen ? (editingFilm ? `MuviDB_draft_film_${editingFilm.id}` : 'MuviDB_draft_film_new') : null;
-  const draftData = useMemo(() => ({ formData, credits, showtimes, selectedCompany, selectedChannel }), [formData, credits, showtimes, selectedCompany, selectedChannel]);
+  const draftData = useMemo(() => ({
+    formData,
+    credits,
+    showtimes,
+    productionCompanies,
+    distributionCompanies,
+    selectedCompany,
+    selectedChannel
+  }), [formData, credits, showtimes, productionCompanies, distributionCompanies, selectedCompany, selectedChannel]);
   const { clearDraft } = useLocalStorageDraft(draftKey, draftData, isDrawerOpen);
   const [draftRestoredMessage, setDraftRestoredMessage] = useState('');
 
@@ -467,7 +469,7 @@ export default function AdminFilms() {
       if (duplicateFilter) {
         query = supabase.rpc('get_duplicate_films');
       } else {
-        query = supabase.from('films').select('*');
+        query = supabase.from('films').select('*, film_companies(role, companies(id, name, logo_url))');
       }
       
       if (actorFilmIds) query = query.in('id', actorFilmIds.length ? actorFilmIds : ['00000000-0000-0000-0000-000000000000']);
@@ -687,9 +689,8 @@ export default function AdminFilms() {
         .eq('film_id', filmId),
       supabase
         .from('film_companies')
-        .select('companies(*)')
-        .eq('film_id', filmId)
-        .limit(1),
+        .select('role, companies(*)')
+        .eq('film_id', filmId),
       supabase
         .from('channel_videos')
         .select('id, channel_id, video_id, channels(id, name, channel_handle, thumbnail_url, owner_company_id)')
@@ -736,12 +737,27 @@ export default function AdminFilms() {
       }));
     }
     
-    if (companyData && companyData.length > 0 && companyData[0].companies) {
-      setSelectedCompany(companyData[0].companies);
-      setCompanySearch(companyData[0].companies.name);
+    if (companyData && companyData.length > 0) {
+      const prods = companyData
+        .filter(fc => !fc.role || fc.role === 'production')
+        .map(fc => fc.companies)
+        .filter(Boolean);
+      setProductionCompanies(prods.length > 0 ? prods : [{ id: null, name: '', logo_url: null }]);
+
+      const dists = companyData
+        .filter(fc => fc.role === 'distribution')
+        .map(fc => fc.companies)
+        .filter(Boolean);
+
+      const filmDist = filmRecord?.distributor || filmRecord?.streaming_links?.distributor || '';
+      if (filmDist && !dists.some(d => d.name?.toLowerCase() === filmDist.toLowerCase())) {
+        dists.push({ id: null, name: filmDist, logo_url: null });
+      }
+      setDistributionCompanies(dists.length > 0 ? dists : [{ id: null, name: '', logo_url: null }]);
     } else {
-      setSelectedCompany(null);
-      setCompanySearch('');
+      setProductionCompanies([{ id: null, name: '', logo_url: null }]);
+      const filmDist = filmRecord?.distributor || filmRecord?.streaming_links?.distributor || '';
+      setDistributionCompanies(filmDist ? [{ id: null, name: filmDist, logo_url: null }] : [{ id: null, name: '', logo_url: null }]);
     }
 
     let matchedChannel = (Array.isArray(channelVideoData) && channelVideoData.length > 0 && channelVideoData[0]?.channels)
@@ -842,49 +858,43 @@ export default function AdminFilms() {
       if (draft) {
         setCredits(draft.credits || []);
         setShowtimes(draft.showtimes || []);
-        setSelectedCompany(draft.selectedCompany || null);
-        setCompanySearch(draft.selectedCompany?.name || '');
+        if (draft.productionCompanies && draft.productionCompanies.length > 0) {
+          setProductionCompanies(draft.productionCompanies);
+        } else if (draft.selectedCompany) {
+          setProductionCompanies([draft.selectedCompany]);
+        } else {
+          setProductionCompanies([{ id: null, name: '', logo_url: null }]);
+        }
+        if (draft.distributionCompanies && draft.distributionCompanies.length > 0) {
+          setDistributionCompanies(draft.distributionCompanies);
+        } else if (draft.formData?.distributor) {
+          setDistributionCompanies([{ id: null, name: draft.formData.distributor, logo_url: null }]);
+        } else {
+          setDistributionCompanies([{ id: null, name: '', logo_url: null }]);
+        }
         setSelectedChannel(draft.selectedChannel || null);
         setFormChannelSearch(draft.selectedChannel?.name || '');
-        const draftDist = draft.formData?.distributor || '';
-        setDistributorSearch(draftDist);
-        if (draftDist) {
-          supabase.from('companies').select('*').ilike('name', draftDist.trim()).maybeSingle().then(({ data }) => {
-            if (data) setSelectedDistributorCompany(data);
-            else setSelectedDistributorCompany(null);
-          });
-        } else {
-          setSelectedDistributorCompany(null);
-        }
       } else {
         await fetchFilmDetails(film.id, film);
-        const filmDist = film.distributor || film.streaming_links?.distributor || '';
-        setDistributorSearch(filmDist);
-        if (filmDist) {
-          supabase.from('companies').select('*').ilike('name', filmDist.trim()).maybeSingle().then(({ data }) => {
-            if (data) setSelectedDistributorCompany(data);
-            else setSelectedDistributorCompany(null);
-          });
-        } else {
-          setSelectedDistributorCompany(null);
-        }
       }
     } else {
       setEditingFilm(null);
       setFormData(draft?.formData || initialFormState);
       setCredits(draft?.credits || []);
       setShowtimes(draft?.showtimes || []);
-      setSelectedCompany(draft?.selectedCompany || null);
-      setCompanySearch(draft?.selectedCompany?.name || '');
-      const draftDist = draft?.formData?.distributor || '';
-      setDistributorSearch(draftDist);
-      if (draftDist) {
-        supabase.from('companies').select('*').ilike('name', draftDist.trim()).maybeSingle().then(({ data }) => {
-          if (data) setSelectedDistributorCompany(data);
-          else setSelectedDistributorCompany(null);
-        });
+      if (draft?.productionCompanies && draft.productionCompanies.length > 0) {
+        setProductionCompanies(draft.productionCompanies);
+      } else if (draft?.selectedCompany) {
+        setProductionCompanies([draft.selectedCompany]);
       } else {
-        setSelectedDistributorCompany(null);
+        setProductionCompanies([{ id: null, name: '', logo_url: null }]);
+      }
+      if (draft?.distributionCompanies && draft.distributionCompanies.length > 0) {
+        setDistributionCompanies(draft.distributionCompanies);
+      } else if (draft?.formData?.distributor) {
+        setDistributionCompanies([{ id: null, name: draft.formData.distributor, logo_url: null }]);
+      } else {
+        setDistributionCompanies([{ id: null, name: '', logo_url: null }]);
       }
       setSelectedChannel(draft?.selectedChannel || null);
       setFormChannelSearch(draft?.selectedChannel?.name || '');
@@ -1022,9 +1032,11 @@ export default function AdminFilms() {
     setSelectedCompany(null);
     setCompanySearch('');
     setCompanyResults([]);
+    setProductionCompanies([{ id: null, name: '', logo_url: null }]);
     setSelectedDistributorCompany(null);
     setDistributorSearch('');
     setDistributorResults([]);
+    setDistributionCompanies([{ id: null, name: '', logo_url: null }]);
     setPeopleSearch('');
     setPeopleResults([]);
     setCustomRoles([]);
@@ -1048,11 +1060,16 @@ export default function AdminFilms() {
           const matched = chMatches[0];
           setSelectedChannel(matched);
           setFormChannelSearch(matched.name);
-          if (matched.owner_company_id && !selectedCompany) {
+          if (matched.owner_company_id) {
             const { data: comp } = await supabase.from('companies').select('*').eq('id', matched.owner_company_id).maybeSingle();
             if (comp) {
-              setSelectedCompany(comp);
-              setCompanySearch(comp.name);
+              setProductionCompanies(prev => {
+                const filtered = prev.filter(p => p.id || p.name?.trim());
+                if (filtered.some(p => p.id === comp.id || p.name?.toLowerCase() === comp.name.toLowerCase())) {
+                  return prev;
+                }
+                return [...filtered, comp];
+              });
             }
           }
           toast.success(`Matched to channel: ${matched.name}`);
@@ -1070,11 +1087,16 @@ export default function AdminFilms() {
           const matched = chByName[0];
           setSelectedChannel(matched);
           setFormChannelSearch(matched.name);
-          if (matched.owner_company_id && !selectedCompany) {
+          if (matched.owner_company_id) {
             const { data: comp } = await supabase.from('companies').select('*').eq('id', matched.owner_company_id).maybeSingle();
             if (comp) {
-              setSelectedCompany(comp);
-              setCompanySearch(comp.name);
+              setProductionCompanies(prev => {
+                const filtered = prev.filter(p => p.id || p.name?.trim());
+                if (filtered.some(p => p.id === comp.id || p.name?.toLowerCase() === comp.name.toLowerCase())) {
+                  return prev;
+                }
+                return [...filtered, comp];
+              });
             }
           }
           toast.success(`Matched to channel: ${matched.name}`);
@@ -1095,15 +1117,20 @@ export default function AdminFilms() {
       if (cv?.channels) {
         setSelectedChannel(cv.channels);
         setFormChannelSearch(cv.channels.name);
-        if (cv.channels.owner_company_id && !selectedCompany) {
+        if (cv.channels.owner_company_id) {
           const { data: comp } = await supabase
             .from('companies')
             .select('*')
             .eq('id', cv.channels.owner_company_id)
             .maybeSingle();
           if (comp) {
-            setSelectedCompany(comp);
-            setCompanySearch(comp.name);
+            setProductionCompanies(prev => {
+              const filtered = prev.filter(p => p.id || p.name?.trim());
+              if (filtered.some(p => p.id === comp.id || p.name?.toLowerCase() === comp.name.toLowerCase())) {
+                return prev;
+              }
+              return [...filtered, comp];
+            });
           }
         }
         toast.success(`Matched to channel: ${cv.channels.name}`);
@@ -1131,15 +1158,20 @@ export default function AdminFilms() {
           const matched = matchedChannels[0];
           setSelectedChannel(matched);
           setFormChannelSearch(matched.name);
-          if (matched.owner_company_id && !selectedCompany) {
+          if (matched.owner_company_id) {
             const { data: comp } = await supabase
               .from('companies')
               .select('*')
               .eq('id', matched.owner_company_id)
               .maybeSingle();
             if (comp) {
-              setSelectedCompany(comp);
-              setCompanySearch(comp.name);
+              setProductionCompanies(prev => {
+                const filtered = prev.filter(p => p.id || p.name?.trim());
+                if (filtered.some(p => p.id === comp.id || p.name?.toLowerCase() === comp.name.toLowerCase())) {
+                  return prev;
+                }
+                return [...filtered, comp];
+              });
             }
           }
           toast.success(`Auto-detected channel: ${matched.name}`);
@@ -1433,6 +1465,49 @@ export default function AdminFilms() {
       const selectedGenreIds = resolvedGenres.ids;
       const channel_video_id = formData.channel_video_id || null;
 
+      // Resolve or create any unlinked companies
+      const resolveCompanyList = async (list, defaultType) => {
+        const resolved = [];
+        for (const item of (list || [])) {
+          const trimmed = (item?.name || '').trim();
+          if (!trimmed) continue;
+          if (item.id) {
+            resolved.push({ id: item.id, name: trimmed, logo_url: item.logo_url });
+            continue;
+          }
+          const { data: match } = await supabase
+            .from('companies')
+            .select('id, name, logo_url')
+            .ilike('name', trimmed)
+            .maybeSingle();
+
+          if (match) {
+            resolved.push({ id: match.id, name: match.name, logo_url: match.logo_url });
+          } else {
+            const { data: created, error: createErr } = await supabase
+              .from('companies')
+              .insert([{
+                name: trimmed,
+                company_type: defaultType,
+                description: '.',
+                website: '.',
+                logo_url: null
+              }])
+              .select('id, name, logo_url')
+              .single();
+            if (!createErr && created) {
+              resolved.push(created);
+            }
+          }
+        }
+        return resolved;
+      };
+
+      const resolvedProds = await resolveCompanyList(productionCompanies, 'production');
+      const resolvedDists = await resolveCompanyList(distributionCompanies, 'distributor');
+      const distNames = resolvedDists.map(d => d.name).filter(Boolean);
+      const distributorJoined = distNames.length > 0 ? distNames.join(', ') : ((formData.distributor || '').trim() || null);
+
       const cleanFilmPayload = {
         title: formData.title
           ? (formData.title === formData.title.toUpperCase() && formData.title !== formData.title.toLowerCase()
@@ -1450,8 +1525,13 @@ export default function AdminFilms() {
         is_trending: Boolean(formData.is_trending),
         is_featured: Boolean(formData.is_featured),
         is_in_cinemas: Boolean(formData.is_in_cinemas),
-        slug: formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
-        mubi_slug: formData.mubi_slug || formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null),
+        distributor: distributorJoined,
+        slug: (!editingFilm || (editingFilm.title && cleanFilmPayload.title.toLowerCase() !== editingFilm.title.toLowerCase()))
+          ? (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null)
+          : (formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null)),
+        mubi_slug: (!editingFilm || (editingFilm.title && cleanFilmPayload.title.toLowerCase() !== editingFilm.title.toLowerCase()))
+          ? (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null)
+          : (formData.mubi_slug || formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null)),
         source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || (formData.youtube_watch_url ? extractYoutubeId(formData.youtube_watch_url) : null) || null,
         trailer_youtube_id: (typeof formData.trailer_youtube_id === 'string' ? formData.trailer_youtube_id.trim() : formData.trailer_youtube_id) || null,
         youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
@@ -1484,7 +1564,7 @@ export default function AdminFilms() {
             }
             return baseStreaming;
           })(),
-          distributor: (formData.distributor || '').trim() || null,
+          distributor: distributorJoined,
           ...((formData.box_office_domestic || formData.box_office_worldwide) ? {
             box_office: {
               domestic: formData.box_office_domestic ? parseFloat(formData.box_office_domestic) : 0,
@@ -1689,10 +1769,45 @@ export default function AdminFilms() {
         insertPromises.push(supabase.from('showtimes').insert(showtimePayload));
       }
 
-      if (selectedCompany) {
-        insertPromises.push(supabase.from('film_companies').insert([{ film_id: filmId, company_id: selectedCompany.id }]));
-      } else if (selectedChannel?.owner_company_id) {
-        insertPromises.push(supabase.from('film_companies').insert([{ film_id: filmId, company_id: selectedChannel.owner_company_id }]));
+      // Insert all resolved production and distribution companies
+      const companyPayloads = [];
+      const seenCompanyRoles = new Set();
+
+      for (const prod of resolvedProds) {
+        const key = `${prod.id}-production`;
+        if (!seenCompanyRoles.has(key)) {
+          seenCompanyRoles.add(key);
+          companyPayloads.push({
+            film_id: filmId,
+            company_id: prod.id,
+            role: 'production'
+          });
+        }
+      }
+
+      // Fallback: If no explicit production companies were added, link channel owner company if present
+      if (companyPayloads.length === 0 && selectedChannel?.owner_company_id) {
+        companyPayloads.push({
+          film_id: filmId,
+          company_id: selectedChannel.owner_company_id,
+          role: 'production'
+        });
+      }
+
+      for (const dist of resolvedDists) {
+        const key = `${dist.id}-distribution`;
+        if (!seenCompanyRoles.has(key)) {
+          seenCompanyRoles.add(key);
+          companyPayloads.push({
+            film_id: filmId,
+            company_id: dist.id,
+            role: 'distribution'
+          });
+        }
+      }
+
+      if (companyPayloads.length > 0) {
+        insertPromises.push(supabase.from('film_companies').insert(companyPayloads));
       }
 
       if (insertPromises.length > 0) {
@@ -2220,6 +2335,7 @@ export default function AdminFilms() {
                   />
                 </th>
                 <th className="px-6 py-4 font-bold">Production</th>
+                <th className="px-6 py-4 font-bold">Companies & Distribution</th>
                 <th className="px-6 py-4 font-bold">Year</th>
                 <th className="px-6 py-4 font-bold">Country</th>
                 <th className="px-6 py-4 font-bold">Platforms</th>
@@ -2230,10 +2346,10 @@ export default function AdminFilms() {
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
-                <tr><td colSpan="8" className="p-20 text-center text-text-muted italic">Loading records...</td></tr>
+                <tr><td colSpan="9" className="p-20 text-center text-text-muted italic">Loading records...</td></tr>
               ) : viewMode === 'library' ? (
                 films.length === 0 ? (
-                  <tr><td colSpan="8" className="p-20 text-center text-text-muted italic">No productions found in library.</td></tr>
+                  <tr><td colSpan="9" className="p-20 text-center text-text-muted italic">No productions found in library.</td></tr>
                 ) : films.map((film) => (
                   <tr key={film.id} className="group hover:bg-surface-2/50 transition-colors">
                     <td className="pl-6 py-4">
@@ -2279,6 +2395,53 @@ export default function AdminFilms() {
                           </div>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const prodList = (film.film_companies || [])
+                          .filter(fc => (!fc.role || fc.role === 'production') && fc.companies?.name)
+                          .map(fc => fc.companies.name);
+
+                        const distList = (film.film_companies || [])
+                          .filter(fc => fc.role === 'distribution' && fc.companies?.name)
+                          .map(fc => fc.companies.name);
+
+                        if (distList.length === 0 && film.distributor) {
+                          film.distributor.split(',').forEach(d => {
+                            const trimmed = d.trim();
+                            if (trimmed && !distList.includes(trimmed)) distList.push(trimmed);
+                          });
+                        }
+
+                        if (prodList.length === 0 && distList.length === 0) {
+                          return <span className="text-[11px] text-text-muted opacity-40 italic">-</span>;
+                        }
+
+                        return (
+                          <div className="flex flex-col gap-1.5 min-w-[140px] max-w-[220px]">
+                            {prodList.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[8px] font-black uppercase tracking-wider text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded border border-purple-500/20 shrink-0">Prod</span>
+                                {prodList.map((name, i) => (
+                                  <span key={i} className="text-xs text-text-primary font-medium truncate max-w-[150px]" title={name}>
+                                    {name}{i < prodList.length - 1 ? ',' : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {distList.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1 py-0.5 rounded border border-emerald-500/20 shrink-0">Dist</span>
+                                {distList.map((name, i) => (
+                                  <span key={i} className="text-xs text-text-muted font-medium truncate max-w-[150px]" title={name}>
+                                    {name}{i < distList.length - 1 ? ',' : ''}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-text-primary font-mono text-xs">{film.year || 'TBD'}</span>
@@ -2699,68 +2862,15 @@ export default function AdminFilms() {
                   />
                 </div>
                 
-                {/* Production Company Field */}
-                <div className="relative">
-                  <label className="block text-xs font-bold text-text-primary mb-2">Production Company</label>
-                  <div className="relative group">
-                    <input 
-                      type="text"
-                      value={companySearch}
-                      onChange={(e) => handleCompanySearch(e.target.value)}
-                      className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all pr-12"
-                      placeholder="Search or add company..."
-                    />
-                    <div className="absolute right-4 top-2.5 flex items-center gap-2">
-                      {isSearchingCompanies ? (
-                        <div className="w-4 h-4 border-2 border-brand/20 border-t-brand rounded-full animate-spin" />
-                      ) : companySearch && !selectedCompany && (
-                        <button
-                          type="button"
-                          onClick={() => createCompany(companySearch)}
-                          className="p-1 hover:bg-brand/10 rounded-full text-brand transition-all"
-                          title="Create and link this company"
-                        >
-                          <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
-                        </button>
-                      )}
-                      {!companySearch && (
-                        <Icon icon="solar:buildings-linear" className="w-4 h-4 text-text-muted" />
-                      )}
-                      {selectedCompany && companySearch === selectedCompany.name && (
-                        <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-green-500" />
-                      )}
-                    </div>
-                    
-                    {companyResults.length > 0 && (
-                      <div className="absolute left-0 top-full mt-2 w-full bg-surface border border-border rounded-md shadow-2xl z-50 overflow-hidden ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2">
-                        {companyResults.map(c => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedCompany(c);
-                              setCompanySearch(c.name);
-                              setCompanyResults([]);
-                            }}
-                            className="w-full flex items-center gap-3 p-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-surface-2 overflow-hidden border border-border flex items-center justify-center">
-                              {c.logo_url ? (
-                                <img src={c.logo_url} alt="" className="w-full h-full object-contain p-1" />
-                              ) : (
-                                <span className="text-[10px] font-bold text-brand">{c.name.charAt(0)}</span>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-xs font-bold text-text-primary">{c.name}</p>
-                              <p className="text-[10px] text-text-muted">{c.website?.replace(/^https?:\/\//, '') || 'No website'}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {/* Multi-Production Companies */}
+                <CompanyListEditor
+                  label="Production Company"
+                  role="production"
+                  companies={productionCompanies}
+                  onChange={setProductionCompanies}
+                  placeholder="Search or add production company..."
+                  addLabel="Add Company"
+                />
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
@@ -2818,69 +2928,16 @@ export default function AdminFilms() {
                       className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all"
                     />
                   </div>
-                  {/* Distributor Field with Company Search & Create */}
-                  <div className="col-span-1 md:col-span-2 relative">
-                    <label className="block text-xs font-bold text-text-primary mb-2">Distributor / Distribution Partner</label>
-                    <div className="relative group">
-                      <input
-                        type="text"
-                        name="distributor"
-                        value={distributorSearch}
-                        onChange={(e) => handleDistributorSearch(e.target.value)}
-                        placeholder="Search or add distributor (e.g. FilmOne, Corporate Pictures, Cinemax, Nile)..."
-                        className="w-full bg-surface-2 border border-border rounded-md px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:ring-4 focus:ring-brand/5 outline-none transition-all pr-12"
-                      />
-                      <div className="absolute right-4 top-2.5 flex items-center gap-2">
-                        {isSearchingDistributors ? (
-                          <div className="w-4 h-4 border-2 border-brand/20 border-t-brand rounded-full animate-spin" />
-                        ) : distributorSearch && !selectedDistributorCompany && (
-                          <button
-                            type="button"
-                            onClick={() => createDistributorCompany(distributorSearch)}
-                            className="p-1 hover:bg-brand/10 rounded-full text-brand transition-all"
-                            title="Create and link this distributor company"
-                          >
-                            <Icon icon="solar:add-circle-bold" className="w-5 h-5" />
-                          </button>
-                        )}
-                        {!distributorSearch && (
-                          <Icon icon="solar:buildings-linear" className="w-4 h-4 text-text-muted" />
-                        )}
-                        {selectedDistributorCompany && distributorSearch === selectedDistributorCompany.name && (
-                          <Icon icon="solar:check-circle-bold" className="w-4 h-4 text-green-500" />
-                        )}
-                      </div>
-
-                      {distributorResults.length > 0 && (
-                        <div className="absolute left-0 top-full mt-2 w-full bg-surface border border-border rounded-md shadow-2xl z-50 overflow-hidden ring-1 ring-black/5 animate-in fade-in slide-in-from-top-2">
-                          {distributorResults.map(c => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedDistributorCompany(c);
-                                setDistributorSearch(c.name);
-                                setFormData(prev => ({ ...prev, distributor: c.name }));
-                                setDistributorResults([]);
-                              }}
-                              className="w-full flex items-center gap-3 p-3 hover:bg-surface-2 transition-colors text-left border-b border-border/50 last:border-0"
-                            >
-                              <div className="w-8 h-8 rounded-lg bg-surface-2 overflow-hidden border border-border flex items-center justify-center">
-                                {c.logo_url ? (
-                                  <img src={c.logo_url} alt="" className="w-full h-full object-contain p-1" />
-                                ) : (
-                                  <span className="text-[10px] font-bold text-brand">{c.name.charAt(0)}</span>
-                                )}
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold text-text-primary">{c.name}</p>
-                                <p className="text-[10px] text-text-muted">{c.website?.replace(/^https?:\/\//, '') || 'No website'}</p>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                  {/* Multi-Distribution Companies */}
+                  <div className="col-span-1 md:col-span-2">
+                    <CompanyListEditor
+                      label="Distributor / Distribution Partner"
+                      role="distribution"
+                      companies={distributionCompanies}
+                      onChange={setDistributionCompanies}
+                      placeholder="Search or add distributor (e.g. FilmOne, Corporate Pictures, Cinemax, Nile)..."
+                      addLabel="Add Distributor"
+                    />
                   </div>
                 </div>
 
@@ -3516,7 +3573,7 @@ export default function AdminFilms() {
                                     setSelectedChannel(ch);
                                     setFormChannelSearch(ch.name);
                                     setFormChannelResults([]);
-                                    if (ch.owner_company_id && !selectedCompany) {
+                                    if (ch.owner_company_id) {
                                       supabase
                                         .from('companies')
                                         .select('*')
@@ -3524,8 +3581,13 @@ export default function AdminFilms() {
                                         .maybeSingle()
                                         .then(({ data: comp }) => {
                                           if (comp) {
-                                            setSelectedCompany(comp);
-                                            setCompanySearch(comp.name);
+                                            setProductionCompanies(prev => {
+                                              const filtered = prev.filter(p => p.id || p.name?.trim());
+                                              if (filtered.some(p => p.id === comp.id || p.name?.toLowerCase() === comp.name.toLowerCase())) {
+                                                return prev;
+                                              }
+                                              return [...filtered, comp];
+                                            });
                                             toast.success(`Also linked production company: ${comp.name}`);
                                           }
                                         });

@@ -121,8 +121,9 @@ async function runCleanup() {
   while (hasMore) {
     const { data: films, error: fetchErr } = await supabase
       .from('films')
-      .select('id, title')
+      .select('id, title, title_locked')
       .eq('source', 'youtube')
+      .eq('title_locked', false)
       .gt('id', lastId)
       .order('id', { ascending: true })
       .limit(BATCH_SIZE);
@@ -167,7 +168,8 @@ async function runCleanup() {
         const { error: updateErr } = await supabase
           .from('films')
           .update({ title: cleaned })
-          .eq('id', film.id);
+          .eq('id', film.id)
+          .eq('title_locked', false);
           
         if (updateErr) {
           console.error(`Failed to update ${film.title}:`, updateErr);

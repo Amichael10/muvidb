@@ -761,10 +761,8 @@ export default function AdminPeople() {
         const ident = extractChannelIdentifier(youtubeChannelInput.trim());
         if (ident?.type === 'id') {
           youtube_channel_id = ident.value;
-          youtube_handle = null;
         } else if (ident?.type === 'handle') {
           youtube_handle = String(ident.value).replace(/^@/, '');
-          youtube_channel_id = null;
         }
       }
 
@@ -1499,11 +1497,11 @@ export default function AdminPeople() {
               {formData.youtube_stats && (
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="bg-surface p-3 rounded-lg border border-border/50 text-center">
-                    <div className="text-xs font-bold text-text-primary">{(formData.youtube_stats.subscribers || 0).toLocaleString()}</div>
+                    <div className="text-xs font-bold text-text-primary">{(Number(formData.youtube_stats.subscribers) || 0).toLocaleString()}</div>
                     <div className="text-[9px] font-bold text-text-muted">Subscribers</div>
                   </div>
                   <div className="bg-surface p-3 rounded-lg border border-border/50 text-center">
-                    <div className="text-xs font-bold text-text-primary">{(formData.youtube_stats.videos || 0).toLocaleString()}</div>
+                    <div className="text-xs font-bold text-text-primary">{(Number(formData.youtube_stats.videos) || 0).toLocaleString()}</div>
                     <div className="text-[9px] font-bold text-text-muted">Videos</div>
                   </div>
                 </div>

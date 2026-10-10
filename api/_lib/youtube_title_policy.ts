@@ -166,7 +166,23 @@ export function extractEmbeddedFilmTitle(raw: string): EmbeddedTitle | null {
     if (prefix && suffix) candidates.push({ prefix, suffix });
   };
 
-  for (const separator of [':', ';', '|']) {
+  if (title.includes('|')) {
+    const pipeParts = title.split(/\|+/).map(p => p.trim()).filter(Boolean);
+    if (pipeParts.length > 1) {
+      // 1. Check if second part has the film title: e.g. "Cast: Teaser || REAL TITLE - Full Movie"
+      const candidatePrefix1 = pipeParts[1].replace(/\s*[-–—:]\s*(?:Full|Latest|New|Nigerian|Nollywood|Yoruba|African|Watch|Movie).*/i, '').trim();
+      if (candidatePrefix1 && isPlausibleFilmTitle(candidatePrefix1)) {
+        return { prefix: candidatePrefix1, suffix: pipeParts[0] };
+      }
+      // 2. Check if first part has the film title: e.g. "REAL TITLE || Cast - Full Movie"
+      const candidatePrefix0 = pipeParts[0].replace(/\s*[-–—:]\s*(?:Full|Latest|New|Nigerian|Nollywood|Yoruba|African|Watch|Movie).*/i, '').trim();
+      if (candidatePrefix0 && isPlausibleFilmTitle(candidatePrefix0)) {
+        return { prefix: candidatePrefix0, suffix: pipeParts[1] };
+      }
+    }
+  }
+
+  for (const separator of [':', ';']) {
     const index = title.indexOf(separator);
     if (index >= 0) add(index, separator.length);
   }

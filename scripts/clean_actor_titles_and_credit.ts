@@ -192,7 +192,8 @@ async function cleanTitlesAndCreditActors() {
   while (true) {
     const { data: films, error: fErr } = await supabase
       .from('films')
-      .select('id, title, slug')
+      .select('id, title, slug, title_locked')
+      .eq('title_locked', false)
       .range(filmPage * filmPageSize, (filmPage + 1) * filmPageSize - 1);
 
     if (fErr) {
@@ -333,7 +334,8 @@ async function cleanTitlesAndCreditActors() {
               title: workingTitle,
               slug: newSlug
             })
-            .eq('id', film.id);
+            .eq('id', film.id)
+            .eq('title_locked', false);
 
           // Handle slug collision gracefully
           if (updateErr && updateErr.message.includes('films_slug_key')) {
@@ -344,7 +346,8 @@ async function cleanTitlesAndCreditActors() {
                 title: workingTitle,
                 slug: newSlug
               })
-              .eq('id', film.id);
+              .eq('id', film.id)
+              .eq('title_locked', false);
 
             if (!retryErr) updateErr = null;
           }

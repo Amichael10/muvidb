@@ -9,7 +9,8 @@ const PROTECTED_NAMES = new Set([
   'bimbo ademoye', 'femi adebayo', 'odunlade adekola', 'mercy aigbe', 'toyin abraham',
   'funke akindele', 'yemi elesho', 'yemi elesho booda nuru', 'chinedu ozuruigbo aba marley',
   'olaide ayodele abraham cross', 'oyebade adebimpe adedimeji ayanfe',
-  'eniola ajao', 'eniola alao', 'eniola alão', 'captain eniola', 'captain eniola alao'
+  'eniola ajao', 'eniola alao', 'eniola alão', 'captain eniola', 'captain eniola alao',
+  'eyitemi afolayan', 'eyiyemi afolayan', 'eyiyemi hephzibah adesewa afolayan', 'eyiwunmi afolayan'
 ]);
 
 // Explicit pairs of distinct individuals that must NEVER be merged
@@ -22,6 +23,14 @@ const DO_NOT_MERGE_PAIRS = new Set([
   'eniola ajao:captain eniola',
   'captain eniola alao:eniola ajao',
   'eniola ajao:captain eniola alao',
+  'eyitemi afolayan:eyiyemi afolayan',
+  'eyiyemi afolayan:eyitemi afolayan',
+  'eyitemi afolayan:eyiyemi hephzibah adesewa afolayan',
+  'eyiyemi hephzibah adesewa afolayan:eyitemi afolayan',
+  'eyitemi afolayan:eyiwunmi afolayan',
+  'eyiwunmi afolayan:eyitemi afolayan',
+  'eyiyemi afolayan:eyiwunmi afolayan',
+  'eyiwunmi afolayan:eyiyemi afolayan',
 ]);
 
 export function shouldBlockMerge(nameA: string, nameB: string): boolean {

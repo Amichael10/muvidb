@@ -32,63 +32,147 @@ export const getPersonYoutubeChannelUrl = (person) => {
 
 export const extractChannelIdentifier = (url) => {
   if (!url) return null;
-  // Handle /channel/UC...
-  const channelMatch = url.match(/\/channel\/(UC[\w-]+)/);
-  if (channelMatch) return { type: 'id', value: channelMatch[1] };
-  
-  // Handle /@handle or /c/handle or /user/handle (handles can contain dots)
-  const handleMatch = url.match(/\/(?:@|c\/|user\/)([\w.-]+)/);
-  if (handleMatch) return { type: 'handle', value: handleMatch[1] };
+  let clean = String(url).trim();
+  if (!clean) return null;
 
-  // Just return the value if it's already an ID or Handle
-  if (url.startsWith('UC')) return { type: 'id', value: url };
-  if (url.startsWith('@')) return { type: 'handle', value: url.substring(1) };
-  
-  return { type: 'handle', value: url };
+  // 1. Direct channel ID pattern: /channel/UC...
+  const channelMatch = clean.match(/\/channel\/(UC[\w-]+)/i);
+  if (channelMatch) return { type: 'id', value: channelMatch[1] };
+
+  // 2. Direct standalone UC... ID (24 characters)
+  if (/^UC[\w-]{22}$/i.test(clean)) {
+    return { type: 'id', value: clean };
+  }
+
+  // 3. Strip URL protocol and YouTube domain if present
+  clean = clean.replace(/^(?:https?:\/\/)?(?:www\.)?youtube\.com\//i, '');
+  clean = clean.replace(/^(?:https?:\/\/)?youtu\.be\//i, '');
+
+  // Strip query strings, hash, and subpages like /videos, /featured, /about
+  clean = clean.split(/[?#]/)[0];
+  clean = clean.replace(/\/(?:videos|featured|playlists|community|channels|about|live|shorts)\/?$/i, '');
+  clean = clean.replace(/\/+$/, '');
+
+  // 4. Check for channel/ prefix remaining
+  if (clean.toLowerCase().startsWith('channel/')) {
+    const id = clean.slice(8);
+    if (id) return { type: 'id', value: id };
+  }
+
+  // 5. Handle /c/, /user/, /@ prefixes
+  clean = clean.replace(/^(?:@|c\/|user\/)/i, '');
+
+  // If there's still a value, it's a handle, username, or vanity slug
+  if (clean) {
+    return { type: 'handle', value: clean };
+  }
+
+  return null;
 };
 
 /**
  * Fetches subscriber count, video count, thumbnail, and banner for a channel.
- * Routes through /api/youtube so the API key stays server-side.
+ * Routes through /api/external so the API key stays server-side.
  */
 export const fetchChannelData = async (identifier) => {
+  if (!identifier || !identifier.value) {
+    throw new Error('Please enter a valid YouTube channel URL, handle, or ID');
+  }
+
   try {
-    let url;
-    if (identifier.type === 'id') {
-      url = `/api/external?provider=youtube&endpoint=channels&part=snippet,statistics,brandingSettings&id=${encodeURIComponent(identifier.value)}`;
-    } else {
-      url = `/api/external?provider=youtube&endpoint=channels&part=snippet,statistics,brandingSettings&forHandle=${encodeURIComponent(identifier.value)}`;
-    }
+    let items = [];
 
-    const detailRes = await fetch(url);
-    
-    if (!detailRes.ok) {
-      let errorMsg = `YouTube details returned status ${detailRes.status}`;
-      const text = await detailRes.text();
-      try {
-        const errorData = JSON.parse(text);
-        if (errorData.error) {
-          if (typeof errorData.error === 'object') {
-            errorMsg = errorData.error.message || JSON.stringify(errorData.error);
-          } else {
-            errorMsg = errorData.error;
+    const fetchEndpoint = async (url) => {
+      const detailRes = await fetch(url);
+      if (!detailRes.ok) {
+        let errorMsg = `YouTube details returned status ${detailRes.status}`;
+        const text = await detailRes.text();
+        try {
+          const errorData = JSON.parse(text);
+          if (errorData.error) {
+            errorMsg =
+              typeof errorData.error === 'object'
+                ? errorData.error.message || JSON.stringify(errorData.error)
+                : errorData.error;
+          } else if (errorData.message) {
+            errorMsg = errorData.message;
           }
-        } else if (errorData.message) {
-          errorMsg = errorData.message;
+        } catch {
+          if (text) errorMsg += `: ${text.substring(0, 100)}`;
         }
-      } catch (e) {
-        if (text) errorMsg += `: ${text.substring(0, 100)}`;
+        throw new Error(errorMsg);
       }
-      console.error('YouTube Details Failed:', detailRes.status, errorMsg);
-      throw new Error(errorMsg);
+      return await detailRes.json();
+    };
+
+    if (identifier.type === 'id') {
+      const data = await fetchEndpoint(
+        `/api/external?provider=youtube&endpoint=channels&part=snippet,statistics,brandingSettings&id=${encodeURIComponent(identifier.value)}`
+      );
+      items = data.items || [];
+    } else {
+      const rawVal = identifier.value.replace(/^@/, '');
+
+      // Attempt 1: forHandle with @ (standard YouTube handle query)
+      try {
+        const data = await fetchEndpoint(
+          `/api/external?provider=youtube&endpoint=channels&part=snippet,statistics,brandingSettings&forHandle=${encodeURIComponent('@' + rawVal)}`
+        );
+        items = data.items || [];
+      } catch (e) {
+        if (e.message?.includes('quota') || e.message?.includes('disabled')) throw e;
+      }
+
+      // Attempt 2: forHandle without @
+      if (!items.length) {
+        try {
+          const data = await fetchEndpoint(
+            `/api/external?provider=youtube&endpoint=channels&part=snippet,statistics,brandingSettings&forHandle=${encodeURIComponent(rawVal)}`
+          );
+          items = data.items || [];
+        } catch (e) {
+          if (e.message?.includes('quota') || e.message?.includes('disabled')) throw e;
+        }
+      }
+
+      // Attempt 3: forUsername (legacy custom /user/ URLs)
+      if (!items.length) {
+        try {
+          const data = await fetchEndpoint(
+            `/api/external?provider=youtube&endpoint=channels&part=snippet,statistics,brandingSettings&forUsername=${encodeURIComponent(rawVal)}`
+          );
+          items = data.items || [];
+        } catch (e) {
+          if (e.message?.includes('quota') || e.message?.includes('disabled')) throw e;
+        }
+      }
+
+      // Attempt 4: Search fallback (if channel vanity slug doesn't match handle directly)
+      if (!items.length) {
+        try {
+          const searchData = await fetchEndpoint(
+            `/api/external?provider=youtube&endpoint=search&part=snippet&type=channel&maxResults=1&q=${encodeURIComponent(rawVal)}`
+          );
+          if (searchData.items && searchData.items.length > 0) {
+            const foundId = searchData.items[0].snippet?.channelId;
+            if (foundId) {
+              const chData = await fetchEndpoint(
+                `/api/external?provider=youtube&endpoint=channels&part=snippet,statistics,brandingSettings&id=${encodeURIComponent(foundId)}`
+              );
+              items = chData.items || [];
+            }
+          }
+        } catch (e) {
+          if (e.message?.includes('quota') || e.message?.includes('disabled')) throw e;
+        }
+      }
     }
 
-    const detailData = await detailRes.json();
-    if (!detailData.items || detailData.items.length === 0) {
-      throw new Error('Channel details not found');
+    if (!items || items.length === 0) {
+      throw new Error('Channel details not found. Please verify the URL or channel handle.');
     }
 
-    const channel = detailData.items[0];
+    const channel = items[0];
     return {
       channelId: channel.id,
       handle: channel.snippet.customUrl,

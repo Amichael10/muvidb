@@ -248,7 +248,7 @@ async function handleCommand(chatId: string | number, text: string) {
       const result = await runStudioCopilotChat({
         message: arg,
         chatHistory: [],
-        actor: { email: 'admin@muvidb.com', role: 'admin' },
+        actor: { id: 'admin-telegram', email: 'admin@muvidb.com', role: 'admin' },
       });
       const responseText = result.response || 'Task completed successfully.';
       await reply(chatId, responseText);

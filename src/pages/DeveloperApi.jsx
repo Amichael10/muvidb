@@ -700,11 +700,11 @@ export default function DeveloperApi() {
 
             {/* Quick Metrics Bar */}
             <div className="pt-4 flex flex-wrap items-center gap-6 text-xs text-text-secondary font-mono border-t border-hairline">
-              <div><strong className="text-text-primary font-bold">12,400+</strong> Films</div>
+              <div><strong className="text-text-primary font-bold">17,500+</strong> Films</div>
               <div className="text-text-muted">•</div>
-              <div><strong className="text-text-primary font-bold">15,000+</strong> Talent</div>
+              <div><strong className="text-text-primary font-bold">27,000+</strong> Talent</div>
               <div className="text-text-muted">•</div>
-              <div><strong className="text-amber-500 dark:text-amber-400 font-bold">₦18.5B+</strong> Box Office</div>
+              <div><strong className="text-amber-500 dark:text-amber-400 font-bold">₦35.5B+</strong> Box Office</div>
               <div className="text-text-muted">•</div>
               <div><strong className="text-emerald-500 dark:text-emerald-400 font-bold">&lt; 42ms</strong> Edge Latency</div>
             </div>

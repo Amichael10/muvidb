@@ -7,13 +7,29 @@
 import dns from 'dns';
 dns.setDefaultResultOrder('ipv4first');
 
+const customLookup = (hostname: string, options: any, callback: any) => {
+  let cb = callback;
+  let opts = options;
+  if (typeof options === 'function') {
+    cb = options;
+    opts = {};
+  }
+  if (hostname === 'pkenrmorywmuvnzfoylp.supabase.co') {
+    if (opts && opts.all) {
+      return cb(null, [{ address: '172.64.149.246', family: 4 }]);
+    }
+    return cb(null, '172.64.149.246', 4);
+  }
+  return (dns.lookup as any)(hostname, opts, cb);
+};
+
 import { Agent, setGlobalDispatcher } from 'undici';
-// The hosted DB has been answering in 8-15s under load, and undici's DEFAULT
-// 10s connect timeout was killing long-running scripts mid-run
-// (UND_ERR_CONNECT_TIMEOUT). Give connections real headroom.
 setGlobalDispatcher(
   new Agent({
-    connect: { timeout: 60_000 },
+    connect: {
+      lookup: customLookup,
+      timeout: 60_000,
+    },
     headersTimeout: 300_000,
     bodyTimeout: 300_000,
   })

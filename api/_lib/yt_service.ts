@@ -183,7 +183,7 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
   const parenMatch = str.match(/\(([^)]+)\)/);
   if (parenMatch) {
     const inner = parenMatch[1].trim();
-    const isNoiseParen = /^(?:latest|full\s+movie|new|20\d{2}|official|hd|yoruba\s+movie|nollywood|action|comedy|drama|concluding\s+part)\b/i.test(inner);
+    const isNoiseParen = /^(?:latest|full\s+movie|new|20\d{2}|official|hd|yoruba\s+movie|nollywood|action|comedy|drama|concluding\s+part|english|yoruba|igbo|hausa|pidgin|subtitled|subtitles|french)\b/i.test(inner);
     const isEpOrPart = /^(?:part|pt|ep|episode|season|s)\s*\d+/i.test(inner);
     if (!isNoiseParen && !isEpOrPart && inner.length >= 2 && inner.length <= 50) {
       let sub = inner.replace(/^(?:the\s+)?latest\s+/i, '').trim();
@@ -209,21 +209,47 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
 
   // 5. Clean core base name
   let base = str;
-  if (base.includes('|')) base = base.split('|')[0].trim();
+  if (base.includes('|')) {
+    const segments = base.split(/\|+/).map(s => s.trim()).filter(Boolean);
+    if (segments.length > 1) {
+      const isActorOrTeaser = (seg: string) => {
+        const hasActorConnector = /\b(?:&|and|featuring|starring|ft\.)\b/i.test(seg);
+        const hasColonTeaser = /[:–—\-]/.test(seg);
+        const hasStoryVerb = /\b(?:vanishes|disappears|betrays|cries|shocked|revenge|falls in love)\b/i.test(seg);
+        return (hasActorConnector && hasColonTeaser) || hasStoryVerb;
+      };
+
+      const hasMovieTag = (seg: string) => {
+        return /\b(?:full\s+(?:nollywood|nigerian|yoruba)?\s*movie|latest\s+movie|complete\s+movie)\b/i.test(seg);
+      };
+
+      if (isActorOrTeaser(segments[0]) && (hasMovieTag(segments[1]) || !isActorOrTeaser(segments[1]))) {
+        base = segments[1];
+      } else if (hasMovieTag(segments[0]) || !isActorOrTeaser(segments[0])) {
+        base = segments[0];
+      } else {
+        base = segments[0];
+      }
+    } else {
+      base = segments[0] || base;
+    }
+  }
+
   base = base.replace(/\s*\/.*$/, ''); // strip slash cast chains
   base = base.replace(/^(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA)\s+(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA|NIGERIAN|NOLLYWOOD|AFRICAN|YORUBA|IGBO)?\s*(?:MOVIE|FILM|MOVIES|FILMS|NOLLYWOOD|NIGERIAN|AFRICAN)?\s*(?:\d{4})?\s*[-–—:]\s*/i, '');
   base = base.replace(/\s*\[[^\]]+\]/g, '');
   base = base.replace(/\s*\{[^}]+\}/g, '');
   base = base.replace(/\s*\([^)]*\)/g, '');
-  base = base.replace(/\s+[-–—]\s*(?:Latest|New|Nigerian|Nollywood|Yoruba|African|Watch|Ft\.|Starring|Featuring).*/i, '');
+  base = base.replace(/\s+[-–—]\s*(?:Latest|New|Nigerian|Nollywood|Yoruba|African|Watch|Ft\.|Starring|Featuring|Full\s+Nollywood\s+Movie|Full\s+Movie).*/i, '');
   base = base.replace(/\s+[-–—]\s+[A-Z][a-z]+\s+[A-Z][a-z]+.*$/i, ''); // star chains
-  base = base.replace(/\s*(?:Latest|New)\s*(?:Nigerian|Nollywood|Yoruba|Igbo)?\s*(?:Epic|Drama|Comedy|Action|Romance)?\s*(?:Movie|Film|Movies|Films|Series|Comedy Series)?\s*(?:\d{4})?.*$/i, '');
+  base = base.replace(/\s*(?:Latest|New|Full)\s*(?:Nigerian|Nollywood|Yoruba|Igbo)?\s*(?:Epic|Drama|Comedy|Action|Romance)?\s*(?:Movie|Film|Movies|Films|Series|Comedy Series)?\s*(?:\d{4})?.*$/i, '');
   base = base.replace(/\bS\d{1,2}E\d{1,3}.*$/i, '').trim();
   base = base.replace(/\b(?:EPISODE|EPS|EP\.|EP|SEASON|S|PART|PT\.?|VOLUME|VOL|E|V)\s*\d+.*$/i, '').trim();
   base = base.replace(/\bCONCLUDING\s+PART.*$/i, '').trim();
 
-  // If subtitle was detected via dash, extract base from before dash
-  if (episodeSubtitle && /[:–—\-]/.test(base)) {
+  // If subtitle was detected via dash, extract base from before dash (only for series)
+  const isSeriesCheck = Boolean(episodeNumber != null || seasonNumber != null);
+  if (isSeriesCheck && episodeSubtitle && /[:–—\-]/.test(base)) {
     const splitBase = base.split(/[:–—\-]/)[0].trim();
     if (splitBase.length >= 3) {
       base = splitBase;
