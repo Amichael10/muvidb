@@ -66,38 +66,7 @@ const AFRICAN_LANGUAGES = new Set([
   'yo', 'ig', 'ha', 'sw', 'zu', 'xh', 'tw', 'ak', 'sn', 'st', 'am', 'so', 'rw', 'ny'
 ]);
 
-const AFRICAN_KEYWORDS = [
-  'nigeria', 'ghana', 'south africa', 'kenya', 'uganda', 'tanzania', 'cameroon',
-  'rwanda', 'zimbabwe', 'senegal', 'zambia', 'egypt', 'morocco', 'ethiopia',
-  'liberia', 'sierra leone', 'nollywood', 'yoruba', 'igbo', 'hausa', 'kannywood',
-  'ghallywood', 'lagos', 'accra', 'ibadan', 'enugu', 'benin city', 'abuja', 'jos'
-];
 
-// Names and tokens distinctive to African / Nollywood talents
-const AFRICAN_TALENT_TOKENS = new Set([
-  'uche', 'nancy', 'kadiri', 'okereke', 'kosoko', 'edochie', 'agu', 'erics', 'akindele',
-  'chinedu', 'emeka', 'chidi', 'kanayo', 'osita', 'ebere', 'chiwetalu', 'lancelot', 'tchidi',
-  'chatta', 'afolayan', 'ogunde', 'salami', 'quadri', 'balogun', 'lawal', 'adekola', 'adebayo',
-  'aigbe', 'remi', 'ademoye', 'sobowale', 'hassan', 'bakre', 'falz', 'falana', 'macaroni',
-  'adedayo', 'njubigbo', 'odoputa', 'imasuen', 'babalola', 'irele', 'ajayi', 'okanlawon',
-  'okpocha', 'achufusi', 'awolowo', 'bachor', 'akpore', 'russet', 'nnaji', 'buari', 'ezuruonye',
-  'nnebe', 'genevieve', 'omotola', 'iniedo', 'esien', 'esin', 'lazarus', 'isokpan', 'adunni',
-  'ade', 'mba', 'ojo', 'dike', 'alabi', 'animashaun', 'badmus', 'belo', 'bello', 'chima',
-  'chigozie', 'chukwu', 'eze', 'ibrahim', 'idris', 'iyabo', 'kalu', 'muhammad', 'nwosu',
-  'obinna', 'odi', 'odunlade', 'ogbonna', 'ogungbe', 'olamide', 'olowo', 'omoni', 'onwuka',
-  'osahon', 'oyeleke', 'somkele', 'taiwo', 'tolu', 'tope', 'yakubu', 'yekini', 'yomi',
-  'zack', 'zubby', 'destiny', 'etiko', 'pete', 'kelechi', 'ike', 'somadina', 'regina',
-  'daniels', 'mercy', 'johnson', 'infinix', 'nollywood', 'yoruba', 'igbo', 'hausa',
-  'iyk', 'iyke', 'fredrick', 'leonard', 'ken', 'muna', 'obio', 'oluebube',
-  'sonia', 'chinenye', 'uchegbu', 'onyeabor', 'anodebe', 'ani', 'uchenna', 'chinwe',
-  'ngozi', 'patience', 'ozokwor', 'nkem', 'owoh', 'sam', 'loco', 'efe', 'bimbo',
-  'ronke', 'fathia', 'williams', 'iheme', 'aki', 'pawpaw', 'okolie', 'ebuka',
-  'stanley', 'odeh', 'etuk', 'eneaji', 'eneng', 'uzoeshi', 'ejike', 'ibedilo',
-  'osifo', 'uka', 'ujams', 'ihebie', 'reginald', 'chisom', 'nnaebue', 'nnanna',
-  'maduka', 'billion', 'nnadi', 'nkechinyere', 'jombo', 'ifeanyi', 'edward',
-  'cbriel', 'blessed', 'okey', 'rita', 'charles', 'omoni', 'oboli', 'kemi',
-  'adetiba', 'jade', 'osiberu', 'chikere', 'biodun', 'stephen', 'mo', 'abudu'
-]);
 
 // Genre name to ID cache
 let genreCache: Map<string, string> | null = null;
@@ -341,26 +310,16 @@ async function syncFilmAndEnsemble(
   const allCountries = [...originCountries, ...prodCountries];
   const isAfricanCountry = allCountries.some(c => AFRICAN_ISO_CODES.has(c));
   const isAfricanLang = AFRICAN_LANGUAGES.has((mediaDetails.original_language || '').toLowerCase());
-  const text = `${title} ${mediaDetails.overview || tmdbCredit.overview || ''}`.toLowerCase();
-  const hasAfricanKeyword = AFRICAN_KEYWORDS.some(k => text.includes(k));
+  const hasStrictForeignCountry = allCountries.some(c => ['US', 'GB', 'CA', 'FR', 'DE', 'AU', 'JP', 'CN', 'HK', 'KR', 'IN', 'BR', 'MX', 'IT', 'ES'].includes(c));
 
-  // Check if cast/crew indicates African / Nollywood production (overcoming TMDB "US" mislabeling)
-  const rawCast = mediaDetails.credits?.cast || [];
-  const rawCrew = mediaDetails.credits?.crew || [];
-  const samplePeople = [...rawCast.slice(0, 15), ...rawCrew.slice(0, 10)];
-  let africanTalentCount = 0;
-  for (const person of samplePeople) {
-    const pName = (person.name || '').toLowerCase();
-    const parts = pName.split(/\s+/);
-    if (parts.some((part: string) => AFRICAN_TALENT_TOKENS.has(part))) {
-      africanTalentCount++;
-    }
+  // If origin/production countries are purely foreign without any African country, REJECT immediately!
+  if (hasStrictForeignCountry && !isAfricanCountry) {
+    console.log(`   ⏭️ Skipping foreign title: "${title}" (${allCountries.join(', ') || 'foreign'})`);
+    return { filmId: '', wasCreated: false, ensembleAdded: 0 };
   }
-  const hasAfricanCastOrCrew =
-    africanTalentCount >= 2 ||
-    (samplePeople.length > 0 && africanTalentCount >= 1 && (samplePeople.length <= 15 || africanTalentCount / samplePeople.length >= 0.1));
 
-  const isAfricanOrigin = isAfricanCountry || isAfricanLang || hasAfricanKeyword || hasAfricanCastOrCrew;
+  // To create a NEW film, it MUST strictly have an African country or verified African language
+  const isAfricanOrigin = isAfricanCountry || isAfricanLang;
 
   const imdbId = mediaDetails.external_ids?.imdb_id || mediaDetails.imdb_id || null;
   const synopsis = mediaDetails.overview || tmdbCredit.overview || null;
