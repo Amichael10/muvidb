@@ -24,6 +24,10 @@ export function useLocalStorageDraft(key, data, isEnabled = true) {
   }, [key, data, isEnabled]);
 
   const clearDraft = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     if (key) {
       localStorage.removeItem(key);
     }

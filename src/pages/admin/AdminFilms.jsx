@@ -1035,6 +1035,7 @@ export default function AdminFilms() {
   };
 
   const handleCloseDrawer = () => {
+    clearDraft();
     setIsDrawerOpen(false);
     setEditingFilm(null);
     setFormData(initialFormState);
@@ -1538,13 +1539,43 @@ export default function AdminFilms() {
         ? resolvedTitle.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-')
         : null;
 
-      const resolvedSlug = (!editingFilm || isTitleChanged)
+      let resolvedSlug = (!editingFilm || isTitleChanged)
         ? generatedSlug
         : (formData.slug || generatedSlug);
 
+      if (resolvedSlug) {
+        const { data: duplicateSlug } = await supabase
+          .from('films')
+          .select('id')
+          .eq('slug', resolvedSlug)
+          .neq('id', editingFilm?.id || '00000000-0000-0000-0000-000000000000')
+          .maybeSingle();
+
+        if (duplicateSlug) {
+          resolvedSlug = `${resolvedSlug}-${formData.year || new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
+        }
+      }
+
       const resolvedMubiSlug = (!editingFilm || isTitleChanged)
-        ? generatedSlug
-        : (formData.mubi_slug || formData.slug || generatedSlug);
+        ? resolvedSlug
+        : (formData.mubi_slug || formData.slug || resolvedSlug);
+
+      let candidateVideoId = (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || (formData.youtube_watch_url ? extractYoutubeId(formData.youtube_watch_url) : null) || null;
+
+      if (candidateVideoId && editingFilm) {
+        // Ensure no other film already holds this source_video_id (avoid unique constraint crash)
+        const { data: duplicateVid } = await supabase
+          .from('films')
+          .select('id, title')
+          .eq('source_video_id', candidateVideoId)
+          .neq('id', editingFilm.id)
+          .maybeSingle();
+
+        if (duplicateVid) {
+          console.warn(`[AdminFilms] Video ID ${candidateVideoId} already attached to "${duplicateVid.title}" (${duplicateVid.id}). Preserving current source_video_id on this record.`);
+          candidateVideoId = editingFilm.source_video_id || null;
+        }
+      }
 
       const cleanFilmPayload = {
         title: resolvedTitle,
@@ -1562,7 +1593,7 @@ export default function AdminFilms() {
         distributor: distributorJoined,
         slug: resolvedSlug,
         mubi_slug: resolvedMubiSlug,
-        source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || (formData.youtube_watch_url ? extractYoutubeId(formData.youtube_watch_url) : null) || null,
+        source_video_id: candidateVideoId,
         trailer_youtube_id: (typeof formData.trailer_youtube_id === 'string' ? formData.trailer_youtube_id.trim() : formData.trailer_youtube_id) || null,
         youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
         release_date: formData.release_date || null,
@@ -1577,8 +1608,8 @@ export default function AdminFilms() {
         language: formData.language || null,
         status: formData.status || 'released',
         ...resolveFilmImageFields({
-          poster_url: formData.poster_url,
-          backdrop_url: formData.backdrop_url,
+          poster_url: typeof formData.poster_url === 'string' ? formData.poster_url.replace(/[\r\n]+/g, '').trim() : formData.poster_url,
+          backdrop_url: typeof formData.backdrop_url === 'string' ? formData.backdrop_url.replace(/[\r\n]+/g, '').trim() : formData.backdrop_url,
         }),
         streaming_links: {
           ...(() => {
@@ -1630,8 +1661,20 @@ export default function AdminFilms() {
       let filmId = editingFilm?.id;
 
       if (editingFilm) {
-        const { error } = await supabase.from('films').update(cleanFilmPayload).eq('id', filmId);
+        const { data: updatedRows, error } = await supabase
+          .from('films')
+          .update(cleanFilmPayload)
+          .eq('id', filmId)
+          .select('id, title, poster_url, backdrop_url, content_type, year, status');
         if (error) throw error;
+        if (!updatedRows || updatedRows.length === 0) {
+          throw new Error('Database updated 0 rows. Please verify your admin session or RLS permissions.');
+        }
+
+        // Immediately reflect changes in the local table state for instant feedback
+        setFilms((prev) =>
+          prev.map((f) => (f.id === filmId ? { ...f, ...cleanFilmPayload, ...updatedRows[0] } : f))
+        );
       } else {
         // If we have a source_video_id, check if it already exists to avoid unique constraint error
         if (cleanFilmPayload.source_video_id) {
@@ -1644,11 +1687,17 @@ export default function AdminFilms() {
           if (existing) {
             // It already exists! Let's update it instead of creating a new one
             filmId = existing.id;
-            const { error: updateErr } = await supabase
+            const { data: updateData, error: updateErr } = await supabase
               .from('films')
               .update(cleanFilmPayload)
-              .eq('id', filmId);
+              .eq('id', filmId)
+              .select('id, title, poster_url, backdrop_url, content_type, year, status');
             if (updateErr) throw updateErr;
+            if (updateData && updateData.length > 0) {
+              setFilms((prev) =>
+                prev.map((f) => (f.id === filmId ? { ...f, ...cleanFilmPayload, ...updateData[0] } : f))
+              );
+            }
             toast.success(`Updated existing film: ${existing.title}`);
           } else {
             const { data, error } = await supabase.from('films').insert([cleanFilmPayload]).select();
