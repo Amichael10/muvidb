@@ -7,6 +7,7 @@ import { notifyProAdminOnTelegram } from '../../lib/proModeration';
 import { getChangedProfileFields } from '../../lib/professionalProfile';
 import { extractChannelIdentifier, fetchChannelData } from '../../lib/youtube';
 import { formatViewCount } from '../../utils/youtube';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const fieldClass = 'mt-2 w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10';
 
@@ -23,6 +24,7 @@ const fields = [
 ];
 
 export default function ProfileEditorModal({ person, onClose, onSaved }) {
+  useBodyScrollLock(true);
   const initial = useMemo(() => Object.fromEntries(fields.map(([key]) => [key, person?.[key] || ''])), [person]);
   const [values, setValues] = useState(initial);
   const [bio, setBio] = useState(person?.bio || '');
@@ -100,7 +102,14 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md overscroll-contain sm:items-center sm:p-5" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      data-lenis-prevent="true"
+      style={{ overscrollBehavior: 'contain' }}
+      className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md overscroll-contain sm:items-center sm:p-5"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
       <form onSubmit={submit} className="relative my-auto flex max-h-[calc(100vh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#151515] shadow-2xl sm:max-h-[88vh] sm:rounded-3xl">
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 bg-[#151515] px-5 py-4 sm:px-8 sm:py-5">
           <div>

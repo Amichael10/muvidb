@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
 import { notifyProAdminOnTelegram } from '../../lib/proModeration';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const CATEGORIES = [
   { id: 'headshot', label: 'Official Headshot', desc: 'Primary professional headshot or portfolio portrait' },
@@ -14,6 +15,7 @@ const CATEGORIES = [
 ];
 
 export default function PhotoUploadModal({ person, onClose, onSaved }) {
+  useBodyScrollLock(true);
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [category, setCategory] = useState('headshot');

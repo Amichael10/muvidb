@@ -622,6 +622,7 @@ export default function AdminPeople() {
   };
 
   const openEditDrawer = async (person, ignoreDraft = false) => {
+    setIsDrawerOpen(true);
     let draft = null;
     if (!ignoreDraft) {
       try {
@@ -685,7 +686,11 @@ export default function AdminPeople() {
     setFormData(draft ? { ...baseForm, ...draft, awards: Array.isArray(draft.awards) ? draft.awards : baseForm.awards } : baseForm);
     setYoutubeChannelInput(draft?.youtube_channel_id || draft?.youtube_handle || getPersonYoutubeChannelUrl(p) || '');
     
-    await refetchCredits(person.id);
+    try {
+      await refetchCredits(person.id);
+    } catch (err) {
+      console.warn('Error refetching credits:', err);
+    }
 
     // Fetch qualifying YT videos
     if (person.youtube_channel_id) {

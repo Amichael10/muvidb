@@ -641,15 +641,25 @@ async function main() {
     const rangeEnd = currentOffset + fetchLimit - 1;
 
     console.log(`\n⏳ Fetching actors batch from offset ${currentOffset} to ${rangeEnd}...`);
-    const { data: people, error } = await supabase
-      .from('people')
-      .select('id, name, tmdb_id, popularity_score, film_count')
-      .order('popularity_score', { ascending: false, nullsFirst: false })
-      .range(currentOffset, rangeEnd);
-
-    if (error) {
-      console.error('❌ Supabase error fetching people candidates:', error.message);
-      break;
+    let people: any[] | null = null;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        const res = await supabase
+          .from('people')
+          .select('id, name, tmdb_id, popularity_score, film_count')
+          .order('popularity_score', { ascending: false, nullsFirst: false })
+          .range(currentOffset, rangeEnd);
+        if (res.error) throw res.error;
+        people = res.data;
+        break;
+      } catch (err: any) {
+        if (attempt === 5) {
+          console.error('❌ Supabase error fetching people candidates after 5 retries:', err.message);
+          break;
+        }
+        console.warn(`⚠️ [Attempt ${attempt}/5] Supabase people fetch failed: ${err.message}. Retrying in 4s...`);
+        await new Promise((r) => setTimeout(r, 4000));
+      }
     }
 
     if (!people || people.length === 0) {

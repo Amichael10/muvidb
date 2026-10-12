@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { notifyProAdminOnTelegram } from '../../lib/proModeration';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const NIGERIAN_GUILDS = [
   { id: 'agn', label: 'Actors Guild of Nigeria (AGN)' },
@@ -14,6 +15,7 @@ const NIGERIAN_GUILDS = [
 ];
 
 export default function RepresentationModal({ person, onClose, onSaved }) {
+  useBodyScrollLock(true);
   const currentStats = person.youtube_stats || {};
   const repData = currentStats.representation || {};
 
@@ -98,6 +100,10 @@ export default function RepresentationModal({ person, onClose, onSaved }) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      data-lenis-prevent="true"
+      style={{ overscrollBehavior: 'contain' }}
       className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md overscroll-contain sm:items-center sm:p-5"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >

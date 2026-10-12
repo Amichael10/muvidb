@@ -102,12 +102,22 @@ export default function PersonVideoPlayerModal({
   const categoryLabel = CATEGORY_LABELS[video.category] || toTitleCase(video.category || 'Video');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in">
+    <div
+      role="dialog"
+      aria-modal="true"
+      data-lenis-prevent="true"
+      style={{ overscrollBehavior: 'contain' }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in overscroll-contain"
+    >
       {/* Background Overlay */}
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Main Player Dialog */}
-      <div className="relative z-10 w-full max-w-5xl bg-surface border border-border rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+      <div
+        data-lenis-prevent="true"
+        style={{ overscrollBehavior: 'contain' }}
+        className="relative z-10 w-full max-w-5xl bg-surface border border-border rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] overscroll-contain"
+      >
         {/* Header Bar */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border bg-surface-2/60">
           <div className="flex items-center gap-2.5 min-w-0">

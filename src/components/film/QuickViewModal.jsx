@@ -113,9 +113,11 @@ export default function QuickViewModal() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 pointer-events-auto"
-      >
+          transition={{ duration: 0.2 }}
+          data-lenis-prevent="true"
+          style={{ overscrollBehavior: 'contain' }}
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 pointer-events-auto overscroll-contain"
+        >
         {/* Backdrop overlay */}
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeQuickView} />
 
@@ -126,10 +128,16 @@ export default function QuickViewModal() {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative w-full max-w-[850px] max-h-[90vh] bg-[#141414] rounded-xl shadow-2xl shadow-black border border-white/10 flex flex-col overflow-hidden z-10"
+          data-lenis-prevent="true"
+          style={{ overscrollBehavior: 'contain' }}
+          className="relative w-full max-w-[850px] max-h-[90vh] bg-[#141414] rounded-xl shadow-2xl shadow-black border border-white/10 flex flex-col overflow-hidden z-10 overscroll-contain"
         >
           {/* Scrollable Inner Container */}
-          <div className="flex-1 w-full overflow-y-auto overflow-x-hidden scrollbar-hide overscroll-contain">
+          <div 
+            data-lenis-prevent="true"
+            style={{ overscrollBehavior: 'contain' }}
+            className="flex-1 w-full overflow-y-auto overflow-x-hidden scrollbar-hide overscroll-contain"
+          >
             {/* Close Button */}
           <button 
             onClick={closeQuickView}

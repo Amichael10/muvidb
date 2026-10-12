@@ -17,6 +17,8 @@ import CareerPassportWelcome from '../components/professional/CareerPassportWelc
 import PhotoUploadModal from '../components/professional/PhotoUploadModal';
 import VideoUploadModal from '../components/professional/VideoUploadModal';
 import ProVideoTheaterModal from '../components/professional/ProVideoTheaterModal';
+import PortfolioEditorModal from '../components/professional/PortfolioEditorModal';
+import DashboardWalkthroughModal from '../components/professional/DashboardWalkthroughModal';
 import ProIntelligenceAssistant from '../components/professional/ProIntelligenceAssistant';
 import { submitProProfileUpdate, notifyProAdminOnTelegram } from '../lib/proModeration';
 
@@ -92,8 +94,20 @@ export default function ProDashboard() {
   const [creditRequests, setCreditRequests] = useState([]);
   const [profileRequests, setProfileRequests] = useState([]);
 
-  // Active Top Navigation Tab: 'filmography' | 'photos' | 'videos' | 'awards' | 'representation' | 'requests'
-  const [activeTab, setActiveTab] = useState('filmography');
+  // Active Navigation Tab: 'overview' | 'filmography' | 'portfolio' | 'photos' | 'videos' | 'awards' | 'representation' | 'intelligence' | 'requests'
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
+
+  // Check if user should see skippable walkthrough
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem('muvidb_pro_walkthrough_seen');
+      if (!seen) {
+        const timer = setTimeout(() => setShowWalkthrough(true), 800);
+        return () => clearTimeout(timer);
+      }
+    } catch (_) {}
+  }, []);
 
   // Filmography Toolbar State
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid'
@@ -111,6 +125,7 @@ export default function ProDashboard() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [editingPortfolio, setEditingPortfolio] = useState(false);
 
   // Inline Form States (Less Pop-ups)
   const [inlineRepOpen, setInlineRepOpen] = useState(false);
@@ -575,238 +590,635 @@ export default function ProDashboard() {
     );
   }
 
+  const TAB_TITLES = {
+    overview: 'Creator Studio & Career Passport',
+    filmography: 'Filmography & Box Office Credits',
+    portfolio: 'Filmmaker Link-in-Bio Showcase',
+    photos: 'Headshots & Production Stills Gallery',
+    videos: 'Video Showreels & Performance Reels',
+    awards: 'Industry Awards, Guilds & Accolades',
+    representation: 'Talent Agency, Manager & Inquiries',
+    intelligence: 'AI Studio & Career Insights',
+    requests: 'Editorial Verification & Submissions',
+  };
+
+  const SIDE_NAV_SECTIONS = [
+    {
+      category: 'Studio Workspace',
+      items: [
+        { id: 'overview', label: 'Overview', icon: 'solar:home-smile-angle-bold' },
+        { id: 'filmography', label: 'Filmography', icon: 'solar:clapperboard-bold', count: credits.length },
+        { id: 'portfolio', label: 'Link-in-Bio Portfolio', icon: 'solar:link-circle-bold', badge: 'Public' },
+        { id: 'photos', label: 'Photos & Stills', icon: 'solar:camera-bold', count: photosList.length },
+        { id: 'videos', label: 'Video Showreels', icon: 'solar:videocamera-record-bold', count: videosList.length },
+      ],
+    },
+    {
+      category: 'Industry & Career',
+      items: [
+        { id: 'representation', label: 'Representation', icon: 'solar:users-group-two-rounded-bold' },
+        { id: 'awards', label: 'Awards & Guilds', icon: 'solar:cup-star-bold', count: awardsList.length },
+        { id: 'intelligence', label: 'AI Studio', icon: 'solar:magic-stick-3-bold', badge: 'Pro' },
+        { id: 'requests', label: 'Requests & Status', icon: 'solar:inbox-bold', count: openRequests.length },
+      ],
+    },
+  ];
+
   return (
-    <main className="relative min-h-screen bg-[#0d0d0d] px-4 pb-24 pt-20 text-text-primary">
+    <main className="relative min-h-screen bg-[#0d0d0d] text-text-primary">
       {/* Cinematic Ambient Glow */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[640px] bg-[radial-gradient(circle_at_80%_0%,rgba(255,83,31,.14),transparent_45%),radial-gradient(circle_at_20%_20%,rgba(255,255,255,.03),transparent_35%)]" />
 
-      <div className="relative mx-auto max-w-7xl space-y-6">
-        {/* Top Control Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
-          <div className="flex items-center gap-2.5">
-            <span className="flex items-center gap-1.5 rounded-lg bg-brand/15 px-2.5 py-1 text-[10px] font-black tracking-widest text-brand uppercase">
-              <Icon icon="solar:shield-check-bold" width="14" /> MuviDB Pro
-            </span>
-            <span className="text-xs font-bold text-text-muted truncate">Creator Studio & Industry Passport</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setUploadingPhoto(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
-            >
-              <Icon icon="solar:camera-add-bold" width="15" /> Add Photo
-            </button>
-            <button
-              onClick={() => setUploadingVideo(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
-            >
-              <Icon icon="solar:videocamera-record-bold" width="15" /> Add Reel
-            </button>
-            <button
-              onClick={() => setAddingCredit(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-black text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90"
-            >
-              <Icon icon="solar:add-circle-bold" width="15" /> Add Credit
-            </button>
-            <Link
-              to="/advanced-search"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
-              title="Search shared filmographies, comparisons & granular talent data"
-            >
-              <Icon icon="solar:tuning-square-2-bold" width="15" className="text-brand" /> Advanced Search
-            </Link>
-            <Link
-              to={`/people/${person.slug || person.id}`}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.03] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-muted transition hover:border-white/25 hover:text-white"
-            >
-              <Icon icon="solar:eye-linear" width="15" /> Public View
-            </Link>
-          </div>
-        </div>
-
-        {/* Cinematic Studio Hero Banner */}
-        <header className="relative overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-[#1a1a1a] via-[#141414] to-[#0d0d0d] p-5 shadow-2xl md:p-8">
-          <div className="absolute right-0 top-0 h-80 w-80 rounded-full bg-brand/10 blur-[110px] pointer-events-none" />
-
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
-            {/* Avatar & Hover Quick Upload */}
-            <div className="group relative shrink-0 mx-auto sm:mx-0">
+      <div className="relative mx-auto flex max-w-[1680px] gap-6 px-3 sm:px-6 pt-20 pb-24">
+        {/* Desktop Side Navigation Rail / Sidebar (Hidden on mobile) */}
+        <aside className="hidden lg:flex w-64 xl:w-72 shrink-0 flex-col gap-4 sticky top-24 self-start max-h-[calc(100vh-7rem)] overflow-y-auto no-scrollbar">
+          {/* User Mini Identity Card */}
+          <div data-tour="user-card" className="rounded-2xl border border-white/10 bg-[#161616] p-4 shadow-xl">
+            <div className="flex items-center gap-3">
               <img
                 src={person.photo_url || '/images/person-placeholder.png'}
                 alt={person.name}
-                className="h-40 w-32 rounded-2xl border-2 border-white/15 object-cover shadow-2xl md:h-48 md:w-38"
+                className="h-12 w-12 rounded-xl border border-white/10 object-cover shrink-0"
               />
-              <span className="absolute -bottom-2 -right-2 grid h-8 w-8 place-items-center rounded-full border-2 border-[#141414] bg-brand text-white shadow-lg">
-                <Icon icon="solar:verified-check-bold" width="16" />
-              </span>
-              <button
-                onClick={() => setUploadingPhoto(true)}
-                className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-black/70 p-2 text-center opacity-0 backdrop-blur-sm transition duration-200 group-hover:opacity-100"
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <h2 className="truncate text-xs font-black text-white">{person.name}</h2>
+                  <Icon icon="solar:verified-check-bold" className="text-brand shrink-0" width="13" />
+                </div>
+                <p className="truncate text-[10px] font-mono text-zinc-400">@{person.slug || 'creator'}</p>
+                <span className="inline-block mt-0.5 text-[9px] font-black uppercase tracking-wider text-brand">
+                  Verified Talent
+                </span>
+              </div>
+            </div>
+
+            {/* Primary CTA: Link-in-Bio */}
+            <button
+              data-tour="portfolio-btn"
+              onClick={() => setEditingPortfolio(true)}
+              className="mt-3.5 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3 py-2 text-xs font-black text-black shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition"
+            >
+              <Icon icon="solar:link-circle-bold" width="16" />
+              <span>Portfolio Link-in-Bio</span>
+            </button>
+          </div>
+
+          {/* Sidebar Nav Items */}
+          <div data-tour="sidebar-nav" className="space-y-4 rounded-2xl border border-white/10 bg-[#141414] p-3 shadow-xl">
+            {SIDE_NAV_SECTIONS.map((section, sIdx) => (
+              <div key={sIdx} className="space-y-1">
+                <p className="px-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
+                  {section.category}
+                </p>
+                <div className="space-y-0.5">
+                  {section.items.map((item) => {
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id)}
+                        className={`group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-black transition ${
+                          isActive
+                            ? 'bg-brand text-white shadow-md shadow-brand/25'
+                            : 'text-zinc-400 hover:bg-white/[0.04] hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Icon
+                            icon={item.icon}
+                            width="16"
+                            className={isActive ? 'text-white' : 'text-zinc-400 group-hover:text-white'}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {item.count !== undefined && (
+                            <span
+                              className={`grid min-w-[18px] place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none ${
+                                isActive ? 'bg-white/20 text-white' : 'bg-white/[0.06] text-zinc-400'
+                              }`}
+                            >
+                              {item.count}
+                            </span>
+                          )}
+                          {item.badge && (
+                            <span className="rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-400">
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {/* Tools & Discovery */}
+            <div className="space-y-1 pt-2 border-t border-white/5">
+              <p className="px-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
+                Tools & Discovery
+              </p>
+              <Link
+                to={`/people/${person.slug || person.id}`}
+                target="_blank"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-black text-zinc-400 hover:bg-white/[0.04] hover:text-white transition"
               >
-                <Icon icon="solar:camera-bold" width="24" className="text-brand" />
-                <span className="mt-1 text-[10px] font-black text-white">Change Headshot</span>
+                <div className="flex items-center gap-2.5">
+                  <Icon icon="solar:eye-linear" width="16" />
+                  <span>Public Profile</span>
+                </div>
+                <Icon icon="solar:arrow-right-up-linear" width="13" />
+              </Link>
+              <Link
+                to="/advanced-search"
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-black text-zinc-400 hover:bg-white/[0.04] hover:text-white transition"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Icon icon="solar:tuning-square-2-bold" width="16" className="text-brand" />
+                  <span>Advanced Search</span>
+                </div>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowWalkthrough(true)}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-black text-zinc-400 hover:bg-white/[0.04] hover:text-white transition"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Icon icon="solar:compass-bold" width="16" className="text-amber-400" />
+                  <span>Feature Tour</span>
+                </div>
+                <span className="text-[9px] font-mono uppercase text-amber-400/80">Guide</span>
               </button>
             </div>
+          </div>
 
-            {/* Profile Identity Details */}
-            <div className="min-w-0 flex-1 text-center sm:text-left">
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full border border-brand/25 bg-brand/10 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
-                  <Icon icon="solar:star-circle-bold" width="12" /> Verified Talent
-                </span>
-                {repData.guilds?.map((g) => (
-                  <span key={g} className="rounded-full border border-white/10 bg-white/[.04] px-2.5 py-0.5 text-[9px] font-black uppercase text-text-muted">
-                    {g.toUpperCase()}
-                  </span>
-                ))}
-                {hasPendingProfileUpdate && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-0.5 text-[9px] font-black uppercase text-amber-400">
-                    <Icon icon="solar:hourglass-line-bold" width="11" /> In Review
-                  </span>
-                )}
+          {/* Passport Completeness Widget */}
+          <div data-tour="passport-widget" className="rounded-2xl border border-white/10 bg-[#161616] p-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Career Passport</p>
+                <p className="mt-0.5 text-lg font-black text-white">{progress.percent}% Ready</p>
               </div>
-
-              <h1 className="mt-2.5 truncate text-2xl font-black tracking-tight text-white sm:text-4xl md:text-5xl">{person.name}</h1>
-              <p className="mt-1 text-xs sm:text-sm font-black text-brand tracking-wide">{roles.join(' · ')}</p>
-              
-              <p className="mt-2.5 max-w-2xl text-xs leading-relaxed text-text-muted line-clamp-2">
-                {person.bio || 'Add a professional biography and career milestones so producers, casting directors, and international festival juries can discover your profile.'}
-              </p>
-
-              {/* Badges & Location */}
-              <div className="mt-3.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-xs text-text-muted">
-                {person.nationality && (
-                  <span className="flex items-center gap-1">
-                    <Icon icon="solar:global-linear" className="text-brand" width="14" />
-                    {person.nationality}
-                  </span>
-                )}
-                {person.birthplace && (
-                  <span className="flex items-center gap-1">
-                    <Icon icon="solar:map-point-linear" className="text-brand" width="14" />
-                    {person.birthplace}
-                  </span>
-                )}
-                {repData.agency && (
-                  <span className="flex items-center gap-1">
-                    <Icon icon="solar:buildings-2-bold" className="text-emerald-400" width="14" />
-                    Rep: <strong className="text-white">{repData.agency}</strong>
-                  </span>
-                )}
-              </div>
+              <button
+                onClick={() => setPassportOpen(true)}
+                className="rounded-xl bg-brand px-3 py-1.5 text-[11px] font-black text-white hover:bg-brand/90 transition shadow-md shadow-brand/20"
+              >
+                View
+              </button>
             </div>
-
-            {/* Profile Strength & Passport Card */}
-            <div className="w-full shrink-0 rounded-2xl border border-white/10 bg-black/40 p-4 sm:p-5 lg:w-72 shadow-inner">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Profile Completeness</p>
-                  <p className="mt-0.5 text-2xl font-black text-white">{progress.percent}%</p>
-                </div>
-                <div
-                  className="relative grid h-12 w-12 place-items-center rounded-full"
-                  style={{ background: `conic-gradient(#ff531f ${progress.percent * 3.6}deg, rgba(255,255,255,.08) 0)` }}
-                >
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-[#161616] text-[10px] font-black text-text-primary">
-                    {progress.completed}/{progress.total}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-brand transition-all duration-500" style={{ width: `${progress.percent}%` }} />
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setEditingProfile(true)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] py-2 text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
-                >
-                  <Icon icon="solar:pen-2-bold" width="14" /> Edit Bio
-                </button>
-                <button
-                  onClick={() => setPassportOpen(true)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl bg-brand py-2 text-xs font-black text-white shadow-lg shadow-brand/15 transition hover:bg-brand/90"
-                >
-                  <Icon icon="solar:share-bold" width="14" /> Passport
-                </button>
-              </div>
+            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-brand transition-all duration-500" style={{ width: `${progress.percent}%` }} />
             </div>
           </div>
-        </header>
+        </aside>
 
-        {/* High-Level Stat Cards */}
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon="solar:clapperboard-play-bold" label="Total Filmography" value={credits.length} detail="Verified Nollywood & African credits" />
-          <MetricCard icon="solar:gallery-wide-bold" label="Portfolio Media" value={highlights.length} detail={`${photosList.length} photos · ${videosList.length} video reels`} />
-          <MetricCard icon="solar:cup-star-bold" label="Industry Awards" value={awardsList.length} detail={`${awardsList.filter((a) => a.status === 'Winner').length} wins · ${awardsList.filter((a) => a.status !== 'Winner').length} nominations`} />
-          <MetricCard
-            icon="logos:youtube-icon"
-            label="YouTube Channel Views"
-            value={youtubeViews ? formatViewCount(youtubeViews) : '—'}
-            detail={youtubeViews ? 'Synced from linked channel' : 'Connect in representation'}
-            highlight={Boolean(youtubeViews)}
-          />
-        </div>
+        {/* Main Content Area */}
+        <div className="min-w-0 flex-1 space-y-6">
+          {/* Top Control Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="flex items-center gap-1.5 rounded-lg bg-brand/15 px-2.5 py-1 text-[10px] font-black tracking-widest text-brand uppercase shrink-0">
+                <Icon icon="solar:shield-check-bold" width="14" /> MuviDB Pro
+              </span>
+              <span className="text-xs font-bold text-text-muted truncate">
+                {TAB_TITLES[activeTab] || 'Creator Studio & Industry Passport'}
+              </span>
+            </div>
 
-        {/* Redesigned Floating Segmented Capsule Navigation (Zero scrollbars, zero clipping) */}
-        <div className="sticky top-20 z-30">
-          <nav
-            className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-[#141414]/95 p-1.5 shadow-2xl backdrop-blur-xl no-scrollbar scrollbar-none"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {[
-              { id: 'filmography', label: 'Filmography', icon: 'solar:clapperboard-bold', count: credits.length },
-              { id: 'photos', label: 'Photos', icon: 'solar:camera-bold', count: photosList.length },
-              { id: 'videos', label: 'Showreels', icon: 'solar:videocamera-record-bold', count: videosList.length },
-              { id: 'awards', label: 'Awards', icon: 'solar:cup-star-bold', count: awardsList.length },
-              { id: 'representation', label: 'Representation', icon: 'solar:users-group-two-rounded-bold' },
-              { id: 'intelligence', label: 'AI Studio', icon: 'solar:magic-stick-3-bold', badge: 'Pro' },
-              { id: 'requests', label: 'Requests', icon: 'solar:inbox-bold', count: openRequests.length },
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`group relative flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-black transition-all ${
-                    isActive
-                      ? 'bg-brand text-white shadow-lg shadow-brand/25'
-                      : 'text-text-muted hover:bg-white/[.05] hover:text-white'
-                  }`}
+            <div data-tour="top-actions" className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowWalkthrough(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-amber-300 hover:text-white hover:bg-amber-500/20 transition"
+                title="Open guided walkthrough tour"
+              >
+                <Icon icon="solar:compass-bold" width="15" className="text-amber-400" /> Tour
+              </button>
+              <button
+                onClick={() => setUploadingPhoto(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
+              >
+                <Icon icon="solar:camera-add-bold" width="15" /> Add Photo
+              </button>
+              <button
+                onClick={() => setUploadingVideo(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
+              >
+                <Icon icon="solar:videocamera-record-bold" width="15" /> Add Reel
+              </button>
+              <button
+                onClick={() => setEditingPortfolio(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-amber-400 transition hover:bg-amber-500/20 hover:border-amber-500/50 shadow-sm"
+                title="Customize your Link-in-Bio showcase and public showreel"
+              >
+                <Icon icon="solar:link-circle-bold" width="15" /> Link-in-Bio
+              </button>
+              <button
+                onClick={() => setAddingCredit(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-black text-white shadow-lg shadow-brand/20 transition hover:bg-brand/90"
+              >
+                <Icon icon="solar:add-circle-bold" width="15" /> Add Credit
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Segmented Capsule Navigation (Hidden on desktop lg:) */}
+          <div className="lg:hidden sticky top-20 z-30">
+            <nav
+              className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-[#141414]/95 p-1.5 shadow-2xl backdrop-blur-xl no-scrollbar scrollbar-none"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {[
+                { id: 'overview', label: 'Overview', icon: 'solar:home-smile-angle-bold' },
+                { id: 'filmography', label: 'Filmography', icon: 'solar:clapperboard-bold', count: credits.length },
+                { id: 'portfolio', label: 'Portfolio', icon: 'solar:link-circle-bold' },
+                { id: 'photos', label: 'Photos', icon: 'solar:camera-bold', count: photosList.length },
+                { id: 'videos', label: 'Showreels', icon: 'solar:videocamera-record-bold', count: videosList.length },
+                { id: 'awards', label: 'Awards', icon: 'solar:cup-star-bold', count: awardsList.length },
+                { id: 'representation', label: 'Rep', icon: 'solar:users-group-two-rounded-bold' },
+                { id: 'intelligence', label: 'AI Studio', icon: 'solar:magic-stick-3-bold', badge: 'Pro' },
+                { id: 'requests', label: 'Requests', icon: 'solar:inbox-bold', count: openRequests.length },
+              ].map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`group relative flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-black transition-all ${
+                      isActive
+                        ? 'bg-brand text-white shadow-lg shadow-brand/25'
+                        : 'text-text-muted hover:bg-white/[.05] hover:text-white'
+                    }`}
+                  >
+                    <Icon icon={tab.icon} width="16" className={isActive ? 'text-white' : 'text-text-muted group-hover:text-white'} />
+                    <span>{tab.label}</span>
+                    {tab.count !== undefined && (
+                      <span
+                        className={`grid min-w-[18px] place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none ${
+                          isActive
+                            ? 'bg-white/25 text-white'
+                            : 'bg-white/[.07] text-text-muted group-hover:bg-white/15 group-hover:text-white'
+                        }`}
+                      >
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* TAB 0: OVERVIEW (Hero, Metrics, Quick Launchers, Recent Credits) */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              {/* Cinematic Studio Hero Banner */}
+              <header className="relative overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-[#1a1a1a] via-[#141414] to-[#0d0d0d] p-5 shadow-2xl md:p-8">
+                <div className="absolute right-0 top-0 h-80 w-80 rounded-full bg-brand/10 blur-[110px] pointer-events-none" />
+
+                <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
+                  {/* Avatar & Hover Quick Upload */}
+                  <div className="group relative shrink-0 mx-auto sm:mx-0">
+                    <img
+                      src={person.photo_url || '/images/person-placeholder.png'}
+                      alt={person.name}
+                      className="h-40 w-32 rounded-2xl border-2 border-white/15 object-cover shadow-2xl md:h-48 md:w-38"
+                    />
+                    <span className="absolute -bottom-2 -right-2 grid h-8 w-8 place-items-center rounded-full border-2 border-[#141414] bg-brand text-white shadow-lg">
+                      <Icon icon="solar:verified-check-bold" width="16" />
+                    </span>
+                    <button
+                      onClick={() => setUploadingPhoto(true)}
+                      className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-black/70 p-2 text-center opacity-0 backdrop-blur-sm transition duration-200 group-hover:opacity-100"
+                    >
+                      <Icon icon="solar:camera-bold" width="24" className="text-brand" />
+                      <span className="mt-1 text-[10px] font-black text-white">Change Headshot</span>
+                    </button>
+                  </div>
+
+                  {/* Profile Identity Details */}
+                  <div className="min-w-0 flex-1 text-center sm:text-left">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-brand/25 bg-brand/10 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-brand">
+                        <Icon icon="solar:star-circle-bold" width="12" /> Verified Talent
+                      </span>
+                      {repData.guilds?.map((g) => (
+                        <span key={g} className="rounded-full border border-white/10 bg-white/[.04] px-2.5 py-0.5 text-[9px] font-black uppercase text-text-muted">
+                          {g.toUpperCase()}
+                        </span>
+                      ))}
+                      {hasPendingProfileUpdate && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-0.5 text-[9px] font-black uppercase text-amber-400">
+                          <Icon icon="solar:hourglass-line-bold" width="11" /> In Review
+                        </span>
+                      )}
+                    </div>
+
+                    <h1 className="mt-2.5 truncate text-2xl font-black tracking-tight text-white sm:text-4xl md:text-5xl">{person.name}</h1>
+                    <p className="mt-1 text-xs sm:text-sm font-black text-brand tracking-wide">{roles.join(' · ')}</p>
+                    
+                    <p className="mt-2.5 max-w-2xl text-xs leading-relaxed text-text-muted line-clamp-2">
+                      {person.bio || 'Add a professional biography and career milestones so producers, casting directors, and international festival juries can discover your profile.'}
+                    </p>
+
+                    {/* Badges & Location */}
+                    <div className="mt-3.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-xs text-text-muted">
+                      {person.nationality && (
+                        <span className="flex items-center gap-1">
+                          <Icon icon="solar:global-linear" className="text-brand" width="14" />
+                          {person.nationality}
+                        </span>
+                      )}
+                      {person.birthplace && (
+                        <span className="flex items-center gap-1">
+                          <Icon icon="solar:map-point-linear" className="text-brand" width="14" />
+                          {person.birthplace}
+                        </span>
+                      )}
+                      {repData.agency && (
+                        <span className="flex items-center gap-1">
+                          <Icon icon="solar:buildings-2-bold" className="text-emerald-400" width="14" />
+                          Rep: <strong className="text-white">{repData.agency}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Profile Strength & Passport Card */}
+                  <div className="w-full shrink-0 rounded-2xl border border-white/10 bg-black/40 p-4 sm:p-5 lg:w-72 shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Profile Completeness</p>
+                        <p className="mt-0.5 text-2xl font-black text-white">{progress.percent}%</p>
+                      </div>
+                      <div
+                        className="relative grid h-12 w-12 place-items-center rounded-full"
+                        style={{ background: `conic-gradient(#ff531f ${progress.percent * 3.6}deg, rgba(255,255,255,.08) 0)` }}
+                      >
+                        <div className="grid h-9 w-9 place-items-center rounded-full bg-[#161616] text-[10px] font-black text-text-primary">
+                          {progress.completed}/{progress.total}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full rounded-full bg-brand transition-all duration-500" style={{ width: `${progress.percent}%` }} />
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setEditingProfile(true)}
+                        className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] py-2 text-xs font-black text-text-primary transition hover:border-brand/40 hover:text-brand"
+                      >
+                        <Icon icon="solar:pen-2-bold" width="14" /> Edit Bio
+                      </button>
+                      <button
+                        onClick={() => setPassportOpen(true)}
+                        className="flex items-center justify-center gap-1.5 rounded-xl bg-brand py-2 text-xs font-black text-white shadow-lg shadow-brand/15 transition hover:bg-brand/90"
+                      >
+                        <Icon icon="solar:share-bold" width="14" /> Passport
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </header>
+
+              {/* High-Level Stat Cards */}
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricCard icon="solar:clapperboard-play-bold" label="Total Filmography" value={credits.length} detail="Verified Nollywood & African credits" />
+                <MetricCard icon="solar:gallery-wide-bold" label="Portfolio Media" value={highlights.length} detail={`${photosList.length} photos · ${videosList.length} video reels`} />
+                <MetricCard icon="solar:cup-star-bold" label="Industry Awards" value={awardsList.length} detail={`${awardsList.filter((a) => a.status === 'Winner').length} wins · ${awardsList.filter((a) => a.status !== 'Winner').length} nominations`} />
+                <MetricCard
+                  icon="logos:youtube-icon"
+                  label="YouTube Channel Views"
+                  value={youtubeViews ? formatViewCount(youtubeViews) : '—'}
+                  detail={youtubeViews ? 'Synced from linked channel' : 'Connect in representation'}
+                  highlight={Boolean(youtubeViews)}
+                />
+              </div>
+
+              {/* Quick Action Hub */}
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div
+                  onClick={() => setEditingPortfolio(true)}
+                  className="group cursor-pointer rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent p-4 transition hover:border-amber-500/50 hover:bg-amber-500/15"
                 >
-                  <Icon icon={tab.icon} width="16" className={isActive ? 'text-white' : 'text-text-muted group-hover:text-white'} />
-                  <span>{tab.label}</span>
-                  {tab.count !== undefined && (
-                    <span
-                      className={`grid min-w-[18px] place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none ${
-                        isActive
-                          ? 'bg-white/25 text-white'
-                          : 'bg-white/[.07] text-text-muted group-hover:bg-white/15 group-hover:text-white'
-                      }`}
-                    >
-                      {tab.count}
+                  <div className="flex items-center justify-between">
+                    <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                      <Icon icon="solar:link-circle-bold" width="20" />
                     </span>
-                  )}
-                  {tab.badge && (
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider ${
-                        isActive
-                          ? 'bg-black/30 text-amber-200'
-                          : 'bg-brand/15 text-brand group-hover:bg-brand/25'
-                      }`}
-                    >
-                      {tab.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+                    <span className="text-[10px] font-mono text-amber-400 font-bold uppercase">Launch</span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-black text-white group-hover:text-amber-400 transition">
+                    Link-in-Bio Portfolio
+                  </h3>
+                  <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
+                    Standalone reel, top projects showcase, and direct inquiry link at muvidb.com/@{person.slug || 'you'}.
+                  </p>
+                </div>
 
-        {/* Tab 1: Filmography & Credits */}
-        {activeTab === 'filmography' && (
+                <div
+                  onClick={() => setAddingCredit(true)}
+                  className="group cursor-pointer rounded-2xl border border-white/10 bg-[#161616] p-4 transition hover:border-brand/40 hover:bg-white/[0.03]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="p-2 rounded-xl bg-brand/15 text-brand">
+                      <Icon icon="solar:add-circle-bold" width="20" />
+                    </span>
+                    <span className="text-[10px] font-mono text-brand font-bold uppercase">Submit</span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-black text-white group-hover:text-brand transition">
+                    Add Film Credit
+                  </h3>
+                  <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
+                    Submit verified cinema, streaming, or TV credits for automated box office tracking.
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => setUploadingPhoto(true)}
+                  className="group cursor-pointer rounded-2xl border border-white/10 bg-[#161616] p-4 transition hover:border-blue-500/40 hover:bg-white/[0.03]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="p-2 rounded-xl bg-blue-500/15 text-blue-400">
+                      <Icon icon="solar:camera-add-bold" width="20" />
+                    </span>
+                    <span className="text-[10px] font-mono text-blue-400 font-bold uppercase">Upload</span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-black text-white group-hover:text-blue-400 transition">
+                    Portraits & Stills
+                  </h3>
+                  <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
+                    Upload 4K headshots, character looks, and film production stills.
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => setPassportOpen(true)}
+                  className="group cursor-pointer rounded-2xl border border-white/10 bg-[#161616] p-4 transition hover:border-emerald-500/40 hover:bg-white/[0.03]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                      <Icon icon="solar:share-bold" width="20" />
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase">Share</span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-black text-white group-hover:text-emerald-400 transition">
+                    Industry Passport
+                  </h3>
+                  <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
+                    Export your official verified digital talent passport and casting card.
+                  </p>
+                </div>
+              </div>
+
+              {/* Recent Verified Credits Snapshot */}
+              <div className="rounded-2xl border border-white/10 bg-[#141414] p-5 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-black text-white">Recent Filmography</h3>
+                    <p className="text-xs text-zinc-400">Latest productions on your verified record</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('filmography')}
+                    className="text-xs font-black text-brand hover:underline flex items-center gap-1"
+                  >
+                    <span>View all {credits.length} credits</span>
+                    <Icon icon="solar:arrow-right-linear" width="14" />
+                  </button>
+                </div>
+
+                {credits.length === 0 ? (
+                  <EmptyState
+                    icon="solar:clapperboard-linear"
+                    title="No credits on record yet"
+                    body="Search and claim your film appearances or submit a new project."
+                    action={
+                      <button
+                        onClick={() => setAddingCredit(true)}
+                        className="rounded-xl bg-brand px-4 py-2 text-xs font-black text-white"
+                      >
+                        Add Your First Credit
+                      </button>
+                    }
+                  />
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {credits.slice(0, 4).map((c) => {
+                      const film = c.films || {};
+                      return (
+                        <div
+                          key={c.id}
+                          className="flex gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-2.5 transition hover:border-white/15"
+                        >
+                          <img
+                            src={film.poster_url || '/images/placeholder-poster.png'}
+                            alt={film.title || 'Film'}
+                            className="h-16 w-11 rounded-lg object-cover shrink-0 border border-white/10"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <h4 className="truncate text-xs font-bold text-white">{film.title || 'Untitled'}</h4>
+                            <p className="truncate text-[10px] text-brand font-medium">
+                              {c.character_name ? `as ${c.character_name}` : formatRole(c.role)}
+                            </p>
+                            <p className="mt-1 text-[9px] text-zinc-400">
+                              {film.year || '—'} · {film.release_type || 'Film'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: LINK-IN-BIO PORTFOLIO HUB */}
+          {activeTab === 'portfolio' && (
+            <div className="space-y-6">
+              <div className="rounded-3xl border border-amber-500/25 bg-gradient-to-br from-amber-500/10 via-[#161616] to-[#0d0d0d] p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400">
+                      <Icon icon="solar:link-circle-bold" width="14" /> Standalone Showcase Hub
+                    </span>
+                    <h2 className="mt-2 text-2xl sm:text-3xl font-black text-white tracking-tight">
+                      @{person.slug || 'creator'} Link-in-Bio
+                    </h2>
+                    <p className="mt-1 text-xs sm:text-sm text-zinc-300 max-w-xl">
+                      Your high-converting creator hub for casting directors, press, and brand partners. Features your showreel video, priority films, and direct inquiry channels.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setEditingPortfolio(true)}
+                      className="rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-black text-black uppercase tracking-wider hover:bg-amber-400 transition flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+                    >
+                      <Icon icon="solar:pen-2-bold" width="16" />
+                      <span>Edit Portfolio Settings</span>
+                    </button>
+                    <a
+                      href={`/@${person.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-bold text-white hover:bg-white/10 transition flex items-center gap-1.5"
+                    >
+                      <Icon icon="solar:square-top-down-linear" width="16" />
+                      <span>View Live</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Direct Share Bar */}
+                <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border border-white/10 bg-black/40">
+                  <div className="flex items-center gap-2 text-xs font-mono text-zinc-300 truncate">
+                    <Icon icon="solar:link-bold" width="16" className="text-amber-400 shrink-0" />
+                    <span className="truncate">{window.location.origin}/@{person.slug}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/@${person.slug}`);
+                      toast.success('Portfolio URL copied to clipboard!');
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+                  >
+                    <Icon icon="solar:copy-bold" width="14" />
+                    <span>Copy Link</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Best Practices Advice */}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-[#161616] p-4">
+                  <span className="text-xs font-mono font-bold text-amber-400 uppercase">Tip 01</span>
+                  <h4 className="mt-1 text-sm font-bold text-white">Social Bio Placement</h4>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Add muvidb.com/@{person.slug} directly to your Instagram, TikTok, and X bios for 1-click industry access.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-[#161616] p-4">
+                  <span className="text-xs font-mono font-bold text-amber-400 uppercase">Tip 02</span>
+                  <h4 className="mt-1 text-sm font-bold text-white">Embed Your Best Reel</h4>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Paste your best 2-minute YouTube or Vimeo dramatic showreel so agents can watch your range instantly.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-[#161616] p-4">
+                  <span className="text-xs font-mono font-bold text-amber-400 uppercase">Tip 03</span>
+                  <h4 className="mt-1 text-sm font-bold text-white">Pin 1–6 Priority Films</h4>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    Select your leading roles and award-winning titles to appear at the very top of your public portfolio.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 1: FILMOGRAPHY & CREDITS */}
+          {activeTab === 'filmography' && (
           <div className="space-y-4">
             {/* Toolbar: Search, Role Filter, Release Filter, View Toggle, Sort */}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#161616] p-3.5">
@@ -1711,6 +2123,7 @@ export default function ProDashboard() {
         {activeTab === 'intelligence' && (
           <ProIntelligenceAssistant person={person} credits={credits} />
         )}
+        </div>
       </div>
 
       {/* Modals */}
@@ -1719,8 +2132,10 @@ export default function ProDashboard() {
       {uploadingPhoto && <PhotoUploadModal person={person} onClose={() => setUploadingPhoto(false)} onSaved={load} />}
       {uploadingVideo && <VideoUploadModal person={person} credits={credits} onClose={() => setUploadingVideo(false)} onSaved={load} />}
       {theaterVideo && <ProVideoTheaterModal video={theaterVideo} onClose={() => setTheaterVideo(null)} />}
+      {editingPortfolio && <PortfolioEditorModal isOpen={editingPortfolio} onClose={() => setEditingPortfolio(false)} person={person} onSaved={load} />}
       {welcomeOpen && <CareerPassportWelcome firstName={person.name?.split(' ')[0]} onDismiss={() => setWelcomeOpen(false)} onCreate={() => { setWelcomeOpen(false); setPassportOpen(true); }} />}
       {passportOpen && <CareerPassportModal person={{ ...person, claimed: true }} credits={credits} stageCredits={stageCredits} personalized onClose={() => setPassportOpen(false)} />}
+      {showWalkthrough && <DashboardWalkthroughModal isOpen={showWalkthrough} onClose={() => setShowWalkthrough(false)} />}
     </main>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import {
   buildCareerPassportModel,
   careerPassportFilename,
@@ -29,6 +30,7 @@ async function getCollaboratorCount(person, credits) {
 }
 
 export default function CareerPassportModal({ person, credits = [], stageCredits = [], personalized = false, onClose }) {
+  useBodyScrollLock(true);
   const [blob, setBlob] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [error, setError] = useState(false);

@@ -780,13 +780,19 @@ export default function AdminFilms() {
     // Fallback 2: Query channels by streaming_links.youtube_channel_id
     const streamingChannelId = filmRecord?.streaming_links?.youtube_channel_id;
     if (!matchedChannel && streamingChannelId) {
-      const { data: ch } = await supabase
-        .from('channels')
-        .select('id, name, channel_handle, thumbnail_url, owner_company_id')
-        .eq('id', streamingChannelId)
-        .maybeSingle();
-      if (ch) {
-        matchedChannel = ch;
+      try {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(streamingChannelId);
+        const chanQuery = supabase
+          .from('channels')
+          .select('id, name, channel_handle, thumbnail_url, owner_company_id');
+        const { data: ch } = isUUID
+          ? await chanQuery.eq('id', streamingChannelId).maybeSingle()
+          : await chanQuery.eq('channel_id', streamingChannelId).maybeSingle();
+        if (ch) {
+          matchedChannel = ch;
+        }
+      } catch (e) {
+        console.warn('Could not match channel by streaming channel id:', e);
       }
     }
 
@@ -800,6 +806,7 @@ export default function AdminFilms() {
   };
 
   const handleOpenDrawer = async (film = null, ignoreDraft = false) => {
+    setIsDrawerOpen(true);
     let draft = null;
     const key = film ? `MuviDB_draft_film_${film.id}` : 'MuviDB_draft_film_new';
     if (!ignoreDraft) {
@@ -875,7 +882,11 @@ export default function AdminFilms() {
         setSelectedChannel(draft.selectedChannel || null);
         setFormChannelSearch(draft.selectedChannel?.name || '');
       } else {
-        await fetchFilmDetails(film.id, film);
+        try {
+          await fetchFilmDetails(film.id, film);
+        } catch (err) {
+          console.error('Error fetching film details:', err);
+        }
       }
     } else {
       setEditingFilm(null);

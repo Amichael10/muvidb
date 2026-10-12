@@ -5,10 +5,12 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { CAST_ROLE, CREW_ROLES } from '../../lib/creditRoles';
 import { notifyProAdminOnTelegram } from '../../lib/proModeration';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const inputClass = 'mt-2 w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10';
 
 export default function CreditRequestModal({ person, onClose, onSaved }) {
+  useBodyScrollLock(true);
   const { user } = useAuth();
   const [mode, setMode] = useState('existing');
   const [query, setQuery] = useState('');
@@ -102,7 +104,14 @@ export default function CreditRequestModal({ person, onClose, onSaved }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md overscroll-contain sm:items-center sm:p-5" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      data-lenis-prevent="true"
+      style={{ overscrollBehavior: 'contain' }}
+      className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md overscroll-contain sm:items-center sm:p-5"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
       <form onSubmit={submit} className="relative my-auto max-h-[calc(100vh-1.5rem)] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-[#151515] p-5 shadow-2xl sm:max-h-[88vh] sm:rounded-3xl sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div><p className="text-[10px] font-black uppercase tracking-[.24em] text-brand">Filmography request</p><h2 className="mt-1 text-xl font-black text-text-primary sm:text-2xl">Add a professional credit</h2><p className="mt-1 text-xs text-text-muted sm:text-sm">Every credit is checked by a MuviDB editor before publishing.</p></div>

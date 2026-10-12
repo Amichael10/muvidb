@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { Icon } from '@iconify/react';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 export default function ProVideoTheaterModal({ video, onClose }) {
+  useBodyScrollLock(Boolean(video));
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose?.();

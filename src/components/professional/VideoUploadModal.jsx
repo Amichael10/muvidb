@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
 import { notifyProAdminOnTelegram } from '../../lib/proModeration';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const VIDEO_CATEGORIES = [
   { id: 'showreel', label: 'Official Showreel / Acting Reel', desc: 'Curated montage showcasing your best performances' },
@@ -14,6 +15,7 @@ const VIDEO_CATEGORIES = [
 ];
 
 export default function VideoUploadModal({ person, credits = [], onClose, onSaved }) {
+  useBodyScrollLock(true);
   const [sourceType, setSourceType] = useState('url'); // 'url' | 'upload'
   const [videoUrl, setVideoUrl] = useState('');
   const [file, setFile] = useState(null);
@@ -211,6 +213,10 @@ export default function VideoUploadModal({ person, credits = [], onClose, onSave
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      data-lenis-prevent="true"
+      style={{ overscrollBehavior: 'contain' }}
       className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-3 backdrop-blur-md overscroll-contain sm:items-center sm:p-5"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
