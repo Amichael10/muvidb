@@ -807,22 +807,23 @@ export default function AdminFilms() {
 
   const handleOpenDrawer = async (film = null, ignoreDraft = false) => {
     setIsDrawerOpen(true);
-    let draft = null;
-    const key = film ? `MuviDB_draft_film_${film.id}` : 'MuviDB_draft_film_new';
-    if (!ignoreDraft) {
-      try {
-        const stored = localStorage.getItem(key);
-        if (stored) draft = JSON.parse(stored);
-      } catch (e) {}
-    }
-    setDraftRestoredMessage(draft ? 'Unsaved changes restored from draft.' : '');
+    try {
+      let draft = null;
+      const key = film ? `MuviDB_draft_film_${film.id}` : 'MuviDB_draft_film_new';
+      if (!ignoreDraft) {
+        try {
+          const stored = localStorage.getItem(key);
+          if (stored) draft = JSON.parse(stored);
+        } catch (e) {}
+      }
+      setDraftRestoredMessage(draft ? 'Unsaved changes restored from draft.' : '');
 
-    setParentSeriesQuery('');
-    setParentSeriesResults([]);
-    setParentSeriesLabel('');
-    setSimilarSeries([]);
-    setSelectedSimilarIds([]);
-    setShowAllGenres(false);
+      setParentSeriesQuery('');
+      setParentSeriesResults([]);
+      setParentSeriesLabel('');
+      setSimilarSeries([]);
+      setSelectedSimilarIds([]);
+      setShowAllGenres(false);
 
     if (film) {
       setEditingFilm(film);
@@ -910,10 +911,14 @@ export default function AdminFilms() {
       setSelectedChannel(draft?.selectedChannel || null);
       setFormChannelSearch(draft?.selectedChannel?.name || '');
       setFormChannelResults([]);
+      setDistributorResults([]);
     }
-    setDistributorResults([]);
+  } catch (err) {
+    console.error('Error opening production drawer:', err);
+  } finally {
     setIsDrawerOpen(true);
-  };
+  }
+};
 
   const searchParentSeries = async (q) => {
     setParentSeriesQuery(q);

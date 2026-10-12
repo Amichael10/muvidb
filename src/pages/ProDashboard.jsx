@@ -631,43 +631,54 @@ export default function ProDashboard() {
 
       <div className="relative mx-auto flex max-w-[1680px] gap-6 px-3 sm:px-6 pt-20 pb-24">
         {/* Desktop Side Navigation Rail / Sidebar (Hidden on mobile) */}
-        <aside className="hidden lg:flex w-64 xl:w-72 shrink-0 flex-col gap-4 sticky top-24 self-start max-h-[calc(100vh-7rem)] overflow-y-auto no-scrollbar">
-          {/* User Mini Identity Card */}
-          <div data-tour="user-card" className="rounded-2xl border border-white/10 bg-[#161616] p-4 shadow-xl">
-            <div className="flex items-center gap-3">
+        <aside
+          data-lenis-prevent="true"
+          onWheel={(e) => e.stopPropagation()}
+          style={{
+            overscrollBehavior: 'contain',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(255,255,255,0.2) transparent',
+          }}
+          className="hidden lg:flex w-64 xl:w-72 shrink-0 flex-col gap-2 sticky top-24 self-start max-h-[calc(100vh-6.5rem)] overflow-y-auto overscroll-contain pr-1.5 custom-scrollbar"
+        >
+          {/* User Mini Identity Card (Compact) */}
+          <div data-tour="user-card" className="rounded-2xl border border-white/10 bg-[#151515] p-2.5 shadow-xl shrink-0">
+            <div className="flex items-center gap-2.5">
               <img
                 src={person.photo_url || '/images/person-placeholder.png'}
                 alt={person.name}
-                className="h-12 w-12 rounded-xl border border-white/10 object-cover shrink-0"
+                className="h-9 w-9 rounded-xl border border-white/10 object-cover shrink-0"
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
                   <h2 className="truncate text-xs font-black text-white">{person.name}</h2>
                   <Icon icon="solar:verified-check-bold" className="text-brand shrink-0" width="13" />
                 </div>
-                <p className="truncate text-[10px] font-mono text-zinc-400">@{person.slug || 'creator'}</p>
-                <span className="inline-block mt-0.5 text-[9px] font-black uppercase tracking-wider text-brand">
-                  Verified Talent
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-[10px] font-mono text-zinc-400">@{person.slug || 'creator'}</p>
+                  <span className="text-[8px] font-black uppercase tracking-wider text-amber-400/90">
+                    Pro
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Primary CTA: Link-in-Bio */}
+            {/* Quick Link-in-Bio Action */}
             <button
               data-tour="portfolio-btn"
-              onClick={() => setEditingPortfolio(true)}
-              className="mt-3.5 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3 py-2 text-xs font-black text-black shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition"
+              onClick={() => setActiveTab('portfolio')}
+              className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-2.5 py-1.5 text-[11px] font-black text-black shadow-md shadow-amber-500/20 hover:from-amber-400 hover:to-amber-500 transition"
             >
-              <Icon icon="solar:link-circle-bold" width="16" />
-              <span>Portfolio Link-in-Bio</span>
+              <Icon icon="solar:link-circle-bold" width="14" />
+              <span>Link-in-Bio Portfolio</span>
             </button>
           </div>
 
           {/* Sidebar Nav Items */}
-          <div data-tour="sidebar-nav" className="space-y-4 rounded-2xl border border-white/10 bg-[#141414] p-3 shadow-xl">
+          <div data-tour="sidebar-nav" className="space-y-2.5 rounded-2xl border border-white/10 bg-[#141414] p-2 shadow-xl">
             {SIDE_NAV_SECTIONS.map((section, sIdx) => (
-              <div key={sIdx} className="space-y-1">
-                <p className="px-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
+              <div key={sIdx} className="space-y-0.5">
+                <p className="px-2 text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-0.5">
                   {section.category}
                 </p>
                 <div className="space-y-0.5">
@@ -677,16 +688,16 @@ export default function ProDashboard() {
                       <button
                         key={item.id}
                         onClick={() => setActiveTab(item.id)}
-                        className={`group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-black transition ${
+                        className={`group flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-xs font-bold transition ${
                           isActive
                             ? 'bg-brand text-white shadow-md shadow-brand/25'
                             : 'text-zinc-400 hover:bg-white/[0.04] hover:text-white'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
                           <Icon
                             icon={item.icon}
-                            width="16"
+                            width="15"
                             className={isActive ? 'text-white' : 'text-zinc-400 group-hover:text-white'}
                           />
                           <span className="truncate">{item.label}</span>
@@ -694,7 +705,7 @@ export default function ProDashboard() {
                         <div className="flex items-center gap-1.5 shrink-0">
                           {item.count !== undefined && (
                             <span
-                              className={`grid min-w-[18px] place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none ${
+                              className={`grid min-w-[17px] place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none ${
                                 isActive ? 'bg-white/20 text-white' : 'bg-white/[0.06] text-zinc-400'
                               }`}
                             >
@@ -714,60 +725,57 @@ export default function ProDashboard() {
               </div>
             ))}
 
-            {/* Tools & Discovery */}
-            <div className="space-y-1 pt-2 border-t border-white/5">
-              <p className="px-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">
-                Tools & Discovery
+            {/* Tools & Discovery (Slim Row) */}
+            <div className="pt-2 border-t border-white/5 space-y-0.5">
+              <p className="px-2 text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-0.5">
+                Tools
               </p>
-              <Link
-                to={`/people/${person.slug || person.id}`}
-                target="_blank"
-                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-black text-zinc-400 hover:bg-white/[0.04] hover:text-white transition"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Icon icon="solar:eye-linear" width="16" />
-                  <span>Public Profile</span>
-                </div>
-                <Icon icon="solar:arrow-right-up-linear" width="13" />
-              </Link>
-              <Link
-                to="/advanced-search"
-                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-black text-zinc-400 hover:bg-white/[0.04] hover:text-white transition"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Icon icon="solar:tuning-square-2-bold" width="16" className="text-brand" />
-                  <span>Advanced Search</span>
-                </div>
-              </Link>
-              <button
-                type="button"
-                onClick={() => setShowWalkthrough(true)}
-                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-black text-zinc-400 hover:bg-white/[0.04] hover:text-white transition"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Icon icon="solar:compass-bold" width="16" className="text-amber-400" />
-                  <span>Feature Tour</span>
-                </div>
-                <span className="text-[9px] font-mono uppercase text-amber-400/80">Guide</span>
-              </button>
+              <div className="grid grid-cols-3 gap-1 px-1">
+                <Link
+                  to={`/people/${person.slug || person.id}`}
+                  target="_blank"
+                  className="flex flex-col items-center justify-center p-1.5 rounded-lg text-[9px] font-bold text-zinc-400 hover:bg-white/[0.05] hover:text-white transition"
+                  title="View Public Profile"
+                >
+                  <Icon icon="solar:eye-linear" width="14" />
+                  <span className="mt-0.5">Profile</span>
+                </Link>
+                <Link
+                  to="/advanced-search"
+                  className="flex flex-col items-center justify-center p-1.5 rounded-lg text-[9px] font-bold text-zinc-400 hover:bg-white/[0.05] hover:text-white transition"
+                  title="Advanced Industry Search"
+                >
+                  <Icon icon="solar:tuning-square-2-bold" width="14" className="text-brand" />
+                  <span className="mt-0.5">Search</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowWalkthrough(true)}
+                  className="flex flex-col items-center justify-center p-1.5 rounded-lg text-[9px] font-bold text-zinc-400 hover:bg-white/[0.05] hover:text-white transition"
+                  title="Feature Tour"
+                >
+                  <Icon icon="solar:compass-bold" width="14" className="text-amber-400" />
+                  <span className="mt-0.5">Tour</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Passport Completeness Widget */}
-          <div data-tour="passport-widget" className="rounded-2xl border border-white/10 bg-[#161616] p-4 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-text-muted">Career Passport</p>
-                <p className="mt-0.5 text-lg font-black text-white">{progress.percent}% Ready</p>
+          {/* Passport Completeness Widget (Slim Inline) */}
+          <div data-tour="passport-widget" className="rounded-2xl border border-white/10 bg-[#151515] p-2.5 shadow-xl shrink-0">
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="font-bold text-zinc-400">Career Passport</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-white">{progress.percent}%</span>
+                <button
+                  onClick={() => setPassportOpen(true)}
+                  className="font-bold text-brand hover:underline"
+                >
+                  View
+                </button>
               </div>
-              <button
-                onClick={() => setPassportOpen(true)}
-                className="rounded-xl bg-brand px-3 py-1.5 text-[11px] font-black text-white hover:bg-brand/90 transition shadow-md shadow-brand/20"
-              >
-                View
-              </button>
             </div>
-            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
               <div className="h-full rounded-full bg-brand transition-all duration-500" style={{ width: `${progress.percent}%` }} />
             </div>
           </div>
@@ -1501,6 +1509,18 @@ export default function ProDashboard() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Tab: Link-in-Bio Portfolio Studio */}
+        {activeTab === 'portfolio' && (
+          <div className="space-y-6">
+            <PortfolioEditorModal
+              isOpen={true}
+              isInline={true}
+              person={person}
+              onSaved={load}
+            />
           </div>
         )}
 

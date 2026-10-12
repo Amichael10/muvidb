@@ -27,21 +27,26 @@ export default function Drawer({ isOpen, onClose, title, width = '520px', childr
   if (!isOpen && !isMounted) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div
+      data-lenis-prevent="true"
+      style={{ overscrollBehavior: 'contain' }}
+      className="fixed inset-0 z-[120] flex justify-end overscroll-contain"
+    >
       {/* Backdrop */}
       <div
         className={`fixed inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'opacity-0'
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
       />
 
       {/* Drawer Panel */}
       <div
+        data-lenis-prevent="true"
+        style={{ width: `min(100vw, ${width})`, overscrollBehavior: 'contain' }}
         className={`relative bg-surface h-full shadow-2xl flex flex-col transition-transform duration-300 ease-out border-l border-border ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
-        style={{ width: `min(100vw, ${width})` }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-border bg-surface-2/50 backdrop-blur-md sticky top-0 z-10">

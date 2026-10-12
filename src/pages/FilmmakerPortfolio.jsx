@@ -587,21 +587,63 @@ export default function FilmmakerPortfolio() {
           </div>
         </section>
 
-        {/* Footer Credit & Claim Hook */}
-        <footer className="pt-8 border-t border-white/10 text-center space-y-3">
-          <p className="text-xs text-zinc-500">
-            Powered by <Link to="/" className="text-zinc-300 hover:text-white font-bold">MuviDB</Link> — The Living African Film Database.
-          </p>
-          <div className="inline-block">
+        {/* Linktree-style Signature MuviDB Actions & Footer */}
+        <footer className="pt-10 pb-20 border-t border-white/10 text-center space-y-5">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+            <Link
+              to={`/people/${person.slug || person.id}`}
+              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 px-5 py-3 text-xs font-bold text-white transition hover:scale-[1.02] shadow-lg"
+            >
+              <Icon icon="solar:user-bold" className="text-amber-400" width="16" />
+              <span>See Full Profile on MuviDB</span>
+              <Icon icon="solar:arrow-right-up-linear" width="14" className="text-zinc-400" />
+            </Link>
+
             <Link
               to="/claim"
-              className="text-[11px] font-mono text-amber-500/80 hover:text-amber-400 transition uppercase tracking-wider underline underline-offset-4"
+              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-5 py-3 text-xs font-bold text-amber-300 transition hover:scale-[1.02] shadow-lg"
             >
-              Are you a filmmaker? Claim your official link-in-bio portfolio &rarr;
+              <Icon icon="solar:shield-check-bold" className="text-amber-400" width="16" />
+              <span>Claim Your Profile on MuviDB</span>
             </Link>
+          </div>
+
+          <div className="pt-2 text-center">
+            <p className="text-[11px] text-zinc-500 font-mono tracking-wider">
+              Powered by{' '}
+              <Link to="/" className="text-zinc-300 hover:text-white font-bold underline underline-offset-2">
+                MuviDB
+              </Link>{' '}
+              — The Living African Film Database
+            </p>
           </div>
         </footer>
       </main>
+
+      {/* Floating Linktree-style Bottom Brand Bar */}
+      <div className="fixed bottom-4 inset-x-0 z-40 pointer-events-none flex justify-center px-4">
+        <div className="pointer-events-auto flex items-center gap-3 px-4 py-2 rounded-full border border-white/20 bg-black/80 backdrop-blur-xl shadow-2xl text-xs text-white">
+          <Link to="/" className="flex items-center gap-1.5 font-black tracking-wider hover:text-amber-400 transition">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span className="text-[11px] font-mono uppercase tracking-widest text-zinc-200">MuviDB</span>
+          </Link>
+          <span className="h-3 w-px bg-white/20" />
+          <Link
+            to={`/people/${person.slug || person.id}`}
+            className="text-[11px] text-zinc-300 hover:text-white font-medium transition flex items-center gap-1"
+          >
+            <span>Full Profile</span>
+            <Icon icon="solar:arrow-right-up-linear" width="12" />
+          </Link>
+          <span className="h-3 w-px bg-white/20" />
+          <Link
+            to="/claim"
+            className="text-[11px] text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1"
+          >
+            <span>Claim Yours</span>
+          </Link>
+        </div>
+      </div>
 
       {/* Direct Work Inquiry Modal */}
       {contactModalOpen && (

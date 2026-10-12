@@ -180,8 +180,9 @@ function Layout({ children }) {
   const isOnboardingPath = location.pathname === '/onboarding';
   const isWaitlistPath = location.pathname === '/waitlist';
   const isSupportPath = location.pathname.startsWith('/support');
+  const isPortfolioPath = location.pathname.startsWith('/@') || location.pathname.startsWith('/portfolio/');
   
-  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath;
+  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath || isPortfolioPath;
   
   return (
     <div className="min-h-screen flex flex-col bg-bg text-text-primary">
