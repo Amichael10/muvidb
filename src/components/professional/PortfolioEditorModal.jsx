@@ -126,6 +126,10 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Featured films search & filter
+  const [filmSearch, setFilmSearch] = useState('');
+  const [filmFilter, setFilmFilter] = useState('all'); // 'all' | 'selected' | 'recent'
+
   // Core portfolio state
   const [portfolio, setPortfolio] = useState({
     handle: '',
@@ -368,6 +372,39 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
     }
   };
 
+  const handleMoveFilmOrder = (filmId, direction) => {
+    const current = [...(portfolio.featured_film_ids || [])];
+    const idx = current.indexOf(filmId);
+    if (idx === -1) return;
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= current.length) return;
+    const temp = current[idx];
+    current[idx] = current[targetIdx];
+    current[targetIdx] = temp;
+    setPortfolio({ ...portfolio, featured_film_ids: current });
+  };
+
+  const filteredFilms = useMemo(() => {
+    return (availableFilms || []).filter((film) => {
+      const q = filmSearch.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        (film.title && film.title.toLowerCase().includes(q)) ||
+        (film.roles && film.roles.some((r) => r.toLowerCase().includes(q))) ||
+        (film.year && film.year.toString().includes(q));
+
+      if (!matchesSearch) return false;
+
+      if (filmFilter === 'selected') {
+        return (portfolio.featured_film_ids || []).includes(film.id);
+      }
+      if (filmFilter === 'recent') {
+        return film.year && Number(film.year) >= 2022;
+      }
+      return true;
+    });
+  }, [availableFilms, filmSearch, filmFilter, portfolio.featured_film_ids]);
+
   const handleAddLink = () => {
     if (!newLink.title.trim() || !newLink.url.trim()) {
       toast.error('Please enter both title and URL.');
@@ -415,7 +452,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
     } else {
       toast.success('Portfolio updated and published!');
       if (onSaved) onSaved(res.data);
-      onClose();
+      if (onClose) onClose();
     }
   };
 
@@ -430,8 +467,8 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
     <div
       data-lenis-prevent="true"
       style={{ overscrollBehavior: 'contain' }}
-      className={`w-full flex flex-col rounded-3xl border border-white/15 bg-[#121214] shadow-2xl overflow-hidden relative overscroll-contain ${
-        isInline ? 'min-h-[780px]' : 'max-w-6xl max-h-[94vh]'
+      className={`w-full flex flex-col rounded-3xl border border-white/10 bg-[#121214] shadow-2xl relative ${
+        isInline ? 'overflow-visible' : 'max-w-6xl max-h-[94vh] overflow-hidden overscroll-contain'
       }`}
     >
       {/* Top Studio Bar */}
@@ -530,18 +567,20 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
       </div>
 
         {/* Studio Body: Split View (Editor on Left, Live Phone Mockup on Right) */}
-        <div className="flex-1 flex overflow-hidden min-h-0">
-          {/* LEFT: Editor Panel */}
-          <div
-            ref={scrollBodyRef}
-            data-lenis-prevent="true"
-            style={{ overscrollBehavior: 'contain' }}
-            className={`flex-1 flex flex-col overflow-y-auto overscroll-contain custom-scrollbar ${
-              mobilePane === 'preview' ? 'hidden lg:flex' : 'flex'
-            }`}
-          >
-            {/* Linktree-Style Tab Navigation */}
-            <div className="px-6 pt-4 pb-2 border-b border-white/5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+        <div className={isInline ? "w-full" : "flex-1 flex overflow-hidden min-h-0"}>
+          <div className={isInline ? "grid grid-cols-1 lg:grid-cols-12 gap-8 items-start p-4 sm:p-6" : "flex-1 flex overflow-hidden min-h-0 w-full"}>
+            {/* LEFT: Editor Panel */}
+            <div
+              ref={isInline ? undefined : scrollBodyRef}
+              data-lenis-prevent="true"
+              className={
+                isInline
+                  ? `lg:col-span-7 xl:col-span-8 space-y-6 ${mobilePane === 'preview' ? 'hidden lg:block' : 'block'}`
+                  : `flex-1 flex flex-col overflow-y-auto overscroll-contain custom-scrollbar ${mobilePane === 'preview' ? 'hidden lg:flex' : 'flex'}`
+              }
+            >
+              {/* Linktree-Style Tab Navigation */}
+              <div className={`pb-2 border-b border-white/5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 ${isInline ? 'px-1' : 'px-6 pt-4'}`}>
               {[
                 { id: 'header', label: 'Header & Bio', icon: 'solar:user-bold' },
                 { id: 'themes', label: 'Themes & Skin', icon: 'solar:palette-bold' },
@@ -1051,42 +1090,207 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                     </div>
 
                     {/* Featured Films Selector */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider">
-                          Priority Featured Films (Max 6)
-                        </label>
-                        <span className="text-[10px] font-mono text-amber-400 font-bold">
-                          {portfolio.featured_film_ids?.length || 0} / 6
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <label className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider block">
+                            Priority Featured Films (Max 6)
+                          </label>
+                          <p className="text-[10px] text-zinc-400 mt-0.5">
+                            Pin your lead roles and highest-profile movies to the top of your public Link-in-Bio.
+                          </p>
+                        </div>
+                        <span className="text-xs font-mono text-amber-400 font-black px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 self-start sm:self-auto shrink-0">
+                          {portfolio.featured_film_ids?.length || 0} / 6 Pinned
                         </span>
                       </div>
-                      <div className="max-h-44 overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.02] p-2 space-y-1 custom-scrollbar">
-                        {availableFilms.map((film) => {
-                          const isChecked = (portfolio.featured_film_ids || []).includes(film.id);
-                          return (
-                            <div
-                              key={film.id}
-                              onClick={() => handleToggleFilm(film.id)}
-                              className={`p-2 rounded-xl cursor-pointer flex items-center justify-between gap-3 transition ${
-                                isChecked ? 'bg-amber-500/10 border border-amber-500/30' : 'hover:bg-white/5'
-                              }`}
+
+                      {/* Film Search & Filter Bar */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                        {/* Search Input */}
+                        <div className="relative flex-1">
+                          <Icon
+                            icon="solar:magnifer-linear"
+                            className="absolute left-3 top-2.5 text-zinc-400"
+                            width="15"
+                          />
+                          <input
+                            type="text"
+                            value={filmSearch}
+                            onChange={(e) => setFilmSearch(e.target.value)}
+                            placeholder="Search films by title, character, or year..."
+                            className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-8 py-2 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                          />
+                          {filmSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setFilmSearch('')}
+                              className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-white"
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span
-                                  className={`w-4 h-4 rounded flex items-center justify-center shrink-0 text-[10px] ${
-                                    isChecked ? 'bg-amber-500 text-black font-bold' : 'border border-white/20 text-transparent'
-                                  }`}
-                                >
-                                  ✓
-                                </span>
-                                <p className="text-xs font-bold text-white truncate">{film.title}</p>
+                              <Icon icon="solar:close-circle-bold" width="14" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Filter Chips */}
+                        <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto no-scrollbar">
+                          <button
+                            type="button"
+                            onClick={() => setFilmFilter('all')}
+                            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition whitespace-nowrap ${
+                              filmFilter === 'all'
+                                ? 'bg-amber-500 text-black shadow'
+                                : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            All ({availableFilms.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFilmFilter('selected')}
+                            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition whitespace-nowrap flex items-center gap-1 ${
+                              filmFilter === 'selected'
+                                ? 'bg-amber-500 text-black shadow'
+                                : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <span>Selected</span>
+                            <span className="font-mono text-[10px]">
+                              ({portfolio.featured_film_ids?.length || 0})
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFilmFilter('recent')}
+                            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition whitespace-nowrap ${
+                              filmFilter === 'recent'
+                                ? 'bg-amber-500 text-black shadow'
+                                : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            Recent (2022+)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Film Cards List with Small Rectangle Posters */}
+                      <div className="max-h-80 overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.02] p-2 space-y-2 custom-scrollbar">
+                        {filteredFilms.length === 0 ? (
+                          <div className="py-8 text-center text-xs text-zinc-500 font-medium">
+                            No films match your search or filter.
+                          </div>
+                        ) : (
+                          filteredFilms.map((film) => {
+                            const isChecked = (portfolio.featured_film_ids || []).includes(film.id);
+                            const selectedIndex = (portfolio.featured_film_ids || []).indexOf(film.id);
+                            return (
+                              <div
+                                key={film.id}
+                                onClick={() => handleToggleFilm(film.id)}
+                                className={`group p-2.5 rounded-xl cursor-pointer flex items-center justify-between gap-3 transition border ${
+                                  isChecked
+                                    ? 'bg-amber-500/10 border-amber-500/40 shadow-sm ring-1 ring-amber-500/20'
+                                    : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/15'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {/* Selection Checkbox */}
+                                  <span
+                                    className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black transition ${
+                                      isChecked
+                                        ? 'bg-amber-500 text-black shadow-sm'
+                                        : 'border border-white/20 text-transparent'
+                                    }`}
+                                  >
+                                    ✓
+                                  </span>
+
+                                  {/* Small rectangular poster */}
+                                  <div className="w-11 h-16 rounded-lg overflow-hidden shrink-0 bg-zinc-800 border border-white/10 relative shadow">
+                                    {film.poster_url ? (
+                                      <img
+                                        src={film.poster_url}
+                                        alt={film.title}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900 text-zinc-600">
+                                        <Icon icon="solar:clapperboard-bold" width="16" />
+                                      </div>
+                                    )}
+                                    {isChecked && (
+                                      <span className="absolute top-1 left-1 bg-black/80 backdrop-blur-sm text-amber-400 font-mono text-[8px] font-black px-1 rounded shadow">
+                                        #{selectedIndex + 1}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Film Metadata */}
+                                  <div className="min-w-0">
+                                    <p className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-amber-400 transition">
+                                      {film.title}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                      {film.roles && film.roles.length > 0 && (
+                                        <span className="text-[10px] text-zinc-400 truncate font-medium">
+                                          {film.roles.join(', ')}
+                                        </span>
+                                      )}
+                                      {film.year && (
+                                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-zinc-400 shrink-0 border border-white/5">
+                                          {film.year}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Reorder Controls & Action Badge */}
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {isChecked ? (
+                                    <div className="flex items-center gap-1">
+                                      {/* Reorder Up / Down */}
+                                      {selectedIndex > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMoveFilmOrder(film.id, -1);
+                                          }}
+                                          className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition"
+                                          title="Move up in priority"
+                                        >
+                                          <Icon icon="solar:arrow-up-linear" width="13" />
+                                        </button>
+                                      )}
+                                      {selectedIndex < (portfolio.featured_film_ids?.length || 0) - 1 && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMoveFilmOrder(film.id, 1);
+                                          }}
+                                          className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition"
+                                          title="Move down in priority"
+                                        >
+                                          <Icon icon="solar:arrow-down-linear" width="13" />
+                                        </button>
+                                      )}
+                                      <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                                        Pinned #{selectedIndex + 1}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[11px] text-zinc-400 group-hover:text-amber-400 font-bold transition flex items-center gap-0.5">
+                                      <span>+ Pin</span>
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <span className="text-[10px] font-mono text-zinc-400">
-                                {film.year || ''}
-                              </span>
-                            </div>
-                          );
-                        })}
+                            );
+                          })
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1139,9 +1343,11 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
 
           {/* RIGHT: Live Interactive Phone Mockup Preview */}
           <div
-            className={`w-full lg:w-[350px] xl:w-[380px] shrink-0 border-t lg:border-t-0 lg:border-l border-white/10 bg-black/40 flex-col items-center justify-center p-4 lg:p-6 overflow-hidden ${
-              mobilePane === 'preview' ? 'flex' : 'hidden lg:flex'
-            }`}
+            className={
+              isInline
+                ? `lg:col-span-5 xl:col-span-4 sticky top-28 self-start flex flex-col items-center justify-center ${mobilePane === 'preview' ? 'flex' : 'hidden lg:flex'}`
+                : `w-full lg:w-[350px] xl:w-[380px] shrink-0 border-t lg:border-t-0 lg:border-l border-white/10 bg-black/40 flex-col items-center justify-center p-4 lg:p-6 overflow-hidden ${mobilePane === 'preview' ? 'flex' : 'hidden lg:flex'}`
+            }
           >
             {/* Phone Bezel Frame */}
             <div
@@ -1307,6 +1513,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
             </div>
           </div>
         </div>
+      </div>
 
         {/* Sticky Footer: Cancel & Save Buttons */}
         <div className="px-5 py-3 border-t border-white/10 bg-[#121214] flex items-center justify-between shrink-0">
