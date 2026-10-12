@@ -291,7 +291,7 @@ export default function AdminFilms() {
                 .eq('id', video.channels.owner_company_id)
                 .maybeSingle();
               if (comp) {
-                setSelectedCompany(comp);
+                setProductionCompanies([{ id: comp.id, name: comp.name, logo_url: comp.logo_url }]);
                 setCompanySearch(comp.name);
               }
             }
@@ -1045,11 +1045,9 @@ export default function AdminFilms() {
     setSelectedSimilarIds([]);
     setCredits([]);
     setShowtimes([]);
-    setSelectedCompany(null);
     setCompanySearch('');
     setCompanyResults([]);
     setProductionCompanies([{ id: null, name: '', logo_url: null }]);
-    setSelectedDistributorCompany(null);
     setDistributorSearch('');
     setDistributorResults([]);
     setDistributionCompanies([{ id: null, name: '', logo_url: null }]);
@@ -1349,7 +1347,11 @@ export default function AdminFilms() {
 
       if (error) throw error;
       
-      setSelectedCompany(data);
+      setProductionCompanies(prev => {
+        const filtered = prev.filter(p => p.id || p.name?.trim());
+        if (filtered.some(p => p.id === data.id || p.name?.toLowerCase() === data.name.toLowerCase())) return prev;
+        return [...filtered, { id: data.id, name: data.name, logo_url: data.logo_url }];
+      });
       setCompanySearch(data.name);
       setCompanyResults([]);
       toast.success(`Company "${name}" created and linked`);
@@ -1367,7 +1369,6 @@ export default function AdminFilms() {
 
     if (!query || !query.trim()) {
       setDistributorResults([]);
-      setSelectedDistributorCompany(null);
       return;
     }
 
@@ -1385,9 +1386,7 @@ export default function AdminFilms() {
 
       const exactMatch = (data || []).find(c => c.name.toLowerCase() === query.trim().toLowerCase());
       if (exactMatch) {
-        setSelectedDistributorCompany(exactMatch);
-      } else {
-        setSelectedDistributorCompany(null);
+        setDistributionCompanies([{ id: exactMatch.id, name: exactMatch.name, logo_url: exactMatch.logo_url }]);
       }
       setIsSearchingDistributors(false);
     }, 300);
@@ -1410,7 +1409,11 @@ export default function AdminFilms() {
 
       if (error) throw error;
 
-      setSelectedDistributorCompany(data);
+      setDistributionCompanies(prev => {
+        const filtered = prev.filter(p => p.id || p.name?.trim());
+        if (filtered.some(p => p.id === data.id || p.name?.toLowerCase() === data.name.toLowerCase())) return prev;
+        return [...filtered, { id: data.id, name: data.name, logo_url: data.logo_url }];
+      });
       setDistributorSearch(data.name);
       setFormData(prev => ({ ...prev, distributor: data.name }));
       setDistributorResults([]);
