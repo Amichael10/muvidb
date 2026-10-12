@@ -66,8 +66,10 @@ jobs:
           current_hour="$(date -u +%H)"
           current_minute="$(date -u +%M)"
 
-          # At 06:00 UTC (07:00 WAT), run morning briefing
-          if [ "$current_hour" = "06" ]; then
+          # At 06:00 UTC (07:00 WAT), run morning briefing.
+          # Allow window 06:00 - 07:59 UTC (next publish slot is 08:00 UTC / 09:00 WAT)
+          # so GitHub Actions runner queuing delays never cause it to fall back to social_publish.
+          if [ "$current_hour" = "06" ] || [ "$current_hour" = "07" ]; then
             echo "task=morning_briefing" >> "$GITHUB_OUTPUT"
           else
             echo "task=social_publish" >> "$GITHUB_OUTPUT"

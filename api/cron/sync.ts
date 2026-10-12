@@ -149,10 +149,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'morning_briefing': {
         const { sendMorningSocialBriefing } = await import('../_lib/editorial/morning_social_briefing.js');
         const { sendMorningOutreachBriefing } = await import('../_lib/outreach/morning_outreach_briefing.js');
-        const [socialRes, outreachRes] = await Promise.all([
-          sendMorningSocialBriefing(),
-          sendMorningOutreachBriefing(),
-        ]);
+        let socialRes: any = null;
+        let outreachRes: any = null;
+        try {
+          socialRes = await sendMorningSocialBriefing();
+        } catch (e: any) {
+          console.error('[cron/sync] Morning social briefing error:', e?.message || e);
+          socialRes = { ok: false, error: e?.message || String(e) };
+        }
+        try {
+          outreachRes = await sendMorningOutreachBriefing();
+        } catch (e: any) {
+          console.error('[cron/sync] Morning outreach briefing error:', e?.message || e);
+          outreachRes = { ok: false, error: e?.message || String(e) };
+        }
         result = { task: 'morning_briefing', social: socialRes, outreach: outreachRes };
         break;
       }
