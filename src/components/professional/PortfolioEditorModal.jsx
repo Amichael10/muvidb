@@ -8,31 +8,31 @@ import { authHeaders } from '../../lib/apiAuth';
 
 const THEME_OPTIONS = [
   {
-    id: 'midnight',
-    name: 'Midnight Cinema',
-    tag: 'Deep Dark + Amber',
-    bg: '#0a0a0c',
-    cardBg: '#141418',
-    glowColor: 'rgba(245, 158, 11, 0.4)',
-    accent: '#f59e0b',
-    ring: 'ring-amber-500',
-    border: 'border-amber-500/50',
-    textAccent: 'text-amber-400',
-    buttonBg: '#f59e0b',
-    buttonText: '#000000',
+    id: 'muvi',
+    name: 'Muvi Cinema',
+    tag: 'African Cinema Noir + Orange',
+    bg: '#080A0D',
+    cardBg: '#12161D',
+    glowColor: 'rgba(255, 90, 31, 0.4)',
+    accent: '#FF5A1F',
+    ring: 'ring-brand',
+    border: 'border-brand/50',
+    textAccent: 'text-brand',
+    buttonBg: '#FF5A1F',
+    buttonText: '#ffffff',
   },
   {
-    id: 'gold',
-    name: 'Golden Era',
-    tag: 'Warm Film Glow',
-    bg: '#0f0e0c',
-    cardBg: '#1a1813',
-    glowColor: 'rgba(234, 179, 8, 0.4)',
-    accent: '#eab308',
-    ring: 'ring-yellow-500',
-    border: 'border-yellow-500/50',
-    textAccent: 'text-yellow-400',
-    buttonBg: '#eab308',
+    id: 'midnight',
+    name: 'Midnight Noir',
+    tag: 'Deep Charcoal & Silver',
+    bg: '#0a0a0c',
+    cardBg: '#141418',
+    glowColor: 'rgba(255, 255, 255, 0.25)',
+    accent: '#ffffff',
+    ring: 'ring-white',
+    border: 'border-white/40',
+    textAccent: 'text-white',
+    buttonBg: '#ffffff',
     buttonText: '#000000',
   },
   {
@@ -141,8 +141,8 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
     inquiry_email: '',
     inquiry_phone: '',
     epk_pdf_url: '',
-    theme_preset: 'midnight',
-    accent_color: '#f59e0b',
+    theme_preset: 'muvi',
+    accent_color: '#FF5A1F',
     header_layout: 'hero',
     avatar_override: '',
     is_published: true,
@@ -202,8 +202,8 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
             inquiry_email: res.portfolio.inquiry_email || person.booking_email || '',
             inquiry_phone: res.portfolio.inquiry_phone || person.booking_phone || '',
             epk_pdf_url: res.portfolio.epk_pdf_url || '',
-            theme_preset: res.portfolio.theme_preset || 'midnight',
-            accent_color: res.portfolio.accent_color || '#f59e0b',
+            theme_preset: res.portfolio.theme_preset || 'muvi',
+            accent_color: res.portfolio.accent_color || '#FF5A1F',
             header_layout: headerLayout,
             avatar_override: avatarOverride,
             is_published: res.portfolio.is_published ?? true,
@@ -474,7 +474,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
       {/* Top Studio Bar */}
       <div className="px-5 py-3.5 border-b border-white/10 bg-[#121214] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="grid h-8 w-8 place-items-center rounded-xl bg-amber-500/10 text-amber-400 shrink-0">
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand/10 text-brand shrink-0">
             <Icon icon="solar:link-circle-bold" width="18" />
           </span>
           <div className="min-w-0">
@@ -501,7 +501,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
               type="button"
               onClick={() => setMobilePane('editor')}
               className={`px-2.5 py-1 rounded-lg transition ${
-                mobilePane === 'editor' ? 'bg-amber-500 text-black' : 'text-zinc-400'
+                mobilePane === 'editor' ? 'bg-brand text-white' : 'text-zinc-400'
               }`}
             >
               Editor
@@ -510,7 +510,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
               type="button"
               onClick={() => setMobilePane('preview')}
               className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
-                mobilePane === 'preview' ? 'bg-amber-500 text-black' : 'text-zinc-400'
+                mobilePane === 'preview' ? 'bg-brand text-white' : 'text-zinc-400'
               }`}
             >
               <Icon icon="solar:smartphone-bold" width="12" />
@@ -547,10 +547,10 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
             type="button"
             onClick={handleSave}
             disabled={saving || loading}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black shadow-md shadow-purple-500/25 transition disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand hover:bg-brand-hover text-white text-xs font-bold shadow-lg shadow-brand/20 transition disabled:opacity-50"
           >
-            <Icon icon="solar:bolt-bold" width="13" />
-            <span>{saving ? 'Saving...' : 'Save'}</span>
+            <Icon icon="solar:diskette-bold" width="15" />
+            <span>{saving ? 'Saving...' : 'Save Changes'}</span>
           </button>
 
           {!isInline && onClose && (
@@ -593,7 +593,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm'
+                      ? 'bg-brand/10 text-brand border border-brand/30 shadow-sm'
                       : 'text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent'
                   }`}
                 >
@@ -618,7 +618,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         <label className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider">
                           Header Portrait Layout
                         </label>
-                        <span className="text-[10px] font-mono text-amber-400 uppercase">
+                        <span className="text-[10px] font-mono text-brand uppercase">
                           {portfolio.header_layout}
                         </span>
                       </div>
@@ -632,13 +632,13 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                               onClick={() => setPortfolio({ ...portfolio, header_layout: lo.id })}
                               className={`p-3 rounded-2xl border text-left transition ${
                                 isSel
-                                  ? 'border-amber-400 bg-amber-500/10 ring-1 ring-amber-400'
+                                  ? 'border-brand bg-brand/10 ring-1 ring-brand'
                                   : 'border-white/10 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.04]'
                               }`}
                             >
                               <div className="flex items-center justify-between mb-1">
                                 <p className="text-xs font-bold text-white">{lo.label}</p>
-                                {isSel && <Icon icon="solar:check-circle-bold" className="text-amber-400" width="14" />}
+                                {isSel && <Icon icon="solar:check-circle-bold" className="text-brand" width="14" />}
                               </div>
                               <p className="text-[10px] text-zinc-400 leading-snug">{lo.desc}</p>
                             </button>
@@ -670,7 +670,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                           <button
                             type="button"
                             onClick={handleOpenPhotoPicker}
-                            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-amber-500 text-black flex items-center justify-center shadow hover:bg-amber-400 transition"
+                            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brand text-white flex items-center justify-center shadow hover:bg-brand-hover transition"
                             title="Choose from Photos"
                           >
                             <Icon icon="solar:pen-bold" width="12" />
@@ -690,7 +690,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                           onClick={handleOpenPhotoPicker}
                           className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition flex items-center gap-1.5"
                         >
-                          <Icon icon="solar:gallery-bold" width="14" className="text-amber-400" />
+                          <Icon icon="solar:gallery-bold" width="14" className="text-brand" />
                           <span>Choose from Photos</span>
                         </button>
                         <label className="px-3.5 py-2 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5">
@@ -708,10 +708,10 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
 
                     {/* Photo Picker Modal Sheet */}
                     {showPhotoPicker && (
-                      <div className="p-4 rounded-2xl border border-amber-500/30 bg-black/60 space-y-3 animate-fade-in">
+                      <div className="p-4 rounded-2xl border border-brand/30 bg-black/60 space-y-3 animate-fade-in">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Icon icon="solar:gallery-bold" className="text-amber-400" width="16" />
+                            <Icon icon="solar:gallery-bold" className="text-brand" width="16" />
                             <h4 className="text-xs font-bold text-white">Your Photo Gallery</h4>
                           </div>
                           <button
@@ -728,7 +728,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         ) : galleryPhotos.length === 0 ? (
                           <div className="text-center py-4">
                             <p className="text-xs text-zinc-400">No photos found in your gallery.</p>
-                            <label className="inline-block mt-2 px-3 py-1.5 rounded-lg bg-amber-500 text-black text-xs font-bold cursor-pointer">
+                            <label className="inline-block mt-2 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-hover transition">
                               Upload First Photo
                               <input type="file" accept="image/*" onChange={handleUploadNewPhoto} className="hidden" />
                             </label>
@@ -743,12 +743,12 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                                   type="button"
                                   onClick={() => handleSelectGalleryPhoto(p.url)}
                                   className={`relative group aspect-square rounded-xl overflow-hidden border transition ${
-                                    isCurrent ? 'border-amber-400 ring-2 ring-amber-400' : 'border-white/10 hover:border-white/40'
+                                    isCurrent ? 'border-brand ring-2 ring-brand' : 'border-white/10 hover:border-white/40'
                                   }`}
                                 >
                                   <img src={p.thumbnail || p.url} alt="" className="w-full h-full object-cover" />
                                   {isCurrent && (
-                                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold text-[9px]">
+                                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-brand text-white flex items-center justify-center font-bold text-[9px]">
                                       ✓
                                     </span>
                                   )}
@@ -778,7 +778,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                           value={portfolio.handle}
                           onChange={(e) => setPortfolio({ ...portfolio, handle: sanitizeHandle(e.target.value) })}
                           placeholder="username"
-                          className="w-full rounded-xl border border-white/10 bg-white/5 pl-8 pr-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none font-mono"
+                          className="w-full rounded-xl border border-white/10 bg-white/5 pl-8 pr-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none font-mono"
                         />
                       </div>
                     </div>
@@ -799,7 +799,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         value={portfolio.tagline || ''}
                         onChange={(e) => setPortfolio({ ...portfolio, tagline: e.target.value })}
                         placeholder="e.g. Award-winning Director & Visual Storyteller"
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                       />
                     </div>
 
@@ -819,7 +819,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         value={portfolio.bio_statement || ''}
                         onChange={(e) => setPortfolio({ ...portfolio, bio_statement: e.target.value })}
                         placeholder="Creative Product Designer voyaging around emerging technologies e.g AI, Web3."
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none resize-none"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none resize-none"
                       />
                     </div>
 
@@ -863,7 +863,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             type="button"
                             onClick={() => setAltFont(!altFont)}
                             className={`w-10 h-6 rounded-full transition-colors p-0.5 ${
-                              altFont ? 'bg-amber-500' : 'bg-white/10'
+                              altFont ? 'bg-brand' : 'bg-white/10'
                             }`}
                           >
                             <div
@@ -897,7 +897,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         onClick={handleShuffleTheme}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold text-white transition shadow-sm"
                       >
-                        <Icon icon="solar:dice-bold" width="14" className="text-amber-400" />
+                        <Icon icon="solar:dice-bold" width="14" className="text-brand" />
                         <span>Shuffle</span>
                       </button>
                     </div>
@@ -913,7 +913,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                       >
                         Curated
                         {themeSubTab === 'curated' && (
-                          <span className="absolute bottom-0 inset-x-0 h-0.5 bg-amber-400 rounded-full" />
+                          <span className="absolute bottom-0 inset-x-0 h-0.5 bg-brand rounded-full" />
                         )}
                       </button>
                       <button
@@ -925,7 +925,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                       >
                         Customizable
                         {themeSubTab === 'custom' && (
-                          <span className="absolute bottom-0 inset-x-0 h-0.5 bg-amber-400 rounded-full" />
+                          <span className="absolute bottom-0 inset-x-0 h-0.5 bg-brand rounded-full" />
                         )}
                       </button>
                     </div>
@@ -946,7 +946,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                               }
                               className={`group relative cursor-pointer rounded-2xl border p-2 transition-all ${
                                 isSelected
-                                  ? 'border-amber-400 bg-white/[0.08] shadow-lg shadow-amber-500/15 ring-2 ring-amber-400'
+                                  ? 'border-brand bg-white/[0.08] shadow-lg shadow-brand/15 ring-2 ring-brand'
                                   : 'border-white/10 bg-white/[0.02] hover:border-white/30 hover:bg-white/[0.05]'
                               }`}
                             >
@@ -963,7 +963,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                                 <div className="relative z-1 flex items-center justify-between">
                                   <span className="text-[10px] font-bold text-white/90 truncate">{t.name}</span>
                                   {isSelected && (
-                                    <Icon icon="solar:check-circle-bold" className="text-amber-400" width="12" />
+                                    <Icon icon="solar:check-circle-bold" className="text-brand" width="12" />
                                   )}
                                 </div>
                                 <div className="relative z-1 space-y-1">
@@ -993,7 +993,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         Accent Highlight Color
                       </label>
                       <div className="flex items-center gap-2">
-                        {['#f59e0b', '#eab308', '#06b6d4', '#ec4899', '#10b981', '#ffffff'].map((color) => (
+                        {['#FF5A1F', '#E64A19', '#06b6d4', '#ec4899', '#10b981', '#ffffff'].map((color) => (
                           <button
                             key={color}
                             type="button"
@@ -1022,7 +1022,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         value={portfolio.featured_reel_url || ''}
                         onChange={(e) => setPortfolio({ ...portfolio, featured_reel_url: e.target.value })}
                         placeholder="https://www.youtube.com/watch?v=..."
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                       />
                     </div>
 
@@ -1044,19 +1044,19 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                           value={newLink.title}
                           onChange={(e) => setNewLink({ ...newLink, title: e.target.value })}
                           placeholder="Title (e.g. IMDb Profile)"
-                          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                         />
                         <input
                           type="text"
                           value={newLink.url}
                           onChange={(e) => setNewLink({ ...newLink, url: e.target.value })}
                           placeholder="https://..."
-                          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                         />
                         <button
                           type="button"
                           onClick={handleAddLink}
-                          className="px-4 py-2 rounded-xl bg-amber-500 text-black text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0 hover:bg-amber-400"
+                          className="px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0 hover:bg-brand-hover shadow-sm"
                         >
                           <Icon icon="solar:add-circle-bold" width="14" />
                           <span>Add</span>
@@ -1071,7 +1071,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-white/10 bg-white/5"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <Icon icon={getLinkIcon(link.url, link.title)} className="text-amber-400 shrink-0" width="16" />
+                              <Icon icon={getLinkIcon(link.url, link.title)} className="text-brand shrink-0" width="16" />
                               <div className="min-w-0">
                                 <p className="text-xs font-bold text-white truncate">{link.title}</p>
                                 <p className="text-[10px] text-zinc-400 truncate">{link.url}</p>
@@ -1100,7 +1100,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             Pin your lead roles and highest-profile movies to the top of your public Link-in-Bio.
                           </p>
                         </div>
-                        <span className="text-xs font-mono text-amber-400 font-black px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 self-start sm:self-auto shrink-0">
+                        <span className="text-xs font-mono text-brand font-black px-2.5 py-1 rounded-full bg-brand/10 border border-brand/20 self-start sm:self-auto shrink-0">
                           {portfolio.featured_film_ids?.length || 0} / 6 Pinned
                         </span>
                       </div>
@@ -1119,7 +1119,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             value={filmSearch}
                             onChange={(e) => setFilmSearch(e.target.value)}
                             placeholder="Search films by title, character, or year..."
-                            className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-8 py-2 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                            className="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-8 py-2 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                           />
                           {filmSearch && (
                             <button
@@ -1139,7 +1139,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             onClick={() => setFilmFilter('all')}
                             className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition whitespace-nowrap ${
                               filmFilter === 'all'
-                                ? 'bg-amber-500 text-black shadow'
+                                ? 'bg-brand text-white shadow'
                                 : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
                             }`}
                           >
@@ -1150,7 +1150,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             onClick={() => setFilmFilter('selected')}
                             className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition whitespace-nowrap flex items-center gap-1 ${
                               filmFilter === 'selected'
-                                ? 'bg-amber-500 text-black shadow'
+                                ? 'bg-brand text-white shadow'
                                 : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
                             }`}
                           >
@@ -1164,7 +1164,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             onClick={() => setFilmFilter('recent')}
                             className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition whitespace-nowrap ${
                               filmFilter === 'recent'
-                                ? 'bg-amber-500 text-black shadow'
+                                ? 'bg-brand text-white shadow'
                                 : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
                             }`}
                           >
@@ -1189,7 +1189,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                                 onClick={() => handleToggleFilm(film.id)}
                                 className={`group p-2.5 rounded-xl cursor-pointer flex items-center justify-between gap-3 transition border ${
                                   isChecked
-                                    ? 'bg-amber-500/10 border-amber-500/40 shadow-sm ring-1 ring-amber-500/20'
+                                    ? 'bg-brand/10 border-brand/40 shadow-sm ring-1 ring-brand/20'
                                     : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/15'
                                 }`}
                               >
@@ -1198,7 +1198,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                                   <span
                                     className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black transition ${
                                       isChecked
-                                        ? 'bg-amber-500 text-black shadow-sm'
+                                        ? 'bg-brand text-white shadow-sm'
                                         : 'border border-white/20 text-transparent'
                                     }`}
                                   >
@@ -1220,7 +1220,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                                       </div>
                                     )}
                                     {isChecked && (
-                                      <span className="absolute top-1 left-1 bg-black/80 backdrop-blur-sm text-amber-400 font-mono text-[8px] font-black px-1 rounded shadow">
+                                      <span className="absolute top-1 left-1 bg-black/80 backdrop-blur-sm text-brand font-mono text-[8px] font-black px-1 rounded shadow">
                                         #{selectedIndex + 1}
                                       </span>
                                     )}
@@ -1228,7 +1228,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
 
                                   {/* Film Metadata */}
                                   <div className="min-w-0">
-                                    <p className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-amber-400 transition">
+                                    <p className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-brand transition">
                                       {film.title}
                                     </p>
                                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
@@ -1277,12 +1277,12 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                                           <Icon icon="solar:arrow-down-linear" width="13" />
                                         </button>
                                       )}
-                                      <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                                      <span className="text-[10px] font-mono font-bold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
                                         Pinned #{selectedIndex + 1}
                                       </span>
                                     </div>
                                   ) : (
-                                    <span className="text-[11px] text-zinc-400 group-hover:text-amber-400 font-bold transition flex items-center gap-0.5">
+                                    <span className="text-[11px] text-zinc-400 group-hover:text-brand font-bold transition flex items-center gap-0.5">
                                       <span>+ Pin</span>
                                     </span>
                                   )}
@@ -1308,7 +1308,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         value={portfolio.inquiry_email || ''}
                         onChange={(e) => setPortfolio({ ...portfolio, inquiry_email: e.target.value })}
                         placeholder="agent@production.com"
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                       />
                     </div>
                     <div>
@@ -1320,7 +1320,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         value={portfolio.inquiry_phone || ''}
                         onChange={(e) => setPortfolio({ ...portfolio, inquiry_phone: e.target.value })}
                         placeholder="+234 800 000 0000"
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                       />
                     </div>
                     <div>
@@ -1332,7 +1332,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         value={portfolio.epk_pdf_url || ''}
                         onChange={(e) => setPortfolio({ ...portfolio, epk_pdf_url: e.target.value })}
                         placeholder="https://..."
-                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                       />
                     </div>
                   </div>
@@ -1351,48 +1351,48 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
           >
             {/* Phone Bezel Frame */}
             <div
-              className="w-full max-w-[290px] h-[580px] rounded-[44px] border-[6px] border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col"
+              className="w-full max-w-[260px] h-[510px] rounded-[28px] border-[3.5px] border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col"
               style={{ backgroundColor: currentTheme.bg }}
             >
               {/* Dynamic Island / Notch */}
-              <div className="absolute top-2 inset-x-0 z-30 flex justify-center pointer-events-none">
-                <div className="w-20 h-4 bg-black rounded-full flex items-center justify-end px-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+              <div className="absolute top-1.5 inset-x-0 z-30 flex justify-center pointer-events-none">
+                <div className="w-16 h-3.5 bg-black rounded-full flex items-center justify-end px-1.5">
+                  <span className="w-1 h-1 rounded-full bg-zinc-700" />
                 </div>
               </div>
 
               {/* Scrollable Phone Content Screen */}
-              <div className="flex-1 overflow-y-auto pt-7 pb-6 px-3.5 space-y-3.5 text-center custom-scrollbar">
+              <div className="flex-1 overflow-y-auto pt-6 pb-4 px-3 space-y-2.5 text-center custom-scrollbar">
                 {/* Header Section (reflecting selected layout: hero vs classic vs banner) */}
                 {portfolio.header_layout === 'hero' ? (
-                  <div className="relative -mx-3.5 -mt-7 mb-2 h-44 overflow-hidden rounded-b-3xl">
+                  <div className="relative -mx-3 -mt-6 mb-2 h-36 overflow-hidden rounded-b-2xl">
                     <img src={activeAvatar} alt="" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-3 text-left">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-2.5 text-left">
                       <div className="flex items-center gap-1">
                         <span className="text-xs font-black text-white">{person.name}</span>
-                        <Icon icon="solar:verified-check-bold" className="text-amber-400" width="12" />
+                        <Icon icon="solar:verified-check-bold" className="text-brand" width="12" />
                       </div>
                       <p className="text-[9px] font-mono text-zinc-300">@{portfolio.handle || person.slug}</p>
                     </div>
                   </div>
                 ) : portfolio.header_layout === 'banner' ? (
                   <div className="space-y-2">
-                    <div className="relative -mx-3.5 -mt-7 h-16 bg-gradient-to-r from-amber-500/20 to-amber-700/20 overflow-hidden" />
-                    <div className="-mt-10 flex flex-col items-center">
-                      <img src={activeAvatar} alt="" className="w-14 h-14 rounded-full border-2 border-white/20 object-cover shadow-lg" />
+                    <div className="relative -mx-3 -mt-6 h-14 bg-gradient-to-r from-brand/20 to-brand/40 overflow-hidden" />
+                    <div className="-mt-8 flex flex-col items-center">
+                      <img src={activeAvatar} alt="" className="w-12 h-12 rounded-full border-2 border-white/20 object-cover shadow-lg" />
                       <div className="flex items-center gap-1 mt-1">
                         <span className="text-xs font-black text-white">{person.name}</span>
-                        <Icon icon="solar:verified-check-bold" className="text-amber-400" width="12" />
+                        <Icon icon="solar:verified-check-bold" className="text-brand" width="12" />
                       </div>
                       <p className="text-[9px] font-mono text-zinc-400">@{portfolio.handle || person.slug}</p>
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center pt-2">
-                    <img src={activeAvatar} alt="" className="w-16 h-16 rounded-full border-2 border-white/20 object-cover shadow-lg" />
+                    <img src={activeAvatar} alt="" className="w-14 h-14 rounded-full border-2 border-white/20 object-cover shadow-lg" />
                     <div className="flex items-center gap-1 mt-1.5">
                       <span className="text-xs font-black text-white">{person.name}</span>
-                      <Icon icon="solar:verified-check-bold" className="text-amber-400" width="12" />
+                      <Icon icon="solar:verified-check-bold" className="text-brand" width="12" />
                     </div>
                     <p className="text-[9px] font-mono text-zinc-400">@{portfolio.handle || person.slug}</p>
                   </div>
@@ -1400,13 +1400,13 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
 
                 {/* Tagline */}
                 {portfolio.tagline && (
-                  <p className="text-[10px] text-zinc-300 font-medium px-2 leading-tight">
+                  <p className="text-[10px] text-zinc-300 font-medium px-1 leading-tight">
                     {portfolio.tagline}
                   </p>
                 )}
 
                 {/* Social icons row */}
-                <div className="flex items-center justify-center gap-1.5 py-1 text-zinc-400">
+                <div className="flex items-center justify-center gap-1.5 py-0.5 text-zinc-400">
                   <span className="p-1 rounded-full bg-white/5 hover:text-white"><Icon icon="simple-icons:x" width="11" /></span>
                   <span className="p-1 rounded-full bg-white/5 hover:text-white"><Icon icon="simple-icons:instagram" width="11" /></span>
                   <span className="p-1 rounded-full bg-white/5 hover:text-white"><Icon icon="simple-icons:youtube" width="11" /></span>
@@ -1429,11 +1429,11 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                   {(portfolio.custom_links || []).map((link) => (
                     <div
                       key={link.id}
-                      className="w-full rounded-xl px-3 py-2 flex items-center justify-between border border-white/10 shadow-sm transition hover:scale-[1.01]"
+                      className="w-full rounded-xl px-2.5 py-1.5 flex items-center justify-between border border-white/10 shadow-sm transition hover:scale-[1.01]"
                       style={{ backgroundColor: currentTheme.cardBg }}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <Icon icon={getLinkIcon(link.url, link.title)} className="text-amber-400 shrink-0" width="13" />
+                        <Icon icon={getLinkIcon(link.url, link.title)} className="text-brand shrink-0" width="13" />
                         <span className="text-[10px] font-bold text-white truncate">{link.title}</span>
                       </div>
                       <Icon icon="solar:arrow-right-linear" width="10" className="text-zinc-500" />
@@ -1443,7 +1443,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
 
                 {/* Featured Films Row inside Phone */}
                 {availableFilms.filter((f) => (portfolio.featured_film_ids || []).includes(f.id)).length > 0 && (
-                  <div className="pt-2 text-left">
+                  <div className="pt-1.5 text-left">
                     <p className="text-[8px] font-mono uppercase tracking-wider text-zinc-400 mb-1">
                       Featured Work
                     </p>
@@ -1467,22 +1467,22 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                 )}
 
                 {/* Simulated Linktree-style MuviDB Footer */}
-                <div className="pt-3 pb-1 border-t border-white/10 text-center">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-[8px] font-bold text-zinc-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <div className="pt-2 pb-1 border-t border-white/10 text-center">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-[8px] font-bold text-zinc-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand" />
                     <span>See full profile on MuviDB</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Floating action buttons beside phone frame */}
-            <div className="hidden sm:flex flex-col gap-2 ml-3">
+            {/* Floating action buttons below phone frame on a straight horizontal line */}
+            <div className="flex flex-row items-center justify-center gap-2 mt-3">
               <a
                 href={liveUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-zinc-700 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white transition shadow-lg"
+                className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white transition shadow-sm hover:border-brand/40"
                 title="Open live link"
               >
                 <Icon icon="solar:arrow-right-up-linear" width="14" />
@@ -1495,7 +1495,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                     toast.success('Link copied to clipboard!');
                   }
                 }}
-                className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-zinc-700 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white transition shadow-lg"
+                className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white transition shadow-sm hover:border-brand/40"
                 title="Copy link"
               >
                 <Icon icon="solar:link-linear" width="14" />
@@ -1505,7 +1505,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                 onClick={() => {
                   toast.success('AI bio recommendation: "Award-winning creator shaping contemporary African cinema."');
                 }}
-                className="w-8 h-8 rounded-full bg-purple-600/80 hover:bg-purple-500 border border-purple-400/30 flex items-center justify-center text-white transition shadow-lg shadow-purple-600/30"
+                className="w-8 h-8 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 flex items-center justify-center text-brand transition shadow-sm hover:border-brand/60"
                 title="AI Bio Enhancer"
               >
                 <Icon icon="solar:magic-stick-3-bold" width="14" />
@@ -1515,26 +1515,28 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
         </div>
       </div>
 
-        {/* Sticky Footer: Cancel & Save Buttons */}
-        <div className="px-5 py-3 border-t border-white/10 bg-[#121214] flex items-center justify-between shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition rounded-xl hover:bg-white/5"
-          >
-            Cancel
-          </button>
+        {/* Sticky Footer: Only shown in Modal Mode (Eliminates redundant second save in Inline Studio) */}
+        {!isInline && (
+          <div className="px-5 py-3 border-t border-white/10 bg-[#121214] flex items-center justify-between shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition rounded-xl hover:bg-white/5"
+            >
+              Cancel
+            </button>
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || loading}
-            className="rounded-full bg-amber-500 text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-amber-400 transition flex items-center gap-2 shadow-lg shadow-amber-500/25 disabled:opacity-50"
-          >
-            <Icon icon="solar:diskette-bold" width="16" />
-            <span>{saving ? 'Saving...' : 'Save & Publish Portfolio'}</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || loading}
+              className="rounded-xl bg-brand text-white px-5 py-2 text-xs font-bold hover:bg-brand-hover transition flex items-center gap-2 shadow-lg shadow-brand/20 disabled:opacity-50"
+            >
+              <Icon icon="solar:diskette-bold" width="15" />
+              <span>{saving ? 'Saving...' : 'Save & Publish Portfolio'}</span>
+            </button>
+          </div>
+        )}
       </div>
   );
 

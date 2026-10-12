@@ -608,7 +608,7 @@ export default function ProDashboard() {
       items: [
         { id: 'overview', label: 'Overview', icon: 'solar:home-smile-angle-bold' },
         { id: 'filmography', label: 'Filmography', icon: 'solar:clapperboard-bold', count: credits.length },
-        { id: 'portfolio', label: 'Link-in-Bio Portfolio', icon: 'solar:link-circle-bold', badge: 'Public' },
+        { id: 'portfolio', label: 'Link-in-Bio Portfolio', icon: 'solar:link-circle-bold', badge: 'PUBLIC' },
         { id: 'photos', label: 'Photos & Stills', icon: 'solar:camera-bold', count: photosList.length },
         { id: 'videos', label: 'Video Showreels', icon: 'solar:videocamera-record-bold', count: videosList.length },
       ],
@@ -618,8 +618,16 @@ export default function ProDashboard() {
       items: [
         { id: 'representation', label: 'Representation', icon: 'solar:users-group-two-rounded-bold' },
         { id: 'awards', label: 'Awards & Guilds', icon: 'solar:cup-star-bold', count: awardsList.length },
-        { id: 'intelligence', label: 'AI Studio', icon: 'solar:magic-stick-3-bold', badge: 'Pro' },
+        { id: 'intelligence', label: 'AI Studio', icon: 'solar:magic-stick-3-bold', badge: 'PRO' },
         { id: 'requests', label: 'Requests & Status', icon: 'solar:inbox-bold', count: openRequests.length },
+      ],
+    },
+    {
+      category: 'Tools & Discovery',
+      items: [
+        { id: 'public-profile', label: 'Public Profile', icon: 'solar:eye-linear', isLink: true, href: `/people/${person.slug || person.id}`, target: '_blank', external: true },
+        { id: 'adv-search', label: 'Advanced Search', icon: 'solar:tuning-square-2-bold', isLink: true, href: '/advanced-search', iconColor: 'text-brand' },
+        { id: 'feature-tour', label: 'Feature Tour', icon: 'solar:compass-bold', isAction: true, onClick: () => setShowWalkthrough(true), badge: 'GUIDE' },
       ],
     },
   ];
@@ -642,81 +650,111 @@ export default function ProDashboard() {
             scrollbarWidth: 'thin',
             scrollbarColor: 'rgba(255,255,255,0.2) transparent',
           }}
-          className="hidden lg:flex w-64 xl:w-72 shrink-0 flex-col gap-2 sticky top-24 self-start max-h-[calc(100vh-6.5rem)] overflow-y-auto overscroll-contain pr-1 custom-scrollbar"
+          className="hidden lg:flex w-64 xl:w-72 shrink-0 flex-col gap-3 sticky top-24 self-start max-h-[calc(100vh-6.5rem)] overflow-y-auto overscroll-contain pr-1 custom-scrollbar"
         >
-          {/* User Mini Identity Card (Ultra-Compact with Integrated Passport) */}
-          <div data-tour="user-card" className="rounded-2xl border border-white/10 bg-[#151515] p-2.5 shadow-xl shrink-0">
-            <div className="flex items-center gap-2">
+          {/* User Identity Card */}
+          <div data-tour="user-card" className="rounded-2xl border border-white/10 bg-[#141414] p-4 shadow-xl shrink-0">
+            <div className="flex items-center gap-3">
               <img
                 src={person.photo_url || '/images/person-placeholder.png'}
                 alt={person.name}
-                className="h-8 w-8 rounded-xl border border-white/10 object-cover shrink-0"
+                className="h-12 w-12 rounded-xl border border-white/10 object-cover shrink-0"
               />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1">
-                  <h2 className="truncate text-xs font-black text-white">{person.name}</h2>
-                  <Icon icon="solar:verified-check-bold" className="text-brand shrink-0" width="13" />
-                </div>
                 <div className="flex items-center gap-1.5">
-                  <p className="truncate text-[10px] font-mono text-zinc-400">@{person.slug || 'creator'}</p>
-                  <span className="text-[8px] font-black uppercase tracking-wider text-amber-400/90">
-                    Pro
-                  </span>
+                  <h2 className="truncate text-sm font-black text-white">{person.name}</h2>
+                  <Icon icon="solar:verified-check-bold" className="text-brand shrink-0" width="15" />
                 </div>
+                <p className="truncate text-xs font-mono text-zinc-400">@{person.slug || 'creator'}</p>
+                <p className="text-[10px] font-black uppercase tracking-wider text-brand mt-0.5">
+                  Verified Talent
+                </p>
               </div>
-              <button
-                data-tour="portfolio-btn"
-                onClick={() => setActiveTab('portfolio')}
-                className="flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/30 px-2 py-1 text-[10px] font-bold text-amber-400 hover:bg-amber-500/20 transition shrink-0"
-                title="Open Link-in-Bio Studio"
-              >
-                <Icon icon="solar:link-circle-bold" width="12" />
-                <span>Bio</span>
-              </button>
             </div>
 
-            {/* Career Passport 1-line progress strip */}
-            <div className="mt-2 pt-1.5 border-t border-white/5 flex items-center justify-between text-[9px]">
-              <span className="font-bold text-zinc-400">Career Passport</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono font-bold text-white">{progress.percent}%</span>
-                <button
-                  onClick={() => setPassportOpen(true)}
-                  className="font-bold text-brand hover:underline"
-                >
-                  View
-                </button>
-              </div>
-            </div>
-            <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-brand transition-all duration-500" style={{ width: `${progress.percent}%` }} />
-            </div>
+            <button
+              data-tour="portfolio-btn"
+              onClick={() => setActiveTab('portfolio')}
+              className="w-full mt-3.5 flex items-center justify-center gap-2 rounded-xl bg-brand text-white font-bold py-2.5 text-xs shadow-lg shadow-brand/25 hover:brightness-110 transition"
+              title="Open Link-in-Bio Portfolio Studio"
+            >
+              <Icon icon="solar:link-circle-bold" width="16" />
+              <span>Portfolio Link-in-Bio</span>
+            </button>
           </div>
 
           {/* Sidebar Nav Items */}
-          <div data-tour="sidebar-nav" className="space-y-1.5 rounded-2xl border border-white/10 bg-[#141414] p-1.5 shadow-xl">
+          <div data-tour="sidebar-nav" className="space-y-4 rounded-2xl border border-white/10 bg-[#141414] p-3 shadow-xl">
             {SIDE_NAV_SECTIONS.map((section, sIdx) => (
-              <div key={sIdx} className="space-y-0.5">
-                <p className="px-2 text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-0.5 mt-0.5">
+              <div key={sIdx} className="space-y-1">
+                <p className="px-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">
                   {section.category}
                 </p>
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {section.items.map((item) => {
+                    if (item.isLink) {
+                      return (
+                        <Link
+                          key={item.id}
+                          to={item.href}
+                          target={item.target}
+                          className="group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-bold text-zinc-400 hover:bg-white/[0.04] hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Icon
+                              icon={item.icon}
+                              width="15"
+                              className={item.iconColor || 'text-zinc-400 group-hover:text-white'}
+                            />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          {item.external && (
+                            <Icon icon="solar:arrow-right-up-linear" width="13" className="text-zinc-500 group-hover:text-zinc-300" />
+                          )}
+                        </Link>
+                      );
+                    }
+
+                    if (item.isAction) {
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={item.onClick}
+                          className="group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-bold text-zinc-400 hover:bg-white/[0.04] hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Icon
+                              icon={item.icon}
+                              width="15"
+                              className="text-brand group-hover:brightness-125"
+                            />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          {item.badge && (
+                            <span className="rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider bg-white/10 text-zinc-300">
+                              {item.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    }
+
                     const isActive = activeTab === item.id;
                     return (
                       <button
                         key={item.id}
                         onClick={() => setActiveTab(item.id)}
-                        className={`group flex w-full items-center justify-between rounded-xl px-2.5 py-1 text-xs font-bold transition ${
+                        className={`group flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition ${
                           isActive
                             ? 'bg-brand text-white shadow-md shadow-brand/25'
                             : 'text-zinc-400 hover:bg-white/[0.04] hover:text-white'
                         }`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <Icon
                             icon={item.icon}
-                            width="14"
+                            width="15"
                             className={isActive ? 'text-white' : 'text-zinc-400 group-hover:text-white'}
                           />
                           <span className="truncate">{item.label}</span>
@@ -724,7 +762,7 @@ export default function ProDashboard() {
                         <div className="flex items-center gap-1.5 shrink-0">
                           {item.count !== undefined && (
                             <span
-                              className={`grid min-w-[16px] place-items-center rounded-full px-1 py-0.5 text-[8px] font-black leading-none ${
+                              className={`grid min-w-[18px] place-items-center rounded-full px-1.5 py-0.5 text-[9px] font-black leading-none ${
                                 isActive ? 'bg-white/20 text-white' : 'bg-white/[0.06] text-zinc-400'
                               }`}
                             >
@@ -732,7 +770,13 @@ export default function ProDashboard() {
                             </span>
                           )}
                           {item.badge && (
-                            <span className="rounded px-1 py-0.5 text-[7px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-400">
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider ${
+                                isActive
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-white/10 text-zinc-300'
+                              }`}
+                            >
                               {item.badge}
                             </span>
                           )}
@@ -743,36 +787,6 @@ export default function ProDashboard() {
                 </div>
               </div>
             ))}
-
-            {/* Tools & Discovery (Slim Row) */}
-            <div className="pt-1.5 border-t border-white/5 flex items-center justify-around px-1 py-0.5">
-              <Link
-                to={`/people/${person.slug || person.id}`}
-                target="_blank"
-                className="flex items-center gap-1 p-1 rounded-lg text-[9px] font-bold text-zinc-400 hover:bg-white/[0.05] hover:text-white transition"
-                title="View Public Profile"
-              >
-                <Icon icon="solar:eye-linear" width="13" />
-                <span>Profile</span>
-              </Link>
-              <Link
-                to="/advanced-search"
-                className="flex items-center gap-1 p-1 rounded-lg text-[9px] font-bold text-zinc-400 hover:bg-white/[0.05] hover:text-white transition"
-                title="Advanced Industry Search"
-              >
-                <Icon icon="solar:tuning-square-2-bold" width="13" className="text-brand" />
-                <span>Search</span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => setShowWalkthrough(true)}
-                className="flex items-center gap-1 p-1 rounded-lg text-[9px] font-bold text-zinc-400 hover:bg-white/[0.05] hover:text-white transition"
-                title="Feature Tour"
-              >
-                <Icon icon="solar:compass-bold" width="13" className="text-amber-400" />
-                <span>Tour</span>
-              </button>
-            </div>
           </div>
         </aside>
 
@@ -793,10 +807,10 @@ export default function ProDashboard() {
               <button
                 type="button"
                 onClick={() => setShowWalkthrough(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-amber-300 hover:text-white hover:bg-amber-500/20 transition"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-text-primary hover:text-white hover:border-brand/40 transition"
                 title="Open guided walkthrough tour"
               >
-                <Icon icon="solar:compass-bold" width="15" className="text-amber-400" /> Tour
+                <Icon icon="solar:compass-bold" width="15" className="text-brand" /> Tour
               </button>
               <button
                 onClick={() => setUploadingPhoto(true)}
@@ -812,7 +826,7 @@ export default function ProDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('portfolio')}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-amber-400 transition hover:bg-amber-500/20 hover:border-amber-500/50 shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-brand/30 bg-brand/10 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-brand transition hover:bg-brand/20 hover:border-brand/50 shadow-sm"
                 title="Customize your Link-in-Bio showcase and public showreel"
               >
                 <Icon icon="solar:link-circle-bold" width="15" /> Link-in-Bio
@@ -1004,15 +1018,15 @@ export default function ProDashboard() {
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div
                   onClick={() => setActiveTab('portfolio')}
-                  className="group cursor-pointer rounded-2xl border border-amber-500/25 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent p-4 transition hover:border-amber-500/50 hover:bg-amber-500/15"
+                  className="group cursor-pointer rounded-2xl border border-brand/25 bg-gradient-to-br from-brand/10 via-brand/5 to-transparent p-4 transition hover:border-brand/50 hover:bg-brand/15"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                    <span className="p-2 rounded-xl bg-brand/20 text-brand">
                       <Icon icon="solar:link-circle-bold" width="20" />
                     </span>
-                    <span className="text-[10px] font-mono text-amber-400 font-bold uppercase">Launch</span>
+                    <span className="text-[10px] font-mono text-brand font-bold uppercase">Launch</span>
                   </div>
-                  <h3 className="mt-3 text-sm font-black text-white group-hover:text-amber-400 transition">
+                  <h3 className="mt-3 text-sm font-black text-white group-hover:text-brand transition">
                     Link-in-Bio Portfolio
                   </h3>
                   <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
