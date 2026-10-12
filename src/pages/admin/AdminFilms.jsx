@@ -292,7 +292,6 @@ export default function AdminFilms() {
                 .maybeSingle();
               if (comp) {
                 setProductionCompanies([{ id: comp.id, name: comp.name, logo_url: comp.logo_url }]);
-                setCompanySearch(comp.name);
               }
             }
           }
@@ -1046,11 +1045,7 @@ export default function AdminFilms() {
     setSelectedSimilarIds([]);
     setCredits([]);
     setShowtimes([]);
-    setCompanySearch('');
-    setCompanyResults([]);
     setProductionCompanies([{ id: null, name: '', logo_url: null }]);
-    setDistributorSearch('');
-    setDistributorResults([]);
     setDistributionCompanies([{ id: null, name: '', logo_url: null }]);
     setPeopleSearch('');
     setPeopleResults([]);
@@ -1307,123 +1302,6 @@ export default function AdminFilms() {
     } catch (error) {
       console.error('Error creating person:', error);
       toast.error('Failed to create person');
-    }
-  };
-
-  const handleCompanySearch = async (query) => {
-    setCompanySearch(query);
-    if (!query) {
-      setCompanyResults([]);
-      return;
-    }
-
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    
-    searchTimeout.current = setTimeout(async () => {
-      setIsSearchingCompanies(true);
-      const { data } = await supabase
-        .from('companies')
-        .select('*')
-        .ilike('name', `%${query}%`)
-        .limit(5);
-      setCompanyResults(data || []);
-      setIsSearchingCompanies(false);
-    }, 300);
-  };
-
-  const createCompany = async (name) => {
-    if (!name) return;
-    setIsCreatingCompany(true);
-    try {
-      const { data, error } = await supabase
-        .from('companies')
-        .insert([{ 
-          name, 
-          description: '.', 
-          website: '.', 
-          logo_url: null 
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      setProductionCompanies(prev => {
-        const filtered = prev.filter(p => p.id || p.name?.trim());
-        if (filtered.some(p => p.id === data.id || p.name?.toLowerCase() === data.name.toLowerCase())) return prev;
-        return [...filtered, { id: data.id, name: data.name, logo_url: data.logo_url }];
-      });
-      setCompanySearch(data.name);
-      setCompanyResults([]);
-      toast.success(`Company "${name}" created and linked`);
-    } catch (error) {
-      console.error('Error creating company:', error);
-      toast.error('Failed to create company');
-    } finally {
-      setIsCreatingCompany(false);
-    }
-  };
-
-  const handleDistributorSearch = async (query) => {
-    setDistributorSearch(query);
-    setFormData(prev => ({ ...prev, distributor: query }));
-
-    if (!query || !query.trim()) {
-      setDistributorResults([]);
-      return;
-    }
-
-    if (distributorSearchTimeout.current) clearTimeout(distributorSearchTimeout.current);
-
-    distributorSearchTimeout.current = setTimeout(async () => {
-      setIsSearchingDistributors(true);
-      const { data } = await supabase
-        .from('companies')
-        .select('*')
-        .ilike('name', `%${query.trim()}%`)
-        .limit(5);
-
-      setDistributorResults(data || []);
-
-      const exactMatch = (data || []).find(c => c.name.toLowerCase() === query.trim().toLowerCase());
-      if (exactMatch) {
-        setDistributionCompanies([{ id: exactMatch.id, name: exactMatch.name, logo_url: exactMatch.logo_url }]);
-      }
-      setIsSearchingDistributors(false);
-    }, 300);
-  };
-
-  const createDistributorCompany = async (name) => {
-    if (!name || !name.trim()) return;
-    setIsCreatingDistributorCompany(true);
-    try {
-      const { data, error } = await supabase
-        .from('companies')
-        .insert([{ 
-          name: name.trim(), 
-          description: '.', 
-          website: '.', 
-          logo_url: null 
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setDistributionCompanies(prev => {
-        const filtered = prev.filter(p => p.id || p.name?.trim());
-        if (filtered.some(p => p.id === data.id || p.name?.toLowerCase() === data.name.toLowerCase())) return prev;
-        return [...filtered, { id: data.id, name: data.name, logo_url: data.logo_url }];
-      });
-      setDistributorSearch(data.name);
-      setFormData(prev => ({ ...prev, distributor: data.name }));
-      setDistributorResults([]);
-      toast.success(`Distributor company "${data.name}" created and linked`);
-    } catch (error) {
-      console.error('Error creating distributor company:', error);
-      toast.error('Failed to create distributor company');
-    } finally {
-      setIsCreatingDistributorCompany(false);
     }
   };
 
