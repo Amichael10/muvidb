@@ -1524,12 +1524,27 @@ export default function AdminFilms() {
       const distNames = resolvedDists.map(d => d.name).filter(Boolean);
       const distributorJoined = distNames.length > 0 ? distNames.join(', ') : ((formData.distributor || '').trim() || null);
 
+      const resolvedTitle = formData.title
+        ? (formData.title === formData.title.toUpperCase() && formData.title !== formData.title.toLowerCase()
+            ? toTitleCase(formData.title.trim())
+            : formData.title.trim())
+        : '';
+
+      const isTitleChanged = editingFilm && editingFilm.title && resolvedTitle.toLowerCase() !== editingFilm.title.toLowerCase();
+      const generatedSlug = resolvedTitle
+        ? resolvedTitle.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-')
+        : null;
+
+      const resolvedSlug = (!editingFilm || isTitleChanged)
+        ? generatedSlug
+        : (formData.slug || generatedSlug);
+
+      const resolvedMubiSlug = (!editingFilm || isTitleChanged)
+        ? generatedSlug
+        : (formData.mubi_slug || formData.slug || generatedSlug);
+
       const cleanFilmPayload = {
-        title: formData.title
-          ? (formData.title === formData.title.toUpperCase() && formData.title !== formData.title.toLowerCase()
-              ? toTitleCase(formData.title.trim())
-              : formData.title.trim())
-          : '',
+        title: resolvedTitle,
         synopsis: formData.synopsis ? toSentenceCase(formData.synopsis.trim()) : '',
         tagline: formData.tagline ? formData.tagline.trim() : null,
         year: formData.year && !isNaN(parseInt(formData.year)) ? parseInt(formData.year) : null,
@@ -1542,12 +1557,8 @@ export default function AdminFilms() {
         is_featured: Boolean(formData.is_featured),
         is_in_cinemas: Boolean(formData.is_in_cinemas),
         distributor: distributorJoined,
-        slug: (!editingFilm || (editingFilm.title && cleanFilmPayload.title.toLowerCase() !== editingFilm.title.toLowerCase()))
-          ? (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null)
-          : (formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null)),
-        mubi_slug: (!editingFilm || (editingFilm.title && cleanFilmPayload.title.toLowerCase() !== editingFilm.title.toLowerCase()))
-          ? (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null)
-          : (formData.mubi_slug || formData.slug || (formData.title ? formData.title.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-') : null)),
+        slug: resolvedSlug,
+        mubi_slug: resolvedMubiSlug,
         source_video_id: (typeof formData.source_video_id === 'string' ? formData.source_video_id.trim() : formData.source_video_id) || (formData.youtube_watch_url ? extractYoutubeId(formData.youtube_watch_url) : null) || null,
         trailer_youtube_id: (typeof formData.trailer_youtube_id === 'string' ? formData.trailer_youtube_id.trim() : formData.trailer_youtube_id) || null,
         youtube_watch_url: (formData.youtube_watch_url || '').trim() || null,
