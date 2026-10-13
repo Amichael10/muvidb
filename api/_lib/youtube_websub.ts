@@ -122,7 +122,7 @@ function callbackUrl(): string {
   const configured = env('YOUTUBE_WEBSUB_CALLBACK_URL');
   const base =
     configured ||
-    `${env('VITE_PUBLIC_SITE_URL') || env('PUBLIC_SITE_URL') || 'https://muvidb.com'}/api/automation?action=youtube-websub`;
+    `${env('VITE_PUBLIC_SITE_URL') || env('PUBLIC_SITE_URL') || 'https://muvidb.com'}/api/youtube-websub`;
   const url = new URL(base);
   url.searchParams.set('token', getWebSubCallbackToken());
   return url.toString();

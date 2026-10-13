@@ -89,6 +89,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handleCompanyClaims } = await import('./_lib/company_claims_handler.js');
       return handleCompanyClaims(req, res);
     }
+    if (key === 'youtube-websub') {
+      const { youtubeWebSubHandler } = await import('./_lib/youtube_websub.js');
+      return youtubeWebSubHandler(req, res);
+    }
+    if (key === 'automation') {
+      const { default: handleAutomation } = await import('./automation.js');
+      return handleAutomation(req, res);
+    }
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
   } catch (err: any) {

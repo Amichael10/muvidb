@@ -215,6 +215,14 @@
       "destination": "/api/media?op=mirror"
     },
     {
+      "source": "/api/youtube-websub",
+      "destination": "/api/data?_r=youtube-websub"
+    },
+    {
+      "source": "/api/automation",
+      "destination": "/api/data?_r=automation"
+    },
+    {
       "source": "/api/scrape-imdb-actor",
       "destination": "/api/automation?action=scrape-imdb-actor"
     },
