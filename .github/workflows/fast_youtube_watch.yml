@@ -1,0 +1,32 @@
+name: Fast YouTube Upload Watcher
+
+on:
+  schedule:
+    # Run every 5 minutes (maximum frequency allowed by GitHub Actions)
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: fast-youtube-upload-watch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  watch-youtube:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE_URL: 'https://muvidb.com'
+      CRON_SECRET: ${{ secrets.VITE_CRON_SECRET }}
+
+    steps:
+      - name: Trigger Fast YouTube Watch
+        shell: bash
+        run: |
+          echo "Triggering YouTube fast watch..."
+          response=$(curl --silent --show-error --max-time 120 \
+            -H "x-cron-secret: $CRON_SECRET" \
+            "$BASE_URL/api/cron/sync?task=youtube_watch")
+          echo "Response: $response"

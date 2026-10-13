@@ -202,22 +202,24 @@ export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidat
     { text: '🙈 Skip / Hide', callback_data: `hide_yt:${channel.id}:${video.video_id}` },
   ]);
 
-  const sent = await sendTelegramMessage({
-    text: message,
-    disablePreview: false,
-    replyMarkup: {
-      inline_keyboard: inlineKeyboard,
-    },
-  });
+  let sentOk = true;
+  if (telegramConfigured()) {
+    const sent = await sendTelegramMessage({
+      text: message,
+      disablePreview: false,
+      replyMarkup: {
+        inline_keyboard: inlineKeyboard,
+      },
+    });
 
-  if (!sent.ok) {
-    console.warn('[youtube_upload_notify] telegram failed:', sent.error);
-    await releaseFailedClaim(channel.id, video.video_id, sent.error || 'Telegram delivery failed');
-    return { ok: false, error: sent.error };
+    if (!sent.ok) {
+      console.warn('[youtube_upload_notify] telegram failed:', sent.error);
+      sentOk = false;
+    }
   }
 
   await markNotified(channel.id, video);
-  return { ok: true, filmId, draftId };
+  return { ok: true, filmId, draftId, telegramSent: sentOk };
 }
 
 /** Notify for uploads not yet in DB buffer and not yet alerted. */
@@ -229,8 +231,8 @@ export async function notifyYouTubeUploads(
     source?: 'websub' | 'reconciliation' | 'full_sync';
   } = {},
 ) {
-  if (!telegramConfigured() || !candidates.length) {
-    return { notified: 0, skipped: candidates.length };
+  if (!candidates.length) {
+    return { notified: 0, skipped: 0 };
   }
 
   let baselineAt = options.baselineAt || null;
@@ -434,81 +436,88 @@ export async function runYouTubeUploadWatch() {
   }
 
   if (!telegramConfigured()) {
-    return {
-      ok: false,
-      message: 'Telegram not configured (TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID)',
-    };
+    console.warn('[runYouTubeUploadWatch] Telegram credentials not configured; new films will be ingested into database without Telegram alerts.');
   }
 
-  const { data: channels, error } = await supabase
-    .from('channels')
-    .select('id, name, channel_handle, channel_id, channel_url')
-    .eq('sync_enabled', true)
-    .order('name');
+  const [channelsRes, subsRes] = await Promise.all([
+    supabase
+      .from('channels')
+      .select('id, name, channel_handle, channel_id, channel_url')
+      .eq('sync_enabled', true)
+      .order('name'),
+    supabase
+      .from('youtube_websub_subscriptions')
+      .select('channel_id, baseline_at'),
+  ]);
 
-  if (error) throw error;
+  if (channelsRes.error) throw channelsRes.error;
+  const channels = channelsRes.data;
   if (!channels?.length) return { ok: true, channels: 0, notified: 0 };
+
+  const subsMap = new Map<string, string>((subsRes.data || []).map((s: any) => [s.channel_id, s.baseline_at]));
 
   let totalNotified = 0;
   const details: { channel: string; notified: number; status?: string }[] = [];
 
-  for (const ch of channels) {
-    try {
-      const { data: existingState, error: stateError } = await supabase
-        .from('youtube_websub_subscriptions')
-        .select('baseline_at')
-        .eq('channel_id', ch.id)
-        .maybeSingle();
-      if (stateError) throw stateError;
+  // Process channels in concurrent chunks of 10
+  const CHUNK_SIZE = 10;
+  for (let i = 0; i < channels.length; i += CHUNK_SIZE) {
+    const chunk = channels.slice(i, i + CHUNK_SIZE);
+    await Promise.all(
+      chunk.map(async (ch) => {
+        try {
+          const baselineAt = subsMap.get(ch.id);
 
-      if (!existingState) {
-        const nowIso = new Date().toISOString();
-        const externalId = ch.channel_id || ch.channel_url?.match(/\/channel\/(UC[\w-]+)/)?.[1];
-        if (!externalId) {
-          details.push({
-            channel: ch.name,
-            notified: 0,
-            status: 'awaiting_websub_setup',
+          if (!baselineAt) {
+            const nowIso = new Date().toISOString();
+            const externalId = ch.channel_id || ch.channel_url?.match(/\/channel\/(UC[\w-]+)/)?.[1];
+            if (!externalId) {
+              details.push({
+                channel: ch.name,
+                notified: 0,
+                status: 'awaiting_websub_setup',
+              });
+              return;
+            }
+            await supabase.from('youtube_websub_subscriptions').insert({
+              channel_id: ch.id,
+              youtube_channel_id: externalId,
+              topic_url: `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(externalId)}`,
+              status: 'pending',
+              baseline_at: nowIso,
+              last_reconciled_at: nowIso,
+            });
+            subsMap.set(ch.id, nowIso);
+            details.push({
+              channel: ch.name,
+              notified: 0,
+              status: 'baseline_initialized',
+            });
+            return;
+          }
+
+          const uploads = await pollChannelUploads(ch, baselineAt);
+
+          const result = await notifyYouTubeUploads(ch, uploads, {
+            baselineAt,
+            source: 'reconciliation',
           });
-          continue;
+          totalNotified += result.notified;
+          await supabase
+            .from('youtube_websub_subscriptions')
+            .update({
+              last_reconciled_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('channel_id', ch.id);
+          if (result.notified > 0) {
+            details.push({ channel: ch.name, notified: result.notified });
+          }
+        } catch (e: any) {
+          console.warn(`[youtube_upload_watch] ${ch.name}:`, e?.message || e);
         }
-        const { error: baselineError } = await supabase.from('youtube_websub_subscriptions').insert({
-          channel_id: ch.id,
-          youtube_channel_id: externalId,
-          topic_url: `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(externalId)}`,
-          status: 'pending',
-          baseline_at: nowIso,
-          last_reconciled_at: nowIso,
-        });
-        if (baselineError) throw baselineError;
-        details.push({
-          channel: ch.name,
-          notified: 0,
-          status: 'baseline_initialized',
-        });
-        continue;
-      }
-
-      const uploads = await pollChannelUploads(ch, existingState.baseline_at);
-
-      const result = await notifyYouTubeUploads(ch, uploads, {
-        baselineAt: existingState.baseline_at,
-        source: 'reconciliation',
-      });
-      totalNotified += result.notified;
-      await supabase
-        .from('youtube_websub_subscriptions')
-        .update({
-          last_reconciled_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('channel_id', ch.id);
-      if (result.notified > 0) {
-        details.push({ channel: ch.name, notified: result.notified });
-      }
-    } catch (e: any) {
-      console.warn(`[youtube_upload_watch] ${ch.name}:`, e?.message || e);
-    }
+      })
+    );
   }
 
   return {
