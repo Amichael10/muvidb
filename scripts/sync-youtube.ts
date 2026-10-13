@@ -13,6 +13,15 @@ async function main() {
     const result = await runVideosSync({ onlyNewChannels: true });
     console.log("Channel backfill status:", JSON.stringify(result, null, 2));
 
+    // Zero-quota upload watch scan across all monitored channels (reconciliation safety net)
+    try {
+      const { runYouTubeUploadWatch } = await import('../api/_lib/youtube_upload_notify.js');
+      const watchResult = await runYouTubeUploadWatch();
+      console.log("YouTube upload watch scan:", JSON.stringify(watchResult, null, 2));
+    } catch (e: any) {
+      console.warn("YouTube upload watch scan failed:", e?.message || e);
+    }
+
     // Refresh view counts on existing YouTube films in a round-robin pass (up to 3,000 films per 8h run)
     try {
       const viewsResult = await refreshYouTubeViewCounts({ maxBatches: 60 });

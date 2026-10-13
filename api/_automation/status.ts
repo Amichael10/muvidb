@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabase } from '../_lib/supabase';
-import { checkRateLimit } from '../_lib/rateLimit';
+import { supabase } from '../_lib/supabase.js';
+import { checkRateLimit } from '../_lib/rateLimit.js';
 
 import { handleCors } from '../_lib/cors.js';
 

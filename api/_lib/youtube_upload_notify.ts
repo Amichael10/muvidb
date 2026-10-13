@@ -324,11 +324,58 @@ export async function notifyYouTubeUploads(
   return { notified, skipped: candidates.length - notified };
 }
 
-/** Lightweight poll — first playlist page only (for frequent watch cron). */
-export async function pollChannelUploads(channel: ChannelRow): Promise<UploadCandidate[]> {
-  const handle = channel.channel_handle?.replace(/^@/, '');
+/** Fast, zero-quota RSS poll with YouTube API fallback for duration checks. */
+export async function pollChannelUploads(channel: ChannelRow, baselineAt?: string): Promise<UploadCandidate[]> {
   const idMatch = channel.channel_url?.match(/\/channel\/(UC[\w-]+)/);
   let ytChannelId = channel.channel_id || idMatch?.[1];
+
+  // Try fast, zero-quota Atom RSS feed first if channel ID is known
+  if (ytChannelId && /^UC[\w-]+$/.test(ytChannelId)) {
+    try {
+      const feedRes = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(ytChannelId)}`, {
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (feedRes.ok) {
+        const xml = await feedRes.text();
+        const { parseYouTubeAtomFeed } = await import('./youtube_websub.js');
+        const entries = parseYouTubeAtomFeed(xml);
+        if (entries.length > 0) {
+          // Filter by baseline if provided to minimize video API calls
+          const relevant = baselineAt
+            ? entries.filter(e => {
+                const pub = new Date(e.publishedAt || e.updatedAt || 0).getTime();
+                const base = new Date(baselineAt).getTime();
+                return pub > base;
+              })
+            : entries;
+
+          if (baselineAt && relevant.length === 0) {
+            return []; // Zero quota used! No new uploads since baseline.
+          }
+
+          const targetEntries = relevant.length > 0 ? relevant : entries.slice(0, 5);
+          const ids = targetEntries.map(e => e.videoId).join(',');
+          const vData = await ytGet('videos', { part: 'contentDetails', id: ids });
+          const durations = new Map<string, number>(
+            (vData.items || []).map((v: any) => [v.id, parseDuration(v.contentDetails?.duration ?? '')]),
+          );
+
+          return targetEntries.map(e => ({
+            video_id: e.videoId,
+            title: e.title,
+            published_at: e.publishedAt,
+            thumbnail_url: `https://i.ytimg.com/vi/${e.videoId}/hqdefault.jpg`,
+            duration_seconds: durations.get(e.videoId) ?? 0,
+          }));
+        }
+      }
+    } catch (feedErr: any) {
+      console.warn(`[pollChannelUploads] RSS feed fallback for channel ${channel.name}:`, feedErr?.message || feedErr);
+    }
+  }
+
+  // Fallback to Data API playlist querying
+  const handle = channel.channel_handle?.replace(/^@/, '');
   let uploadsId = '';
 
   let ytChannelData = null;
@@ -375,7 +422,7 @@ export async function pollChannelUploads(channel: ChannelRow): Promise<UploadCan
   });
 }
 
-/** Run from GitHub Actions — alert before the full sync auto-imports. */
+/** Run from GitHub Actions or Cron — alert before the full sync auto-imports. */
 export async function runYouTubeUploadWatch() {
   if (process.env.ENABLE_YOUTUBE_WATCH === 'false') {
     return {
@@ -407,7 +454,6 @@ export async function runYouTubeUploadWatch() {
 
   for (const ch of channels) {
     try {
-      const uploads = await pollChannelUploads(ch);
       const { data: existingState, error: stateError } = await supabase
         .from('youtube_websub_subscriptions')
         .select('baseline_at')
@@ -442,6 +488,8 @@ export async function runYouTubeUploadWatch() {
         });
         continue;
       }
+
+      const uploads = await pollChannelUploads(ch, existingState.baseline_at);
 
       const result = await notifyYouTubeUploads(ch, uploads, {
         baselineAt: existingState.baseline_at,

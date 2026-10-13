@@ -250,11 +250,31 @@ async function handleVerification(req: VercelRequest, res: VercelResponse) {
   const leaseSeconds = Math.max(0, Number(req.query['hub.lease_seconds'] || 0));
   const externalId = youtubeTopicChannelId(topic);
 
+  console.log(`[youtube_websub] Verification request mode=${mode} externalId=${externalId}`);
+
   if (!['subscribe', 'unsubscribe'].includes(mode) || !externalId || !challenge || challenge.length > 512) {
     return res.status(404).end();
   }
 
-  const subscription = await findSubscriptionByExternalId(externalId);
+  let subscription = await findSubscriptionByExternalId(externalId);
+  if (!subscription) {
+    const { data: ch } = await supabase.from('channels').select('id').eq('channel_id', externalId).maybeSingle();
+    if (ch) {
+      const nowIso = new Date().toISOString();
+      const { data: createdSub } = await supabase.from('youtube_websub_subscriptions').upsert({
+        channel_id: ch.id,
+        youtube_channel_id: externalId,
+        topic_url: topic,
+        status: mode === 'subscribe' ? 'active' : 'unsubscribed',
+        baseline_at: nowIso,
+        last_verified_at: nowIso,
+        lease_expires_at: mode === 'subscribe' && leaseSeconds ? new Date(Date.now() + leaseSeconds * 1000).toISOString() : null,
+        updated_at: nowIso,
+      }, { onConflict: 'channel_id' }).select().maybeSingle();
+      if (createdSub) subscription = createdSub as SubscriptionRow;
+    }
+  }
+
   if (!subscription) return res.status(404).end();
 
   const now = new Date();
@@ -271,7 +291,7 @@ async function handleVerification(req: VercelRequest, res: VercelResponse) {
     })
     .eq('channel_id', subscription.channel_id);
 
-  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   return res.status(200).send(challenge);
 }
