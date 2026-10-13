@@ -5,31 +5,26 @@ import { getAwardOrg, AWARD_LOGOS } from '../../lib/awards';
 const SIZE_MAP = {
   xs: {
     container: 'w-6 h-6 rounded-md',
-    img: 'p-0.5',
     icon: 12,
     text: 'text-[8px]',
   },
   sm: {
     container: 'w-8 h-8 rounded-lg',
-    img: 'p-1',
     icon: 14,
     text: 'text-[9px]',
   },
   md: {
     container: 'w-12 h-12 rounded-xl',
-    img: 'p-1.5',
     icon: 20,
     text: 'text-[11px]',
   },
   lg: {
     container: 'w-16 h-16 rounded-2xl',
-    img: 'p-2',
     icon: 28,
     text: 'text-xs',
   },
   xl: {
     container: 'w-24 h-24 rounded-2xl',
-    img: 'p-3',
     icon: 38,
     text: 'text-sm',
   },
@@ -38,11 +33,13 @@ const SIZE_MAP = {
 /**
  * AwardLogo
  * Renders a verified festival/award ceremony logo (mirrored from FilmFreeway or official archives).
+ * Fills the square container edge-to-edge with smooth rounded clipping.
  * Falls back to an exquisite gold/accent laurel emblem if logo is absent or fails to load.
  */
 export default function AwardLogo({
   org,
   size = 'md',
+  fit = 'cover',
   className = '',
   imgClassName = '',
   showLaurel = true,
@@ -123,7 +120,7 @@ export default function AwardLogo({
         alt={`${label} Logo`}
         loading="lazy"
         onError={() => setImgError(true)}
-        className={`w-full h-full object-contain filter contrast-105 transition-transform duration-300 group-hover:scale-105 ${sizeConfig.img} ${imgClassName}`}
+        className={`w-full h-full ${fit === 'contain' ? 'object-contain p-1' : 'object-cover'} filter contrast-105 transition-transform duration-300 group-hover:scale-105 ${imgClassName}`}
       />
     </div>
   );
