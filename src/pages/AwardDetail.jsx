@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Icon } from '@iconify/react';
 import { getAwardOrg, groupAwards, loadAwardsCatalog, normOrg } from '../lib/awards';
+import AwardLogo from '../components/awards/AwardLogo';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { formatFilmTitle, formatPersonName, toTitleCase } from '../utils/format';
 
@@ -183,21 +184,24 @@ export default function AwardDetail() {
                   </span>
                 </div>
 
-                {/* Title */}
-                <motion.h1
-                  initial={{ opacity: 0, y: 14 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 font-heading text-4xl font-black leading-tight tracking-tight sm:text-5xl lg:text-6xl"
-                >
-                  {meta.full}
-                </motion.h1>
-
-                {/* Tagline */}
-                {meta.tagline && (
-                  <p className="mt-2 text-base font-semibold text-brand sm:text-lg">
-                    {meta.tagline}
-                  </p>
-                )}
+                {/* Title & Logo */}
+                <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-5">
+                  <AwardLogo org={meta} size="xl" className="border-border shadow-xl ring-2 ring-border/50 shrink-0" />
+                  <div className="min-w-0">
+                    <motion.h1
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="font-heading text-3xl font-black leading-tight tracking-tight sm:text-4xl lg:text-5xl text-text-primary"
+                    >
+                      {meta.full}
+                    </motion.h1>
+                    {meta.tagline && (
+                      <p className="mt-2 text-sm sm:text-base font-semibold text-brand">
+                        {meta.tagline}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
                 {/* Short Explainer */}
                 <p className="mt-4 text-sm leading-relaxed text-text-muted sm:text-base">

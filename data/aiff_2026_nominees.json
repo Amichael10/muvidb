@@ -1,0 +1,178 @@
+{
+  "festival": {
+    "name": "Abuja International Film Festival",
+    "acronym": "AIFF",
+    "edition": "23rd Edition",
+    "year": 2026,
+    "dates": "20 - 25 October 2026",
+    "city": "Abuja, Nigeria"
+  },
+  "categories": [
+    {
+      "category": "Outstanding Experimental",
+      "nominees": [
+        { "title": "Niynip Truce", "country": "Cameroon", "nominee": "Dama Humphrey" },
+        { "title": "Silent Switch", "country": "Nigeria", "nominee": "Allen George" },
+        { "title": "Homebound", "country": "Nigeria", "nominee": "Nnajiofor \"Oscar\" Ugwu" },
+        { "title": "Sleepover", "country": "Russian Federation", "nominee": "David Sokratyan" },
+        { "title": "Otoge (Enough is Enough)", "country": "Estonia", "nominee": "Kevin Akpomiemie Emmanuel David-Ichekor, Reece Vassil Mladjov" },
+        { "title": "And Something Else", "country": "Russian Federation", "nominee": "Taymuraz Gogaev" },
+        { "title": "A Night of Gold", "country": "Nigeria", "nominee": "Emmanuella Enenu Agada, Abra'm Jr. Alabi" }
+      ]
+    },
+    {
+      "category": "Outstanding Student Film",
+      "nominees": [
+        { "title": "Wake the Flies", "country": "Germany, Nigeria", "nominee": "Longgul Makpring Dakwom, Lawuna Yilwada" },
+        { "title": "More Than Bests Short Film", "country": "France", "nominee": "Robert Qilin Brahm" },
+        { "title": "Perfect Boy", "country": "Russian Federation", "nominee": "Alexandra Sheveleva" },
+        { "title": "Constellation of the Sea", "country": "United States of America", "nominee": "Addie Akina Knoll" },
+        { "title": "In the Footsteps of Our Liberators", "country": "France", "nominee": "Boris Nicot, Collective of High School Students" },
+        { "title": "Mi Tazi", "country": "Nigeria", "nominee": "Blessing Bulus" },
+        { "title": "Kilter", "country": "United Kingdom", "nominee": "Ivan Francis Clements" },
+        { "title": "More Than Love", "country": "China", "nominee": "Hongben Shi" }
+      ]
+    },
+    {
+      "category": "Documentary - (Short)",
+      "nominees": [
+        { "title": "The Witnesses: Boys Who Lived with Violence", "country": "Nigeria", "nominee": "Temitope Damilola Oyewusi" },
+        { "title": "Beach Inna Bondage: The Fight for Jamaica's Coastline", "country": "Jamaica, Netherlands", "nominee": "Emiel Martens, Elsie Vermeer" },
+        { "title": "The Last Blade", "country": "Nigeria", "nominee": "Jeremiah Onoge" },
+        { "title": "Anchor Point", "country": "Canada", "nominee": "Victor Quijada, Samuel Greffe" },
+        { "title": "Debt of Death", "country": "Nigeria", "nominee": "Azubuike Erinugha" },
+        { "title": "Offside", "country": "Mexico", "nominee": "Abril Schmucler Iñiguez" },
+        { "title": "A Night of Gold", "country": "Palestine, State of", "nominee": "Ismail Abu Hatab" }
+      ]
+    },
+    {
+      "category": "Documentary - (Full Length)",
+      "nominees": [
+        { "title": "Nollywood (The Untold Story)", "country": "Nigeria", "nominee": "Oluwaseun Akinseloyin" },
+        { "title": "Ìṣẹ̀ṣe - Voice of the Motherland", "country": "Nigeria", "nominee": "Segun Adefila" },
+        { "title": "With Immediate Effect", "country": "Nigeria", "nominee": "Efe Omorogbe" },
+        { "title": "Shadows of Silence", "country": "Slovenia", "nominee": "Jure Kreft, Darko Sintič" },
+        { "title": "Saury Seaweed: Whisper of the Sea", "country": "South Korea", "nominee": "June-Ho Lee" }
+      ]
+    },
+    {
+      "category": "Outstanding Animation",
+      "nominees": [
+        { "title": "The Legacy of Adam, Breakup", "country": "Tanzania", "nominee": "Roger Andre Gihlemoen" },
+        { "title": "Siri and the Whispering Woods", "country": "Nigeria", "nominee": "Inikori Jerry Avwerosuo" },
+        { "title": "The Black Smoke of Prediction...", "country": "Croatia", "nominee": "Damir Dado Šuša" },
+        { "title": "Hacker Leonilia", "country": "Brazil", "nominee": "Gustavo Fontele Dourado" },
+        { "title": "Dobrina", "country": "Germany", "nominee": "Hannes Rall" },
+        { "title": "Twins", "country": "United Kingdom", "nominee": "Victoria Joel" },
+        { "title": "Hypatia of Alexandria -the solitary bee-", "country": "France", "nominee": "Erwan Le Gal" }
+      ]
+    },
+    {
+      "category": "Outstanding Actor (Male)",
+      "nominees": [
+        { "person": "Zubby Micheal", "film": "Ikenga (The Last Festival)", "country": "Nigeria" },
+        { "person": "Uzor Arukwe", "film": "Evi", "country": "Nigeria" },
+        { "person": "Rotimi Salami", "film": "The Invincible Child (Kilanko)", "country": "Nigeria" },
+        { "person": "Francis Duru", "film": "Pink Diary", "country": "Nigeria" },
+        { "person": "Deyemi Okanlawon", "film": "Two Halves", "country": "Nigeria" },
+        { "person": "Richard Ayodeji Makun", "film": "The Waiter", "country": "Nigeria" },
+        { "person": "Alex Usifo", "film": "Shatta", "country": "Nigeria" },
+        { "person": "Eso Dike", "film": "A Night with the Queen", "country": "Nigeria" }
+      ]
+    },
+    {
+      "category": "Outstanding Actress (Female)",
+      "nominees": [
+        { "person": "Beverly Osu", "film": "Ikenga (The Last Festival)", "country": "Nigeria" },
+        { "person": "Kike Ayodeji", "film": "Blind Justice", "country": "Nigeria" },
+        { "person": "Lydia Helen", "film": "Donostia", "country": "Spain" },
+        { "person": "Linda Osifo", "film": "Two Halves", "country": "Nigeria" },
+        { "person": "Regina Daniels", "film": "The Waiter", "country": "Nigeria" },
+        { "person": "Tayo Elesin", "film": "A Night with the Queen", "country": "Nigeria" },
+        { "person": "Chika Ike", "film": "Shatta", "country": "Nigeria" }
+      ]
+    },
+    {
+      "category": "Outstanding Narrative Concept",
+      "nominees": [
+        { "nominee": "Gabe Gabriel, Loren Loubser", "film": "Dread", "country": "South Africa, United Kingdom" },
+        { "nominee": "Diana Childs", "film": "Diana Child", "country": "Nigeria" },
+        { "nominee": "Larry Yang", "film": "The Shadow's Edge", "country": "China" },
+        { "nominee": "Oghenejiruona Deniran-Okobi", "film": "Two Halves", "country": "Nigeria" },
+        { "nominee": "Chavala Aaron Yaduma", "film": "Sanctuary", "country": "Nigeria" },
+        { "nominee": "Sandy Zion", "film": "Follow Me to Forever", "country": "Nigeria" }
+      ]
+    },
+    {
+      "category": "Feature Film (Nigeria)",
+      "nominees": [
+        { "title": "Ikenga - Last Festival", "director": "Darlington Kelechi Ogbodo", "country": "Nigeria" },
+        { "title": "Evi", "director": "Uyoyou Adia", "country": "Nigeria" },
+        { "title": "The Invincible Child (Kilanko)", "director": "Allwell Ademola", "country": "Nigeria" },
+        { "title": "You of All People", "director": "Franklin Ogalanya", "country": "Nigeria" },
+        { "title": "Two Halves", "director": "Kingsley Fresh Onyenma", "country": "Nigeria" },
+        { "title": "OoniLuwo; One Queen, Two Kings", "director": "Jimoh Abiodun Olusegun", "country": "Nigeria" },
+        { "title": "The Waiter", "director": "Toka McBaror", "country": "Nigeria" },
+        { "title": "Follow Me to Forever", "director": "Eric Stephenson", "country": "Nigeria" }
+      ]
+    },
+    {
+      "category": "Outstanding Feature (Foreign)",
+      "nominees": [
+        { "title": "Unbound Voices", "director": "Bing Shao", "country": "China" },
+        { "title": "Her Story", "director": "Yihui Shao", "country": "China" },
+        { "title": "G For Gap", "director": "Fei Long", "country": "China" },
+        { "title": "Bride Price", "director": "George N Faux", "country": "United States of America" },
+        { "title": "Donostia", "director": "Daniel Cummings", "country": "Spain" },
+        { "title": "The Shadow's Edge", "director": "Larry Yang", "country": "China" }
+      ]
+    },
+    {
+      "category": "Outstanding Music Score",
+      "nominees": [
+        { "nominee": "Jeremiah Onoge", "film": "Damaged", "country": "Nigeria" },
+        { "nominee": "Samuel Idiagbonya", "film": "Pink Diary", "country": "Nigeria" },
+        { "nominee": "Fei Long", "film": "G For Gap", "country": "China" },
+        { "nominee": "Tayo Elesin", "film": "Yellow Slipper", "country": "Nigeria" },
+        { "nominee": "Ifeoma Esther Ojukwu", "film": "Èlédà Àyànmọ́", "country": "Nigeria" },
+        { "nominee": "Paschal Nkemjika Osubor", "film": "The Ghost", "country": "Nigeria" },
+        { "nominee": "Deeptarko Chowdhury, Raghav Meattle, Neel Adhikari, Teja Asgk", "film": "The First Bite", "country": "India" },
+        { "nominee": "Uyoyou Adia", "film": "Evi", "country": "Nigeria" }
+      ]
+    },
+    {
+      "category": "Outstanding Cinematography",
+      "nominees": [
+        { "nominee": "Daniil Kononov", "film": "Another World", "country": "Russian Federation" },
+        { "nominee": "Anton Gromov", "film": "And Something Else", "country": "Russian Federation" },
+        { "nominee": "Zhuo Bian", "film": "As the Water Flows", "country": "China" },
+        { "nominee": "Zhijian Tong", "film": "The Return of the Lame Hero", "country": "China" },
+        { "nominee": "Daniel Cummings", "film": "Donostia", "country": "Spain" },
+        { "nominee": "Edmund Tetteh Agorhom", "film": "The City of God Beneath the River_", "country": "Ghana" }
+      ]
+    },
+    {
+      "category": "Outstanding Director",
+      "nominees": [
+        { "director": "Uyoyou Adia", "film": "Evi", "country": "Nigeria" },
+        { "director": "Zhijian Tong", "film": "The Return of the Lame Hero", "country": "China" },
+        { "director": "Daniel Cummings", "film": "Donostia", "country": "Spain" },
+        { "director": "Larry Yang", "film": "The Shadow's Edge", "country": "China" },
+        { "director": "Toka McBaror", "film": "The Waiter", "country": "Nigeria" },
+        { "director": "Ifeoma Esther Ojukwu, Stanley Obi Arinze", "film": "Èlédà Àyànmọ́", "country": "Nigeria" }
+      ]
+    },
+    {
+      "category": "Special Mention",
+      "nominees": [
+        { "title": "Blurred Lines", "director": "Uru Eke", "country": "Nigeria" },
+        { "title": "Nini", "director": "Samuel Idiagbonya", "country": "Nigeria" },
+        { "title": "China", "director": "Fei Long", "country": "China" },
+        { "title": "Fehintola", "director": "Azeez Ijaduade", "country": "Nigeria" },
+        { "title": "Looking Glass", "director": "Ivanna Samuel", "country": "Canada" },
+        { "title": "Okola", "director": "Paul Oluseyi Lasisi", "country": "Nigeria" },
+        { "title": "Dance Like Someone's Watching", "director": "Esosa Ighodaro", "country": "Ireland" }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,32 @@
 import { supabase } from './supabase.js';
 
 /**
+ * Verified high-res award ceremony and festival logos
+ * Mirrored directly from FilmFreeway CDNs and official film archives.
+ */
+export const AWARD_LOGOS = {
+  AMVCA: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-amvca.png',
+  AMAA: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-amaa.png',
+  AFRIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-afriff.jpg',
+  TINFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-tinff.webp',
+  BINFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-binff.jpg',
+  AIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-aiff.jpg',
+  EKOIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-ekoiff.jpg',
+  LIFANIMA: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-lifanima.jpg',
+  ASIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-asiff.jpg',
+  BIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-biff.jpg',
+  BCFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-bcff.jpg',
+  CCFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-ccff.jpg',
+  ZUFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-zuff.jpg',
+  AFFIF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-affif.jpg',
+  SEPTIMIUS: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-septimius.jpg',
+  TIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-tiff.png',
+  SUNDANCE: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-sundance.jpg',
+  VENICE: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-venice.jpg',
+  CFIF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/97c4c683-7aa2-4eb6-8ced-ab37f838e2b1.jpg',
+};
+
+/**
  * Ceremony & Festival catalogue for the Awards Directory and Details pages.
  * Enriched with location, categories, entry plans, submission timelines, and official portals.
  */
@@ -112,6 +138,33 @@ export const AWARD_ORGS = [
     submitUrl: 'https://www.binff.net/',
     submitLabel: 'BINFF Official Portal',
     tags: ['Brampton', 'Canada', 'Nollywood', 'Diaspora', 'Festival', 'TINFF Sister Festival', 'Web Series', 'African Cinema'],
+  },
+  {
+    id: 'AIFF',
+    label: 'AIFF',
+    full: 'Abuja International Film Festival',
+    tagline: 'West Africa’s Longest-Running Independent Film Festival',
+    category: 'festival',
+    location: 'Abuja, Nigeria',
+    frequency: 'Annual (October)',
+    founded: 2004,
+    accent: '#0D9488',
+    about:
+      'Founded in 2004 by Fidelis Duker, the Abuja International Film Festival (AIFF) is West Africa’s longest-running independent film festival. Now in its 23rd Edition, AIFF champions groundbreaking African storytelling and international cinema across feature films, documentaries, animation, student cinema, and experimental works.',
+    when:
+      'Held annually in late October in the Federal Capital Territory, Abuja (20 – 25 October 2026 for the 23rd Edition).',
+    submissions:
+      'Filmmakers submit competitive titles via FilmFreeway across categories including Feature Film (Nigeria), Outstanding Foreign Feature, Outstanding Actor/Actress, Outstanding Director, Documentary, Animation, Music Score, Cinematography, and Experimental Cinema.',
+    entryPlan: {
+      fees: 'Standard Entry ($20 – $50 on FilmFreeway)',
+      eligibility: 'African, Nollywood, and international independent features, shorts, animations, and documentaries.',
+      formats: 'HD / 4K Digital screener via FilmFreeway / Vimeo.',
+      categoriesCount: '15+ Competitive Festival Categories',
+      platform: 'FilmFreeway',
+    },
+    submitUrl: 'https://filmfreeway.com/AbujaInternationalFilmFestival',
+    submitLabel: 'Submit on FilmFreeway',
+    tags: ['Abuja', 'Festival', 'Nollywood', 'International', 'Independent', 'Feature', 'Documentary', 'Animation', 'Student Film'],
   },
   {
     id: 'DIYMA',
@@ -1355,6 +1408,33 @@ export const AWARD_ORGS = [
     submitLabel: null,
     tags: ['Lagos', 'Nollywood', 'Breakthrough Actors', 'Acting Honors'],
   },
+  {
+    id: 'CFIF',
+    label: 'CFiF',
+    full: 'Christian Faith International Film Festival',
+    tagline: 'Empowering Kingdom Storytellers & Faith-Based Indie Cinema',
+    category: 'festival',
+    location: 'Yaba, Lagos, Nigeria',
+    frequency: 'Annual (December)',
+    founded: 2026,
+    accent: '#D97706',
+    about:
+      'The Christian Faith International Film Festival (CFiF) is an annual film showcase and honours platform held in Yaba, Lagos, Nigeria. The festival empowers and celebrates faith-based, values-driven independent filmmakers across Nigeria, Africa, and the global diaspora, spotlighting narratives of faith, redemption, purpose, and spiritual impact.',
+    when:
+      '1st Edition scheduled for December 18–19, 2026, in Yaba, Lagos, Nigeria.',
+    submissions:
+      'Open to indie feature films, faith shorts, documentaries, animations, gospel music videos, and student films via Festhome.',
+    entryPlan: {
+      fees: 'Standard Entry ($10 – $35 via Festhome)',
+      eligibility: 'Faith-based, moral, and inspirational independent features, shorts, and documentaries.',
+      formats: 'Full HD / 4K online screener (MP4/MOV) with English subtitles.',
+      categoriesCount: '10+ Faith & Craft Categories',
+      platform: 'Festhome',
+    },
+    submitUrl: 'https://filmmakers.festhome.com/festival/christian-faith-indie-film-festival',
+    submitLabel: 'Submit on Festhome',
+    tags: ['Lagos', 'Yaba', 'Faith-Based', 'Christian Cinema', 'Indie Film', 'Festhome', 'Gospel'],
+  },
 ];
 
 export function getAwardOrg(id) {
@@ -1364,7 +1444,12 @@ export function getAwardOrg(id) {
     AWARD_ORGS.find((o) => o.id.toLowerCase() === cleanId.toLowerCase()) ||
     AWARD_ORGS.find((o) => o.label.toLowerCase() === cleanId.toLowerCase()) ||
     AWARD_ORGS.find((o) => o.full.toLowerCase().includes(cleanId.toLowerCase()));
-  if (match) return match;
+  if (match) {
+    return {
+      ...match,
+      logoUrl: match.logoUrl || AWARD_LOGOS[match.id] || null,
+    };
+  }
 
   const cleanLabel = cleanId.replace(/_/g, ' ');
 
@@ -1372,6 +1457,7 @@ export function getAwardOrg(id) {
     id: cleanId,
     label: cleanLabel,
     full: cleanLabel,
+    logoUrl: AWARD_LOGOS[cleanId] || null,
     tagline: 'African & International Cinema Honours',
     category: 'academy',
     location: 'Nigeria / Africa',

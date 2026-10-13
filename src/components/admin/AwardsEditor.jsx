@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import { supabase } from '../../lib/supabase';
 import { AWARD_ORGS } from '../../lib/awards';
 import { getCategoriesForOrg, getCraftRolesForCategory } from '../../lib/awardsSync';
+import AwardLogo from '../awards/AwardLogo';
 
 /**
  * Awards & nominations editor for the jsonb `awards` column, shared by the
@@ -109,25 +110,28 @@ export default function AwardsEditor({ value, onChange, variant, filmCredits }) 
           {awards.map((award, idx) => (
             <div key={idx} className="rounded-xl border border-border bg-surface-2/30 p-4 space-y-3.5">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1 p-1 bg-surface rounded-lg border border-border">
-                  <button
-                    type="button"
-                    onClick={() => update(idx, { won: true })}
-                    className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all ${
-                      award.won ? 'bg-brand text-white' : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    Winner
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => update(idx, { won: false })}
-                    className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all ${
-                      !award.won ? 'bg-amber-500 text-white' : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    Nominee
-                  </button>
+                <div className="flex items-center gap-2.5">
+                  <AwardLogo org={award.organization} size="sm" />
+                  <div className="flex items-center gap-1 p-1 bg-surface rounded-lg border border-border">
+                    <button
+                      type="button"
+                      onClick={() => update(idx, { won: true })}
+                      className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all ${
+                        award.won ? 'bg-brand text-white' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      Winner
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => update(idx, { won: false })}
+                      className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-all ${
+                        !award.won ? 'bg-amber-500 text-white' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      Nominee
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -354,7 +358,8 @@ function SearchableOrgPicker({ value, onChange }) {
                 }`}
               >
                 <div className="flex items-center justify-between w-full gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <AwardLogo org={org} size="xs" />
                     <span className="text-xs font-black text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded">
                       {org.id}
                     </span>

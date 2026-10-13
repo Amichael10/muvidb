@@ -25,7 +25,7 @@ const GEMINI_KEYS = (() => {
 let geminiKeyIdx = 0;
 const deadGeminiKeys = new Set<string>();
 
-const GEMINI_PEOPLE_MODEL = process.env.GEMINI_PEOPLE_MODEL || 'gemini-2.5-flash';
+const GEMINI_PEOPLE_MODEL = process.env.GEMINI_PEOPLE_MODEL || 'gemini-flash-latest';
 const DAILY_BUDGET_USD = Number(process.env.GEMINI_PEOPLE_DAILY_BUDGET_USD || '5');
 const CACHE_DAYS = 30;
 const MAX_RETRIES = 3;

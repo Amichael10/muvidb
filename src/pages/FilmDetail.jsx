@@ -23,6 +23,8 @@ import ShareAction from '../components/ui/ShareAction';
 import { slugOrId } from '../utils/slug';
 import { getShowName } from '../utils/series';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+import AwardLogo from '../components/awards/AwardLogo';
+import { normOrg } from '../lib/awards';
 import { formatFilmTitle, toSentenceCase, formatPersonName, toTitleCase } from '../utils/format';
 import { formatRole } from '../lib/creditRoles';
 
@@ -1241,9 +1243,15 @@ export default function FilmDetail() {
                       .map((award, idx) => (
                         <li
                           key={`${award.organization}-${award.season}-${award.category}-${idx}`}
-                          className="flex items-start gap-3 py-3.5"
+                          className="flex items-start gap-3.5 py-4"
                         >
-                          <Icon icon="solar:cup-star-linear" className="text-base text-text-muted shrink-0 mt-0.5" />
+                          <Link
+                            to={`/awards/${normOrg(award.organization)}`}
+                            className="shrink-0 hover:scale-105 transition-transform"
+                            title={award.organization || 'Award Ceremony'}
+                          >
+                            <AwardLogo org={award.organization} size="sm" />
+                          </Link>
                           <div className="min-w-0 flex-1">
                             <p className="text-text-primary text-sm font-semibold leading-snug">
                               {award.category || award.title}
@@ -1256,7 +1264,13 @@ export default function FilmDetail() {
                               </span>
                             </p>
                             <p className="text-text-muted text-xs mt-0.5">
-                              {[award.organization || 'AMVCA', award.year].filter(Boolean).join(' · ')}
+                              <Link
+                                to={`/awards/${normOrg(award.organization)}`}
+                                className="hover:text-text-primary hover:underline font-semibold text-text-primary/90"
+                              >
+                                {award.organization || 'AMVCA'}
+                              </Link>
+                              {award.year ? ` · ${award.year}` : ''}
                               {award.recipients?.length ? ` · ${award.recipients.join(', ')}` : ''}
                             </p>
                           </div>

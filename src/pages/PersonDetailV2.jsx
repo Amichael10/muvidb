@@ -25,6 +25,8 @@ import WhatsAppOptInModal from '../components/person/WhatsAppOptInModal'
 import AddPersonMediaModal from '../components/person/AddPersonMediaModal'
 import PersonPhotoLightboxModal from '../components/person/PersonPhotoLightboxModal'
 import BookingModal from '../components/person/BookingModal'
+import AwardLogo from '../components/awards/AwardLogo'
+import { normOrg } from '../lib/awards'
 
 const PLATFORM_STYLES = {
   cinema:      { label: 'Cinema',   bg: 'bg-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-400' },
@@ -1851,13 +1853,15 @@ export default function PersonDetailV2() {
                   <button
                     key={org}
                     onClick={() => setSelectedAwardOrg(org)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap shrink-0 ${
+                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap shrink-0 ${
                       selectedAwardOrg === org
                         ? 'bg-amber-500 text-black font-black shadow-lg shadow-amber-500/20'
                         : 'bg-surface border border-border text-text-muted hover:text-text-primary hover:border-amber-500/40'
                     }`}
                   >
-                    {org} ({count})
+                    <AwardLogo org={org} size="xs" showLaurel={false} className="border-0 bg-transparent shadow-none" />
+                    <span>{org}</span>
+                    <span className="opacity-70 text-[10px]">({count})</span>
                   </button>
                 ))}
               </div>
@@ -1900,14 +1904,26 @@ export default function PersonDetailV2() {
                         </span>
                       </div>
 
-                      {/* Organization & Category */}
-                      <div className="sm:col-span-4">
-                        <p className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                          {award.canonicalOrg || 'Honorary Award'}
-                        </p>
-                        <p className="text-sm font-bold text-text-primary mt-0.5">
-                          {toTitleCase(award.category || 'Special Recognition')}
-                        </p>
+                      {/* Organization & Category with Logo */}
+                      <div className="sm:col-span-4 flex items-center gap-3">
+                        <Link
+                          to={`/awards/${normOrg(award.organization || award.canonicalOrg)}`}
+                          className="shrink-0 hover:scale-105 transition-transform"
+                          title={award.canonicalOrg}
+                        >
+                          <AwardLogo org={award.organization || award.canonicalOrg} size="sm" />
+                        </Link>
+                        <div className="min-w-0">
+                          <Link
+                            to={`/awards/${normOrg(award.organization || award.canonicalOrg)}`}
+                            className="text-xs font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 hover:underline block truncate"
+                          >
+                            {award.canonicalOrg || 'Honorary Award'}
+                          </Link>
+                          <p className="text-sm font-bold text-text-primary mt-0.5 line-clamp-1">
+                            {toTitleCase(award.category || 'Special Recognition')}
+                          </p>
+                        </div>
                       </div>
 
                       {/* Work / Film Tag */}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Icon } from '@iconify/react';
 import { AWARD_ORGS, getAwardOrg, loadAwardsCatalog } from '../lib/awards';
+import AwardLogo from '../components/awards/AwardLogo';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { formatFilmTitle, formatPersonName } from '../utils/format';
 
@@ -337,14 +338,17 @@ export default function Awards() {
                         </span>
                       </div>
 
-                      {/* Header Title */}
-                      <div className="mt-4">
-                        <h3 className="font-heading text-2xl font-black tracking-tight text-text-primary group-hover:text-brand transition-colors">
-                          {org.label}
-                        </h3>
-                        <p className="mt-0.5 text-xs font-semibold text-text-primary line-clamp-1">
-                          {org.full}
-                        </p>
+                      {/* Header Title with Logo */}
+                      <div className="mt-4 flex items-start gap-3.5">
+                        <AwardLogo org={org} size="md" className="mt-0.5 border-border/80" />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-heading text-2xl font-black tracking-tight text-text-primary group-hover:text-brand transition-colors">
+                            {org.label}
+                          </h3>
+                          <p className="mt-0.5 text-xs font-semibold text-text-primary line-clamp-1">
+                            {org.full}
+                          </p>
+                        </div>
                       </div>
 
                       {/* About Snippet */}
