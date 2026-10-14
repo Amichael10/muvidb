@@ -145,6 +145,7 @@ export async function sendMetaWhatsAppTemplate(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20_000),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -161,6 +162,7 @@ export async function sendMetaWhatsAppTemplate(
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(20_000),
         });
         const retryData = await retryRes.json().catch(() => ({}));
         if (retryRes.ok && !retryData.error) {

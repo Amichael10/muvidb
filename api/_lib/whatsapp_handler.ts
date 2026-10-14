@@ -2,8 +2,8 @@
  * WhatsApp Endpoints Handler:
  * 1. POST /api/whatsapp?action=opt-in
  *    Allows authenticated user to update their phone and toggle WhatsApp alerts.
- * 2. POST /api/whatsapp?action=test-alert (Admin only)
- *    Manually triggers movie alerts for a specific film to test the WhatsApp flow.
+ * 2. POST /api/whatsapp?action=trigger-alert (Admin only)
+ *    Queues a film for the scheduled WhatsApp dispatcher.
  * 3. GET / POST /api/whatsapp?action=webhook
  *    Meta WhatsApp Webhook for token verification and incoming 'STOP' unsubscribe messages.
  */
@@ -13,7 +13,7 @@ import { supabase } from './supabase.js';
 import { isValidAuth } from './auth.js';
 import { handleCors } from './cors.js';
 import { normalizeWhatsAppNumber } from './meta_whatsapp.js';
-import { dispatchMovieWhatsAppAlerts } from './whatsapp_movie_alerts.js';
+import { enqueueMovieWhatsAppAlert } from './whatsapp_alert_queue.js';
 
 export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -151,46 +151,18 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: 'Admin or Cron authentication required' });
     }
 
-    const { filmId, title, slug, posterUrl, releaseType, customPlatformName } = req.body || {};
-    if (!filmId) {
-      return res.status(400).json({ error: 'filmId is required' });
+    const { filmId } = req.body || {};
+    if (!filmId) return res.status(400).json({ error: 'filmId is required' });
+    const { data: film, error } = await supabase.from('films').select('id').eq('id', filmId).maybeSingle();
+    if (error) return res.status(500).json({ error: 'Cannot read film' });
+    if (!film) return res.status(404).json({ error: 'Film not found' });
+    try {
+      await enqueueMovieWhatsAppAlert(filmId);
+      return res.status(202).json({ success: true, queued: true });
+    } catch (error) {
+      console.error('[WhatsApp Alert] Queue failure:', error);
+      return res.status(500).json({ error: 'Could not queue WhatsApp alert' });
     }
-
-    // If film details weren't passed in body, fetch from DB
-    let filmTitle = title;
-    let filmSlug = slug;
-    let filmPoster = posterUrl;
-    let filmReleaseType = releaseType;
-
-    if (!filmTitle) {
-      const { data: film } = await supabase
-        .from('films')
-        .select('id, title, slug, poster_url, release_type')
-        .eq('id', filmId)
-        .single();
-
-      if (!film) {
-        return res.status(404).json({ error: 'Film not found' });
-      }
-      filmTitle = film.title;
-      filmSlug = film.slug;
-      filmPoster = film.poster_url;
-      filmReleaseType = film.release_type;
-    }
-
-    const dispatchResult = await dispatchMovieWhatsAppAlerts({
-      filmId,
-      title: filmTitle,
-      slug: filmSlug,
-      posterUrl: filmPoster,
-      releaseType: filmReleaseType,
-      customPlatformName,
-    });
-
-    return res.status(200).json({
-      success: true,
-      result: dispatchResult,
-    });
   }
 
   return res.status(404).json({ error: 'Unknown action' });

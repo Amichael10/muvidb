@@ -44,8 +44,7 @@ export async function dispatchMovieWhatsAppAlerts(
   };
 
   if (!isWhatsAppConfigured()) {
-    console.warn('[WhatsApp Alert] Meta WhatsApp API is not configured. Skipping alert dispatch.');
-    return result;
+    throw new Error('Meta WhatsApp API is not configured');
   }
 
   const { filmId, title, slug, posterUrl, releaseType, customPlatformName } = filmCtx;
@@ -56,7 +55,8 @@ export async function dispatchMovieWhatsAppAlerts(
     .select('person_id, people(id, name, slug)')
     .eq('film_id', filmId);
 
-  if (creditErr || !credits || credits.length === 0) {
+  if (creditErr) throw new Error(`Cannot read film credits: ${creditErr.message}`);
+  if (!credits || credits.length === 0) {
     console.log('[WhatsApp Alert] No credits found for film:', filmId);
     return result;
   }
@@ -78,7 +78,8 @@ export async function dispatchMovieWhatsAppAlerts(
     .select('user_id, person_id, notify_whatsapp')
     .in('person_id', personIds);
 
-  if (followErr || !followRows || followRows.length === 0) {
+  if (followErr) throw new Error(`Cannot read follows: ${followErr.message}`);
+  if (!followRows || followRows.length === 0) {
     console.log('[WhatsApp Alert] No followers found for cast of film:', filmId);
     return result;
   }
@@ -108,26 +109,22 @@ export async function dispatchMovieWhatsAppAlerts(
     .select('id, name, whatsapp_phone, whatsapp_enabled')
     .in('id', userIds);
 
-  if (userErr || !users || users.length === 0) {
-    console.error('[WhatsApp Alert] Error fetching user phone records:', userErr);
-    return result;
-  }
+  if (userErr) throw new Error(`Cannot read WhatsApp preferences: ${userErr.message}`);
+  if (!users || users.length === 0) return result;
 
   // 5. Query whatsapp_movie_alert_log for existing notifications for this film to guarantee idempotency
   let alreadyNotifiedUserIds = new Set<string>();
-  try {
-    const { data: existingLogs } = await supabase
-      .from('whatsapp_movie_alert_log')
-      .select('user_id')
-      .eq('film_id', filmId)
-      .in('user_id', userIds);
+  const { data: existingLogs, error: logReadError } = await supabase
+    .from('whatsapp_movie_alert_log')
+    .select('user_id')
+    .eq('film_id', filmId)
+    .eq('status', 'sent')
+    .in('user_id', userIds);
 
-    if (existingLogs) {
-      alreadyNotifiedUserIds = new Set(existingLogs.map((l) => l.user_id));
-    }
-  } catch (err) {
-    // If the table is brand new or not yet cached, proceed cautiously
-    console.warn('[WhatsApp Alert] Could not read existing alert logs:', err);
+  if (logReadError) throw new Error(`Cannot read alert history: ${logReadError.message}`);
+
+  if (existingLogs) {
+    alreadyNotifiedUserIds = new Set(existingLogs.map((l) => l.user_id));
   }
 
   // Determine watch platform label
@@ -139,7 +136,7 @@ export async function dispatchMovieWhatsAppAlerts(
   }
 
   const filmUrl = `https://muvidb.com/film/${slug || filmId}`;
-  const poster = posterUrl || 'https://muvidb.com/images/og-default.jpg';
+  const poster = posterUrl || 'https://muvidb.com/images/MuviDB%20Brand/Wordmark.png';
 
   // 6. Iterate through each unique user, synthesize actor summary, and send ONE message
   for (const userRow of users) {
@@ -187,27 +184,31 @@ export async function dispatchMovieWhatsAppAlerts(
       templateName: process.env.WHATSAPP_MOVIE_ALERT_TEMPLATE || 'movie_release_alert',
       headerImageUrl: poster,
       bodyParameters: [actorsSummary, title, platformLabel, filmUrl],
+      buttonUrlPayload: slug || filmId,
     });
 
     if (sendRes.ok) {
       result.sentCount++;
       // Log to whatsapp_movie_alert_log
-      try {
-        await supabase.from('whatsapp_movie_alert_log').insert({
-          user_id: uId,
-          film_id: filmId,
-          phone,
-          followed_people_names: actorNames,
-          message_id: sendRes.messageId || null,
-          status: 'sent',
-        });
-      } catch (logErr) {
-        console.warn('[WhatsApp Alert] Failed to log alert success:', logErr);
-      }
+      const { error: logError } = await supabase.from('whatsapp_movie_alert_log').upsert({
+        user_id: uId,
+        film_id: filmId,
+        phone,
+        followed_people_names: actorNames,
+        message_id: sendRes.messageId || null,
+        status: 'sent',
+        error_message: null,
+      }, { onConflict: 'user_id,film_id' });
+      if (logError) throw new Error(`Message accepted but alert history could not be saved: ${logError.message}`);
     } else {
       result.failedCount++;
       result.errors.push({ userId: uId, error: sendRes.error || 'Failed to send' });
       console.error(`[WhatsApp Alert] Failed sending to user ${uId}:`, sendRes.error);
+      const { error: logError } = await supabase.from('whatsapp_movie_alert_log').upsert({
+        user_id: uId, film_id: filmId, phone, followed_people_names: actorNames,
+        status: 'failed', error_message: sendRes.error || 'Failed to send',
+      }, { onConflict: 'user_id,film_id' });
+      if (logError) throw new Error(`Cannot save alert failure: ${logError.message}`);
     }
   }
 

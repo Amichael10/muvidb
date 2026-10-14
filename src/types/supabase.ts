@@ -5241,6 +5241,38 @@ export type Database = {
           },
         ]
       }
+      whatsapp_movie_alert_queue: {
+        Row: {
+          available_at: string
+          film_id: string
+          last_error: string | null
+          locked_until: string | null
+          queued_at: string
+        }
+        Insert: {
+          available_at?: string
+          film_id: string
+          last_error?: string | null
+          locked_until?: string | null
+          queued_at?: string
+        }
+        Update: {
+          available_at?: string
+          film_id?: string
+          last_error?: string | null
+          locked_until?: string | null
+          queued_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_movie_alert_queue_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: true
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       youtube_upload_alert_log: {
         Row: {
           channel_id: string
@@ -5349,6 +5381,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_whatsapp_movie_alert: {
+        Args: never
+        Returns: {
+          available_at: string
+          film_id: string
+          last_error: string | null
+          locked_until: string | null
+          queued_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "whatsapp_movie_alert_queue"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       admin_ban_user: {
         Args: { ban_status: boolean; target_user_id: string }
         Returns: undefined

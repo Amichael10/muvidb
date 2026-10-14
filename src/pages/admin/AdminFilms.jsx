@@ -1786,12 +1786,12 @@ export default function AdminFilms() {
         }
       }
 
-      // If film is published or in cinemas, trigger WhatsApp followers notification (non-blocking)
-      if (cleanFilmPayload.is_published || cleanFilmPayload.is_in_cinemas) {
+      // Queue after credits are saved; the worker reads publication status from the database.
+      if (credits.length > 0) {
         try {
           const { data: sessionData } = await supabase.auth.getSession();
           const token = sessionData?.session?.access_token;
-          fetch('/api/whatsapp?action=trigger-alert', {
+          const alertResponse = await fetch('/api/whatsapp?action=trigger-alert', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1804,9 +1804,11 @@ export default function AdminFilms() {
               posterUrl: cleanFilmPayload.poster_url,
               releaseType: cleanFilmPayload.release_type,
             }),
-          }).catch(e => console.warn('WhatsApp alert trigger edge:', e));
+          });
+          if (!alertResponse.ok) throw new Error(`WhatsApp queue returned HTTP ${alertResponse.status}`);
         } catch (waErr) {
           console.warn('WhatsApp trigger error:', waErr);
+          toast.error('Film saved, but WhatsApp alerts could not be queued.');
         }
       }
 

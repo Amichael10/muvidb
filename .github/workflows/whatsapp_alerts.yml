@@ -1,0 +1,29 @@
+name: WhatsApp Cast and Crew Alerts
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: whatsapp-movie-alerts
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deliver-alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Process credit alert queue
+        env:
+          CRON_SECRET: ${{ secrets.VITE_CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET"
+          response=$(curl --silent --show-error --fail-with-body --max-time 260 \
+            -H "x-cron-secret: $CRON_SECRET" \
+            'https://muvidb.com/api/cron/sync?task=whatsapp_alerts')
+          echo "$response" | jq .
+          echo "$response" | jq -e '(.result.failed // .failed // 0) == 0'

@@ -10,7 +10,10 @@ This guide walks you through connecting the **Meta WhatsApp Cloud API** to MuviD
    - If not, the **WhatsAppOptInModal** pops up asking for their WhatsApp number (+234...).
    - Upon opting in, their number is saved to `users.whatsapp_phone`, and `follows.notify_whatsapp = true`.
 2. **Movie Publication / Cinema Alert Trigger**:
-   - When a film is saved or marked published in Admin Films, it fires the alert engine [`whatsapp_movie_alerts.ts`](file:///c:/Users/User/Filmdba/lumi/api/_lib/whatsapp_movie_alerts.ts).
+   - Database triggers queue credit insertions/person changes from YouTube sync, harvesters, and manual additions. Publication changes also queue films with eligible followers. Admin Films queues after its credit save completes.
+   - The `whatsapp_alerts.yml` workflow calls `/api/cron/sync?task=whatsapp_alerts` every five minutes using `VITE_CRON_SECRET`. The worker reads publication status from the database, claims each film exclusively, and retries failures. GitHub scheduling can delay runs.
+   - Apply `20261014225910_whatsapp_credit_alert_queue.sql` before deploying the worker. No historical films are backfilled automatically. Failure details appear in the queue's `last_error` and `whatsapp_movie_alert_log.error_message`.
+   - The approved image template requires four body parameters and a dynamic URL button parameter containing the film slug or ID.
 3. **Multi-Actor Deduplicator (Smart Grouping)**:
    - If a user follows 5 actors who all appear in the same film, the engine groups them and sends **only 1 message**:
      > *"Actors you follow (Lateef Olofin, Funke Akindele, and 1 other) are starring in the new release: Jagun Jagun 2!"*
