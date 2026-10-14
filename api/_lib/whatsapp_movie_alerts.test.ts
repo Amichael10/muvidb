@@ -44,7 +44,7 @@ describe('WhatsApp cast and crew alerts', () => {
   it('skips previously sent alerts', async () => {
     const queries = setup([{ user_id: 'user' }]);
     const result = await dispatchMovieWhatsAppAlerts(context);
-    expect(queries[3].eq).toHaveBeenCalledWith('status', 'sent');
+    expect(queries[3].in).toHaveBeenCalledWith('status', ['sent', 'delivered', 'read']);
     expect(result.skippedAlreadyNotified).toBe(1);
     expect(mocks.send).not.toHaveBeenCalled();
   });

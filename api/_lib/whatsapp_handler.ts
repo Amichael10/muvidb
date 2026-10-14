@@ -14,6 +14,7 @@ import { isValidAuth } from './auth.js';
 import { handleCors } from './cors.js';
 import { normalizeWhatsAppNumber } from './meta_whatsapp.js';
 import { enqueueMovieWhatsAppAlert } from './whatsapp_alert_queue.js';
+import { recordWhatsAppDeliveryStatuses } from './whatsapp_delivery_status.js';
 
 export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -40,6 +41,7 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST' && action === 'webhook') {
     const body = req.body;
     try {
+      await recordWhatsAppDeliveryStatuses(body);
       const entry = body?.entry?.[0];
       const changes = entry?.changes?.[0];
       const value = changes?.value;
@@ -62,7 +64,7 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ status: 'ok' });
     } catch (err: any) {
       console.error('[WhatsApp Webhook] Inbound handling error:', err);
-      return res.status(200).json({ status: 'error_logged' });
+      return res.status(500).json({ status: 'error_logged' });
     }
   }
 

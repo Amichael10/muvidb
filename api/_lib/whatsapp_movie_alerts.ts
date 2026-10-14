@@ -118,7 +118,7 @@ export async function dispatchMovieWhatsAppAlerts(
     .from('whatsapp_movie_alert_log')
     .select('user_id')
     .eq('film_id', filmId)
-    .eq('status', 'sent')
+    .in('status', ['sent', 'delivered', 'read'])
     .in('user_id', userIds);
 
   if (logReadError) throw new Error(`Cannot read alert history: ${logReadError.message}`);
