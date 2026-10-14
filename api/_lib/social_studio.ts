@@ -1740,7 +1740,19 @@ export async function syncContentItemWithSource(
       newAssetId = assetResult.rows[0]?.id || null;
       newAssetUrl = assetResult.rows[0]?.publicUrl || null;
     } catch (assetErr: any) {
-      console.warn(`[syncContentItemWithSource] Failed to refresh poster asset for ${contentItemId}:`, assetErr?.message);
+      console.warn(`[syncContentItemWithSource] Portrait poster preparation skipped for ${contentItemId}:`, assetErr?.message);
+      try {
+        const renderResult = await renderAndStoreAssets({
+          contentItemId: item.id,
+          snapshot: freshSnapshot,
+          templateVersion: 1,
+          formats: ['square_1_1'],
+        });
+        newAssetId = renderResult.rows[0]?.id || null;
+        newAssetUrl = renderResult.rows[0]?.publicUrl || null;
+      } catch (renderErr: any) {
+        console.warn(`[syncContentItemWithSource] Landscape template card render also failed for ${contentItemId}:`, renderErr?.message);
+      }
     }
   }
 
@@ -1914,7 +1926,7 @@ async function renderAndStoreAssets(input: {
   contentItemId: string;
   snapshot: SocialSourceSnapshot;
   templateSlug?: string | null;
-  templateVersion: number | null;
+  templateVersion?: number | null;
   formats: SocialAssetFormat[];
 }): Promise<{ rows: StoredAsset[]; carouselAssets?: Record<string, StoredAsset[]>; error?: string }> {
   const bucket = getAssetBucket();
@@ -2016,9 +2028,8 @@ export async function generateSocialDraft(
     .maybeSingle();
 
   if (templateError) throw templateError;
-  // HTML templates are bundled with the API. Keep generation functional when
-  // a deployment is ahead of the database migration that registers the row.
-  // The nullable template_id remains null until the migration is applied.
+  // If no graphic template matches, fall back to pure portrait poster format.
+  // The system posts pristine portrait posters directly without templates.
   const effectiveTemplate = template || (isHtmlSocialTemplate(input.templateSlug)
     ? {
         id: null,
@@ -2030,9 +2041,13 @@ export async function generateSocialDraft(
           formats: htmlTemplateFormats(input.templateSlug),
         },
       }
-    : null);
-  if (!effectiveTemplate) throw httpError(404, `Template ${input.templateSlug} not found`);
-  if (!effectiveTemplate.is_active) throw httpError(409, `Template ${input.templateSlug} is not active`);
+    : {
+        id: null,
+        slug: input.templateSlug || 'poster-only',
+        version: 1,
+        is_active: true,
+        template_config: { formats: ['portrait_4_5'] },
+      });
 
   let snapshot =
     sourceEntityType === 'person'
@@ -2055,10 +2070,16 @@ export async function generateSocialDraft(
     };
   }
 
-  const posterOnly = (input.contentType === 'where_to_watch' || input.contentType === 'whats_on_stage') && !input.skipAssets;
+  // Pure Portrait Poster mode: all films and stage plays post their vertical portrait poster directly
   const isPosterKind = snapshot.kind === 'upcoming_movie' || snapshot.kind === 'whats_on_stage';
-  const poster = posterOnly && isPosterKind
-    ? await preparePoster(await downloadSocialImage((snapshot as any).posterUrl || '')) : null;
+  const posterSourceUrl = isPosterKind ? (snapshot as any).posterUrl : (snapshot as any).photoUrl;
+  const posterOnly = !input.skipAssets && Boolean(posterSourceUrl);
+  const poster = posterOnly
+    ? await preparePoster(await downloadSocialImage(posterSourceUrl)).catch((err: any) => {
+        console.warn(`[generateSocialDraft] Poster preparation rejected for ${posterSourceUrl}:`, err.message);
+        return null;
+      })
+    : null;
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
     snapshot.kind === 'actor_spotlight'
@@ -2096,15 +2117,17 @@ export async function generateSocialDraft(
   // caption-only draft rather than failing generation — the item is still
   // reviewable and can be re-rendered later.
   const assets = poster
-    ? await storePosterAsset(contentItem.id, poster, (snapshot as any).posterUrl)
+    ? await storePosterAsset(contentItem.id, poster, posterSourceUrl || (snapshot as any).posterUrl)
     : input.skipAssets
+    ? { rows: [] as StoredAsset[] }
+    : (effectiveTemplate.slug === 'poster-only' && !isPosterKind)
     ? { rows: [] as StoredAsset[] }
     : await renderAndStoreAssets({
         contentItemId: contentItem.id,
         snapshot,
-        templateSlug: effectiveTemplate.slug,
+        templateSlug: effectiveTemplate.slug === 'poster-only' ? null : effectiveTemplate.slug,
         templateVersion: effectiveTemplate.version,
-        formats: templateFormats(effectiveTemplate.template_config, effectiveTemplate.slug),
+        formats: isPosterKind ? ['square_1_1'] : templateFormats(effectiveTemplate.template_config, effectiveTemplate.slug),
       });
 
   if (assets.error) warnings.push(`Asset rendering failed: ${assets.error}`);
@@ -2126,7 +2149,7 @@ export async function generateSocialDraft(
       hashtags: content.hashtags,
       selected_asset_id: format ? assetIdByFormat.get(format) ?? null : null,
       platform_options: {
-        ...(poster ? { poster_source_url: (snapshot as any).posterUrl, poster_only: true } : {}),
+        ...(poster ? { poster_source_url: (snapshot as any).posterUrl, poster_only: true } : { poster_only: false }),
         caption_limit: PLATFORM_CAPTION_LIMITS[platform].captionLimit,
         asset_format: format,
         ...(useCarousel

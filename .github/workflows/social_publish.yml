@@ -2,6 +2,8 @@ name: Social Studio Publisher & Morning Briefings
 
 on:
   schedule:
+    # 00:00 WAT (23:00 UTC) — Social Studio Daily Scheduler (Checks DB & Schedules Next Day)
+    - cron: "0 23 * * *"
     # 07:00 WAT (06:00 UTC) — Morning Telegram Briefing (Social 3-Post Review & Outreach Digest)
     - cron: "0 6 * * *"
     # 09:00 WAT (08:00 UTC) — Slot 1 (Graphic: Spotlight / Streaming Guide)
@@ -17,12 +19,13 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: "Task to execute: social_publish or morning_briefing"
+        description: "Task to execute: social_publish, daily_social_schedule, or morning_briefing"
         required: true
         default: "social_publish"
         type: choice
         options:
           - social_publish
+          - daily_social_schedule
           - morning_briefing
           - morning_social
           - morning_outreach
@@ -66,10 +69,13 @@ jobs:
           current_hour="$(date -u +%H)"
           current_minute="$(date -u +%M)"
 
+          # At 23:00 UTC (12:00 AM / 00:00 WAT), check DB and schedule for the next day.
+          if [ "$current_hour" = "23" ]; then
+            echo "task=daily_social_schedule" >> "$GITHUB_OUTPUT"
           # At 06:00 UTC (07:00 WAT), run morning briefing.
           # Allow window 06:00 - 07:59 UTC (next publish slot is 08:00 UTC / 09:00 WAT)
           # so GitHub Actions runner queuing delays never cause it to fall back to social_publish.
-          if [ "$current_hour" = "06" ] || [ "$current_hour" = "07" ]; then
+          elif [ "$current_hour" = "06" ] || [ "$current_hour" = "07" ]; then
             echo "task=morning_briefing" >> "$GITHUB_OUTPUT"
           else
             echo "task=social_publish" >> "$GITHUB_OUTPUT"

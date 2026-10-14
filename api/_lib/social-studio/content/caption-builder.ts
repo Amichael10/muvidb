@@ -128,29 +128,114 @@ export function buildViralNarrative(
   return { hookText: capitalized, debateQuestion: question };
 }
 
+function pickQuestion(options: string[], seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % options.length;
+  return options[idx];
+}
+
 function deriveDebateQuestion(text: string, isComingSoon: boolean): string {
   const lower = text.toLowerCase();
 
-  if (/royal|prince|king|palace|throne|monarch/i.test(lower) && /outcast|love|marry|fianc/i.test(lower)) {
-    return 'If your family gave you an ultimatum between royal inheritance and true love, which one are you picking?';
+  // 1. Check if the synopsis already contains an author-crafted question
+  const directQMatch = text.match(/([A-Z][^.!?]*\?)/);
+  if (directQMatch && directQMatch[1].length >= 25 && directQMatch[1].length <= 140) {
+    return directQMatch[1].trim();
   }
-  if (/betray|deceit|lies|backstab|secret/i.test(lower)) {
-    return 'Can trust ever truly be rebuilt once someone you love betrays you?';
+
+  // 2. Faith, Hardship & Survival (e.g. Ire Ati Ayo)
+  if (/faith|survival|survive|injustice|poverty|financial ruin|hardship|destitute|struggle/i.test(lower)) {
+    return pickQuestion([
+      'When life pushes someone to their absolute breaking point, what keeps hope alive?',
+      'In a battle between personal survival and staying true to your values, which one wins?',
+      'When faith and financial hardship collide, what is the one line you would never cross?',
+      'How far would you go to protect the people you love when all the odds are stacked against you?',
+    ], text);
   }
-  if (/revenge|vengeance|payback|retribution/i.test(lower)) {
-    return 'When pushed to the absolute edge, how far is too far for revenge?';
+
+  // 3. Royal, Succession & Chieftaincy
+  if (/royal|prince|king|palace|throne|monarch|chieftaincy|crown/i.test(lower)) {
+    return pickQuestion([
+      'If your family gave you an ultimatum between royal inheritance and true love, which one are you picking?',
+      'When the crown demands everything, is power ever truly worth the personal sacrifice?',
+      'When ancient tradition clashes with freedom of choice, which one should prevail?',
+    ], text);
   }
-  if (/money|greed|wealth|inherit|heir|property/i.test(lower)) {
-    return 'Does money expose who people truly are, or does it change them?';
+
+  // 4. Marriage, Affairs & Infidelity
+  if (/marriage|husband|wife|affair|infidelity|cheat|unfaithful|mistress/i.test(lower)) {
+    return pickQuestion([
+      'Can a marriage ever truly heal after a forbidden affair, or does a scar always remain?',
+      'What is the one boundary in a relationship that can never be forgiven once crossed?',
+      'When hidden secrets begin to fracture a home, can complete honesty still save it?',
+    ], text);
   }
-  if (/crime|cop|detective|underworld|gang|cartel/i.test(lower)) {
-    return 'In a world where one wrong move could cost your life, who can you really trust?';
+
+  // 5. Revenge, Retribution & Vengeance
+  if (/revenge|vengeance|payback|retribution|avenge/i.test(lower)) {
+    return pickQuestion([
+      'When pushed to the absolute edge, how far is too far for revenge?',
+      'Does getting even ever truly bring peace, or does it just dig another grave?',
+      'Where do you draw the line between justice and personal payback?',
+    ], text);
   }
-  if (/marriage|husband|wife|affair|cheat|infidelity/i.test(lower)) {
-    return 'What is the one thing you could never forgive in a relationship?';
+
+  // 6. Wealth, Greed & Money
+  if (/money|greed|wealth|inherit|inheritance|billionaire|fortune|property/i.test(lower)) {
+    return pickQuestion([
+      'Does money expose who people truly are, or does it change them completely?',
+      'When wealth enters the picture, can family bonds survive the test?',
+      'What matters more when everything is on the line: securing the bag or keeping your peace?',
+    ], text);
   }
-  if (/mother|father|family|daughter|son|brother|sister/i.test(lower)) {
-    return 'How far should family loyalty go when someone crosses the line?';
+
+  // 7. Crime, Underworld & Gangs
+  if (/crime|cartel|underworld|gang|cartel|heist|syndicate|detective|cop\b|police/i.test(lower)) {
+    return pickQuestion([
+      'In a world where one wrong move could cost your life, who can you really trust?',
+      'When survival means breaking the rules, what would your next move be?',
+      'Once you step into the dark side to survive, can you ever truly walk back out clean?',
+    ], text);
+  }
+
+  // 8. Betrayal & Deceit (strict betrayal/backstabbing, excluding generic "secret")
+  if (/betray|backstab|treachery|double[- ]cross/i.test(lower)) {
+    return pickQuestion([
+      'Can trust ever truly be rebuilt once someone you love betrays you?',
+      'When the person you trust most hides the truth, is forgiveness ever an option?',
+      'How do you move forward when betrayal comes from the last person you suspected?',
+    ], text);
+  }
+
+  // 9. Secrets & Hidden Truths
+  if (/darkest secret|buried past|hidden truth|unravel|scandal/i.test(lower)) {
+    return pickQuestion([
+      'How long can a dangerous secret stay buried before it destroys everything around it?',
+      'Would you rather live with a painful truth or a comfortable lie?',
+      'When the past catches up with you, can running away ever truly protect the people you love?',
+    ], text);
+  }
+
+  // 10. Family & Sibling Loyalty
+  if (/mother|father|family|daughter|son|brother|sister|sibling/i.test(lower)) {
+    return pickQuestion([
+      'How far should family loyalty go when someone crosses the line?',
+      'How much would you sacrifice to shield your family from the harsh realities of the world?',
+      'When blood and personal morality clash, whose side do you take?',
+    ], text);
+  }
+
+  // 11. Romance & Love
+  if (/romance|romantic|heartbreak|soulmate|fall in love|passion/i.test(lower)) {
+    return pickQuestion([
+      'Can true love survive when societal expectations and family disapproval stand in the way?',
+      'What is the hardest sacrifice you have ever had to make for love?',
+      'When your heart wants one thing but reality demands another, which do you follow?',
+    ], text);
   }
 
   return isComingSoon

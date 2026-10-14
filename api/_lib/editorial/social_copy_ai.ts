@@ -100,7 +100,7 @@ Goal: Utility-first discovery.
 - Example structure:
   Now streaming: [Film Title] 📺
   You can currently watch [Film Title] on [Platform].
-  Starring [selected cast with @handles].
+  Starring [selected cast names without @ handles].
   [1 factual sentence about the premise].
   Have you seen it already, or is this going on your watchlist?
   Find more places to watch on MuviDB.
@@ -332,7 +332,7 @@ SOURCE DATA:
 - TAGLINE: ${tagline}
 - CAST: ${topCast}
 - DIRECTOR / CREW: ${directors}
-- VERIFIED INSTAGRAM CREDIT TAGS: ${creditedPeople || 'N/A'}
+- VERIFIED CAST & CREW: ${topCast || 'N/A'}
 - CRITIC DATA: ${criticQuote ? `"${criticQuote}" by ${criticName} (${criticPub}) [Rating: ${rating}]` : (rating ? `Rated ${rating} on MuviDB` : 'N/A')}
 - KNOWN FOR / CREDITS: ${knownFor}
 - BIO / CONTEXT: ${bio}
@@ -342,7 +342,7 @@ ${personSection}
 ${taskInstructions}
 
 For EACH variation, provide tailored text for:
-- "instagram": Full caption with clean formatting, every supplied verified cast/crew @handle, and 3-5 hashtags at the bottom.
+- "instagram": Full caption with clean formatting, listing cast/crew names cleanly without @ handles (e.g. Starring: Name 1, Name 2), and 3-5 hashtags at the bottom.
 - When YOUTUBE CHANNEL is supplied, name it in every platform's copy. Never replace it with generic "YouTube" wording.
 - "threads": Punchy, conversation-first post strictly under 480 characters.
 - "facebook": Engaging storytelling paragraph with watch info and community discussion question.
@@ -444,9 +444,11 @@ function applyVerifiedMovieAttribution(req: AICopyRequest, variations: AICopyVar
       if (channelName && !captions[platform].toLowerCase().includes(channelName.toLowerCase())) {
         additions.push(`Watch on YouTube via ${channelName}.`);
       }
-      if (platform === 'instagram' && handles.length) {
-        const missingHandles = handles.filter(handle => !captions.instagram.toLowerCase().includes(handle.toLowerCase()));
-        if (missingHandles.length) additions.push(`Cast & crew: ${missingHandles.join(' ')}`);
+      const castNames = Array.isArray(data.topCast)
+        ? data.topCast.slice(0, 4).map((c: any) => typeof c === 'string' ? c : c?.name).filter(Boolean)
+        : [];
+      if (castNames.length && !captions[platform].toLowerCase().includes('starring:') && !captions[platform].toLowerCase().includes('starring')) {
+        additions.push(`Starring: ${castNames.join(', ')}`);
       }
       captions[platform] = appendBeforeHashtags(captions[platform], additions, COPY_LIMITS[platform]);
     }

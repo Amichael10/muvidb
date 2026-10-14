@@ -176,6 +176,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = await sendMorningOutreachBriefing();
         break;
       }
+      case 'daily_social_schedule':
+      case 'social_schedule': {
+        const { generateDailyScheduleDrafts } = await import('../_lib/editorial/calendar_service.js');
+        // 12:00 AM WAT is 23:00 UTC. Check DB and schedule for the upcoming days.
+        const todayWat = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 10);
+        result = await generateDailyScheduleDrafts({
+          startDate: todayWat,
+          daysAhead: 2,
+          actor: { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'amichaelwale@gmail.com', role: 'admin' },
+        });
+        break;
+      }
       case 'critics':              result = await runCriticsSync(); break;
       case 'kava':      
         return res.status(200).json({ 

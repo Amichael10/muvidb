@@ -1,3 +1,6 @@
+import dns from 'node:dns';
+try { dns.setDefaultResultOrder('ipv4first'); dns.setServers(['1.1.1.1', '8.8.8.8']); } catch {}
+
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +11,7 @@ export type SocialAssetFormat = 'portrait_4_5' | 'square_1_1' | 'vertical_9_16';
 
 export const ASSET_FORMAT_DIMENSIONS: Record<SocialAssetFormat, { width: number; height: number }> = {
   portrait_4_5: { width: 1080, height: 1350 },
-  square_1_1: { width: 1080, height: 1080 },
+  square_1_1: { width: 1254, height: 1254 },
   vertical_9_16: { width: 1080, height: 1920 },
 };
 
@@ -84,12 +87,8 @@ async function fetchArtwork(url: string): Promise<Artwork> {
   const size = imageSize(buffer);
   if (!size || !size.width || !size.height) return null;
 
-  // Strict Rule: Never use landscape or square artwork as poster artwork.
-  // Must be strictly portrait with aspect ratio >= 1.15:1.
-  if (size.width >= size.height || (size.height / size.width) < 1.15) return null;
-
-  // Strict Rule: Must be high-resolution (minimum 450x600).
-  if (size.width < 450 || size.height < 600) return null;
+  // Accept any artwork with decent resolution (at least 320x180)
+  if (size.width < 320 || size.height < 180) return null;
 
   return {
     dataUri: `data:${type};base64,${buffer.toString('base64')}`,
@@ -100,17 +99,13 @@ async function fetchArtwork(url: string): Promise<Artwork> {
 
 async function loadArtwork(url: string | null): Promise<Artwork> {
   if (!url) return null;
-  // Reject obvious video thumbnails or landscape banners up front
-  if (/ytimg\.com|img\.youtube\.com|hqdefault|maxresdefault|sddefault|mqdefault|\/vi\/|(?:^|[-_/])(?:backdrop|banner|landscape|wide|horizontal)(?:[-_./]|$)/i.test(url)) {
-    return null;
-  }
 
   for (const candidate of artworkCandidates(url)) {
     try {
       const artwork = await fetchArtwork(candidate);
       if (artwork) return artwork;
     } catch {
-      // Try the next candidate; a failed fetch degrades to a typographic card.
+      // Try the next candidate; a failed fetch degrades gracefully.
     }
   }
 
@@ -208,7 +203,7 @@ function cardCopy(snapshot: SocialSourceSnapshot): CardCopy {
     eyebrow: snapshot.comingSoon ? 'Coming Soon' : 'Now Showing',
     headline: snapshot.title,
     support: snapshot.year ? String(snapshot.year) : null,
-    imageUrl: snapshot.posterUrl,
+    imageUrl: snapshot.posterUrl || (snapshot as any).backdropUrl || (snapshot as any).backdrop,
   };
 }
 
@@ -1156,6 +1151,305 @@ function buildMovieSpotlightCard(
   return h('div', { width: `${width}px`, height: `${height}px`, display: 'flex', position: 'relative', backgroundColor: BRAND.bg }, children);
 }
 
+function isLandscapeArtworkUrl(url?: string | null): boolean {
+  if (!url) return false;
+  return /ytimg\.com|img\.youtube\.com|hqdefault|maxresdefault|sddefault|mqdefault|\/vi\/|(?:^|[-_/])(?:backdrop|banner|landscape|wide|horizontal)(?:[-_./]|$)/i.test(url);
+}
+
+function headerDotGrid(cols = 8, rows = 4, gap = 18, dotSize = 4.5, color = '#FF5A1F'): SatoriNode {
+  const dots: unknown[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      dots.push(
+        h('div', {
+          position: 'absolute',
+          left: `${c * gap}px`,
+          top: `${r * gap}px`,
+          width: `${dotSize}px`,
+          height: `${dotSize}px`,
+          borderRadius: `${dotSize}px`,
+          backgroundColor: color,
+          opacity: 0.65,
+          display: 'flex',
+        }),
+      );
+    }
+  }
+  return h('div', { position: 'relative', width: `${cols * gap}px`, height: `${rows * gap}px`, display: 'flex' }, dots);
+}
+
+/**
+ * 2B. Movie Spotlight Card - 1254x1254 Square Landscape Layout
+ * Matches user-provided authored design:
+ * - Header: MuviDB Logo + DISCOVER. CREDIT. CELEBRATE. (Left) & 8x4 Dot Grid (Right)
+ * - Upper Middle: NEW ON red pill + Large Bold Syne Title (No genre/synopsis)
+ * - Lower Middle: 16:9 Landscape Artwork with subtle frame & shadow
+ * - Footer: Circled Orange Play Button + EXPLORE MORE ON / MUVIDB.COM
+ */
+function buildMovieLandscapeCard(
+  snapshot: UpcomingMovieSnapshot,
+  _format: SocialAssetFormat,
+  poster: Artwork,
+  logo: BrandLockup,
+  _decor: CardDecor,
+): SatoriNode {
+  const width = 1254;
+  const height = 1254;
+  const pad = 60;
+
+  const children: unknown[] = [];
+
+  // 1. Header Left: MuviDB Icon + Wordmark + Tagline | DISCOVER. CREDIT. CELEBRATE.
+  const lockupParts: unknown[] = [];
+  if (logo.icon) {
+    const iconH = 46;
+    const iconW = Math.round((logo.icon.width / logo.icon.height) * iconH);
+    lockupParts.push({
+      type: 'img',
+      props: {
+        src: logo.icon.dataUri,
+        width: iconW,
+        height: iconH,
+        style: { width: `${iconW}px`, height: `${iconH}px`, flexShrink: 0 },
+      },
+    });
+  }
+
+  lockupParts.push(
+    h(
+      'div',
+      {
+        display: 'flex',
+        flexDirection: 'column',
+        marginLeft: '14px',
+        justifyContent: 'center',
+      },
+      [
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: '38px', letterSpacing: '-0.5px', color: '#111111', lineHeight: 1.05 }, 'MuviDB'),
+        h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: '9.5px', letterSpacing: '2.4px', color: '#FF5A1F', marginTop: '2px' }, 'EVERY FILM. EVERY CREDIT.'),
+      ],
+    ),
+    // Vertical divider
+    h('div', {
+      display: 'flex',
+      width: '1.5px',
+      height: '42px',
+      backgroundColor: 'rgba(17,17,17,0.22)',
+      marginLeft: '20px',
+      marginRight: '20px',
+    }),
+    // 3 stacked lines with red periods
+    h(
+      'div',
+      {
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: 'Outfit',
+        fontWeight: 600,
+        fontSize: '11px',
+        letterSpacing: '1.4px',
+        lineHeight: 1.32,
+      },
+      [
+        h('div', { display: 'flex', alignItems: 'center' }, [h('span', { color: '#111111' }, 'DISCOVER'), h('span', { color: '#E50914' }, '.')]),
+        h('div', { display: 'flex', alignItems: 'center' }, [h('span', { color: '#111111' }, 'CREDIT'), h('span', { color: '#E50914' }, '.')]),
+        h('div', { display: 'flex', alignItems: 'center' }, [h('span', { color: '#111111' }, 'CELEBRATE'), h('span', { color: '#E50914' }, '.')]),
+      ],
+    ),
+  );
+
+  children.push(
+    h('div', { position: 'absolute', left: `${pad}px`, top: '56px', display: 'flex', alignItems: 'center' }, lockupParts),
+  );
+
+  // 1B. Header Right: 8x4 Dot Grid
+  children.push(
+    h('div', { position: 'absolute', right: `${pad}px`, top: '58px', display: 'flex' }, headerDotGrid(8, 4, 18, 4.5, '#FF5A1F')),
+  );
+
+  // 2. Red Pill Badge: "NEW ON YOUTUBE" / "NEW ON NETFLIX" / etc.
+  const theme = getPlatformTheme(snapshot);
+  let badgeText = 'NEW ON YOUTUBE';
+  if (snapshot.comingSoon) {
+    badgeText = 'COMING SOON';
+  } else if ((snapshot as any).isInCinemas) {
+    badgeText = 'IN CINEMAS NOW';
+  } else if (theme.name && theme.name !== 'Streaming') {
+    badgeText = `NEW ON ${theme.name.toUpperCase()}`;
+  } else {
+    badgeText = 'NOW STREAMING';
+  }
+
+  children.push(
+    h(
+      'div',
+      {
+        position: 'absolute',
+        left: `${pad}px`,
+        top: '166px',
+        backgroundColor: '#E50914',
+        paddingLeft: '16px',
+        paddingRight: '16px',
+        paddingTop: '6px',
+        paddingBottom: '6px',
+        borderRadius: '6px',
+        display: 'flex',
+        alignItems: 'center',
+      },
+      h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: '18px', letterSpacing: '1.2px', color: '#FFFFFF' }, badgeText),
+    ),
+  );
+
+  // 3. Huge Bold Title in Syne 800 (First part in #111111, accent part in #E50914)
+  const rawTitle = (snapshot.title || 'UNTITLED').trim();
+  const words = rawTitle.split(/\s+/).filter(Boolean);
+  let topText = '';
+  let accentText = '';
+  if (words.length <= 1) {
+    topText = words[0] || 'UNTITLED';
+  } else if (words.length === 2) {
+    topText = words[0];
+    accentText = words[1];
+  } else {
+    const half = Math.ceil(words.length / 2);
+    topText = words.slice(0, half).join(' ');
+    accentText = words.slice(half).join(' ');
+  }
+
+  const titleLen = rawTitle.length;
+  const titleSize = titleLen > 32 ? 46 : titleLen > 24 ? 56 : titleLen > 18 ? 68 : titleLen > 12 ? 80 : 92;
+
+  const titleNodes: unknown[] = [
+    h('span', { color: '#111111', marginRight: accentText ? '18px' : '0' }, topText.toUpperCase()),
+  ];
+  if (accentText) {
+    titleNodes.push(h('span', { color: '#E50914' }, accentText.toUpperCase()));
+  }
+
+  children.push(
+    h(
+      'div',
+      {
+        position: 'absolute',
+        left: `${pad}px`,
+        top: '228px',
+        width: `${width - pad * 2}px`,
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'baseline',
+        fontFamily: 'Syne',
+        fontWeight: 800,
+        fontSize: `${titleSize}px`,
+        lineHeight: 1.05,
+      },
+      titleNodes,
+    ),
+  );
+
+  // 4. Center Artwork (16:9 Landscape Poster/Thumbnail)
+  const posterW = width - pad * 2; // 1134px
+  const posterH = Math.round(posterW * (9 / 16)); // 638px
+  const posterY = 356;
+
+  if (poster) {
+    children.push(
+      h(
+        'div',
+        {
+          position: 'absolute',
+          left: `${pad}px`,
+          top: `${posterY}px`,
+          width: `${posterW}px`,
+          height: `${posterH}px`,
+          borderRadius: '22px',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.22)',
+          overflow: 'hidden',
+          display: 'flex',
+          border: '1px solid rgba(17,17,17,0.12)',
+          backgroundColor: '#000000',
+        },
+        {
+          type: 'img',
+          props: {
+            src: poster.dataUri,
+            width: posterW,
+            height: posterH,
+            style: { width: `${posterW}px`, height: `${posterH}px`, objectFit: 'cover' },
+          },
+        },
+      ),
+    );
+
+    // Optional Star Rating Badge if available
+    if (snapshot.likedPercent) {
+      children.push(
+        h(
+          'div',
+          {
+            position: 'absolute',
+            left: `${pad + 20}px`,
+            top: `${posterY + 18}px`,
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.82)',
+            paddingTop: '6px',
+            paddingBottom: '6px',
+            paddingLeft: '14px',
+            paddingRight: '14px',
+            borderRadius: '8px',
+          },
+          [
+            h('div', { display: 'flex', marginRight: '6px' }, icon('star', 16, 1, '#FFB800')),
+            h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: '17px', color: '#FFFFFF' }, `${(snapshot.likedPercent / 10).toFixed(1)}/10`),
+          ],
+        ),
+      );
+    }
+  }
+
+  // 5. Footer Left: Circled Play Button + EXPLORE MORE ON / MUVIDB.COM
+  const playIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="54" height="54" viewBox="0 0 54 54"><circle cx="27" cy="27" r="25" fill="none" stroke="#FF5A1F" stroke-width="2.8"/><polygon points="22,17 38,27 22,37" fill="#FF5A1F"/></svg>`;
+  const playIconUri = `data:image/svg+xml;base64,${Buffer.from(playIconSvg).toString('base64')}`;
+
+  children.push(
+    h(
+      'div',
+      { position: 'absolute', left: `${pad}px`, bottom: '68px', display: 'flex', alignItems: 'center' },
+      [
+        {
+          type: 'img',
+          props: {
+            src: playIconUri,
+            width: 54,
+            height: 54,
+            style: { width: '54px', height: '54px', flexShrink: 0 },
+          },
+        },
+        h(
+          'div',
+          { display: 'flex', flexDirection: 'column', marginLeft: '16px' },
+          [
+            h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: '15px', letterSpacing: '1.8px', color: '#111111' }, 'EXPLORE MORE ON'),
+            h('div', { display: 'flex', fontFamily: 'Outfit', fontWeight: 600, fontSize: '20px', letterSpacing: '1px', color: '#FF5A1F', marginTop: '2px' }, 'MUVIDB.COM'),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  return h(
+    'div',
+    {
+      width: `${width}px`,
+      height: `${height}px`,
+      display: 'flex',
+      position: 'relative',
+      backgroundColor: '#F5F3F0',
+    },
+    children,
+  );
+}
+
 export type RenderedAsset = {
   format: SocialAssetFormat;
   png: Buffer;
@@ -1184,12 +1478,21 @@ export async function renderSnapshotAsset(input: {
     }
   }
 
-  const { width, height } = ASSET_FORMAT_DIMENSIONS[input.format];
   const copy = cardCopy(input.snapshot);
-
   const artwork = input.artwork !== undefined ? input.artwork : await loadArtwork(copy.imageUrl);
   const brandLogo = await getBrandLockup();
   const decor = await getCardDecor();
+
+  const isLandscape = Boolean(
+    input.snapshot.kind !== 'actor_spotlight' &&
+    input.snapshot.kind !== 'birthday_spotlight' &&
+    ((artwork && (artwork.width / artwork.height) >= 1.05) ||
+     (!artwork && isLandscapeArtworkUrl(copy.imageUrl)))
+  );
+
+  const { width, height } = isLandscape
+    ? { width: 1254, height: 1254 }
+    : ASSET_FORMAT_DIMENSIONS[input.format];
 
   let element: SatoriNode;
 
@@ -1197,6 +1500,14 @@ export async function renderSnapshotAsset(input: {
     element = buildPersonSpotlightCard(
       input.snapshot,
       personCardSpec(input.snapshot),
+      input.format,
+      artwork,
+      brandLogo,
+      decor,
+    );
+  } else if (isLandscape) {
+    element = buildMovieLandscapeCard(
+      input.snapshot as UpcomingMovieSnapshot,
       input.format,
       artwork,
       brandLogo,

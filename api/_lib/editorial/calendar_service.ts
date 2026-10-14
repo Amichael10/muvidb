@@ -219,14 +219,27 @@ export interface GenerateScheduleDraftsOptions {
  */
 export async function generateDailyScheduleDrafts(options: GenerateScheduleDraftsOptions = {}) {
   const daysAhead = Math.min(Math.max(options.daysAhead || 7, 1), 30);
-  const systemActor = options.actor || {
-    id: '00000000-0000-0000-0000-000000000000',
-    email: 'admin@muvidb.com',
+
+  // Use a real admin user ID so Postgres foreign key constraint on users(id) succeeds
+  let adminId = options.actor?.id;
+  if (!adminId || adminId === '00000000-0000-0000-0000-000000000000') {
+    const { data: adminUser } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .eq('email', 'amichaelwale@gmail.com')
+      .maybeSingle();
+    adminId = adminUser?.id || '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37';
+  }
+
+  const systemActor = {
+    id: adminId,
+    email: options.actor?.email || 'amichaelwale@gmail.com',
     role: 'admin' as const,
   };
 
-  const { generateSocialDraft } = await import('../social_studio.js');
+  const { generateSocialDraft, scheduleContentItem } = await import('../social_studio.js');
   const { fetchSeriesCandidates } = await import('./candidate_service.js');
+  const { isLikelyLandscapeOrThumbnailUrl } = await import('./candidate_strategy.js');
 
   let startYear = new Date().getUTCFullYear();
   let startMonth = new Date().getUTCMonth();
@@ -258,48 +271,48 @@ export async function generateDailyScheduleDrafts(options: GenerateScheduleDraft
   let totalCreated = 0;
 
   // 3 daily slots aligned with GitHub Actions publisher crons (Africa/Lagos is UTC+1)
+  // Strictly where_to_watch, upcoming_movie, and whats_on_stage (stage play / theatre) — no actor spotlights!
   const DAILY_SLOTS = [
     {
       slotIndex: 1,
       time: '09:00:00',
-      rotation: ['where_to_watch', 'actor_spotlight'],
-      label: 'Morning Spotlight & Streaming Guide',
+      rotation: ['where_to_watch', 'upcoming_movie'],
+      label: 'Morning Streaming Guide & Release Radar',
     },
     {
       slotIndex: 2,
       time: '12:00:00',
-      rotation: ['critics_say'],
-      label: 'Midday Critic Consensus & Reviews',
+      rotation: ['upcoming_movie', 'where_to_watch'],
+      label: 'Midday Release Radar & Streaming Guide',
     },
     {
       slotIndex: 3,
       time: '15:30:00',
-      rotation: ['upcoming_movie', 'whats_on_stage', 'film_conversation'],
-      label: 'Afternoon Release Radar & Culture',
+      rotation: ['whats_on_stage', 'where_to_watch', 'upcoming_movie'],
+      label: 'Afternoon Stage Play & Evening Streaming Guide',
     },
   ];
 
   for (let dayOffset = 0; dayOffset < daysAhead; dayOffset++) {
     const d = new Date(Date.UTC(startYear, startMonth, startDay + dayOffset, 12, 0, 0));
     const dateStr = d.toISOString().split('T')[0];
-    const isFriday = d.getUTCDay() === 5;
 
     const dayItems: any[] = [];
 
     for (const slot of DAILY_SLOTS) {
       let contentType = slot.rotation[dayOffset % slot.rotation.length];
-      if (slot.slotIndex === 2 && isFriday) {
-        contentType = 'weekend_watchlist';
-      }
 
       // 09:00 WAT = 08:00 UTC, 12:00 WAT = 11:00 UTC, 15:30 WAT = 14:30 UTC
       const scheduledFor = new Date(`${dateStr}T${slot.time}+01:00`).toISOString();
-      const { data: existingPost } = await supabase
-        .from('social_content_items')
-        .select('id, title, status, scheduled_for')
+      const { data: existingVariant } = await supabase
+        .from('social_platform_variants')
+        .select('id, content_item_id, status, scheduled_for, social_content_items(id, title, status)')
         .eq('scheduled_for', scheduledFor)
         .neq('status', 'rejected')
+        .limit(1)
         .maybeSingle();
+
+      const existingPost = existingVariant?.social_content_items as any;
 
       if (existingPost) {
         dayItems.push({
@@ -313,72 +326,92 @@ export async function generateDailyScheduleDrafts(options: GenerateScheduleDraft
       }
 
       try {
-        const candidates = await fetchSeriesCandidates(contentType, 20);
-        const { isLikelyLandscapeOrThumbnailUrl } = await import('./candidate_strategy.js');
-        const candidate = candidates.find(c => {
-          if (usedEntityIds.has(c.id)) return false;
-          if (contentType === 'where_to_watch' || contentType === 'whats_on_stage') {
-            return Boolean(c.imageUrl && !isLikelyLandscapeOrThumbnailUrl(c.imageUrl));
+        let candidates = await fetchSeriesCandidates(contentType, 25);
+        if (!candidates.length && contentType === 'whats_on_stage') {
+          contentType = 'where_to_watch';
+          candidates = await fetchSeriesCandidates(contentType, 25);
+        }
+        if (!candidates.length && contentType !== 'where_to_watch') {
+          contentType = 'where_to_watch';
+          candidates = await fetchSeriesCandidates(contentType, 25);
+        }
+        if (!candidates.length) {
+          contentType = 'upcoming_movie';
+          candidates = await fetchSeriesCandidates(contentType, 25);
+        }
+
+        const { validatePosterUrlIsHighResPortrait } = await import('../social-studio/content/poster-media.js');
+        let candidate: any = null;
+        for (const c of candidates) {
+          if (usedEntityIds.has(c.id)) continue;
+          if (!c.imageUrl || isLikelyLandscapeOrThumbnailUrl(c.imageUrl)) continue;
+          try {
+            await validatePosterUrlIsHighResPortrait(c.imageUrl);
+            candidate = c;
+            break;
+          } catch (err: any) {
+            console.warn(`[calendar_service] Candidate "${c.name}" rejected by portrait quality blocker:`, err.message);
           }
-          return true;
-        }) || candidates.find(c => {
-          if (contentType === 'where_to_watch' || contentType === 'whats_on_stage') {
-            return Boolean(c.imageUrl && !isLikelyLandscapeOrThumbnailUrl(c.imageUrl));
-          }
-          return true;
-        }) || null;
+        }
 
         if (!candidate) {
-          console.warn(`[calendar_service] No eligible portrait candidates found for ${contentType} on ${dateStr}`);
+          console.warn(`[calendar_service] No eligible vertical portrait candidates found for ${contentType} on ${dateStr}`);
           continue;
         }
 
         usedEntityIds.add(candidate.id);
 
-        const templateMap: Record<string, string> = {
-          actor_spotlight: 'actor-spotlight-v1',
-          upcoming_movie: 'upcoming-movie-v1',
-          critics_say: 'critics-say-v1',
-          where_to_watch: 'where-to-watch-v1',
-          weekend_watchlist: 'weekend-watchlist-v1',
-          whats_on_stage: 'whats-on-stage-v1',
-          film_conversation: 'nollywood-debate-v1',
-        };
+        // Only target platforms with active connected status
+        const { data: activeConns } = await supabase
+          .from('social_connections')
+          .select('platform')
+          .eq('status', 'connected');
+        const connectedPlatforms = new Set((activeConns || []).map(c => c.platform));
+        const activePlatforms = ['instagram', 'threads', 'facebook', 'tiktok'].filter(p => connectedPlatforms.has(p));
+        const draftPlatforms = activePlatforms.length > 0 ? activePlatforms : ['instagram', 'threads', 'facebook'];
 
-        const templateSlug = templateMap[contentType] || 'where-to-watch-v1';
-
+        // Generate draft with skipAssets: false so the portrait poster is prepared and stored
         const draft = await generateSocialDraft(
           {
             contentType: contentType as any,
             sourceEntityId: candidate.id,
             criticReviewId: candidate.data?.criticReview?.id || null,
-            templateSlug,
-            platforms: ['instagram', 'threads', 'facebook', 'tiktok'],
-            skipAssets: true,
+            templateSlug: 'poster-only',
+            platforms: draftPlatforms as any,
+            skipAssets: false,
           },
           systemActor,
         );
 
         if (draft?.contentItem?.id) {
-          await supabase
-            .from('social_content_items')
-            .update({
-              scheduled_for: scheduledFor,
-              status: 'draft',
-              metadata: {
-                scheduled_date: dateStr,
-                scheduled_time: slot.time,
-                slot_index: slot.slotIndex,
-                auto_scheduled: true,
-                candidate_name: candidate.name,
-              },
-            })
-            .eq('id', draft.contentItem.id);
+          // Schedule the content item and immediately enqueue into social_publish_jobs
+          await scheduleContentItem(
+            {
+              contentItemId: draft.contentItem.id,
+              scheduledFor,
+            },
+            systemActor,
+          ).catch(async (scheduleErr: any) => {
+            console.warn(`[calendar_service] scheduleContentItem fallback for ${draft.contentItem.id}:`, scheduleErr.message);
+            await supabase
+              .from('social_content_items')
+              .update({
+                status: 'scheduled',
+                metadata: {
+                  scheduled_date: dateStr,
+                  scheduled_time: slot.time,
+                  slot_index: slot.slotIndex,
+                  auto_scheduled: true,
+                  candidate_name: candidate.name,
+                },
+              })
+              .eq('id', draft.contentItem.id);
 
-          await supabase
-            .from('social_platform_variants')
-            .update({ scheduled_for: scheduledFor })
-            .eq('content_item_id', draft.contentItem.id);
+            await supabase
+              .from('social_platform_variants')
+              .update({ status: 'scheduled', scheduled_for: scheduledFor })
+              .eq('content_item_id', draft.contentItem.id);
+          });
 
           totalCreated++;
           dayItems.push({
@@ -387,7 +420,7 @@ export async function generateDailyScheduleDrafts(options: GenerateScheduleDraft
             time: slot.time,
             title: draft.contentItem.title,
             contentType,
-            status: 'draft',
+            status: 'scheduled',
           });
         }
       } catch (slotErr: any) {

@@ -45,7 +45,7 @@ export async function enrichFilmsFromAI(
 
 For each item output an object with:
 - "id": echo the id exactly.
-- "title": the actual movie or episode title ONLY. Remove cast names, channel names, release years, and buzzwords ("Latest Yoruba Movie 2026", "Full Movie", "Nollywood", "HD", pipes/brackets, etc). PRESERVE episode/part/season numbers if present (e.g. "Si Olorun Episode 5"). Use Proper Case.
+- "title": the actual movie or episode title ONLY. NEVER output an actor's name as the movie title! (For example, in "OMO ALAAPA - Latest Yoruba Movie 2026, Itele | Ibrahim chatta", the movie title is "Omo Alaapa", NOT "Ibrahim Chatta"). Remove cast names, channel names, release years, and buzzwords ("Latest Yoruba Movie 2026", "Full Movie", "Nollywood", "HD", pipes/brackets, etc). PRESERVE episode/part/season numbers if present (e.g. "Si Olorun Episode 5"). Use Proper Case.
 - "cast": array of FULL actor names that appear in the title or description and are actually in this film. Proper Case. Use [] if none are clearly identifiable. Do NOT include the channel name or the uploader.
 - "director": the director's full name ONLY if explicitly credited (e.g. "Directed by …", "A film by …"). Otherwise null. Do NOT put the director in "cast".
 - "genres": array of genres mentioned or evident in the description or title (e.g. explicit "Genre: Drama, Epic", "A Yoruba Romantic Comedy", "Action Thriller"). Choose ONLY from standard genres: ["Drama", "Comedy", "Romance", "Action", "Thriller", "Horror", "Epic", "Crime", "Family", "Adventure", "Fantasy", "Mystery", "Sci-Fi", "Documentary"]. Return [] if none are identifiable.
@@ -68,7 +68,7 @@ ${JSON.stringify(chunk)}`;
       if (Array.isArray(parsed)) {
         for (const row of parsed) {
           if (!row?.id) continue;
-          const title = typeof row.title === 'string' ? row.title.trim() : undefined;
+          let title = typeof row.title === 'string' ? row.title.trim() : undefined;
           const synopsis =
             typeof row.synopsis === 'string' && row.synopsis.trim().length > 10
               ? row.synopsis.trim()
@@ -76,6 +76,10 @@ ${JSON.stringify(chunk)}`;
           const cast = Array.isArray(row.cast)
             ? row.cast.map((c: any) => String(c).trim()).filter((c: string) => c.length > 1 && c.length < 60)
             : [];
+          // Reject title if it matches any actor in the cast list
+          if (title && cast.some(c => c.toLowerCase() === title!.toLowerCase())) {
+            title = undefined;
+          }
           const director =
             typeof row.director === 'string' && row.director.trim().length > 1 && row.director.trim().length < 60
               ? row.director.trim()

@@ -482,16 +482,23 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
         .eq('release_type', platform).order('updated_at', { ascending: false }).limit(Math.max(limit * 2, 20))
     );
-    const [platformResults, youtubeRows, linkedRows] = await Promise.all([
+    const [platformResults, youtubeRows, youtubeRecentRows, linkedRows] = await Promise.all([
       Promise.all(platformQueries),
       supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
         .not('youtube_watch_url', 'is', null).order('updated_at', { ascending: false }).limit(poolLimit),
       supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
+        .not('youtube_watch_url', 'is', null).order('created_at', { ascending: false }).limit(poolLimit),
+      supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
         .not('streaming_links', 'is', null).order('updated_at', { ascending: false }).limit(poolLimit),
     ]);
-    const firstError = platformResults.find(result => result.error)?.error || youtubeRows.error || linkedRows.error;
+    const firstError = platformResults.find(result => result.error)?.error || youtubeRows.error || youtubeRecentRows.error || linkedRows.error;
     if (firstError) throw firstError;
-    filmRows = [...platformResults.flatMap(result => result.data || []), ...(youtubeRows.data || []), ...(linkedRows.data || [])];
+    filmRows = [
+      ...platformResults.flatMap(result => result.data || []),
+      ...(youtubeRows.data || []),
+      ...(youtubeRecentRows.data || []),
+      ...(linkedRows.data || [])
+    ];
   } else if (intent === 'upcoming') {
     const today = new Date();
     const horizon = new Date(today.getTime() + 366 * 86_400_000);

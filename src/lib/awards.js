@@ -24,6 +24,7 @@ export const AWARD_LOGOS = {
   SUNDANCE: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-sundance.jpg',
   VENICE: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-venice.jpg',
   CFIF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/97c4c683-7aa2-4eb6-8ced-ab37f838e2b1.jpg',
+  REFFA: 'https://reffaawards.com/wp-content/uploads/2020/01/cropped-REFFA-1-192x192.png',
 };
 
 /**
@@ -31,6 +32,33 @@ export const AWARD_LOGOS = {
  * Enriched with location, categories, entry plans, submission timelines, and official portals.
  */
 export const AWARD_ORGS = [
+  {
+    id: 'REFFA',
+    label: 'REFFA',
+    full: 'Regal Film Festival and Awards',
+    tagline: '...A Celebration of African Storytelling',
+    category: 'festival',
+    location: 'Accra, Ghana',
+    frequency: 'Annual (December)',
+    founded: 2024,
+    accent: '#E54220',
+    about:
+      'Regal Film Festival and Awards is an exceptionally designed reward system for filmmaking in Africa. Poised to showcase the uniqueness, arts, and creativity of the African in filmmaking through screenings, high-impact masterclasses, and prestigious gala awards.',
+    when:
+      'Held annually in Accra, Ghana in December (Festival Opening December 8th; Screenings & Workshops 9th–11th; Awards Night Gala on 12th December) at The Palms Convention Center and La Palm Royal Beach Hotel.',
+    submissions:
+      'Feature films, shorts, documentaries, student works, TV and web series, and animation can be submitted via FilmFreeway and the official REFFA website portal.',
+    entryPlan: {
+      fees: 'Regular / Student / International tiers',
+      eligibility: 'African and Diaspora feature films, documentaries, shorts, animations, and student projects.',
+      formats: 'Full HD / 4K secure digital screener with English subtitles.',
+      categoriesCount: '27+ Competitive Categories',
+      platform: 'FilmFreeway & REFFA Official Portal',
+    },
+    submitUrl: 'https://reffaawards.com/',
+    submitLabel: 'REFFA Official Portal',
+    tags: ['Accra', 'Ghana', 'Pan-African', 'Festival', 'Awards', 'Storytelling', 'Student Cinema'],
+  },
   {
     id: 'AMVCA',
     label: 'AMVCA',

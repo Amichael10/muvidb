@@ -21,7 +21,6 @@ import MobileNav from './components/layout/MobileNav';
 import SmoothScroll from './components/layout/SmoothScroll';
 import CookieConsent from './components/CookieConsent';
 import QuickViewModal from './components/film/QuickViewModal';
-import SupportFloatingButton from './components/layout/SupportFloatingButton';
 import ErrorPage from './components/ErrorPage';
 
 import './index.css';
@@ -182,7 +181,6 @@ function AppChrome({ children }: { children: ReactNode }) {
       </main>
       {!hideLayout && <Footer />}
       {!hideLayout && <MobileNav />}
-      {!hideLayout && !location.pathname.startsWith('/support') && <SupportFloatingButton />}
       {!hideLayout && <BackToTop />}
     </div>
   );

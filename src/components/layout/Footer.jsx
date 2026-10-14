@@ -35,7 +35,6 @@ const footerGroups = [
       { label: 'Developer API', to: '/developers', isNew: true },
       { label: 'Brand Kit', to: '/brand', isNew: true },
       { label: 'Title Search', to: '/tools/title-checker', isNew: true },
-      { label: 'Support the Archive', to: '/support' },
       { label: 'Film Classification', to: '/classification' },
     ],
   },

@@ -169,15 +169,35 @@ export function extractEmbeddedFilmTitle(raw: string): EmbeddedTitle | null {
   if (title.includes('|')) {
     const pipeParts = title.split(/\|+/).map(p => p.trim()).filter(Boolean);
     if (pipeParts.length > 1) {
-      // 1. Check if second part has the film title: e.g. "Cast: Teaser || REAL TITLE - Full Movie"
-      const candidatePrefix1 = pipeParts[1].replace(/\s*[-–—:]\s*(?:Full|Latest|New|Nigerian|Nollywood|Yoruba|African|Watch|Movie).*/i, '').trim();
-      if (candidatePrefix1 && isPlausibleFilmTitle(candidatePrefix1)) {
-        return { prefix: candidatePrefix1, suffix: pipeParts[0] };
+      const stripPartNoise = (part: string) => {
+        let s = part.trim();
+        // Leading promotional markers
+        s = s.replace(/^(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA)\s+(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA|NIGERIAN|NOLLYWOOD|AFRICAN|YORUBA|IGBO)?\s*(?:MOVIE|FILM|MOVIES|FILMS|NOLLYWOOD|NIGERIAN|AFRICAN)?\s*(?:\d{4})?\s*[-–—:]\s*/i, '');
+        // Trailing dash with noise / year / metadata
+        s = s.replace(/\s*[-–—:]\s*(?:Full|Latest|New|Nigerian|Nollywood|Yoruba|African|Watch|Movie|\d{4}).*/i, '');
+        // Trailing genre/film noise with or without Latest/New/Full
+        s = s.replace(/\s*[-–—:]?\s*(?:(?:Latest|New|Hot|Trending|Full|Complete)\s+)?(?:Nigerian|Nollywood|Yoruba|Igbo|African|Hausa|Ghanaian)?\s*(?:Epic|Drama|Comedy|Action|Romance|Thriller)?\s*(?:Movie|Movies|Film|Films|Series|Comedy Series)(?:\s*20\d{2})?.*$/i, '');
+        // Trailing year
+        s = s.replace(/\s*[-–—:]?\s*\b20\d{2}\b.*$/i, '');
+        // Opening brackets or parens
+        s = s.replace(/\s*[\(\[\{].*$/, '');
+        return s.replace(/^[–—\-:, ]+|[–—\-:, ]+$/g, '').trim();
+      };
+
+      const candidate0 = stripPartNoise(pipeParts[0]);
+      const candidate1 = stripPartNoise(pipeParts[1]);
+
+      const isTeaser0 = isSensationalizedYouTubeTitle(pipeParts[0]) || /\b(?:starring|featuring|ft\.?|vanishes|disappears|betrays|cries|shocked)\b/i.test(pipeParts[0]);
+      const hasMovieTag1 = /\b(?:full\s+(?:nollywood|nigerian|yoruba)?\s*movie|latest\s+(?:nollywood|nigerian|yoruba)?\s*movie|complete\s+movie)\b/i.test(pipeParts[1]);
+
+      // If part 0 is a teaser or part 1 explicitly has a movie tag, prefer part 1
+      if ((isTeaser0 || hasMovieTag1) && candidate1 && isPlausibleFilmTitle(candidate1) && !isSensationalizedYouTubeTitle(candidate1)) {
+        return { prefix: candidate1, suffix: [pipeParts[0], ...pipeParts.slice(2)].join(' | ') };
       }
-      // 2. Check if first part has the film title: e.g. "REAL TITLE || Cast - Full Movie"
-      const candidatePrefix0 = pipeParts[0].replace(/\s*[-–—:]\s*(?:Full|Latest|New|Nigerian|Nollywood|Yoruba|African|Watch|Movie).*/i, '').trim();
-      if (candidatePrefix0 && isPlausibleFilmTitle(candidatePrefix0)) {
-        return { prefix: candidatePrefix0, suffix: pipeParts[1] };
+
+      // Standard Nollywood pipe format: Part 0 is the movie title, subsequent parts are cast/actors
+      if (candidate0 && isPlausibleFilmTitle(candidate0) && !isSensationalizedYouTubeTitle(candidate0)) {
+        return { prefix: candidate0, suffix: pipeParts.slice(1).join(' | ') };
       }
     }
   }
@@ -262,4 +282,72 @@ export function curateYouTubeTitle(raw: string): YouTubeTitleDecision {
     castSourceText: original,
     reason: 'normal-title',
   };
+}
+
+/**
+ * Validate whether an AI-proposed title is valid and safe to use over the
+ * deterministic titlePolicy.title.
+ *
+ * Guarantees:
+ * 1. AI title must NEVER match an actor name in the cast list or cast source text.
+ * 2. When titlePolicy already cleanly extracted an embedded title prefix,
+ *    AI can only refine that prefix (e.g. casing/punctuation), NOT replace it
+ *    with a completely different substring from the cast or marketing suffix.
+ * 3. AI title must not be extracted solely from pipe-separated actor segments.
+ */
+export function isValidEnrichedTitle(
+  aiTitle: string | undefined | null,
+  titlePolicy: YouTubeTitleDecision | null | undefined,
+  rawTitle: string,
+  castList: string[] = []
+): boolean {
+  if (!aiTitle) return false;
+  const trimmed = aiTitle.trim();
+  if (trimmed.length < 2 || trimmed.length > 70) return false;
+  if (isSensationalizedYouTubeTitle(trimmed)) return false;
+
+  const trimmedLower = trimmed.toLowerCase();
+  const rawLower = (rawTitle || '').toLowerCase();
+  if (!rawLower.includes(trimmedLower)) return false;
+
+  // 1. aiTitle must NEVER match an actor in castList
+  if (castList.some(actor => {
+    const a = actor.trim().toLowerCase();
+    if (!a) return false;
+    return a === trimmedLower || (a.length > 3 && (trimmedLower === a || trimmedLower.startsWith(a + ' ') || trimmedLower.endsWith(' ' + a)));
+  })) {
+    return false;
+  }
+
+  // 2. If titlePolicy cleanly extracted an embedded title prefix,
+  // the AI title MUST overlap with that deterministic title.
+  if (titlePolicy && titlePolicy.action === 'clean' && titlePolicy.title) {
+    const detLower = titlePolicy.title.toLowerCase();
+    const overlaps = detLower.includes(trimmedLower) || trimmedLower.includes(detLower);
+    if (!overlaps) {
+      return false;
+    }
+  }
+
+  // 3. If titlePolicy has castSourceText, aiTitle must NOT come from the cast/noise text
+  // unless it was also part of the deterministic title prefix.
+  if (titlePolicy?.castSourceText) {
+    const castSourceLower = titlePolicy.castSourceText.toLowerCase();
+    const detLower = (titlePolicy.title || '').toLowerCase();
+    if (castSourceLower.includes(trimmedLower) && !detLower.includes(trimmedLower)) {
+      return false;
+    }
+  }
+
+  // 4. If rawTitle contains pipes (|), actors are listed after the first pipe.
+  // If aiTitle is not in the first pipe segment, reject it.
+  if (rawTitle.includes('|')) {
+    const pipeParts = rawTitle.split('|').map(p => p.trim().toLowerCase());
+    const firstPart = pipeParts[0] || '';
+    if (!firstPart.includes(trimmedLower)) {
+      return false;
+    }
+  }
+
+  return true;
 }

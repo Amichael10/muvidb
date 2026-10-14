@@ -11,7 +11,7 @@ export async function downloadSocialImage(url: string): Promise<Buffer> {
   if (!url) throw new Error('Portrait poster needed. Add a portrait poster to the film first.');
   let normalizedUrl = url.trim().replace(/^http:\/\//i, 'https://');
   if (isLikelyLandscapeOrThumbnailUrl(normalizedUrl)) {
-    throw new Error(`Landscape or video thumbnail URL detected (${normalizedUrl}). Under no condition can Social Studio post landscape artwork.`);
+    throw new Error(`Landscape or video thumbnail URL detected (${normalizedUrl}). Using 1254x1254 template card instead.`);
   }
   if (normalizedUrl.includes('bakkaz-files.nyc3.cdn.digitaloceanspaces.com')) {
     normalizedUrl = normalizedUrl.replace('bakkaz-files.nyc3.cdn.digitaloceanspaces.com', 'cloud.bakkaz.name.ng');
@@ -24,7 +24,7 @@ export async function downloadSocialImage(url: string): Promise<Buffer> {
   const response = await fetch(target, {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
     redirect: 'follow',
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(5000),
   });
   if (!response.ok || !response.body) throw new Error(`Could not fetch poster (${response.status})`);
   const chunks: Uint8Array[] = [];
@@ -46,14 +46,13 @@ export async function preparePoster(bytes: Buffer, _requirePortrait = true) {
   const height = swapped ? metadata.width : metadata.height;
   if (!width || !height) throw new Error('Poster dimensions could not be read');
 
-  // Strict Rule: On no condition must Social Studio post landscape or square artwork.
-  // Theatrical portrait posters must have aspect ratio >= 1.15:1.
-  if (width >= height || (height / width) < 1.15) {
-    throw new Error(`Portrait poster strictly required. Image is a landscape or square artwork (${width}x${height}, ratio ${(height / width).toFixed(2)}:1). Under no condition can Social Studio post landscape artwork.`);
+  // Strict Rule: Only portrait artwork posts alone. Square or landscape artwork uses the 1254x1254 template card.
+  // Aspect ratio (height / width) must be >= 1.15:1.
+  if ((height / width) < 1.15) {
+    throw new Error(`Portrait poster strictly required. Image is landscape or square artwork (${width}x${height}, ratio ${(height / width).toFixed(2)}:1). Using 1254x1254 template card instead.`);
   }
 
-  // Strict Rule: Only crisp, high-resolution portrait posters.
-  // Minimum resolution floor is 450x600 (recommended 800x1200+).
+  // Strict Rule: Only crisp, high-resolution portrait artwork (minimum 450x600).
   if (width < 450 || height < 600) {
     throw new Error(`Poster resolution is too low (${width}x${height}). Social Studio strictly requires a crisp, high-resolution portrait poster (minimum 450x600).`);
   }
@@ -72,8 +71,8 @@ export async function validateHighResPortraitPoster(bytes: Buffer): Promise<{ wi
   const height = swapped ? metadata.width : metadata.height;
   if (!width || !height) throw new Error('Poster dimensions could not be read');
 
-  if (width >= height || (height / width) < 1.15) {
-    throw new Error(`Landscape or square artwork detected (${width}x${height}, ratio ${(height / width).toFixed(2)}:1). Under no condition can Social Studio post landscape artwork.`);
+  if ((height / width) < 1.15) {
+    throw new Error(`Portrait poster strictly required. Landscape or square artwork detected (${width}x${height}, ratio ${(height / width).toFixed(2)}:1). Using 1254x1254 template card instead.`);
   }
 
   if (width < 450 || height < 600) {

@@ -76,13 +76,13 @@ export function classifyFilmLifecycle(film: any, referenceDate = new Date()): Fi
 }
 
 export function isLikelyLandscapeOrThumbnailUrl(url?: string | null): boolean {
-  if (!url || typeof url !== 'string' || !url.trim()) return false;
+  if (!url || typeof url !== 'string' || !url.trim()) return true;
   return /ytimg\.com|img\.youtube\.com|hqdefault|maxresdefault|sddefault|mqdefault|\/vi\/|(?:^|[-_/])(?:backdrop|banner|landscape|wide|horizontal)(?:[-_./]|$)/i.test(url);
 }
 
 export function isFilmEligibleForIntent(film: any, intent: EditorialSeriesIntent, referenceDate = new Date()): boolean {
-  // Films with obvious landscape video thumbnails or banners cannot be posted as posters
-  if (isLikelyLandscapeOrThumbnailUrl(film?.poster_url)) return false;
+  // Films must have artwork (either poster, square artwork, or landscape thumbnail/backdrop)
+  if (!film?.poster_url && !film?.backdrop_url && !film?.backdrop) return false;
 
   const lifecycle = classifyFilmLifecycle(film, referenceDate);
   if (intent === 'streaming') return lifecycle === 'now_streaming';
@@ -101,11 +101,27 @@ export function filmCandidateScore(film: any, intent: EditorialSeriesIntent, ref
   const release = dateValue(film?.release_date);
   const updated = dateValue(film?.updated_at) || dateValue(film?.created_at) || 0;
   const freshnessDays = updated ? Math.max(0, (referenceDate.getTime() - updated) / 86_400_000) : 3650;
-  const hasLandscapePoster = isLikelyLandscapeOrThumbnailUrl(film?.poster_url);
-  const completeness = (film?.poster_url && !hasLandscapePoster ? 25 : 0) + (film?.synopsis ? 10 : 0) + (film?.backdrop_url || film?.backdrop ? 5 : 0);
+  const completeness = ((film?.poster_url || film?.backdrop_url) ? 25 : 0) + (film?.synopsis ? 10 : 0) + (film?.backdrop_url || film?.backdrop ? 5 : 0);
 
   if (intent === 'streaming') {
-    return (PLATFORM_PRIORITY[platform || ''] || 0) + Math.max(0, 120 - freshnessDays) + completeness;
+    // High prominence to new YouTube uploads
+    let youtubeRecencyBonus = 0;
+    if (platform === 'youtube' && (film?.poster_url || film?.backdrop_url)) {
+      const uploadRecency = release ? Math.max(0, (referenceDate.getTime() - release) / 86_400_000) : freshnessDays;
+      if (uploadRecency <= 7) {
+        youtubeRecencyBonus = 1200; // Released in the last 7 days gets top prominence
+      } else if (uploadRecency <= 14) {
+        youtubeRecencyBonus = 900;  // Released in the last 2 weeks
+      } else if (uploadRecency <= 30) {
+        youtubeRecencyBonus = 600;  // Released in the last month
+      } else if (uploadRecency <= 90) {
+        youtubeRecencyBonus = 350;  // Released in the last 3 months
+      } else {
+        youtubeRecencyBonus = 150;
+      }
+    }
+
+    return (PLATFORM_PRIORITY[platform || ''] || 0) + youtubeRecencyBonus + Math.max(0, 120 - freshnessDays) + completeness;
   }
   if (intent === 'upcoming') {
     const daysUntilRelease = release ? Math.max(0, (release - referenceDate.getTime()) / 86_400_000) : 366;

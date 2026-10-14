@@ -9,6 +9,7 @@ import { pickTmdbMatch } from './tmdb_match.js';
 import {
   curateYouTubeTitle,
   isSensationalizedYouTubeTitle,
+  isValidEnrichedTitle,
   type YouTubeTitleDecision,
 } from './youtube_title_policy.js';
 import { notifyYouTubeUploads, sendUploadAlert } from './youtube_upload_notify.js';
@@ -153,13 +154,7 @@ async function repairLinkedYouTubeFilms(
     const policy = curateYouTubeTitle(video.title);
     const ai = aiMap.get(video.video_id);
     const aiTitle = ai?.title?.trim();
-    const rawLower = String(video.title || '').toLocaleLowerCase();
-    const usableAiTitle = Boolean(
-      aiTitle
-      && aiTitle.length <= 70
-      && rawLower.includes(aiTitle.toLocaleLowerCase())
-      && !isSensationalizedYouTubeTitle(aiTitle),
-    );
+    const usableAiTitle = isValidEnrichedTitle(aiTitle, policy, video.title, ai?.cast);
     const deterministicTitle = policy.action !== 'skip' ? policy.title : null;
     const cleanedTitle = usableAiTitle ? cleanTitle(aiTitle!) : deterministicTitle;
     const noisySynopsis = synopsisNeedsRewrite(film.synopsis);
@@ -584,17 +579,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                 const titlePolicy = titlePolicies.get(v.video_id)!;
                 if (!titlePolicy || titlePolicy.action === 'skip' || !titlePolicy.title) continue;
                 const aiTitle = ai?.title?.trim();
-                const normalizedRaw = rawTitle.toLocaleLowerCase();
-                const usableAiTitle = Boolean(
-                  aiTitle
-                  && aiTitle.length <= 70
-                  && normalizedRaw.includes(aiTitle.toLocaleLowerCase())
-                  && !isSensationalizedYouTubeTitle(aiTitle),
-                );
-                // The policy supplies a safe deterministic prefix. AI may
-                // shorten that prefix further when cast names were placed
-                // before the marketing marker, but only to text present in the
-                // original upload title.
+                const usableAiTitle = isValidEnrichedTitle(aiTitle, titlePolicy, rawTitle, ai?.cast);
                 const cleanedTitle = usableAiTitle ? cleanTitle(aiTitle!) : titlePolicy.title;
                 if (titlePolicy.action === 'clean') embeddedTitlesCleaned++;
                 const vidYear = v.published_at ? new Date(v.published_at).getFullYear() : null;
