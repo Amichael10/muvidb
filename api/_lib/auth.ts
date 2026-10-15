@@ -39,20 +39,21 @@ export async function isValidAuth(req: VercelRequest): Promise<{ valid: boolean,
       }
 
       if (user) {
-        let role = user.user_metadata?.role || 'fan';
+        let role = 'fan';
         
         try {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('users')
             .select('role')
             .eq('id', user.id)
             .single();
           
+          if (profileError || !profile) return { valid: false, reason: 'Administrator profile unavailable' };
           if (profile?.role) {
             role = profile.role;
           }
         } catch (dbErr) {
-          console.warn('Auth check: Failed to fetch role from public.users', dbErr);
+          return { valid: false, reason: 'Administrator profile unavailable' };
         }
         
         if (role === 'admin' || role === 'admin_limited') {

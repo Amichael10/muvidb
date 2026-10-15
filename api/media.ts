@@ -81,13 +81,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!upstream.ok) return res.status(502).send('Upstream error');
 
-    const buffer = Buffer.from(await upstream.arrayBuffer());
-    if (buffer.byteLength > 15 * 1024 * 1024) return res.status(413).send('Too large');
+    const limit = 15 * 1024 * 1024;
+    if (Number(upstream.headers.get('content-length')) > limit) {
+      await upstream.body?.cancel();
+      return res.status(413).send('Too large');
+    }
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    const reader = upstream.body?.getReader();
+    if (!reader) return res.status(502).send('Empty upstream response');
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > limit) {
+          await reader.cancel();
+          return res.status(413).send('Too large');
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const buffer = Buffer.concat(chunks);
 
     // Trust the file signature over the (frequently wrong) content-type header —
     // origin servers often label valid images as application/octet-stream.
-    const headerCt = upstream.headers.get('content-type') || '';
-    const contentType = sniffImageType(buffer) || (headerCt.startsWith('image/') ? headerCt : null);
+    const contentType = sniffImageType(buffer);
     if (!contentType) return res.status(415).send('Not an image');
 
     res.setHeader('Content-Type', contentType);

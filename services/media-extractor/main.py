@@ -1,6 +1,7 @@
 import os
 import tempfile
 import base64
+import hmac
 from typing import Optional, Tuple
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
@@ -9,6 +10,13 @@ import yt_dlp
 app = FastAPI(title="MuviDB Media Extractor Microservice", version="1.6.0")
 
 AUTH_SECRET = os.getenv("EXTRACTOR_SECRET", "").strip()
+
+def require_extractor_auth(authorization: Optional[str]):
+    if not AUTH_SECRET:
+        raise HTTPException(status_code=503, detail="Extractor authentication is not configured")
+    token = authorization[7:].strip() if authorization and authorization.startswith("Bearer ") else ""
+    if not hmac.compare_digest(token, AUTH_SECRET):
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 class ExtractRequest(BaseModel):
     url: str
@@ -126,10 +134,7 @@ def health_check():
 
 @app.post("/extract")
 def extract_media(req: ExtractRequest, authorization: str = Header(None)):
-    if AUTH_SECRET:
-        token = authorization.replace("Bearer ", "").strip() if authorization else ""
-        if token != AUTH_SECRET:
-            raise HTTPException(status_code=401, detail="Unauthorized")
+    require_extractor_auth(authorization)
 
     url = req.url.strip()
     if not url:
@@ -220,10 +225,7 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
     import subprocess
     import requests
 
-    if AUTH_SECRET:
-        token = authorization.replace("Bearer ", "").strip() if authorization else ""
-        if token != AUTH_SECRET:
-            raise HTTPException(status_code=401, detail="Unauthorized")
+    require_extractor_auth(authorization)
 
     url = req.url.strip()
     if not url:

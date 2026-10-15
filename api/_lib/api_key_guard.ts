@@ -122,16 +122,16 @@ export async function requireApiKey(
       }
     }
 
-    // Update usage statistics asynchronously without blocking the response
-    Promise.resolve(
-      supabase
-        .from('api_keys')
-        .update({
-          usage_count: (keyRecord.usage_count || 0) + 1,
-          last_used_at: new Date().toISOString(),
-        })
-        .eq('id', keyRecord.id)
-    ).catch((err: any) => console.warn('[api_key_guard] Failed to update key usage:', err));
+    const { data: quota, error: quotaError } = await supabase.rpc('consume_api_key_quota', { p_key_id: keyRecord.id });
+    if (quotaError) {
+      res.status(503).json({ error: 'Quota service temporarily unavailable' });
+      return null;
+    }
+    if (!quota) {
+      res.setHeader('Retry-After', '60');
+      res.status(429).json({ error: 'API key request allowance exceeded' });
+      return null;
+    }
 
     return keyRecord as ApiKeyRecord;
   } catch (err: any) {

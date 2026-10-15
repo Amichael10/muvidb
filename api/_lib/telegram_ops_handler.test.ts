@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const telegram = vi.hoisted(() => ({
   message: vi.fn(),
@@ -78,9 +78,12 @@ function response() {
   return result;
 }
 
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
 describe('Telegram content intake', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('TELEGRAM_WEBHOOK_SECRET', 'telegram-test-secret');
     inserted.length = 0;
     telegram.photo.mockResolvedValue({ ok: true, messageId: 1 });
     telegram.message.mockResolvedValue({ ok: true, messageId: 1 });
@@ -91,10 +94,18 @@ describe('Telegram content intake', () => {
     })));
   });
 
+  it('rejects webhook calls when no server secret is configured', async () => {
+    vi.stubEnv('TELEGRAM_WEBHOOK_SECRET', '');
+    const res = response();
+    await handleTelegramOps({ method: 'POST', headers: {}, body: {} } as any, res);
+    expect(res.statusCode).toBe(401);
+    expect(inserted).toEqual([]);
+  });
+
   it('turns a forwarded YouTube Short into one intake item with all approval actions', async () => {
     const req: any = {
       method: 'POST',
-      headers: {},
+      headers: { 'x-telegram-bot-api-secret-token': 'telegram-test-secret' },
       body: {
         message: {
           message_id: 77,
@@ -129,7 +140,7 @@ describe('Telegram content intake', () => {
   it('turns a forwarded Facebook Reel into a facebook_reel intake with playable video', async () => {
     const req: any = {
       method: 'POST',
-      headers: {},
+      headers: { 'x-telegram-bot-api-secret-token': 'telegram-test-secret' },
       body: {
         message: {
           message_id: 88,
@@ -167,7 +178,7 @@ describe('Telegram content intake', () => {
   it('turns a forwarded Threads post from message entity into a threads_post intake', async () => {
     const req: any = {
       method: 'POST',
-      headers: {},
+      headers: { 'x-telegram-bot-api-secret-token': 'telegram-test-secret' },
       body: {
         message: {
           message_id: 99,

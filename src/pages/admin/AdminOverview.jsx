@@ -225,14 +225,10 @@ export default function AdminOverview() {
   const handleRunScript = async (scriptName) => {
     const promise = (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      const cronSecret = (import.meta.env && import.meta.env.VITE_CRON_SECRET) || '';
       
       const headers = {
         'Authorization': `Bearer ${session?.access_token || ''}`
       };
-      if (cronSecret) {
-        headers['x-cron-secret'] = cronSecret;
-      }
 
       return fetch(`/api/cron/${scriptName}`, { headers });
     })().then(async res => {

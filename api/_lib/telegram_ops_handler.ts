@@ -33,7 +33,7 @@ const IP_RE = /^(?:\d{1,3}\.){3}\d{1,3}$|^(?:[a-fA-F0-9:]+)$/;
 
 function verifyWebhookSecret(req: VercelRequest): boolean {
   const expected = (process.env.TELEGRAM_WEBHOOK_SECRET || '').trim();
-  if (!expected) return true; // optional until setWebhook is run with secret
+  if (!expected) return false;
   const got = String(req.headers['x-telegram-bot-api-secret-token'] || '');
   return got === expected;
 }

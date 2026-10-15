@@ -819,13 +819,11 @@ export default function AdminYouTubeVideos() {
     setSyncing(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const cronSecret = (import.meta.env && import.meta.env.VITE_CRON_SECRET) || '';
       
       const headers = { 
         'Authorization': `Bearer ${session?.access_token || ''}`,
         'Content-Type': 'application/json' 
       };
-      if (cronSecret) headers['x-cron-secret'] = cronSecret;
 
       const res = await fetch('/api/cron/refresh-videos', { method: 'POST', headers });
       

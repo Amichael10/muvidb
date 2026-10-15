@@ -16,6 +16,8 @@ import { normalizeWhatsAppNumber } from './meta_whatsapp.js';
 import { enqueueMovieWhatsAppAlert } from './whatsapp_alert_queue.js';
 import { recordWhatsAppDeliveryStatuses } from './whatsapp_delivery_status.js';
 import { getWhatsAppHealth } from './whatsapp_monitor.js';
+import { verifyMetaWebhookSignature } from './webhook_signature.js';
+import type { RawBodyRequest } from './request_body.js';
 
 export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -34,7 +36,8 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    const expectedToken = (process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || process.env.META_WEBHOOK_VERIFY_TOKEN || 'muvidb_whatsapp_verify_token').trim();
+    const expectedToken = (process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || process.env.META_WEBHOOK_VERIFY_TOKEN || '').trim();
+    if (!expectedToken) return res.status(503).json({ error: 'Webhook verification is not configured' });
 
     if (mode === 'subscribe' && token === expectedToken) {
       console.log('[WhatsApp Webhook] Verification successful');
@@ -46,6 +49,11 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
   // ── META INBOUND WEBHOOK (POST) ─────────────────────────────────────────────
   // Handles incoming messages such as 'STOP' or button click to unsubscribe
   if (req.method === 'POST' && action === 'webhook') {
+    const secret = (process.env.WHATSAPP_APP_SECRET || '').trim();
+    if (!secret) return res.status(503).json({ error: 'Webhook signature verification is not configured' });
+    if (!verifyMetaWebhookSignature((req as RawBodyRequest).rawBody, req.headers['x-hub-signature-256'], secret)) {
+      return res.status(401).json({ error: 'Invalid webhook signature' });
+    }
     const body = req.body;
     try {
       await recordWhatsAppDeliveryStatuses(body);
@@ -58,14 +66,14 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
         const from = message.from; // Sender phone number
         const text = (message.text?.body || message.button?.text || '').trim().toUpperCase();
 
-        if (text === 'STOP' || text === 'UNSUBSCRIBE' || text.includes('STOP')) {
+        if (text === 'STOP' || text === 'UNSUBSCRIBE') {
           console.log(`[WhatsApp Webhook] STOP received from ${from}. Opting out user.`);
           const normalized = normalizeWhatsAppNumber(from);
           // Look up user by phone and disable whatsapp_enabled
           await supabase
             .from('users')
             .update({ whatsapp_enabled: false })
-            .ilike('whatsapp_phone', `%${normalized.slice(-10)}%`);
+            .in('whatsapp_phone', [normalized, `+${normalized}`]);
         }
       }
       return res.status(200).json({ status: 'ok' });
@@ -101,7 +109,6 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
       id: user.id,
       email: user.email,
       name: resolvedName,
-      role: user.user_metadata?.role || 'fan',
       whatsapp_enabled: Boolean(enabled),
     };
     if (normalizedPhone) {

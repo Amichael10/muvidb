@@ -75,20 +75,21 @@ export async function requireSocialStudioAdmin(req: VercelRequest): Promise<Soci
   if (error || !data.user) throw httpError(401, 'Invalid admin session');
 
   const user = data.user as User;
-  let role = String(user.app_metadata?.role || user.user_metadata?.role || '').toLowerCase();
+  let role = '';
 
   try {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .maybeSingle();
 
+    if (profileError || !profile) throw httpError(403, 'Administrator profile unavailable');
     if (profile?.role) {
       role = String(profile.role).toLowerCase();
     }
   } catch (dbErr) {
-    console.warn('Social Studio: Failed checking users table for role:', dbErr);
+    throw httpError(403, 'Administrator profile unavailable');
   }
 
   if (role !== 'admin' && role !== 'admin_limited') {

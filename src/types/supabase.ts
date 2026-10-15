@@ -307,6 +307,8 @@ export type Database = {
           key_prefix: string
           last_used_at: string | null
           name: string
+          quota_window_count: number
+          quota_window_start: string | null
           rate_limit_per_min: number
           revoked_at: string | null
           scopes: string[]
@@ -321,6 +323,8 @@ export type Database = {
           key_prefix: string
           last_used_at?: string | null
           name: string
+          quota_window_count?: number
+          quota_window_start?: string | null
           rate_limit_per_min?: number
           revoked_at?: string | null
           scopes?: string[]
@@ -335,6 +339,8 @@ export type Database = {
           key_prefix?: string
           last_used_at?: string | null
           name?: string
+          quota_window_count?: number
+          quota_window_start?: string | null
           rate_limit_per_min?: number
           revoked_at?: string | null
           scopes?: string[]
@@ -766,8 +772,17 @@ export type Database = {
       }
       companies: {
         Row: {
+          api_key: string | null
+          api_tier: string | null
           awards: Json
+          banner_url: string | null
+          booking_url: string | null
+          claimed: boolean | null
+          claimed_at: string | null
+          claimed_by: string | null
           company_type: string | null
+          contact_email: string | null
+          contact_phone: string | null
           created_at: string
           description: string | null
           employees: string | null
@@ -784,13 +799,25 @@ export type Database = {
           tmdb_id: number | null
           twitter_url: string | null
           updated_at: string
+          verification_code: string | null
+          verified: boolean | null
+          verified_via: string | null
           website: string | null
           years_active: string | null
           youtube_url: string | null
         }
         Insert: {
+          api_key?: string | null
+          api_tier?: string | null
           awards?: Json
+          banner_url?: string | null
+          booking_url?: string | null
+          claimed?: boolean | null
+          claimed_at?: string | null
+          claimed_by?: string | null
           company_type?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           description?: string | null
           employees?: string | null
@@ -807,13 +834,25 @@ export type Database = {
           tmdb_id?: number | null
           twitter_url?: string | null
           updated_at?: string
+          verification_code?: string | null
+          verified?: boolean | null
+          verified_via?: string | null
           website?: string | null
           years_active?: string | null
           youtube_url?: string | null
         }
         Update: {
+          api_key?: string | null
+          api_tier?: string | null
           awards?: Json
+          banner_url?: string | null
+          booking_url?: string | null
+          claimed?: boolean | null
+          claimed_at?: string | null
+          claimed_by?: string | null
           company_type?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           description?: string | null
           employees?: string | null
@@ -830,11 +869,126 @@ export type Database = {
           tmdb_id?: number | null
           twitter_url?: string | null
           updated_at?: string
+          verification_code?: string | null
+          verified?: boolean | null
+          verified_via?: string | null
           website?: string | null
           years_active?: string | null
           youtube_url?: string | null
         }
         Relationships: []
+      }
+      company_claims: {
+        Row: {
+          claim_code: string | null
+          company_id: string
+          created_at: string
+          id: string
+          instagram_handle: string | null
+          notes: string | null
+          official_role: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          telegram_message_id: string | null
+          updated_at: string
+          user_id: string
+          verification_doc_url: string | null
+          verification_method: string | null
+          website_or_social: string | null
+          work_email: string
+        }
+        Insert: {
+          claim_code?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          instagram_handle?: string | null
+          notes?: string | null
+          official_role: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          telegram_message_id?: string | null
+          updated_at?: string
+          user_id: string
+          verification_doc_url?: string | null
+          verification_method?: string | null
+          website_or_social?: string | null
+          work_email: string
+        }
+        Update: {
+          claim_code?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          instagram_handle?: string | null
+          notes?: string | null
+          official_role?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          telegram_message_id?: string | null
+          updated_at?: string
+          user_id?: string
+          verification_doc_url?: string | null
+          verification_method?: string | null
+          website_or_social?: string | null
+          work_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_claims_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_members: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          role: string
+          status: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          role?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_members_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       content_channel_approvals: {
         Row: {
@@ -2060,6 +2214,77 @@ export type Database = {
           },
         ]
       }
+      filmmaker_portfolios: {
+        Row: {
+          accent_color: string | null
+          bio_statement: string | null
+          created_at: string
+          custom_links: Json | null
+          epk_pdf_url: string | null
+          featured_film_ids: string[] | null
+          featured_reel_url: string | null
+          handle: string
+          id: string
+          inquiry_email: string | null
+          inquiry_phone: string | null
+          is_published: boolean | null
+          person_id: string
+          tagline: string | null
+          theme_preset: string | null
+          updated_at: string
+          user_id: string
+          view_count: number | null
+        }
+        Insert: {
+          accent_color?: string | null
+          bio_statement?: string | null
+          created_at?: string
+          custom_links?: Json | null
+          epk_pdf_url?: string | null
+          featured_film_ids?: string[] | null
+          featured_reel_url?: string | null
+          handle: string
+          id?: string
+          inquiry_email?: string | null
+          inquiry_phone?: string | null
+          is_published?: boolean | null
+          person_id: string
+          tagline?: string | null
+          theme_preset?: string | null
+          updated_at?: string
+          user_id: string
+          view_count?: number | null
+        }
+        Update: {
+          accent_color?: string | null
+          bio_statement?: string | null
+          created_at?: string
+          custom_links?: Json | null
+          epk_pdf_url?: string | null
+          featured_film_ids?: string[] | null
+          featured_reel_url?: string | null
+          handle?: string
+          id?: string
+          inquiry_email?: string | null
+          inquiry_phone?: string | null
+          is_published?: boolean | null
+          person_id?: string
+          tagline?: string | null
+          theme_preset?: string | null
+          updated_at?: string
+          user_id?: string
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filmmaker_portfolios_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       films: {
         Row: {
           audience_rating: number | null
@@ -2317,16 +2542,19 @@ export type Database = {
       follows: {
         Row: {
           followed_at: string
+          notify_whatsapp: boolean
           person_id: string
           user_id: string
         }
         Insert: {
           followed_at?: string
+          notify_whatsapp?: boolean
           person_id: string
           user_id: string
         }
         Update: {
           followed_at?: string
+          notify_whatsapp?: boolean
           person_id?: string
           user_id?: string
         }
@@ -2818,9 +3046,14 @@ export type Database = {
       }
       people: {
         Row: {
+          availability_note: string | null
+          availability_status: string | null
           awards: Json
           bio: string | null
           birthplace: string | null
+          booking_email: string | null
+          booking_phone: string | null
+          booking_whatsapp: string | null
           claimed_by: string | null
           created_at: string
           date_of_birth: string | null
@@ -2830,12 +3063,16 @@ export type Database = {
           facebook_url: string | null
           film_count: number | null
           gender: string | null
+          headshots: Json | null
           id: string
+          imdb_id: string | null
           instagram_url: string | null
           is_deceased: boolean | null
+          is_pro: boolean | null
           is_spotlight: boolean | null
           is_verified: boolean
           known_for_department: string | null
+          management_company_id: string | null
           mubi_id: number | null
           mubi_slug: string | null
           name: string
@@ -2849,7 +3086,10 @@ export type Database = {
           photo_cutout_url: string | null
           photo_url: string | null
           popularity_score: number
+          pro_expires_at: string | null
+          pro_plan: string | null
           profile_views: number | null
+          showreel_urls: Json | null
           slug: string | null
           source: string | null
           status: string | null
@@ -2857,14 +3097,21 @@ export type Database = {
           tmdb_id: number | null
           twitter_url: string | null
           updated_at: string
+          view_count_total: number | null
+          view_count_weekly: number | null
           youtube_channel_id: string | null
           youtube_handle: string | null
           youtube_stats: Json | null
         }
         Insert: {
+          availability_note?: string | null
+          availability_status?: string | null
           awards?: Json
           bio?: string | null
           birthplace?: string | null
+          booking_email?: string | null
+          booking_phone?: string | null
+          booking_whatsapp?: string | null
           claimed_by?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -2874,12 +3121,16 @@ export type Database = {
           facebook_url?: string | null
           film_count?: number | null
           gender?: string | null
+          headshots?: Json | null
           id?: string
+          imdb_id?: string | null
           instagram_url?: string | null
           is_deceased?: boolean | null
+          is_pro?: boolean | null
           is_spotlight?: boolean | null
           is_verified?: boolean
           known_for_department?: string | null
+          management_company_id?: string | null
           mubi_id?: number | null
           mubi_slug?: string | null
           name: string
@@ -2893,7 +3144,10 @@ export type Database = {
           photo_cutout_url?: string | null
           photo_url?: string | null
           popularity_score?: number
+          pro_expires_at?: string | null
+          pro_plan?: string | null
           profile_views?: number | null
+          showreel_urls?: Json | null
           slug?: string | null
           source?: string | null
           status?: string | null
@@ -2901,14 +3155,21 @@ export type Database = {
           tmdb_id?: number | null
           twitter_url?: string | null
           updated_at?: string
+          view_count_total?: number | null
+          view_count_weekly?: number | null
           youtube_channel_id?: string | null
           youtube_handle?: string | null
           youtube_stats?: Json | null
         }
         Update: {
+          availability_note?: string | null
+          availability_status?: string | null
           awards?: Json
           bio?: string | null
           birthplace?: string | null
+          booking_email?: string | null
+          booking_phone?: string | null
+          booking_whatsapp?: string | null
           claimed_by?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -2918,12 +3179,16 @@ export type Database = {
           facebook_url?: string | null
           film_count?: number | null
           gender?: string | null
+          headshots?: Json | null
           id?: string
+          imdb_id?: string | null
           instagram_url?: string | null
           is_deceased?: boolean | null
+          is_pro?: boolean | null
           is_spotlight?: boolean | null
           is_verified?: boolean
           known_for_department?: string | null
+          management_company_id?: string | null
           mubi_id?: number | null
           mubi_slug?: string | null
           name?: string
@@ -2937,7 +3202,10 @@ export type Database = {
           photo_cutout_url?: string | null
           photo_url?: string | null
           popularity_score?: number
+          pro_expires_at?: string | null
+          pro_plan?: string | null
           profile_views?: number | null
+          showreel_urls?: Json | null
           slug?: string | null
           source?: string | null
           status?: string | null
@@ -2945,11 +3213,21 @@ export type Database = {
           tmdb_id?: number | null
           twitter_url?: string | null
           updated_at?: string
+          view_count_total?: number | null
+          view_count_weekly?: number | null
           youtube_channel_id?: string | null
           youtube_handle?: string | null
           youtube_stats?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "people_management_company_id_fkey"
+            columns: ["management_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       people_enrichment_evidence: {
         Row: {
@@ -5055,6 +5333,8 @@ export type Database = {
           professional_roles: string[]
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
+          whatsapp_enabled: boolean
+          whatsapp_phone: string | null
         }
         Insert: {
           account_intent?: string
@@ -5070,6 +5350,8 @@ export type Database = {
           professional_roles?: string[]
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
+          whatsapp_enabled?: boolean
+          whatsapp_phone?: string | null
         }
         Update: {
           account_intent?: string
@@ -5085,6 +5367,8 @@ export type Database = {
           professional_roles?: string[]
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
+          whatsapp_enabled?: boolean
+          whatsapp_phone?: string | null
         }
         Relationships: [
           {
@@ -5149,94 +5433,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      youtube_channels: {
-        Row: {
-          added_by: string | null
-          channel_id: string
-          channel_url: string | null
-          created_at: string
-          description: string | null
-          film_count: number
-          id: string
-          is_active: boolean
-          is_featured: boolean | null
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          added_by?: string | null
-          channel_id: string
-          channel_url?: string | null
-          created_at?: string
-          description?: string | null
-          film_count?: number
-          id?: string
-          is_active?: boolean
-          is_featured?: boolean | null
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          added_by?: string | null
-          channel_id?: string
-          channel_url?: string | null
-          created_at?: string
-          description?: string | null
-          film_count?: number
-          id?: string
-          is_active?: boolean
-          is_featured?: boolean | null
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "youtube_channels_added_by_fkey"
-            columns: ["added_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      youtube_stats: {
-        Row: {
-          comment_count: number
-          film_id: string
-          id: string
-          like_count: number
-          synced_at: string
-          view_count: number
-          youtube_video_id: string
-        }
-        Insert: {
-          comment_count?: number
-          film_id: string
-          id?: string
-          like_count?: number
-          synced_at?: string
-          view_count?: number
-          youtube_video_id: string
-        }
-        Update: {
-          comment_count?: number
-          film_id?: string
-          id?: string
-          like_count?: number
-          synced_at?: string
-          view_count?: number
-          youtube_video_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "youtube_stats_film_id_fkey"
-            columns: ["film_id"]
-            isOneToOne: false
-            referencedRelation: "films"
             referencedColumns: ["id"]
           },
         ]
@@ -5337,6 +5533,94 @@ export type Database = {
             foreignKeyName: "whatsapp_movie_alert_queue_film_id_fkey"
             columns: ["film_id"]
             isOneToOne: true
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      youtube_channels: {
+        Row: {
+          added_by: string | null
+          channel_id: string
+          channel_url: string | null
+          created_at: string
+          description: string | null
+          film_count: number
+          id: string
+          is_active: boolean
+          is_featured: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          added_by?: string | null
+          channel_id: string
+          channel_url?: string | null
+          created_at?: string
+          description?: string | null
+          film_count?: number
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          added_by?: string | null
+          channel_id?: string
+          channel_url?: string | null
+          created_at?: string
+          description?: string | null
+          film_count?: number
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youtube_channels_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      youtube_stats: {
+        Row: {
+          comment_count: number
+          film_id: string
+          id: string
+          like_count: number
+          synced_at: string
+          view_count: number
+          youtube_video_id: string
+        }
+        Insert: {
+          comment_count?: number
+          film_id: string
+          id?: string
+          like_count?: number
+          synced_at?: string
+          view_count?: number
+          youtube_video_id: string
+        }
+        Update: {
+          comment_count?: number
+          film_id?: string
+          id?: string
+          like_count?: number
+          synced_at?: string
+          view_count?: number
+          youtube_video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youtube_stats_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
             referencedRelation: "films"
             referencedColumns: ["id"]
           },
@@ -5450,23 +5734,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      claim_whatsapp_movie_alert: {
-        Args: never
-        Returns: {
-          available_at: string
-          film_id: string
-          issue_notified_at: string | null
-          last_error: string | null
-          locked_until: string | null
-          queued_at: string
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "whatsapp_movie_alert_queue"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
       admin_ban_user: {
         Args: { ban_status: boolean; target_user_id: string }
         Returns: undefined
@@ -5485,6 +5752,10 @@ export type Database = {
       }
       approve_actor_profile_claim: {
         Args: { p_admin_id: string; p_claim_id: string }
+        Returns: Json
+      }
+      approve_company_claim: {
+        Args: { p_claim_id: string; p_reviewer_id?: string }
         Returns: Json
       }
       approve_credit_candidate: {
@@ -5536,6 +5807,24 @@ export type Database = {
           id: string
         }[]
       }
+      claim_whatsapp_movie_alert: {
+        Args: never
+        Returns: {
+          available_at: string
+          film_id: string
+          issue_notified_at: string | null
+          last_error: string | null
+          locked_until: string | null
+          queued_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "whatsapp_movie_alert_queue"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      consume_api_key_quota: { Args: { p_key_id: string }; Returns: boolean }
       create_pro_profile: {
         Args: {
           pro_bio: string
@@ -5560,10 +5849,6 @@ export type Database = {
         Returns: number
       }
       find_person_by_name: { Args: { p_name: string }; Returns: string }
-      force_promote_to_admin: {
-        Args: { user_email: string }
-        Returns: undefined
-      }
       generate_slug: { Args: { input: string }; Returns: string }
       get_coming_soon_films: { Args: { p_limit?: number }; Returns: Json[] }
       get_credit_candidate_review_films: {
@@ -5702,12 +5987,24 @@ export type Database = {
           queue_created_at: string
         }[]
       }
+      increment_portfolio_views: {
+        Args: { p_handle: string }
+        Returns: undefined
+      }
       increment_profile_views: {
         Args: { person_uuid: string }
         Returns: undefined
       }
       is_admin: { Args: never; Returns: boolean }
       is_clickbait_title: { Args: { t: string }; Returns: boolean }
+      is_company_admin_or_owner: {
+        Args: { p_company_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_company_member: {
+        Args: { p_company_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_social_studio_admin: { Args: never; Returns: boolean }
       match_film_fuzzy: {
         Args: { query_title: string; threshold?: number }
@@ -5840,6 +6137,10 @@ export type Database = {
         Args: { p_candidate_id: string }
         Returns: undefined
       }
+      require_security_admin: {
+        Args: { p_catalog?: boolean }
+        Returns: undefined
+      }
       reset_credit_harvest_queue_and_logs: { Args: never; Returns: undefined }
       review_actor_credit_request: {
         Args: {
@@ -5946,9 +6247,14 @@ export type Database = {
       search_people_fuzzy: {
         Args: { lim?: number; q: string }
         Returns: {
+          availability_note: string | null
+          availability_status: string | null
           awards: Json
           bio: string | null
           birthplace: string | null
+          booking_email: string | null
+          booking_phone: string | null
+          booking_whatsapp: string | null
           claimed_by: string | null
           created_at: string
           date_of_birth: string | null
@@ -5958,12 +6264,16 @@ export type Database = {
           facebook_url: string | null
           film_count: number | null
           gender: string | null
+          headshots: Json | null
           id: string
+          imdb_id: string | null
           instagram_url: string | null
           is_deceased: boolean | null
+          is_pro: boolean | null
           is_spotlight: boolean | null
           is_verified: boolean
           known_for_department: string | null
+          management_company_id: string | null
           mubi_id: number | null
           mubi_slug: string | null
           name: string
@@ -5977,7 +6287,10 @@ export type Database = {
           photo_cutout_url: string | null
           photo_url: string | null
           popularity_score: number
+          pro_expires_at: string | null
+          pro_plan: string | null
           profile_views: number | null
+          showreel_urls: Json | null
           slug: string | null
           source: string | null
           status: string | null
@@ -5985,6 +6298,8 @@ export type Database = {
           tmdb_id: number | null
           twitter_url: string | null
           updated_at: string
+          view_count_total: number | null
+          view_count_weekly: number | null
           youtube_channel_id: string | null
           youtube_handle: string | null
           youtube_stats: Json | null
@@ -6029,6 +6344,8 @@ export type Database = {
           professional_roles: string[]
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
+          whatsapp_enabled: boolean
+          whatsapp_phone: string | null
         }
         SetofOptions: {
           from: "*"

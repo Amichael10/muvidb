@@ -29,6 +29,8 @@ export async function handleChannels(req: VercelRequest, res: VercelResponse) {
 
   // ── Link Video to Film & Channel (Admin Service-Role API) ──────────────────
   if (action === 'link_video' || (req.method === 'POST' && req.body?.action === 'link_video')) {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST for linkage changes' });
+    if (!(await isValidAuth(req)).valid) return res.status(401).json({ error: 'Administrator authentication required' });
     try {
       const { film_id, channel_id, video_id, title, thumbnail_url } = req.body || {};
       if (!film_id && !video_id) {

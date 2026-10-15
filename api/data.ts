@@ -1,5 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleCors } from './_lib/cors.js';
+import { prepareRequestBody } from './_lib/request_body.js';
+
+export const config = { api: { bodyParser: false } };
 
 /**
  * Temporary hardened router — catch all failures so we stop returning
@@ -9,6 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   try {
+    await prepareRequestBody(req);
     const raw = req.query._r;
     const key = Array.isArray(raw) ? raw[0] : raw;
 
@@ -100,11 +104,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(404).json({ error: 'Unknown resource', key: key ?? null });
   } catch (err: any) {
+    if (err?.statusCode === 400 || err?.statusCode === 413) {
+      return res.status(err.statusCode).json({ error: err.statusCode === 413 ? 'Request too large' : 'Invalid JSON' });
+    }
     console.error('[api/data]', err);
-    return res.status(500).json({
-      error: 'data router failed',
-      message: err?.message || String(err),
-      stack: (err?.stack || '').split('\n').slice(0, 8),
-    });
+    return res.status(500).json({ error: 'Request could not be completed' });
   }
 }

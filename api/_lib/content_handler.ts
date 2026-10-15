@@ -35,6 +35,11 @@ export async function handleContent(req: VercelRequest, res: VercelResponse) {
       if (!filmId) return res.status(400).json({ error: 'Missing filmId' });
       if (!UUID_RE.test(filmId)) return res.status(400).json({ error: 'Invalid filmId' });
 
+      const { data: film, error: filmError } = await supabase.from('films')
+        .select('id').eq('id', filmId).eq('is_published', true).maybeSingle();
+      if (filmError) throw filmError;
+      if (!film) return res.status(404).json({ error: 'Film not found' });
+
       const { data, error } = await supabase
         .from('credits')
         .select('id, role, character_name, billing_order, people(id, name, photo_url, popularity_score, slug)')
@@ -56,8 +61,9 @@ export async function handleContent(req: VercelRequest, res: VercelResponse) {
 
       const { data, error } = await supabase
         .from('credits')
-        .select('*, films(*)')
-        .eq('person_id', personId);
+        .select('*, films!inner(*)')
+        .eq('person_id', personId)
+        .eq('films.is_published', true);
       if (error) throw error;
 
       res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400');
@@ -99,8 +105,9 @@ export async function handleContent(req: VercelRequest, res: VercelResponse) {
 
       const { data, error } = await supabase
         .from('credits')
-        .select('film_id')
+        .select('film_id, films!inner(id)')
         .in('person_id', ids)
+        .eq('films.is_published', true)
         .limit(MAX_FILMS);
       if (error) throw error;
 
