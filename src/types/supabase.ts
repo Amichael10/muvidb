@@ -5241,10 +5241,77 @@ export type Database = {
           },
         ]
       }
+      whatsapp_movie_alert_log: {
+        Row: {
+          attempts: number
+          created_at: string
+          error_code: number | null
+          error_message: string | null
+          film_id: string
+          followed_people_names: string[]
+          id: string
+          issue_notified_at: string | null
+          last_attempt_at: string
+          message_id: string | null
+          next_retry_at: string | null
+          phone: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error_code?: number | null
+          error_message?: string | null
+          film_id: string
+          followed_people_names?: string[]
+          id?: string
+          issue_notified_at?: string | null
+          last_attempt_at?: string
+          message_id?: string | null
+          next_retry_at?: string | null
+          phone: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error_code?: number | null
+          error_message?: string | null
+          film_id?: string
+          followed_people_names?: string[]
+          id?: string
+          issue_notified_at?: string | null
+          last_attempt_at?: string
+          message_id?: string | null
+          next_retry_at?: string | null
+          phone?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_movie_alert_log_film_id_fkey"
+            columns: ["film_id"]
+            isOneToOne: false
+            referencedRelation: "films"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_movie_alert_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_movie_alert_queue: {
         Row: {
           available_at: string
           film_id: string
+          issue_notified_at: string | null
           last_error: string | null
           locked_until: string | null
           queued_at: string
@@ -5252,6 +5319,7 @@ export type Database = {
         Insert: {
           available_at?: string
           film_id: string
+          issue_notified_at?: string | null
           last_error?: string | null
           locked_until?: string | null
           queued_at?: string
@@ -5259,6 +5327,7 @@ export type Database = {
         Update: {
           available_at?: string
           film_id?: string
+          issue_notified_at?: string | null
           last_error?: string | null
           locked_until?: string | null
           queued_at?: string
@@ -5386,6 +5455,7 @@ export type Database = {
         Returns: {
           available_at: string
           film_id: string
+          issue_notified_at: string | null
           last_error: string | null
           locked_until: string | null
           queued_at: string

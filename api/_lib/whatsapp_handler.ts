@@ -15,11 +15,18 @@ import { handleCors } from './cors.js';
 import { normalizeWhatsAppNumber } from './meta_whatsapp.js';
 import { enqueueMovieWhatsAppAlert } from './whatsapp_alert_queue.js';
 import { recordWhatsAppDeliveryStatuses } from './whatsapp_delivery_status.js';
+import { getWhatsAppHealth } from './whatsapp_monitor.js';
 
 export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   const action = req.query.action || req.query.op || '';
+  if (req.method === 'GET' && action === 'health') {
+    if (!(await isValidAuth(req)).valid) return res.status(401).json({ error: 'Admin authentication required' });
+    res.setHeader('Cache-Control', 'no-store');
+    try { return res.status(200).json(await getWhatsAppHealth()); }
+    catch (error: any) { return res.status(500).json({ error: error.message }); }
+  }
 
   // ── META WEBHOOK VERIFICATION (GET) ─────────────────────────────────────────
   if (req.method === 'GET' && (action === 'webhook' || req.query['hub.mode'])) {

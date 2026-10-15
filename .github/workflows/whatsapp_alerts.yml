@@ -26,4 +26,4 @@ jobs:
             -H "x-cron-secret: $CRON_SECRET" \
             'https://muvidb.com/api/cron/sync?task=whatsapp_alerts')
           echo "$response" | jq .
-          echo "$response" | jq -e '(.result.failed // .failed // 0) == 0'
+          echo "$response" | jq -e '(.failed == 0) and (.monitoring.error == null) and (.monitoring.notificationsConfigured == true)'

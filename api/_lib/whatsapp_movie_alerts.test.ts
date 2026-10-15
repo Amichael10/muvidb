@@ -42,9 +42,9 @@ describe('WhatsApp cast and crew alerts', () => {
   });
 
   it('skips previously sent alerts', async () => {
-    const queries = setup([{ user_id: 'user' }]);
+    const queries = setup([{ user_id: 'user', status: 'delivered', attempts: 1 }]);
     const result = await dispatchMovieWhatsAppAlerts(context);
-    expect(queries[3].in).toHaveBeenCalledWith('status', ['sent', 'delivered', 'read']);
+    expect(queries[3].select).toHaveBeenCalledWith('user_id,status,attempts,next_retry_at');
     expect(result.skippedAlreadyNotified).toBe(1);
     expect(mocks.send).not.toHaveBeenCalled();
   });
@@ -62,6 +62,19 @@ describe('WhatsApp cast and crew alerts', () => {
     setup([], [{ user_id: 'user', person_id: 'actor', notify_whatsapp: false }]);
     await dispatchMovieWhatsAppAlerts(context);
     expect(mocks.send).not.toHaveBeenCalled();
+  });
+
+  it('does not resend permanent failures or retries scheduled for later', async () => {
+    setup([{ user_id: 'user', status: 'failed', attempts: 1, next_retry_at: null }]);
+    await dispatchMovieWhatsAppAlerts(context);
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+
+  it('retries a due temporary failure with an increased attempt count', async () => {
+    const queries = setup([{ user_id: 'user', status: 'failed', attempts: 1, next_retry_at: '2020-01-01T00:00:00Z' }]);
+    mocks.send.mockResolvedValue({ ok: true, messageId: 'retry-message' });
+    await dispatchMovieWhatsAppAlerts(context);
+    expect(queries[4].upsert).toHaveBeenCalledWith(expect.objectContaining({ attempts: 2, status: 'sent', next_retry_at: null }), { onConflict: 'user_id,film_id' });
   });
 
   it('fails visibly when credentials or database queries are unavailable', async () => {

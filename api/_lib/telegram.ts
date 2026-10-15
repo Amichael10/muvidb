@@ -42,6 +42,7 @@ export async function sendTelegramMessage(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.ok) {

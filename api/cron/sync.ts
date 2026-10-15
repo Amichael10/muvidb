@@ -14,6 +14,7 @@ import { sweepAndUpdatePlayStatuses } from '../_lib/theatre_service.js';
 import { runYouTubeUploadWatch } from '../_lib/youtube_upload_notify.js';
 import { runCriticsSync } from '../_lib/critics_sync.js';
 import { runWhatsAppAlertQueue } from '../_lib/whatsapp_alert_queue.js';
+import { monitorWhatsAppAlerts } from '../_lib/whatsapp_monitor.js';
 
 
 /**
@@ -115,7 +116,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let result: any;
 
     switch (task) {
-      case 'whatsapp_alerts': result = await runWhatsAppAlertQueue(); break;
+      case 'whatsapp_alerts': {
+        let monitoring: any;
+        try { monitoring = await monitorWhatsAppAlerts(); }
+        catch (error: any) {
+          monitoring = { error: error.message };
+          console.error('[WhatsApp monitoring]', error.message);
+        }
+        result = { ...(await runWhatsAppAlertQueue()), monitoring };
+        break;
+      }
       case 'showtimes':      result = await runShowtimesSync(); break;
       case 'cinema_cleanup': result = { task: 'cinema_cleanup', ...(await sweepStaleCinemas()) }; break;
       case 'videos':      

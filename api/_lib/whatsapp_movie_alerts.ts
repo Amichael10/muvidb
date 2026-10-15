@@ -7,6 +7,7 @@
  * 3. Idempotent tracking via whatsapp_movie_alert_log.
  */
 
+import { whatsappRetryAt, MAX_WHATSAPP_ATTEMPTS } from './whatsapp_retry_policy.js';
 import { supabase } from './supabase.js';
 import { sendMetaWhatsAppTemplate, isWhatsAppConfigured, normalizeWhatsAppNumber } from './meta_whatsapp.js';
 
@@ -116,15 +117,18 @@ export async function dispatchMovieWhatsAppAlerts(
   let alreadyNotifiedUserIds = new Set<string>();
   const { data: existingLogs, error: logReadError } = await supabase
     .from('whatsapp_movie_alert_log')
-    .select('user_id')
+    .select('user_id,status,attempts,next_retry_at')
     .eq('film_id', filmId)
-    .in('status', ['sent', 'delivered', 'read'])
     .in('user_id', userIds);
 
   if (logReadError) throw new Error(`Cannot read alert history: ${logReadError.message}`);
 
   if (existingLogs) {
-    alreadyNotifiedUserIds = new Set(existingLogs.map((l) => l.user_id));
+    alreadyNotifiedUserIds = new Set(existingLogs.filter(log => {
+      if (['sent', 'delivered', 'read'].includes(log.status)) return true;
+      return log.status === 'failed' && (!log.next_retry_at
+        || Date.parse(log.next_retry_at) > Date.now() || log.attempts >= MAX_WHATSAPP_ATTEMPTS);
+    }).map(log => log.user_id));
   }
 
   // Determine watch platform label
@@ -179,6 +183,8 @@ export async function dispatchMovieWhatsAppAlerts(
     // {{2}} = Movie Title (e.g., "Jagun Jagun")
     // {{3}} = Where to watch (e.g., "In Cinemas")
     // {{4}} = Film Page Link (e.g., "https://muvidb.com/film/jagun-jagun")
+    const attempts = (existingLogs?.find(l => l.user_id === uId)?.attempts || 0) + 1;
+    const attemptedAt = new Date().toISOString();
     const sendRes = await sendMetaWhatsAppTemplate({
       to: phone,
       templateName: process.env.WHATSAPP_MOVIE_ALERT_TEMPLATE || 'movie_release_alert',
@@ -196,7 +202,8 @@ export async function dispatchMovieWhatsAppAlerts(
         phone,
         followed_people_names: actorNames,
         message_id: sendRes.messageId || null,
-        status: 'sent',
+        status: 'sent', attempts, last_attempt_at: attemptedAt,
+        next_retry_at: null, error_code: null, issue_notified_at: null,
         error_message: null,
       }, { onConflict: 'user_id,film_id' });
       if (logError) throw new Error(`Message accepted but alert history could not be saved: ${logError.message}`);
@@ -206,7 +213,9 @@ export async function dispatchMovieWhatsAppAlerts(
       console.error(`[WhatsApp Alert] Failed sending to user ${uId}:`, sendRes.error);
       const { error: logError } = await supabase.from('whatsapp_movie_alert_log').upsert({
         user_id: uId, film_id: filmId, phone, followed_people_names: actorNames,
-        status: 'failed', error_message: sendRes.error || 'Failed to send',
+        status: 'failed', message_id: null, error_message: sendRes.error || 'Failed to send',
+        attempts, last_attempt_at: attemptedAt, error_code: sendRes.details?.code || null,
+        next_retry_at: whatsappRetryAt(sendRes.details?.code, attempts), issue_notified_at: null,
       }, { onConflict: 'user_id,film_id' });
       if (logError) throw new Error(`Cannot save alert failure: ${logError.message}`);
     }

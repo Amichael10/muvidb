@@ -14,6 +14,7 @@ This guide walks you through connecting the **Meta WhatsApp Cloud API** to MuviD
    - The `whatsapp_alerts.yml` workflow calls `/api/cron/sync?task=whatsapp_alerts` every five minutes using `VITE_CRON_SECRET`. The worker reads publication status from the database, claims each film exclusively, and retries failures. GitHub scheduling can delay runs.
    - Apply `20261014225910_whatsapp_credit_alert_queue.sql` before deploying the worker. No historical films are backfilled automatically. Failure details appear in the queue's `last_error` and `whatsapp_movie_alert_log.error_message`.
    - The approved image template requires four body parameters and a dynamic URL button parameter containing the film slug or ID.
+   - Posters are converted to JPEG and uploaded to Meta before the template request. Media validation failures are reported before message acceptance.
 3. **Multi-Actor Deduplicator (Smart Grouping)**:
    - If a user follows 5 actors who all appear in the same film, the engine groups them and sends **only 1 message**:
      > *"Actors you follow (Lateef Olofin, Funke Akindele, and 1 other) are starring in the new release: Jagun Jagun 2!"*
@@ -21,6 +22,14 @@ This guide walks you through connecting the **Meta WhatsApp Cloud API** to MuviD
 4. **Unsubscribe / Compliance**:
    - Every message includes "Reply STOP to unsubscribe".
    - The inbound webhook at `/api/whatsapp?action=webhook` listens for "STOP" and automatically disables alerts for that phone number.
+
+## Delivery monitoring
+
+Apply `20261015063628_whatsapp_delivery_monitoring.sql` before deploying monitoring. The admin overview includes a WhatsApp delivery panel backed by the authenticated, uncached `/api/whatsapp?action=health` endpoint. It shows failures, accepted messages without confirmation for over 30 minutes, queue errors, attempts, and the next retry time. Recipient phone numbers are not returned by this endpoint.
+
+The existing five-minute worker schedules known temporary Meta failures (130429, 131000, 131016, 131056) for retry after 5 then 15 minutes, up to three total attempts. Template/account/recipient errors, marketing restrictions, and ambiguous request failures need attention. Accepted messages without receipts are never automatically resent.
+
+New failures, stalled confirmations, and queue errors are reported once through the existing `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` channel. If Telegram is absent, the panel displays that warning; if notification delivery fails, the claim is released for the next worker run. Confirmed delivery/read events supersede older sent events. GitHub scheduling and external outages can delay monitoring.
 
 ---
 
