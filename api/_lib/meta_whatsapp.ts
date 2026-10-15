@@ -83,13 +83,41 @@ export async function sendMetaWhatsAppTemplate(
 
   // Header image (Poster/Backdrop)
   if (opts.headerImageUrl) {
+    // Catalogue posters are often WebP. WhatsApp image headers require JPEG/PNG.
+    // Upload a validated JPEG first, rather than letting asynchronous URL fetching
+    // accept a message whose media cannot subsequently be delivered.
+    let mediaId: string;
+    try {
+      const response = await fetch(opts.headerImageUrl, { signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) throw new Error(`Poster download failed: HTTP ${response.status}`);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length > 20 * 1024 * 1024) throw new Error('Poster exceeds 20 MB');
+      const { default: sharp } = await import('sharp');
+      const jpeg = await sharp(bytes, { limitInputPixels: 40_000_000 })
+        .rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+        .flatten({ background: '#ffffff' }).jpeg({ quality: 85 }).toBuffer();
+      if (jpeg.length > 5 * 1024 * 1024) throw new Error('Converted poster exceeds WhatsApp image limit');
+      const form = new FormData();
+      form.set('messaging_product', 'whatsapp');
+      form.set('type', 'image/jpeg');
+      form.set('file', new Blob([new Uint8Array(jpeg)], { type: 'image/jpeg' }), 'poster.jpg');
+      const upload = await fetch(`https://graph.facebook.com/v21.0/${config.phoneNumberId}/media`, {
+        method: 'POST', headers: { Authorization: `Bearer ${config.accessToken}` },
+        body: form, signal: AbortSignal.timeout(20_000),
+      });
+      const uploaded = await upload.json();
+      if (!upload.ok || !uploaded.id) throw new Error(uploaded.error?.message || `Media upload failed: HTTP ${upload.status}`);
+      mediaId = uploaded.id;
+    } catch (error: any) {
+      return { ok: false, error: `WhatsApp poster preparation failed: ${error.message}` };
+    }
     components.push({
       type: 'header',
       parameters: [
         {
           type: 'image',
           image: {
-            link: opts.headerImageUrl,
+            id: mediaId,
           },
         },
       ],
