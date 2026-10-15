@@ -115,7 +115,10 @@ function isAuthorized(request: Request, env: Env) {
 async function supabaseQuery(env: Env, path: string): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return { ok: false, error: 'Supabase secrets are not configured' };
   try {
-    const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${path}`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+    const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${path}`, {
+      // Modern Supabase secret keys are API keys, not JWT bearer tokens.
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY },
+    });
     const data = await response.json();
     return response.ok ? { ok: true, data } : { ok: false, error: typeof data?.message === 'string' ? data.message : `Supabase returned ${response.status}` };
   } catch (error) {
@@ -127,7 +130,7 @@ async function logActivity(env: Env, eventType: string, status: string, message:
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return;
   await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/content_engine_activity_logs`, {
     method: 'POST',
-    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'content-type': 'application/json', Prefer: 'return=minimal' },
+    headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, 'content-type': 'application/json', Prefer: 'return=minimal' },
     body: JSON.stringify({ event_type: eventType, status, message, metadata }),
   });
 }

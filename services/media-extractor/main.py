@@ -320,7 +320,6 @@ def process_clip(req: ClipRequest, authorization: str = Header(None)):
             upload_url = f"{supabase_url.rstrip('/')}/storage/v1/object/social-published-assets/test-scenario/{file_name}"
             headers = {
                 "apikey": supabase_key,
-                "Authorization": f"Bearer {supabase_key}",
                 "Content-Type": "video/mp4",
                 "x-upsert": "true"
             }
