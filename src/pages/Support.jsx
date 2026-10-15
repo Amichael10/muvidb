@@ -98,7 +98,7 @@ export default function Support() {
       const returnUrl = `${window.location.origin}/support?status=success`;
       const cancelUrl = `${window.location.origin}/support`;
 
-      const res = await fetch('/api/data?key=bachs&op=initialize', {
+      const res = await fetch('/api/bachs?op=initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

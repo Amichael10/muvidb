@@ -1,3 +1,4 @@
+import { fetchWithLocalClipperAuth } from '../../lib/localClipperFetch';
 import { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
@@ -66,7 +67,7 @@ export default function SocialVideoClipModal({
     let cancelled = false;
     const check = async () => {
       try {
-        const response = await fetch(`${LOCAL_CLIPPER_URL}/health`, { method: 'GET' });
+        const response = await fetchWithLocalClipperAuth(`${LOCAL_CLIPPER_URL}/health`, { method: 'GET' });
         if (!cancelled) setClipperStatus(response.ok ? 'running' : 'offline');
       } catch {
         if (!cancelled) setClipperStatus('offline');
@@ -88,7 +89,7 @@ export default function SocialVideoClipModal({
       toast.success('Starting the desktop clipper… a separate PowerShell window should open.');
       window.setTimeout(async () => {
         try {
-          const response = await fetch(`${LOCAL_CLIPPER_URL}/health`);
+          const response = await fetchWithLocalClipperAuth(`${LOCAL_CLIPPER_URL}/health`);
           if (!response.ok) throw new Error();
           setClipperStatus('running');
         } catch {
@@ -125,10 +126,10 @@ export default function SocialVideoClipModal({
     try {
       let source = { title: videoTitle, duration: duration || 60, transcript: '' };
       try {
-        const metadataResponse = await fetch(`${LOCAL_CLIPPER_URL}/metadata`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: videoInput || videoUrl }) });
+        const metadataResponse = await fetchWithLocalClipperAuth(`${LOCAL_CLIPPER_URL}/metadata`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: videoInput || videoUrl }) });
         if (metadataResponse.ok) source = { ...source, ...(await metadataResponse.json()) };
       } catch { /* Gemini can still provide a conservative recommendation from title/duration. */ }
-      const response = await fetch('/api/ai', {
+      const response = await fetchWithLocalClipperAuth('/api/ai', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ task: 'recommend_clip_segment', data: source }),
@@ -397,7 +398,7 @@ export default function SocialVideoClipModal({
     const token = localClip.token || localClip.job_id || (typeof localClip.download_url === 'string' ? localClip.download_url.split('/').pop() : null);
 
     // 1. Create an R2 upload session
-    const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', {
+    const sessionResponse = await fetchWithLocalClipperAuth('/api/social?task=create_r2_upload_session', {
       method: 'POST',
       headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
       signal,
@@ -415,7 +416,7 @@ export default function SocialVideoClipModal({
     // 2. Direct high-speed upload from desktop Python process to R2 (bypasses browser PNA/loopback issues)
     if (token) {
       try {
-        const directUploadRes = await fetch(`${LOCAL_CLIPPER_URL}/upload`, {
+        const directUploadRes = await fetchWithLocalClipperAuth(`${LOCAL_CLIPPER_URL}/upload`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal,
@@ -427,7 +428,7 @@ export default function SocialVideoClipModal({
         });
         if (directUploadRes.ok) {
           if (localClip.cleanup_url) {
-            fetch(localClip.cleanup_url, { method: 'DELETE' }).catch(() => {});
+            fetchWithLocalClipperAuth(localClip.cleanup_url, { method: 'DELETE' }).catch(() => {});
           }
           return {
             ...localClip,
@@ -442,12 +443,12 @@ export default function SocialVideoClipModal({
     }
 
     // 3. Browser download & upload fallback
-    const clipResponse = await fetch(localClip.download_url, { signal });
+    const clipResponse = await fetchWithLocalClipperAuth(localClip.download_url, { signal });
     if (!clipResponse.ok) throw new Error('The desktop clipper finished, but the rendered file could not be read.');
     const clipBlob = await clipResponse.blob();
     if (!clipBlob.size) throw new Error('The desktop clipper returned an empty video.');
 
-    const driveResponse = await fetch(session.uploadUrl, {
+    const driveResponse = await fetchWithLocalClipperAuth(session.uploadUrl, {
       method: 'PUT',
       headers: { 'Content-Type': 'video/mp4' },
       signal,
@@ -458,7 +459,7 @@ export default function SocialVideoClipModal({
     }
 
     if (localClip.cleanup_url) {
-      fetch(localClip.cleanup_url, { method: 'DELETE' }).catch(() => {});
+      fetchWithLocalClipperAuth(localClip.cleanup_url, { method: 'DELETE' }).catch(() => {});
     }
 
     return {
@@ -473,7 +474,7 @@ export default function SocialVideoClipModal({
   // separate step so an upload/attach failure can never be mistaken for a
   // failed YouTube extraction and retried through the cloud fallback.
   const renderWithDesktopClipper = async (payload, signal) => {
-    const response = await fetch(`${LOCAL_CLIPPER_URL}/clip`, {
+    const response = await fetchWithLocalClipperAuth(`${LOCAL_CLIPPER_URL}/clip`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal,
@@ -499,7 +500,7 @@ export default function SocialVideoClipModal({
             else signal.addEventListener('abort', abort, { once: true });
           }
         });
-        const statusResponse = await fetch(data.status_url, { signal });
+        const statusResponse = await fetchWithLocalClipperAuth(data.status_url, { signal });
         const status = await statusResponse.json().catch(() => ({}));
         if (statusResponse.ok && status.success) return status;
         if (!statusResponse.ok) throw new Error(status.detail || status.error || 'The desktop clipper could not finish this video.');
@@ -578,7 +579,7 @@ export default function SocialVideoClipModal({
             throw new Error(`The desktop clipper could not render this crop. ${error?.message || 'Check that FFmpeg is installed and try again.'}`);
           }
           setRenderStatusText(`[2/3] Desktop clipper unavailable for ${ratio}. Trying cloud fallback…`);
-          const res = await fetch('/api/social?task=clip_video', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, signal: abortController.signal, body: JSON.stringify(payload) });
+          const res = await fetchWithLocalClipperAuth('/api/social?task=clip_video', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, signal: abortController.signal, body: JSON.stringify(payload) });
           data = await res.json().catch(() => ({}));
           if (!res.ok || !data.success) throw new Error(error?.message || data.error || 'The video could not be rendered.');
         }

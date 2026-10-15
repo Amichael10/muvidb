@@ -1,44 +1,65 @@
-# Security remediation in progress
+# Security remediation — 15 October 2026
 
-This tracks work against the 25 findings in the audit. The audit and its reproduction suite describe the original state; the reproduction suite intentionally asserts the original insecure behavior and is not a post-fix acceptance suite.
+This records changes against the 25 findings in the accompanying audit. The audit describes the original baseline; its reproduction tests intentionally demonstrate the original vulnerabilities. Application regression tests validate the fixes.
 
-## Database protections applied
+## Changes and practical effects
 
-- Removed the publicly callable `force_promote_to_admin` function.
-- Stopped the active signup trigger from trusting an administrator role in editable signup metadata.
-- Made role changes reject missing administrator profiles.
-- Restricted company claim approval to administrators/service callers; bound the recorded reviewer to the authenticated administrator. Claim approval no longer generates a plaintext key in the public company record.
-- Restricted the four flagged catalogue mutation functions to verified catalogue administrators or service callers, with fixed search paths.
-- Added a service-only, atomic API-key quota function. Its row lock serializes requests across API instances and increments usage without lost updates.
-- Removed the broad public write policies on the published `film-images` bucket. Existing private `contributions` uploads and administrator publishing policies remain in place.
-- Restricted talent representation writes to verified administrators, approved actor profile managers, or active company owners/admins for that record.
-- Removed public access to deletion audit logs and restricted retention cleanup to the service role.
+| Finding | Protection added | Practical effect |
+|---|---|---|
+| 01: Public admin promotion | Removed the promotion RPC from the live database. | Ordinary accounts cannot promote themselves through it. |
+| 02: Editable metadata grants privileges | Trusted database roles govern signup, admin checks and WhatsApp profile sync; missing profiles fail closed. | Editing account metadata cannot grant administrator access. |
+| 03: Browser cron credential | Removed browser callers and VITE_CRON_SECRET; replaced CRON_SECRET in Vercel Production/Preview, GitHub Actions and local files. | Scheduled jobs use a new server-only credential. Final deployment checks remain required. |
+| 04: Anonymous company approval | Administrator-only approval; reviewer bound to the authenticated administrator. | Applicants cannot approve their own claims. |
+| 05: Public person-media mutation | Authentication, ownership checks, quotas, private staging, format validation and admin review. | Uploads remain allowed but stay private until approved. |
+| 06: Public channel linking | Administrator JWT and POST required. | Visitors cannot attach videos to catalogue records. |
+| 07: Fake sandbox payment | Removed sandbox confirmation grants; sandbox settlement never grants a paid tier. | Simulated payments cannot unlock real subscriptions. |
+| 08: Forged payment webhook | Documented signatures, recorded orders, server prices, matching amount/currency/transaction IDs and atomic replay-resistant settlement. | Only a matching verified payment activates access. Old unrecorded checkouts cannot activate through this flow. |
+| 09: Forged WhatsApp event | Meta HMAC over exact raw bytes, exact STOP command and complete phone-number matching. | Fake delivery receipts/opt-outs fail. Live unsigned probe returned 401. |
+| 10: Public storage writes | Removed broad published-bucket writes; retained private contributions and added private person-media staging. | People can submit files; administrators alone publish them. |
+| 11: Representation editing | Restrict writes to admins, approved actor managers and relevant active company owners/admins. | One user cannot edit another agency's relationships. |
+| 12: Public deletion logs | Admin reads, service-only writes and retention. | Ordinary accounts cannot read or falsify deletion logs. Historical records are not retroactively trustworthy. |
+| 13: Catalogue mutation RPCs | Verified admin/service callers, restricted grants and fixed search paths. | Public callers cannot run privileged batch mutations. |
+| 14: Paid AI/scanner abuse | Professional authorization, shared atomic user/IP/global quotas, bounded input and admin-only scanner POST. | Public search stays available within limits; paid tools require an appropriate account. |
+| 15: Image proxy SSRF | Validate every DNS answer and redirect; pin validated DNS, reject reserved networks, cap bytes/time. | Proxy cannot fetch internal services or buffer unlimited downloads. |
+| 16: Active SVG content | Raster-only proxy, sandbox response policies for SVG/storage, re-encoded uploaded photos. | These image paths cannot execute uploaded SVG scripts. |
+| 17: Tracked secrets/cookies | Remove credential-bearing scripts/cookies from tracking; exclude cookies from container images; migrate credentials. | Revocation and external session invalidation remain required below. |
+| 18: Local clipper abuse | Loopback client/Host, exact trusted origins and per-process pairing token. | Unrelated websites cannot start jobs. Restart the desktop clipper to apply this. |
+| 19: Editable company entitlements | Database guards protect verification, claims and tiers; plaintext company API keys prohibited. | Profile edits cannot grant paid or verified status. |
+| 20: Unenforced API limits | Service-only row-locked quota consumption. | Concurrent requests count correctly toward each key's limit. |
+| 21: Draft credit exposure | Public credit lookups require published parent films. | Draft film information stays hidden. |
+| 22: Forged editor messages | Removed obsolete cross-window render listener; current editor uses direct callbacks. | Forged browser messages cannot inject a draft render. |
+| 23: Errors/browser policy | Generic public errors, bounded bodies, explicit CORS/security headers and local-only dev binding. Vercel Standard Protection enabled. | Custom public domains remain public; generated/old deployment URLs require authentication. |
+| 24: Dependencies | Updated all five lockfiles, runtime packages and maintained SheetJS distribution. | Main production dependency audit is clear; development advisories remain below. |
+| 25: Missing auxiliary secrets | Telegram and extractor reject missing authentication secrets. | Missing configuration disables access rather than leaving it open. |
 
-Migrations are timestamped in `supabase/migrations`. The normal `db push` was blocked by an existing local/remote migration history mismatch (`20260920`); the targeted migrations were applied transactionally using the linked Management API and recorded in migration history. Unrelated history was not changed.
+## Database rollout
 
-## Application changes prepared, not pushed
+Eight timestamped security migrations have been applied and registered in migration history. Normal db push encountered the pre-existing local/remote mismatch at `20260920`; only reviewed migrations were applied transactionally through the linked Management API. Unrelated history and catalogue data were preserved. Supabase types were regenerated.
 
-- Administrator and Social Studio authorization fail closed when the trusted profile is missing or unavailable, instead of trusting editable user metadata.
-- WhatsApp self-service profile synchronization no longer writes a role from user metadata.
-- Channel-video linking requires an authenticated administrator and POST.
-- Removed the cron secret from the two browser callers. The already-exposed credential still requires rotation in all deployed environments and scheduled jobs.
-- API-key authorization consumes the database quota before serving requests.
-- Public credit lookups require published parent films.
-- The data router no longer returns exception messages and stack traces.
-- Telegram webhook verification and the media extractor reject requests when their configured authentication secret is absent.
-- WhatsApp callbacks now require a valid Meta HMAC signature over the original request bytes. STOP matches the complete normalized number; ordinary message text containing the word STOP does not unsubscribe a user.
-- The data router preserves raw webhook bodies before JSON parsing and bounds request size. Existing WebSub XML handling remains supported.
-- The image proxy rejects SVG and other unrecognized image formats and limits downloads while reading the stream.
+The profile-media guard blocks direct non-admin changes to public portrait/highlight fields. Upload modals submit for review. Older direct profile-primary controls may receive a review-required error; they cannot bypass moderation.
 
-## Validation so far
+## Validation
 
-- 42 focused regression tests passed, covering administrator authorization, API quotas, body parsing, image formats/size, signed WhatsApp callbacks, existing WhatsApp sending/delivery/monitoring, Telegram intake, and YouTube WebSub.
-- Generated Supabase types after adding the quota RPC and columns.
-- TypeScript validation, production client/SSR build, and media-extractor Python compilation passed.
-- Live database checks confirmed the promotion function was removed, anonymous claim approval is denied, and browser roles cannot execute the quota mutation RPC.
+- Root suite: 77 files, 528 tests: **522 passed, 3 skipped, 3 failed**. Failures concern unchanged social-render dimensions, editorial landscape-video filtering and social-copy Instagram fallback expectations. Related source/tests and rendering dependency versions were unchanged. These failures were not hidden or weakened.
+- All new security regression tests passed. Earlier hardening batch passed 42 focused tests.
+- TypeScript validation, production client/SSR build, OpenCut build, four Python clipper security tests and Python compilation passed.
+- Main production dependency audit: **zero known vulnerabilities**. Content engine and scraper: zero. Remaining development-tool advisories: root eight high; OpenCut seven; launch-video ten. Some transitive packages have no compatible published fix; forced breaking upgrades were not treated as safe fixes.
+- Live checks confirmed restricted privileged RPCs and service-only quota mutations. Public custom domain returned 200. Unsigned WhatsApp callback returned 401; a genuine signed Meta callback still needs observation.
+- No real payment, unsolicited WhatsApp message, bulk catalogue cleanup or public upload was performed for testing. Provider sandbox checkout is still needed to certify end-to-end payment integration.
 
-## Still outstanding
+## Credential and deployment closure
 
-The full audit remediation is **not complete**. Remaining work includes securing person-media upload/approval end to end, payment order/signature validation, AI/scanner cost controls, media proxy SSRF handling, credential revocation/rotation, local clipper pairing, company sensitive-field protection, editor message validation, dependency updates, and final deployment checks.
+The project uses ES256 for current user sessions, but an older HS256 signing key remains trusted. Although legacy API keys are disabled, a previously committed service JWT still works alongside a modern public API key. **Disabling legacy API keys alone does not revoke that JWT.** Revoke the old signing key after checking all consumers use replacement credentials. Current sessions have used ES256 since June.
 
-WhatsApp signature verification uses the **Meta app's App Secret**, separate from the sending access token and the webhook setup verification token, in `WHATSAPP_APP_SECRET`. The user confirmed privately saving it in Vercel Production. A deployment is needed for that environment change to take effect. Never include its value in this report or chat.
+Vercel Production/Preview, GitHub Actions and local files now use modern publishable/secret keys and a new cron credential. VITE_CRON_SECRET was removed. Social-token encryption and OAuth state have separate configured secrets, preventing disruption from this credential migration.
+
+Wrangler is not authenticated on this workstation. A deployed content engine, if present, also needs SUPABASE_SERVICE_ROLE_KEY and PUBLISHER_TOKEN replaced. The extractor's external environment and the Google session represented by committed cookies require separate verification. Removing cookies from Git does not invalidate a stolen session. SEC-17 remains open until those checks and the old-JWT denial test pass.
+
+Final deployment and credential-revocation results will be appended after rollout.
+
+## References
+
+- [Supabase API-key migration](https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys) and [signing keys](https://supabase.com/docs/guides/auth/signing-keys).
+- [OPay callback signing](https://documentation.opaycheckout.com/callback-signature).
+- [Bachs webhook verification](https://docs.bachs.io/guides/webhooks/overview) and [collection success](https://docs.bachs.io/guides/webhooks/events/collection-succeeded).
+- [Vercel deployment protection](https://vercel.com/docs/deployment-protection).

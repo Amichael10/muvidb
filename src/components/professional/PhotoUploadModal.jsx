@@ -1,9 +1,7 @@
+import { savePersonMedia, uploadPersonMediaFile } from '../../lib/personMedia';
 import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
-import { supabase } from '../../lib/supabase';
-import { authHeaders } from '../../lib/apiAuth';
-import { notifyProAdminOnTelegram } from '../../lib/proModeration';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const CATEGORIES = [
@@ -68,116 +66,12 @@ export default function PhotoUploadModal({ person, onClose, onSaved }) {
 
     setUploading(true);
     try {
-      let finalUrl = previewUrl;
-      let r2Key = null;
-
-      // 1. Get presigned R2 upload URL
-      if (file) {
-        const uploadSessionRes = await fetch('/api/social?task=create_r2_upload_url', {
-          method: 'POST',
-          headers: await authHeaders(),
-          body: JSON.stringify({
-            fileName: `${person.slug || person.id}_${Date.now()}_${file.name}`,
-            mimeType: file.type || 'image/jpeg'
-          })
-        });
-
-        if (uploadSessionRes.ok) {
-          const session = await uploadSessionRes.json();
-          if (session?.uploadUrl) {
-            // Upload binary direct to R2
-            const putRes = await fetch(session.uploadUrl, {
-              method: 'PUT',
-              headers: { 'Content-Type': file.type || 'image/jpeg' },
-              body: file
-            });
-            if (putRes.ok) {
-              finalUrl = session.publicUrl;
-              r2Key = session.key;
-            }
-          }
-        }
-      }
-
-      // 2. Save media record into person's highlights / media
-      const newPhotoItem = {
-        id: `photo_${Date.now()}`,
-        type: 'photo',
-        category,
-        title: title || 'Official Photo',
-        url: finalUrl,
-        thumbnail: finalUrl,
-        photographer: photographer || null,
-        year: Number(year) || new Date().getFullYear(),
-        is_primary: isPrimary,
-        created_at: new Date().toISOString()
-      };
-
-      // Retrieve existing highlights
-      const currentStats = person.youtube_stats || {};
-      const existingHighlights = Array.isArray(currentStats.instagram_highlights)
-        ? [...currentStats.instagram_highlights]
-        : [];
-
-      if (isPrimary) {
-        // Unmark other primary photos
-        existingHighlights.forEach(h => {
-          if (h.type === 'photo') h.is_primary = false;
-        });
-      }
-
-      const updatedHighlights = [newPhotoItem, ...existingHighlights];
-
-      const updates = {
-        youtube_stats: {
-          ...currentStats,
-          instagram_highlights: updatedHighlights
-        },
-        updated_at: new Date().toISOString()
-      };
-
-      // If marked as primary headshot, also update main photo_url
-      if (isPrimary) {
-        updates.photo_url = finalUrl;
-      }
-
-      const { error: dbError } = await supabase
-        .from('people')
-        .update(updates)
-        .eq('id', person.id);
-
-      if (dbError) throw dbError;
-
-      // Also record into person_media with pending moderation status
-      try {
-        await supabase.from('person_media').insert({
-          person_id: person.id,
-          media_type: 'photo',
-          category,
-          title: title || 'Official Photo',
-          url: finalUrl,
-          thumbnail_url: finalUrl,
-          photographer_credit: photographer || null,
-          year: Number(year) || new Date().getFullYear(),
-          is_primary: isPrimary,
-          status: 'pending'
-        });
-      } catch (mediaErr) {
-        console.warn('person_media insert note:', mediaErr);
-      }
-
-      // Notify Admin on Telegram
-      notifyProAdminOnTelegram({
-        personId: person.id,
-        personName: person.name,
-        personSlug: person.slug,
-        updateType: 'photos',
-        summary: `New photo uploaded (${category}): "${title || 'Official Photo'}"`,
-        details: `URL: ${finalUrl}\nPhotographer: ${photographer || 'N/A'}\nPrimary: ${isPrimary ? 'Yes' : 'No'}`,
-        link: '/admin/contributions'
-      }).catch((err) => console.warn('Photo upload telegram notify error:', err));
-
-      toast.success(isPrimary ? 'Photo uploaded and set as primary headshot!' : 'Photo added to portfolio!');
+      if (!file) throw new Error('Please select a photo.');
+      const finalUrl = await uploadPersonMediaFile(file, person.id);
+      await savePersonMedia({ person_id: person.id, media_type: 'photo', category,
+        title: title || 'Official Photo', url: finalUrl, thumbnail_url: finalUrl,
+        photographer_credit: photographer || null, year: Number(year), is_primary: isPrimary });
+      toast.success('Photo submitted. It will appear after admin approval.');
       onSaved?.();
       onClose();
     } catch (err) {

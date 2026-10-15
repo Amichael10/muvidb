@@ -5,21 +5,23 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
  * the request only if it comes from our trusted domains or localhost.
  */
 export function getCorsHeaders(req: VercelRequest) {
-  const origin = req?.headers?.origin || (req?.headers as any)?.Origin || '';
+  const origin = String(req?.headers?.origin || (req?.headers as any)?.Origin || '');
   let allowedOrigin = 'https://muvidb.com'; // fallback default
 
   if (origin) {
-    // Check if origin is allowed
-    // Allow localhost, muvidb.com, or Vercel preview domains
+    const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean);
+    const deploymentOrigins = [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL].filter(Boolean).map(host => `https://${host}`);
+    // Preview origins are explicitly tied to this deployment or configuration.
     const isAllowed =
       origin === 'https://muvidb.com' ||
       origin === 'https://www.muvidb.com' ||
       origin === 'https://lumi.muvidb.com' ||
       origin === 'https://studio.muvidb.com' ||
-      origin.endsWith('.muvidb.com') ||
-      origin.endsWith('.vercel.app') ||
-      /^http:\/\/localhost(:\d+)?$/.test(origin) ||
-      /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin);
+      configuredOrigins.includes(origin) || deploymentOrigins.includes(origin) ||
+      (process.env.NODE_ENV !== 'production' && (
+        /^http:\/\/localhost(:\d+)?$/.test(origin) ||
+        /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)
+      ));
 
     if (isAllowed) {
       allowedOrigin = origin;

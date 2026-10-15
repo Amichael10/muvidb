@@ -58,6 +58,27 @@
   },
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self' https: data: blob:; script-src 'self' https: blob: 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' https: 'unsafe-inline'; connect-src 'self' https: wss: http://127.0.0.1:4317 http://localhost:4317; worker-src 'self' blob:; frame-src https: blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self' https://checkout.bachs.io" }
+      ]
+    },
+    {
+      "source": "/storage/:path*",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "sandbox; default-src 'none'; style-src 'unsafe-inline'" }
+      ]
+    },
+    {
+      "source": "/(.*\\.[sS][vV][gG])",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "sandbox; default-src 'none'; style-src 'unsafe-inline'" }
+      ]
+    },
+    {
       "source": "/assets/(.*)",
       "headers": [
         {

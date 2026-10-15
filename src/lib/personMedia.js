@@ -1,3 +1,29 @@
+import { authHeaders } from './apiAuth';
+
+export async function savePersonMedia(payload, method = 'POST') {
+  const response = await fetch('/api/person-media', { method,
+    headers: await authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(payload) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Unable to save media');
+  return result.data;
+}
+
+export async function uploadPersonMediaFile(file, personId) {
+  if (!file || file.size > 32 * 1024 * 1024) throw new Error('Please choose a file up to 32 MB.');
+  const headers = await authHeaders({ 'Content-Type': 'application/json' });
+  const prepared = await fetch('/api/person-media?action=presign', { method: 'POST', headers,
+    body: JSON.stringify({ personId, fileName: file.name, mimeType: file.type, fileSize: file.size }) });
+  const session = await prepared.json();
+  if (!prepared.ok || !session.uploadUrl) throw new Error(session.error || 'Unable to prepare upload');
+  const uploaded = await fetch(session.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type, 'x-upsert': 'false' }, body: file });
+  if (!uploaded.ok) throw new Error('The file could not be uploaded. Please try again.');
+  const preview = await fetch('/api/person-media?action=preview-upload', { method: 'POST', headers,
+    body: JSON.stringify({ personId, key: session.key }) });
+  const result = await preview.json();
+  if (!preview.ok || !result.url) throw new Error(result.error || 'Unable to preview uploaded file');
+  return result.url;
+}
+
 /**
  * Utilities for formatting, parsing, and classifying IMDb-style Person Media
  */

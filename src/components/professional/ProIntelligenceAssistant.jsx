@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
+import { authHeaders } from '../../lib/apiAuth';
 
 const PRESET_PROMPTS = [
   'Compare my filmography genres against top trending African cinema genres',
@@ -25,7 +26,7 @@ export default function ProIntelligenceAssistant({ person, credits = [] }) {
     try {
       const res = await fetch('/api/pro-intel', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           query: q,
           personContext: person ? { name: person.name, department: person.known_for_department, creditsCount: credits.length } : null,

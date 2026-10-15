@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { authHeaders } from '../lib/apiAuth';
 import {
   fetchUserManagedCompanies,
   fetchCompanyFullProfile,
@@ -106,16 +107,13 @@ export default function CompanyDashboard() {
   const [apiKey, setApiKey] = useState('mvd_live_7e8b91a24d5f6c802143eb99a4');
   const [keyCopied, setKeyCopied] = useState(false);
   const [checkingOutBachs, setCheckingOutBachs] = useState(false);
-  const [bachsModalData, setBachsModalData] = useState(null);
-  const [confirmingBachsPayment, setConfirmingBachsPayment] = useState(false);
-  const [selectedBachsMethod, setSelectedBachsMethod] = useState('card');
 
   const handleBachsCheckout = async (amount = 25000, planType = 'pro_monthly') => {
     setCheckingOutBachs(true);
     try {
-      const res = await fetch('/api/data?key=bachs&op=initialize', {
+      const res = await fetch('/api/bachs?op=initialize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           companyId: currentCompany?.id,
           userEmail: user?.email || 'admin@muvidb.com',
@@ -130,15 +128,7 @@ export default function CompanyDashboard() {
 
       const data = await res.json().catch(() => null);
 
-      if (data?.isSandbox || data?.checkoutUrl?.includes('mock_bachs=1')) {
-        setBachsModalData({
-          reference: data.reference || `MUV_${Date.now()}`,
-          sessionId: data.sessionId || `BACHS_${Date.now()}`,
-          amount,
-          planType,
-          companyId: currentCompany?.id,
-        });
-      } else if (data?.checkoutUrl || data?.cashierUrl) {
+      if (data?.checkoutUrl || data?.cashierUrl) {
         toast.success('Redirecting to Bachs Checkout...');
         window.location.href = data.checkoutUrl || data.cashierUrl;
       } else {
@@ -149,35 +139,6 @@ export default function CompanyDashboard() {
       toast.error('Failed to connect to Bachs payment gateway.');
     } finally {
       setCheckingOutBachs(false);
-    }
-  };
-
-  const handleConfirmMockBachs = async () => {
-    setConfirmingBachsPayment(true);
-    try {
-      const res = await fetch('/api/data?key=bachs&op=confirm_sandbox', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companyId: bachsModalData?.companyId || currentCompany?.id,
-          reference: bachsModalData?.reference,
-        }),
-      });
-      const result = await res.json().catch(() => null);
-      if (result?.success) {
-        toast.success('Payment Confirmed! Studio Pro API tier is now active.');
-        setBachsModalData(null);
-        if (currentCompany) {
-          setCurrentCompany({ ...currentCompany, api_tier: 'pro' });
-        }
-        setRefreshTrigger((prev) => prev + 1);
-      } else {
-        toast.error(result?.error || 'Failed to confirm sandbox payment');
-      }
-    } catch (err) {
-      toast.error('Payment confirmation failed');
-    } finally {
-      setConfirmingBachsPayment(false);
     }
   };
 
@@ -2039,185 +2000,6 @@ export default function CompanyDashboard() {
       )}
 
       {/* ── MODAL: BACHS HOSTED CASHIER SIMULATION ── */}
-      {bachsModalData && (
-        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-surface border border-emerald-500/40 rounded-3xl max-w-md w-full shadow-2xl overflow-hidden relative">
-            
-            {/* Bachs Branded Header */}
-            <div className="bg-emerald-600 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-black text-lg">
-                  <Icon icon="solar:card-2-bold" width="22" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm tracking-tight">Bachs Secure Checkout</h3>
-                  <p className="text-[10px] text-white/80 font-medium flex items-center gap-1">
-                    <Icon icon="solar:shield-check-bold" width="12" /> Official Merchant Gateway
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setBachsModalData(null)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition cursor-pointer"
-              >
-                <Icon icon="solar:close-circle-bold" width="20" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 space-y-5 text-xs">
-              
-              {/* Order Info & Amount Card */}
-              <div className="bg-surface-2/80 border border-border rounded-2xl p-4 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Merchant Order</span>
-                  <span className="font-bold text-text-primary text-xs truncate max-w-[180px] block">
-                    {currentCompany?.name || 'MuviDB Studio Pro'}
-                  </span>
-                  <span className="text-[10px] font-mono text-text-muted">
-                    {bachsModalData.reference}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Total Amount</span>
-                  <span className="text-xl font-black text-emerald-400">₦25,000</span>
-                  <span className="text-[9px] text-text-muted block">NGN</span>
-                </div>
-              </div>
-
-              {/* Payment Channel Selector */}
-              <div>
-                <label className="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2">
-                  Choose Payment Method
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBachsMethod('card')}
-                    className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 cursor-pointer ${
-                      selectedBachsMethod === 'card'
-                        ? 'border-emerald-500 bg-emerald-500/10 text-text-primary font-bold shadow-sm'
-                        : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    <Icon icon="solar:card-bold" width="18" className={selectedBachsMethod === 'card' ? 'text-emerald-400' : ''} />
-                    <span className="text-[11px]">Bank Card</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBachsMethod('transfer')}
-                    className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 cursor-pointer ${
-                      selectedBachsMethod === 'transfer'
-                        ? 'border-emerald-500 bg-emerald-500/10 text-text-primary font-bold shadow-sm'
-                        : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    <Icon icon="solar:bank-bold" width="18" className={selectedBachsMethod === 'transfer' ? 'text-emerald-400' : ''} />
-                    <span className="text-[11px]">Bank Transfer</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBachsMethod('crypto')}
-                    className={`p-3 rounded-xl border text-center transition flex flex-col items-center gap-1.5 cursor-pointer ${
-                      selectedBachsMethod === 'crypto'
-                        ? 'border-emerald-500 bg-emerald-500/10 text-text-primary font-bold shadow-sm'
-                        : 'border-border bg-surface-2 text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    <Icon icon="solar:wallet-money-bold" width="18" className={selectedBachsMethod === 'crypto' ? 'text-emerald-400' : ''} />
-                    <span className="text-[11px]">USDT / Crypto</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Method Details simulation */}
-              {selectedBachsMethod === 'card' && (
-                <div className="p-3.5 bg-surface-2 border border-border rounded-xl space-y-2">
-                  <div className="flex items-center justify-between text-[11px] text-text-muted">
-                    <span>Card Number</span>
-                    <span className="text-[10px] text-emerald-400 font-bold">Mastercard / Visa / Verve</span>
-                  </div>
-                  <div className="font-mono text-xs font-bold text-text-primary tracking-widest bg-surface p-2 rounded-lg border border-border">
-                    5399 •••• •••• 8910
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="flex-1 bg-surface p-2 rounded-lg border border-border font-mono text-[11px] text-text-muted">
-                      EXP: 12/28
-                    </div>
-                    <div className="w-16 bg-surface p-2 rounded-lg border border-border font-mono text-[11px] text-text-muted text-center">
-                      CVV: •••
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedBachsMethod === 'transfer' && (
-                <div className="p-3.5 bg-surface-2 border border-border rounded-xl space-y-1 text-center">
-                  <p className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Dynamic Virtual Account</p>
-                  <p className="font-mono text-base font-black text-text-primary tracking-wider">8034 912 401</p>
-                  <p className="text-[11px] text-emerald-400 font-bold">Bachs Settlement Bank (Wema / Providus)</p>
-                </div>
-              )}
-
-              {selectedBachsMethod === 'crypto' && (
-                <div className="p-3.5 bg-surface-2 border border-border rounded-xl space-y-1 text-center">
-                  <p className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Stablecoin Deposit</p>
-                  <p className="font-mono text-xs font-bold text-text-primary truncate">0x71c...9B2e (USDT / USDC)</p>
-                  <p className="text-[11px] text-emerald-400 font-bold">Base / Polygon / Tron Network</p>
-                </div>
-              )}
-
-              {/* Merchant Security Badge */}
-              <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-[11px] text-emerald-400">
-                <Icon icon="solar:shield-check-bold" width="16" className="shrink-0" />
-                <span>Bachs Preview Sandbox: Click Authorize to test instant plan activation and elevate your company's API access limits.</span>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-2 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setBachsModalData(null)}
-                  disabled={confirmingBachsPayment}
-                  className="w-1/3 py-3 rounded-xl bg-surface-2 border border-border text-text-muted hover:text-text-primary font-bold transition text-xs cursor-pointer"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleConfirmMockBachs}
-                  disabled={confirmingBachsPayment}
-                  className="w-2/3 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold transition text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {confirmingBachsPayment ? (
-                    <>
-                      <Icon icon="solar:restart-linear" className="animate-spin" width="16" />
-                      <span>Authorizing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Icon icon="solar:lock-keyhole-bold" width="14" />
-                      <span>Authorize & Pay ₦25,000</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <p className="text-[10px] text-center text-text-muted">
-                Powered by Bachs.io • PCI DSS Level 1 Certified
-              </p>
-
-            </div>
-
-          </div>
-        </div>
-      )}
-
       {inviteModalOpen && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-2xl max-w-sm w-full p-6 shadow-2xl">

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from './supabase.js';
 import { generateAIContent, parseJSON, hasCohere } from './ai_service.js';
+import { requireRequestQuota } from './request_quota.js';
 
 export async function handleProIntelQuery(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -8,12 +9,25 @@ export async function handleProIntelQuery(req: VercelRequest, res: VercelRespons
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { query, history = [] } = req.body || {};
+  const token = String(req.headers.authorization || '').match(/^Bearer (.+)$/)?.[1];
+  if (!token) return res.status(401).json({ error: 'Sign in required' });
+  const { data: auth, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !auth.user) return res.status(401).json({ error: 'Invalid session' });
+  const { data: profile, error: profileError } = await supabase.from('users').select('role').eq('id', auth.user.id).maybeSingle();
+  if (profileError || !profile || !['professional', 'admin', 'admin_limited'].includes(profile.role)) {
+    return res.status(403).json({ error: 'Professional account required' });
+  }
+  const { query, history: suppliedHistory } = req.body || {};
+  const history = Array.isArray(suppliedHistory) ? suppliedHistory.slice(-4).map(item => ({
+    role: item?.role === 'assistant' ? 'assistant' : 'user', content: String(item?.content || '').slice(0, 2000),
+  })) : [];
   const q = String(query || '').trim();
 
   if (!q || q.length < 3) {
     return res.status(400).json({ error: 'Query is too short' });
   }
+  if (q.length > 2000) return res.status(400).json({ error: 'Query is too long' });
+  if (!(await requireRequestQuota(req, res, 'pro-intel', auth.user.id))) return;
 
   try {
     // 1. Retrieve relevant entities from database based on keywords in query
@@ -140,7 +154,7 @@ Return a JSON object:
   } catch (err: any) {
     console.error('[pro-intel] Query execution error:', err?.message || err);
     return res.status(500).json({
-      error: err?.message || 'Pro Intelligence analysis failed',
+      error: 'Pro Intelligence analysis failed',
     });
   }
 }

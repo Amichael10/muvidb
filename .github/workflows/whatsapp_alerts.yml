@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Process credit alert queue
         env:
-          CRON_SECRET: ${{ secrets.VITE_CRON_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           test -n "$CRON_SECRET"
           response=$(curl --silent --show-error --fail-with-body --max-time 260 \

@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      CRON_SECRET: ${{ secrets.CRON_SECRET || secrets.VITE_CRON_SECRET }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
 
     steps:
       - name: Verify publisher secret

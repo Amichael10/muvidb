@@ -38,6 +38,7 @@ CLIP_JOBS: dict[str, dict] = {}
 ALLOWED_ORIGINS = [
     "https://muvidb.com",
     "https://www.muvidb.com",
+    "https://studio.muvidb.com",
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:5173",
@@ -50,31 +51,45 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 app = FastAPI(title="MuviDB Local Clipper", version="2.1.0")
+PAIRING_TOKEN = secrets.token_urlsafe(32)
 
 
 class PrivateNetworkAccessMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        origin = request.headers.get("origin") or "*"
+        origin = request.headers.get("origin")
+        if request.url.hostname not in ("localhost", "127.0.0.1", "::1"):
+            return Response("Invalid local host", status_code=403)
+        if not request.client or request.client.host not in ("127.0.0.1", "::1"):
+            return Response("Loopback access required", status_code=403)
+        if origin and origin not in ALLOWED_ORIGINS:
+            return Response("Origin not allowed", status_code=403)
         if request.method == "OPTIONS":
+            if not origin:
+                return Response(status_code=403)
             response = Response(status_code=204)
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, HEAD"
-            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Muvidb-Clipper-Token"
             response.headers["Access-Control-Allow-Private-Network"] = "true"
             response.headers["Access-Control-Max-Age"] = "86400"
             return response
 
+        if request.url.path != "/health":
+            token = request.headers.get("x-muvidb-clipper-token", "")
+            if not secrets.compare_digest(token, PAIRING_TOKEN):
+                return Response("Local clipper pairing required", status_code=401)
         response = await call_next(request)
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Private-Network"] = "true"
-        response.headers["Access-Control-Expose-Headers"] = "*"
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+            response.headers["Vary"] = "Origin"
         return response
 
 
 # Add CORSMiddleware first, then PrivateNetworkAccessMiddleware so PNA wraps everything (including OPTIONS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -198,7 +213,7 @@ def cookie_options() -> dict:
 
 
 @app.get("/health")
-def health():
+def health(request: Request):
     cleanup_expired_files()
     fc_path = get_filmcraft_path()
     return {
@@ -208,8 +223,7 @@ def health():
         "ffmpeg": bool(shutil.which("ffmpeg")),
         "filmcraft": bool(fc_path),
         "filmcraft_version": "0.5.0" if fc_path else None,
-        "filmcraft_path": str(fc_path) if fc_path else None,
-        "cookie_source": "file" if is_valid_netscape_cookie_file(os.getenv("YT_COOKIES_FILE", "")) else os.getenv("YT_COOKIES_FROM_BROWSER", "chrome"),
+        "pairing_token": PAIRING_TOKEN if request.headers.get("origin") in ALLOWED_ORIGINS else None,
     }
 
 

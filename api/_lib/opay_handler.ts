@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import crypto from 'node:crypto';
 import { supabase } from './supabase.js';
+import { initializePaymentOrder, paymentAmountMinor, paymentReturnUrl, paymentOrderStatus, verifyOpayCallback } from './payment_security.js';
 
 interface OPayInitializeRequest {
   companyId: string;
@@ -43,10 +43,7 @@ export async function handleOpay(req: VercelRequest, res: VercelResponse) {
 async function handleInitialize(req: VercelRequest, res: VercelResponse) {
   try {
     const {
-      companyId,
       userEmail,
-      amount = 25000,
-      planType = 'pro_monthly',
       returnUrl,
     } = req.body as OPayInitializeRequest;
 
@@ -61,16 +58,15 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
     const isLive = process.env.OPAY_ENV === 'live';
     const endpoint = isLive ? OPAY_LIVE_URL : OPAY_SANDBOX_URL;
 
-    const reference = companyId
-      ? `MUV_CMP_${companyId}_${Date.now()}`.toUpperCase()
-      : `MUV_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`.toUpperCase();
-
-    const origin = req.headers.origin || 'https://muvidb.com';
-    const finalReturnUrl = returnUrl || `${origin}/company/dashboard?tab=api&payment=success&ref=${reference}`;
+    const order = await initializePaymentOrder(req, res, 'opay', !isLive);
+    if (!order) return;
+    const { reference, companyId, amount, planType } = order;
+    const origin = 'https://muvidb.com';
+    const finalReturnUrl = paymentReturnUrl(returnUrl, `${origin}/company/dashboard?tab=api&payment=success&ref=${reference}`);
     const callbackUrl = `${origin}/api/webhooks/opay`;
 
     // Amount in Kobo: e.g. 25000 NGN -> 2500000 Kobo
-    const amountKobo = Math.round(amount * 100);
+    const amountKobo = order.amountMinor;
 
     const productName = (req.body as any)?.productName || (planType === 'support' ? 'MuviDB Archive Contribution' : `MuviDB Studio Pro (${planType})`);
     const productDesc = (req.body as any)?.productDescription || (planType === 'support' ? 'Support & Preservation Contribution for MuviDB Archive' : 'MuviDB Studio Pro & Developer API Tier');
@@ -129,7 +125,8 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // In Test mode or if upstream sandbox is unreachable from localhost/development:
+    if (isLive) return res.status(502).json({ error: 'Payment gateway unavailable; no payment has been confirmed' });
+    // Sandbox checkout never activates paid access.
     // Provide seamless OPay Sandbox Cashier session
     const mockCashierUrl = returnUrl
       ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}mock_opay=1&ref=${reference}&amount=${amount}&plan=${planType}`
@@ -145,7 +142,7 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err: any) {
     console.error('[OPay] Exception in initialize:', err);
-    return res.status(500).json({ error: err.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Payment service unavailable' });
   }
 }
 
@@ -153,35 +150,7 @@ async function handleInitialize(req: VercelRequest, res: VercelResponse) {
  * Confirm sandbox payment and elevate studio tier
  */
 async function handleConfirmSandbox(req: VercelRequest, res: VercelResponse) {
-  try {
-    const { companyId, reference } = req.body || {};
-    let targetCompanyId = companyId;
-
-    if (!targetCompanyId && reference?.includes('_CMP_')) {
-      const parts = reference.split('_');
-      targetCompanyId = parts[2];
-    }
-
-    if (targetCompanyId) {
-      const { error } = await supabase
-        .from('companies')
-        .update({ api_tier: 'pro' })
-        .eq('id', targetCompanyId);
-
-      if (error) {
-        console.error('[OPay Sandbox] Supabase update error:', error);
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      reference,
-      status: 'SUCCESS',
-      message: 'Payment confirmed! Studio Pro tier activated.',
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
+  return res.status(410).json({ error: 'Sandbox checkout cannot activate paid access' });
 }
 
 /**
@@ -190,48 +159,32 @@ async function handleConfirmSandbox(req: VercelRequest, res: VercelResponse) {
 async function handleWebhook(req: VercelRequest, res: VercelResponse) {
   try {
     const rawBody = req.body;
-    console.log('[OPay Webhook] Received payload:', JSON.stringify(rawBody));
 
-    const secretKey = (process.env.OPAY_SECRET_KEY || process.env.SECRET_KEY || '').trim();
+    const secretKey = (process.env.OPAY_SECRET_KEY || '').trim();
     const payload = rawBody?.payload || rawBody;
     const incomingSha512 = req.headers['sha512'] || rawBody?.sha512;
 
-    // Verify HMAC/SHA512 if provided
-    if (incomingSha512 && secretKey && rawBody?.payload) {
-      const calculated = crypto
-        .createHmac('sha512', secretKey)
-        .update(JSON.stringify(rawBody.payload))
-        .digest('hex');
-
-      if (calculated !== incomingSha512) {
-        console.warn('[OPay Webhook] Signature mismatch. Calculated:', calculated, 'Got:', incomingSha512);
-      }
-    }
+    if (!secretKey) return res.status(503).json({ error: 'Payment verification is not configured' });
+    if (!verifyOpayCallback(payload, incomingSha512, secretKey)) return res.status(401).json({ error: 'Invalid payment signature' });
 
     const status = payload?.status;
     const reference = payload?.reference;
 
-    if (status === 'SUCCESS') {
-      console.log(`[OPay Webhook] Payment SUCCESS for reference: ${reference}`);
-
-      if (reference?.includes('_CMP_')) {
-        const parts = reference.split('_');
-        const companyId = parts[2];
-        if (companyId) {
-          await supabase
-            .from('companies')
-            .update({
-              api_tier: 'pro',
-            })
-            .eq('id', companyId);
-        }
-      }
+    if (status === 'SUCCESS' && !payload.refunded) {
+      const minor = paymentAmountMinor(payload.amount);
+      if (!minor) return res.status(400).json({ error: 'Invalid payment amount' });
+      const { data, error } = await supabase.rpc('settle_payment_order', {
+        p_reference: reference, p_provider: 'opay', p_amount_minor: minor, p_currency: payload.currency,
+        p_transaction_id: payload.transactionId, p_event_id: payload.transactionId, p_checkout_id: null,
+      });
+      if (error) return res.status(503).json({ error: 'Payment processing unavailable' });
+      if (!data) return res.status(400).json({ error: 'Payment does not match an order' });
     }
 
     return res.status(200).json({ code: '00000', message: 'SUCCESS' });
   } catch (err: any) {
     console.error('[OPay Webhook] Error:', err);
-    return res.status(200).json({ code: '00000', message: 'ERROR_RECORDED' });
+    return res.status(503).json({ error: 'Payment processing unavailable' });
   }
 }
 
@@ -239,38 +192,7 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse) {
  * Check status of an existing order
  */
 async function handleCheckStatus(req: VercelRequest, res: VercelResponse) {
-  try {
-    const reference = String(req.query.reference || '');
-    const orderNo = String(req.query.orderNo || '');
-
-    if (!reference && !orderNo) {
-      return res.status(400).json({ error: 'reference or orderNo is required' });
-    }
-
-    const publicKey = (process.env.OPAY_PUBLIC_KEY || process.env.PUBLIC_KEY || '').trim();
-    const merchantId = (process.env.OPAY_MERCHANT_ID || '').trim();
-    const isLive = process.env.OPAY_ENV === 'live';
-    const endpoint = isLive
-      ? 'https://api.opaycheckout.com/api/v1/international/cashier/status'
-      : 'https://testapi.opaycheckout.com/api/v1/international/cashier/status';
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${publicKey}`,
-      'MerchantId': merchantId,
-    };
-
-    const opayRes = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ reference, orderNo }),
-    });
-
-    const data = await opayRes.json().catch(() => null);
-    return res.status(opayRes.status).json(data);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
+  return paymentOrderStatus(req, res, 'opay');
 }
 
 export default handleOpay;

@@ -22,7 +22,7 @@ export async function handleAuthEmailSend(req: VercelRequest, res: VercelRespons
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const expected = (process.env.CRON_SECRET || process.env.VITE_CRON_SECRET || '').trim();
+  const expected = (process.env.CRON_SECRET || '').trim();
   const auth = req.headers.authorization || '';
   if (!expected || auth !== `Bearer ${expected}`) {
     return res.status(401).json({ error: 'Unauthorized' });

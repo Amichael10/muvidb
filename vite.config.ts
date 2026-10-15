@@ -77,7 +77,7 @@ export default defineConfig(({ mode, isSsrBuild }) => {
     // the SSR build (the server bundle must stay a single module graph).
     server: {
       port: 3001,
-      host: '0.0.0.0',
+      host: '127.0.0.1',
       // Harvest workers append progress continuously. Keeping those files out
       // of Vite's watcher prevents the approval UI from being starved by
       // needless rescans while multiple workers are active.

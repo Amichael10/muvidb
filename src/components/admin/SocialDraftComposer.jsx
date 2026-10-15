@@ -798,53 +798,8 @@ export default function SocialDraftComposer({
     setStep3Open(true);
   }, [initialDraft]);
 
-  // 1. Cross-tab real-time listener from OpenCut Studio
-  useEffect(() => {
-    const handleStudioMessage = (event) => {
-      if (event.data?.type === 'OPEN_CUT_RENDER_COMPLETE') {
-        const { draftId, variantId, publicUrl, assetId, width, height, format } = event.data;
-
-        const isVideo = Boolean(publicUrl && (
-          /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(publicUrl) ||
-          publicUrl.startsWith('blob:') ||
-          format?.includes('video') ||
-          format?.includes('render') ||
-          format?.includes('custom') ||
-          format?.includes('9:16') ||
-          format?.includes('1:1')
-        ));
-        const newAsset = {
-          id: assetId || publicUrl,
-          publicUrl,
-          mediaType: isVideo ? 'video' : 'image',
-          format: format || 'custom_render',
-          width: width || 1080,
-          height: height || 1080,
-        };
-
-        setResult(curr => {
-          if (!curr) return curr;
-          const updatedAssets = [newAsset, ...(curr.assets || []).filter(a => a.id !== newAsset.id && a.publicUrl !== publicUrl)];
-          const updatedVariants = (curr.variants || []).map(v => {
-            if (!variantId || v.id === variantId) {
-              return {
-                ...v,
-                selected_asset_id: newAsset.id,
-                selected_asset: newAsset,
-              };
-            }
-            return v;
-          });
-          return { ...curr, assets: updatedAssets, variants: updatedVariants };
-        });
-
-        toast.success('✨ Rendered asset from Studio attached to draft!');
-      }
-    };
-
-    window.addEventListener('message', handleStudioMessage);
-    return () => window.removeEventListener('message', handleStudioMessage);
-  }, []);
+  // Studio assets attach through the modal callback, which owns this draft.
+  // Do not accept cross-window messages as authorization to attach assets.
 
   // 2. Persist working state into sessionStorage so returning via URL or tab refresh restores everything
   useEffect(() => {

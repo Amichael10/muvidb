@@ -1,9 +1,7 @@
+import { savePersonMedia, uploadPersonMediaFile } from '../../lib/personMedia';
 import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
-import { supabase } from '../../lib/supabase';
-import { authHeaders } from '../../lib/apiAuth';
-import { notifyProAdminOnTelegram } from '../../lib/proModeration';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 const VIDEO_CATEGORIES = [
@@ -71,128 +69,16 @@ export default function VideoUploadModal({ person, credits = [], onClose, onSave
 
     setUploading(true);
     try {
-      let finalUrl = videoUrl.trim();
-      let embedProvider = 'youtube';
-      let embedId = null;
-      let thumbnailUrl = 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&w=800&q=80';
-
-      if (sourceType === 'upload' && file) {
-        // Direct MP4 R2 Presigned Upload
-        const uploadSessionRes = await fetch('/api/social?task=create_r2_upload_url', {
-          method: 'POST',
-          headers: await authHeaders(),
-          body: JSON.stringify({
-            fileName: `videos/${person.slug || person.id}_${Date.now()}_${file.name}`,
-            mimeType: file.type || 'video/mp4'
-          })
-        });
-
-        if (uploadSessionRes.ok) {
-          const session = await uploadSessionRes.json();
-          if (session?.uploadUrl) {
-            const putRes = await fetch(session.uploadUrl, {
-              method: 'PUT',
-              headers: { 'Content-Type': file.type || 'video/mp4' },
-              body: file
-            });
-            if (putRes.ok) {
-              finalUrl = session.publicUrl;
-              embedProvider = 'r2';
-            }
-          }
-        }
-      } else {
-        const parsed = parseVideoEmbed(videoUrl);
-        if (parsed) {
-          embedProvider = parsed.provider;
-          embedId = parsed.id;
-          finalUrl = parsed.url;
-          thumbnailUrl = parsed.thumbnail;
-        }
-      }
-
-      // Check if film title should be tagged
+      const parsed = sourceType === 'upload' ? null : parseVideoEmbed(videoUrl);
+      const finalUrl = sourceType === 'upload' ? await uploadPersonMediaFile(file, person.id) : parsed?.url;
+      if (!finalUrl) throw new Error('Please provide a video file or link.');
       const selectedCredit = credits.find(c => c.film_id === taggedFilmId || c.films?.id === taggedFilmId);
-      const filmTitle = selectedCredit?.films?.title || null;
-
-      const newVideoItem = {
-        id: `video_${Date.now()}`,
-        type: 'video',
-        category,
-        title: title || `${person.name} - ${category.toUpperCase()}`,
-        url: finalUrl,
-        thumbnail: thumbnailUrl,
-        embed_provider: embedProvider,
-        embed_id: embedId,
-        film_id: taggedFilmId || null,
-        film_title: filmTitle,
-        character_name: characterName || selectedCredit?.character_name || null,
-        year: Number(year) || new Date().getFullYear(),
-        is_featured: isFeatured,
-        created_at: new Date().toISOString()
-      };
-
-      // Retrieve existing highlights
-      const currentStats = person.youtube_stats || {};
-      const existingHighlights = Array.isArray(currentStats.instagram_highlights)
-        ? [...currentStats.instagram_highlights]
-        : [];
-
-      if (isFeatured) {
-        // Unmark other featured videos
-        existingHighlights.forEach(h => {
-          if (h.type === 'video') h.is_featured = false;
-        });
-      }
-
-      const updatedHighlights = [newVideoItem, ...existingHighlights];
-
-      const { error: dbError } = await supabase
-        .from('people')
-        .update({
-          youtube_stats: {
-            ...currentStats,
-            instagram_highlights: updatedHighlights
-          },
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', person.id);
-
-      if (dbError) throw dbError;
-
-      // Also record into person_media with pending moderation status
-      try {
-        await supabase.from('person_media').insert({
-          person_id: person.id,
-          media_type: 'video',
-          category,
-          title: title || `${person.name} - ${category.toUpperCase()}`,
-          url: finalUrl,
-          thumbnail_url: thumbnailUrl,
-          embed_provider: embedProvider,
-          embed_id: embedId,
-          film_id: taggedFilmId || null,
-          character_name: characterName || selectedCredit?.character_name || null,
-          year: Number(year) || new Date().getFullYear(),
-          is_primary: isFeatured,
-          status: 'pending'
-        });
-      } catch (mediaErr) {
-        console.warn('person_media video insert note:', mediaErr);
-      }
-
-      // Notify Admin on Telegram
-      notifyProAdminOnTelegram({
-        personId: person.id,
-        personName: person.name,
-        personSlug: person.slug,
-        updateType: 'videos',
-        summary: `New video reel uploaded (${category}): "${title}"`,
-        details: `URL: ${finalUrl}\nTagged Film: ${filmTitle || 'None'}\nFeatured: ${isFeatured ? 'Yes' : 'No'}`,
-        link: '/admin/contributions'
-      }).catch((err) => console.warn('Video upload telegram notify error:', err));
-
-      toast.success(isFeatured ? 'Video added and pinned as your main featured showreel!' : 'Video added to portfolio!');
+      await savePersonMedia({ person_id: person.id, media_type: 'video', category,
+        title: title || `${person.name} - ${category}`, url: finalUrl,
+        thumbnail_url: parsed?.thumbnail || null, embed_provider: parsed?.provider || 'direct', embed_id: parsed?.id || null,
+        film_id: taggedFilmId || null, character_name: characterName || selectedCredit?.character_name || null,
+        year: Number(year), is_primary: isFeatured });
+      toast.success('Video submitted. It will appear after admin approval.');
       onSaved?.();
       onClose();
     } catch (err) {

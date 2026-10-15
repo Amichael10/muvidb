@@ -227,6 +227,9 @@ tessdata/
 *.traineddata
 
 # Temporary scraping and profiling dumps
+services/media-extractor/cookies.txt
+scratch/add_genres_and_assign.cjs
+scratch/assign_remaining_genres.cjs
 bp_*
 rhoda_*
 

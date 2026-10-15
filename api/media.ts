@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleHealth } from './_lib/health.js';
 import { handleMirrorImages } from './_lib/mirror_images_admin.js';
+import { downloadPublicImage } from './_lib/safe_image_download.js';
 
 // Consolidated media/system router (Hobby free-tier function budget — see
 // docs/SSR_MIGRATION.md). Public paths are preserved by vercel.json rewrites:
@@ -15,10 +16,6 @@ export const config = { maxDuration: 60 }; // mirror-images batch needs the head
 // /api/media?url=<origin>, so users only ever see muvidb.com URLs and broken
 // hotlinks disappear. Responses are cached hard at the Vercel edge, so each
 // origin image is fetched at most once.
-
-// Block obvious SSRF targets (loopback, private ranges, cloud metadata, .local).
-const BLOCKED_HOST =
-  /^(localhost$|127\.|0\.0\.0\.0$|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|::1$|.*\.local$)/i;
 
 // Detect a real image from its leading bytes, regardless of the content-type header.
 function sniffImageType(buf: Buffer): string | null {
@@ -62,49 +59,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).send('Invalid url');
   }
   if (!/^https?:$/.test(target.protocol)) return res.status(400).send('Unsupported protocol');
-  if (BLOCKED_HOST.test(target.hostname)) return res.status(403).send('Blocked host');
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const upstream = await fetch(target.toString(), {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': target.origin + '/',
-      },
+    const buffer = await downloadPublicImage(target, {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'image/webp,image/png,image/jpeg,image/gif,image/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
     });
-
-    if (!upstream.ok) return res.status(502).send('Upstream error');
-
-    const limit = 15 * 1024 * 1024;
-    if (Number(upstream.headers.get('content-length')) > limit) {
-      await upstream.body?.cancel();
-      return res.status(413).send('Too large');
-    }
-    const chunks: Uint8Array[] = [];
-    let bytes = 0;
-    const reader = upstream.body?.getReader();
-    if (!reader) return res.status(502).send('Empty upstream response');
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytes += value.byteLength;
-        if (bytes > limit) {
-          await reader.cancel();
-          return res.status(413).send('Too large');
-        }
-        chunks.push(value);
-      }
-    } finally {
-      reader.releaseLock();
-    }
-    const buffer = Buffer.concat(chunks);
 
     // Trust the file signature over the (frequently wrong) content-type header —
     // origin servers often label valid images as application/octet-stream.
@@ -118,8 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     return res.status(200).send(buffer);
   } catch (e: any) {
-    return res.status(502).send(e?.name === 'AbortError' ? 'Timeout' : 'Fetch failed');
-  } finally {
-    clearTimeout(timeout);
+    const status = [400, 403, 413, 504].includes(e?.statusCode) ? e.statusCode : 502;
+    return res.status(status).send(status === 403 ? 'Blocked host' : status === 413 ? 'Too large' : 'Image fetch failed');
   }
 }

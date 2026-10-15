@@ -1,3 +1,4 @@
+import { fetchWithLocalClipperAuth } from '../../lib/localClipperFetch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
@@ -494,7 +495,7 @@ export default function AdminSocialStudio() {
   const fetchConnectionsStatus = async () => {
     setConnections(current => ({ ...current, loading: true }));
     try {
-      const res = await fetch('/api/social?task=connections_status', { headers: await authHeaders() });
+      const res = await fetchWithLocalClipperAuth('/api/social?task=connections_status', { headers: await authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setConnections(current => ({
@@ -518,7 +519,7 @@ export default function AdminSocialStudio() {
   const connectMeta = async () => {
     setConnections(prev => ({ ...prev, connecting: true }));
     try {
-      const res = await fetch('/api/social?task=meta_oauth_start', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=meta_oauth_start', {
         method: 'POST',
         headers: await authHeaders(),
       });
@@ -538,7 +539,7 @@ export default function AdminSocialStudio() {
   const connectThreads = async () => {
     setConnections(prev => ({ ...prev, connecting: true }));
     try {
-      const res = await fetch('/api/social?task=threads_oauth_start', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=threads_oauth_start', {
         method: 'POST',
         headers: await authHeaders(),
       });
@@ -558,7 +559,7 @@ export default function AdminSocialStudio() {
   const connectTikTok = async () => {
     setConnections(prev => ({ ...prev, connecting: true }));
     try {
-      const res = await fetch('/api/social?task=tiktok_oauth_start', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=tiktok_oauth_start', {
         method: 'POST',
         headers: await authHeaders(),
       });
@@ -582,7 +583,7 @@ export default function AdminSocialStudio() {
 
     setConnections(prev => ({ ...prev, connecting: true }));
     try {
-      const res = await fetch('/api/social?task=disconnect_platform', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=disconnect_platform', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ platform, connectionId }),
@@ -607,7 +608,7 @@ export default function AdminSocialStudio() {
 
     setConnections(prev => ({ ...prev, connecting: true }));
     try {
-      const res = await fetch('/api/social?task=save_connection', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=save_connection', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -639,7 +640,7 @@ export default function AdminSocialStudio() {
 
     const toastId = toast.loading('Resetting Social Studio data...');
     try {
-      const res = await fetch('/api/social?task=reset_studio_data', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=reset_studio_data', {
         method: 'POST',
         headers: await authHeaders(),
       });
@@ -710,7 +711,7 @@ export default function AdminSocialStudio() {
   const fetchCalendar = async (offset = shuffleOffset) => {
     setLoadingCalendar(true);
     try {
-      const res = await fetch(`/api/social?task=calendar_plan&days=30&offset=${offset}&startDate=${calendarStartDate}`, { headers: await authHeaders() });
+      const res = await fetchWithLocalClipperAuth(`/api/social?task=calendar_plan&days=30&offset=${offset}&startDate=${calendarStartDate}`, { headers: await authHeaders() });
       const data = await res.json().catch(() => ([]));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setCalendarSlots(Array.isArray(data) ? data : []);
@@ -732,7 +733,7 @@ export default function AdminSocialStudio() {
     setSeedingCalendar(true);
     try {
       // 1. Instant seed of 30 days of calendar slots (09:00, 12:00, 15:30 WAT)
-      const res = await fetch('/api/social?task=seed_calendar', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=seed_calendar', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -749,7 +750,7 @@ export default function AdminSocialStudio() {
 
       // 2. Pre-seed lightweight drafts for immediate upcoming days (09:00, 12:00, 15:30 WAT)
       if (postsPerDay === 3) {
-        fetch('/api/social?task=seed_calendar_drafts', {
+        fetchWithLocalClipperAuth('/api/social?task=seed_calendar_drafts', {
           method: 'POST',
           headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -771,7 +772,7 @@ export default function AdminSocialStudio() {
   useEffect(() => {
     let cancelled = false;
     const checkClipper = async () => {
-      try { const response = await fetch('http://127.0.0.1:4317/health'); if (!cancelled) setClipperStatus(response.ok ? 'running' : 'offline'); }
+      try { const response = await fetchWithLocalClipperAuth('http://127.0.0.1:4317/health'); if (!cancelled) setClipperStatus(response.ok ? 'running' : 'offline'); }
       catch { if (!cancelled) setClipperStatus('offline'); }
     };
     checkClipper();
@@ -861,16 +862,16 @@ export default function AdminSocialStudio() {
       setVideoAutopilot(prev => ({ ...prev, message: `Gemini is choosing the strongest viral scene from ${film.title}…` }));
       let sourceMetadata = { title: film.title, duration: 3600, transcript: '', description: '', synopsis: film.synopsis || '', genre: Array.isArray(film.genres) ? film.genres.join(', ') : (film.genres || '') };
       try {
-        const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: sourceUrl }) });
+        const metadataResponse = await fetchWithLocalClipperAuth('http://127.0.0.1:4317/metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: sourceUrl }) });
         if (metadataResponse.ok) sourceMetadata = { ...sourceMetadata, ...(await metadataResponse.json()) };
       } catch { /* Gemini safe fallback */ }
-      const recommendationResponse = await fetch('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { ...sourceMetadata, duration: Math.max(1, Number(sourceMetadata.duration) || 3600), targetLength: videoPlan.clipLength || 45 } }) });
+      const recommendationResponse = await fetchWithLocalClipperAuth('/api/ai', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ task: 'recommend_clip_segment', data: { ...sourceMetadata, duration: Math.max(1, Number(sourceMetadata.duration) || 3600), targetLength: videoPlan.clipLength || 45 } }) });
       const recommendation = await recommendationResponse.json().catch(() => ({}));
       if (!recommendationResponse.ok) throw new Error(recommendation.error || 'Gemini could not recommend a clip.');
       const safeStart = Math.max(0, parseTimestampToSeconds(recommendation.startTime ?? recommendation.startTimeFormatted));
       const safeEnd = Math.min(Math.max(safeStart + 1, parseTimestampToSeconds(recommendation.endTime ?? recommendation.endTimeFormatted) || safeStart + (videoPlan.clipLength || 45)), Number(sourceMetadata.duration) || safeStart + (videoPlan.clipLength || 45));
       const clips = ['9:16', '1:1'].map(aspect_ratio => ({ url: sourceUrl, start_time: safeStart, end_time: safeEnd, aspect_ratio, fit_mode: 'cover', title: film.title }));
-      const batchResponse = await fetch('http://127.0.0.1:4317/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clips }) });
+      const batchResponse = await fetchWithLocalClipperAuth('http://127.0.0.1:4317/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clips }) });
       const batch = await batchResponse.json().catch(() => ({}));
       if (!batchResponse.ok) throw new Error(batch.detail || 'The local clipper could not queue the video batch.');
       setVideoAutopilot(prev => ({ ...prev, message: 'Rendering 9:16 and 1:1 videos locally…', jobs: batch.jobs || [] }));
@@ -879,19 +880,19 @@ export default function AdminSocialStudio() {
         let status;
         for (;;) {
           await new Promise(resolve => setTimeout(resolve, 1500));
-          const response = await fetch(job.status_url);
+          const response = await fetchWithLocalClipperAuth(job.status_url);
           status = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(status.detail || 'A local video render failed.');
           if (status.success) break;
           setVideoAutopilot(prev => ({ ...prev, message: `Rendering ${status.result?.aspect_ratio || 'video'}… ${status.progress || 0}%` }));
         }
-        const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: status.size_bytes || 1024 }) });
+        const sessionResponse = await fetchWithLocalClipperAuth('/api/social?task=create_r2_upload_session', { method: 'POST', headers: { ...(await authHeaders()), 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: status.size_bytes || 1024 }) });
         const session = await sessionResponse.json().catch(() => ({}));
         if (!sessionResponse.ok) throw new Error(session.error || 'Could not prepare video storage.');
 
         let uploadSuccessful = false;
         try {
-          const directUploadRes = await fetch('http://127.0.0.1:4317/upload', {
+          const directUploadRes = await fetchWithLocalClipperAuth('http://127.0.0.1:4317/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token: job.job_id, upload_url: session.uploadUrl, content_type: 'video/mp4' }),
@@ -905,8 +906,8 @@ export default function AdminSocialStudio() {
 
         if (!uploadSuccessful) {
           try {
-            const blob = await (await fetch(status.download_url)).blob();
-            const uploadResponse = await fetch(session.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: blob });
+            const blob = await (await fetchWithLocalClipperAuth(status.download_url)).blob();
+            const uploadResponse = await fetchWithLocalClipperAuth(session.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: blob });
             if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
           } catch (err) {
             throw new Error('Clipper download blocked by browser. Please restart your local clipper script to apply the CORS patch.');
@@ -917,7 +918,7 @@ export default function AdminSocialStudio() {
       if (completed.length > 0) {
         const primaryAsset = completed[0];
         const dims = getDimensionsForAspectRatio(primaryAsset.aspect_ratio);
-        await fetch('/api/social?task=create_editor_video_draft', {
+        await fetchWithLocalClipperAuth('/api/social?task=create_editor_video_draft', {
           method: 'POST',
           headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1102,7 +1103,7 @@ export default function AdminSocialStudio() {
 
     if (sourceUrl) {
       try {
-        const metadataResponse = await fetch('http://127.0.0.1:4317/metadata', {
+        const metadataResponse = await fetchWithLocalClipperAuth('http://127.0.0.1:4317/metadata', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: sourceUrl }),
@@ -1117,7 +1118,7 @@ export default function AdminSocialStudio() {
     }
 
     const isManual = row.mode === 'manual';
-    const response = await fetch('/api/ai', {
+    const response = await fetchWithLocalClipperAuth('/api/ai', {
       method: 'POST',
       headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1299,7 +1300,7 @@ export default function AdminSocialStudio() {
           progress: 30,
         }));
 
-        const batchResponse = await fetch('http://127.0.0.1:4317/batch', {
+        const batchResponse = await fetchWithLocalClipperAuth('http://127.0.0.1:4317/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ clips }),
@@ -1314,7 +1315,7 @@ export default function AdminSocialStudio() {
           let status;
           for (;;) {
             await new Promise(resolve => setTimeout(resolve, 1200));
-            const response = await fetch(job.status_url);
+            const response = await fetchWithLocalClipperAuth(job.status_url);
             status = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(status.detail || 'Video render failed.');
             if (status.success) break;
@@ -1330,7 +1331,7 @@ export default function AdminSocialStudio() {
             message: `Preparing upload session for ${film.title} (${targetFormat})…`,
             progress: 82,
           }));
-          const sessionResponse = await fetch('/api/social?task=create_r2_upload_session', {
+          const sessionResponse = await fetchWithLocalClipperAuth('/api/social?task=create_r2_upload_session', {
             method: 'POST',
             headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
             body: JSON.stringify({ fileName: status.file_name, mimeType: 'video/mp4', fileSize: status.size_bytes || 1024 }),
@@ -1346,7 +1347,7 @@ export default function AdminSocialStudio() {
 
           let uploadSuccessful = false;
           try {
-            const directUploadRes = await fetch('http://127.0.0.1:4317/upload', {
+            const directUploadRes = await fetchWithLocalClipperAuth('http://127.0.0.1:4317/upload', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ token: job.job_id, upload_url: session.uploadUrl, content_type: 'video/mp4' }),
@@ -1360,8 +1361,8 @@ export default function AdminSocialStudio() {
 
           if (!uploadSuccessful) {
             try {
-              const blob = await (await fetch(status.download_url)).blob();
-              const uploadResponse = await fetch(session.uploadUrl, {
+              const blob = await (await fetchWithLocalClipperAuth(status.download_url)).blob();
+              const uploadResponse = await fetchWithLocalClipperAuth(session.uploadUrl, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'video/mp4' },
                 body: blob,
@@ -1391,7 +1392,7 @@ export default function AdminSocialStudio() {
             message: action === 'publish' ? `Publishing ${film.title} live…` : action === 'schedule' ? `Scheduling ${film.title}…` : `Saving ${film.title} draft…`,
             progress: 95,
           }));
-          const draftResponse = await fetch('/api/social?task=create_editor_video_draft', {
+          const draftResponse = await fetchWithLocalClipperAuth('/api/social?task=create_editor_video_draft', {
             method: 'POST',
             headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1423,7 +1424,7 @@ export default function AdminSocialStudio() {
           const contentItemId = draft.id || draft.contentItemId || draft.content_item_id || draft.item?.id;
           if (contentItemId && (action === 'schedule' || action === 'publish')) {
             const task = action === 'publish' ? 'publish_editor_video_now' : 'schedule';
-            const response = await fetch(`/api/social?task=${task}`, {
+            const response = await fetchWithLocalClipperAuth(`/api/social?task=${task}`, {
               method: 'POST',
               headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
               body: JSON.stringify({ contentItemId, scheduledFor: new Date(`${row.date}T${row.time}`).toISOString() }),
@@ -1467,7 +1468,7 @@ export default function AdminSocialStudio() {
   const fetchSummary = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await fetch('/api/social', { headers: await authHeaders() });
+      const res = await fetchWithLocalClipperAuth('/api/social', { headers: await authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setSummary({ ...emptySummary, ...data, counts: { ...emptySummary.counts, ...(data.counts || {}) } });
@@ -1571,7 +1572,7 @@ export default function AdminSocialStudio() {
 
     setReviewingId(contentItemId);
     try {
-      const res = await fetch('/api/social?task=review', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=review', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentItemId, action, reason }),
@@ -1593,7 +1594,7 @@ export default function AdminSocialStudio() {
     setSyncingQueue(true);
     const toastId = toast.loading('Checking queue against live database updates (synopsis, images, cast/crew)...');
     try {
-      const res = await fetch('/api/social?task=sync_queue', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=sync_queue', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -1618,7 +1619,7 @@ export default function AdminSocialStudio() {
     setReviewingId(contentItemId);
     const toastId = toast.loading('Re-checking source movie/play details...');
     try {
-      const res = await fetch('/api/social?task=sync_item', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=sync_item', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentItemId }),
@@ -1654,7 +1655,7 @@ export default function AdminSocialStudio() {
 
     setReviewingId(contentItemId);
     try {
-      const res = await fetch('/api/social?task=schedule', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=schedule', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentItemId, scheduledFor: scheduledFor.toISOString() }),
@@ -1693,7 +1694,7 @@ export default function AdminSocialStudio() {
   const runCancelSchedule = async contentItemId => {
     setReviewingId(contentItemId);
     try {
-      const res = await fetch('/api/social?task=cancel_schedule', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=cancel_schedule', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentItemId }),
@@ -1717,7 +1718,7 @@ export default function AdminSocialStudio() {
     setReviewingId(contentItemId);
     const toastId = toast.loading('Initiating instant publish for selected channels...');
     try {
-      const res = await fetch('/api/social?task=publish_now', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=publish_now', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentItemId }),
@@ -1744,7 +1745,7 @@ export default function AdminSocialStudio() {
     setReviewingId(contentItemId);
     const toastId = toast.loading(platform ? `Retrying ${platform}...` : 'Retrying failed platforms...');
     try {
-      const res = await fetch('/api/social?task=retry_failed', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=retry_failed', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentItemId, platform }),
@@ -1770,7 +1771,7 @@ export default function AdminSocialStudio() {
     setReviewingId(item.id);
     try {
       if (item.status === 'scheduled') {
-        const res = await fetch('/api/social?task=prepare_queue_item_edit', {
+        const res = await fetchWithLocalClipperAuth('/api/social?task=prepare_queue_item_edit', {
           method: 'POST',
           headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
           body: JSON.stringify({ contentItemId: item.id }),
@@ -1791,7 +1792,7 @@ export default function AdminSocialStudio() {
   const openQueueEditor = async item => {
     setReviewingId(item.id);
     try {
-      const res = await fetch('/api/social?task=prepare_queue_item_edit', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=prepare_queue_item_edit', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentItemId: item.id }),
@@ -1832,7 +1833,7 @@ export default function AdminSocialStudio() {
         id: variant.id,
         caption: queueEditCaptions[variant.id],
       }));
-      const res = await fetch('/api/social?task=update_queue_item', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=update_queue_item', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1862,7 +1863,7 @@ export default function AdminSocialStudio() {
 
     setReviewingId(item.id);
     try {
-      const res = await fetch('/api/social?task=delete_queue_item', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=delete_queue_item', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({ contentItemId: item.id }),
@@ -2042,7 +2043,7 @@ export default function AdminSocialStudio() {
               onClick={async () => {
                 setPublishing(true);
                 try {
-                  const res = await fetch('/api/social?task=publish_due', {
+                  const res = await fetchWithLocalClipperAuth('/api/social?task=publish_due', {
                     method: 'POST',
                     headers: await authHeaders(),
                     body: JSON.stringify({ limit: 10 }),
@@ -2740,7 +2741,7 @@ export default function AdminSocialStudio() {
                                 const upload = await uploadAdminSocialMedia(file, 'social-published-assets');
                                 if (upload.error || !upload.url) throw new Error(upload.error || 'The uploaded media has no public URL');
                                 const publicUrl = upload.url;
-                                const res = await fetch('/api/social?task=attach_custom_asset', {
+                                const res = await fetchWithLocalClipperAuth('/api/social?task=attach_custom_asset', {
                                   method: 'POST',
                                   headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ contentItemId: item.id, publicUrl }),
@@ -2879,7 +2880,7 @@ export default function AdminSocialStudio() {
                                         }
                                       : draft));
                                     try {
-                                      await fetch('/api/social?task=update_variant_options', {
+                                      await fetchWithLocalClipperAuth('/api/social?task=update_variant_options', {
                                         method: 'POST',
                                         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ variantId: variant.id, status: nextStatus }),

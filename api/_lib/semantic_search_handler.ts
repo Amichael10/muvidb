@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { embedWithCohere, hasCohere, rerankWithCohere } from './ai_service.js';
 import { supabase } from './supabase.js';
+import { requireRequestQuota } from './request_quota.js';
 
 export async function handleSemanticSearch(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -17,11 +18,15 @@ export async function handleSemanticSearch(req: VercelRequest, res: VercelRespon
   if (q.length < 2) {
     return res.status(400).json({ error: 'q too short', films: [], people: [] });
   }
+  if (q.length > 500 || (Array.isArray(body.candidates) && body.candidates.length > 60)) {
+    return res.status(400).json({ error: 'Search input exceeds the allowed size' });
+  }
   if (!hasCohere()) {
     return res.status(503).json({ error: 'Cohere not configured', films: [], people: [] });
   }
 
   try {
+    if (!(await requireRequestQuota(req, res, 'semantic-search'))) return;
     if (mode === 'vector') {
       if (entity === 'people') {
         return res.status(400).json({
@@ -43,7 +48,7 @@ export async function handleSemanticSearch(req: VercelRequest, res: VercelRespon
   } catch (err: any) {
     console.error('semantic-search:', err?.message || err);
     return res.status(500).json({
-      error: err?.message || 'semantic search failed',
+      error: 'semantic search failed',
       films: [],
       people: [],
     });
@@ -59,7 +64,11 @@ async function rerankSearch(
   let candidates: Array<{ id: string; title?: string; name?: string; synopsis?: string; description?: string }> = Array.isArray(
     body.candidates,
   )
-    ? body.candidates
+    ? body.candidates.map((item: any) => ({
+      id: String(item?.id || '').slice(0, 64), title: String(item?.title || '').slice(0, 300),
+      name: String(item?.name || '').slice(0, 300), synopsis: String(item?.synopsis || '').slice(0, 2000),
+      description: String(item?.description || '').slice(0, 2000),
+    }))
     : [];
 
   const emptyKey = entity === 'people' ? 'people' : 'films';
@@ -101,7 +110,7 @@ async function rerankSearch(
     [c.title || c.name, c.synopsis || c.description].filter(Boolean).join(' — ').slice(0, 800),
   );
   const ranked = await rerankWithCohere(query, docs, {
-    topN: Math.min(Number(body.limit) || 20, candidates.length),
+    topN: Math.min(Math.max(Math.floor(Number(body.limit) || 20), 1), candidates.length),
   });
 
   const byIndex = new Map(candidates.map((c, i) => [i, c]));
@@ -141,7 +150,7 @@ async function vectorSearch(q: string, body: any, res: VercelResponse) {
 
   if (error) {
     console.error('match_films_semantic rpc failed:', error.message);
-    return res.status(500).json({ error: error.message, films: [] });
+    return res.status(500).json({ error: 'Semantic search unavailable', films: [] });
   }
 
   res.setHeader(

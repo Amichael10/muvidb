@@ -1,8 +1,8 @@
+import { authHeaders } from '../../lib/apiAuth';
+import { savePersonMedia } from '../../lib/personMedia';
 import { useState, useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
-import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
 import ImageField from './ImageField';
 
 const PHOTO_CATEGORIES = [
@@ -28,7 +28,6 @@ function extractYoutubeId(url) {
 }
 
 export default function PersonMediaEditor({ personId, personName }) {
-  const { user } = useAuth();
   const [mediaList, setMediaList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'photo', 'video'
@@ -57,22 +56,10 @@ export default function PersonMediaEditor({ personId, personName }) {
     if (!personId) return;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('person_media')
-        .select(`
-          *,
-          films(id, title, year, poster_url)
-        `)
-        .eq('person_id', personId)
-        .order('is_primary', { ascending: false })
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading media:', error);
-      } else {
-        setMediaList(data || []);
-      }
+      const response = await fetch(`/api/person-media?personId=${encodeURIComponent(personId)}`, { headers: await authHeaders() });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Unable to load media for review');
+      setMediaList(result.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -119,7 +106,7 @@ export default function PersonMediaEditor({ personId, personName }) {
       category: item.category,
       title: item.title,
       description: item.description || '',
-      url: item.url,
+      url: item.url || '',
       thumbnail_url: item.thumbnail_url || '',
       film_id: item.film_id || null,
       character_name: item.character_name || '',
@@ -174,8 +161,6 @@ export default function PersonMediaEditor({ personId, personName }) {
       }
 
       // Ensure uploaded_by is set
-      const { data: authData } = await supabase.auth.getUser();
-      const currentUserId = user?.id || authData?.user?.id;
 
       const payload = {
         person_id: personId,
@@ -193,12 +178,11 @@ export default function PersonMediaEditor({ personId, personName }) {
         year: formData.year ? parseInt(formData.year) : null,
         is_primary: formData.is_primary,
         status: formData.status || 'approved',
-        uploaded_by: currentUserId || null,
       };
 
       const res = await fetch('/api/person-media', {
         method: editingItem ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           ...(editingItem ? { id: editingItem.id } : {}),
           ...payload
@@ -226,7 +210,7 @@ export default function PersonMediaEditor({ personId, personName }) {
     setDeletingId(id);
     try {
       const res = await fetch(`/api/person-media?id=${id}`, {
-        method: 'DELETE'
+        method: 'DELETE', headers: await authHeaders()
       });
       const resJson = await res.json();
       if (!res.ok) {
@@ -243,24 +227,20 @@ export default function PersonMediaEditor({ personId, personName }) {
 
   const handleTogglePrimary = async (item) => {
     try {
-      const nextPrimary = !item.is_primary;
-      if (nextPrimary) {
-        await supabase
-          .from('person_media')
-          .update({ is_primary: false })
-          .eq('person_id', personId)
-          .eq('media_type', item.media_type);
-      }
-      await supabase
-        .from('person_media')
-        .update({ is_primary: nextPrimary })
-        .eq('id', item.id);
-
-      toast.success(nextPrimary ? 'Set as primary' : 'Unset primary');
+      await savePersonMedia({ ...item, person_id: personId, is_primary: !item.is_primary }, 'PUT');
+      toast.success('Primary selection updated');
       fetchMedia();
-    } catch (err) {
-      toast.error('Failed to update primary status');
-    }
+    } catch (err) { toast.error(err.message || 'Unable to update media'); }
+  };
+
+  const handleModerate = async (item, status) => {
+    setIsSaving(true);
+    try {
+      await savePersonMedia({ ...item, person_id: personId, status }, 'PUT');
+      toast.success(status === 'approved' ? 'Approved and published' : 'Submission rejected');
+      fetchMedia();
+    } catch (err) { toast.error(err.message || 'Unable to review media'); }
+    finally { setIsSaving(false); }
   };
 
   const photos = mediaList.filter(m => m.media_type === 'photo');
@@ -453,6 +433,13 @@ export default function PersonMediaEditor({ personId, personName }) {
 
               {/* Title & Info */}
               <div className="p-2.5 space-y-1">
+                <p className="text-[10px] font-bold uppercase text-text-muted">{item.status}</p>
+                {item.status === 'pending' && (
+                  <div className="flex gap-2 py-1">
+                    <button type="button" disabled={isSaving} onClick={() => handleModerate(item, 'approved')} className="rounded bg-emerald-700 px-2 py-1 text-xs font-bold text-white">Approve</button>
+                    <button type="button" disabled={isSaving} onClick={() => handleModerate(item, 'rejected')} className="rounded bg-red-800 px-2 py-1 text-xs font-bold text-white">Reject</button>
+                  </div>
+                )}
                 <h5 className="text-xs font-bold text-text-primary truncate" title={item.title}>
                   {item.title}
                 </h5>

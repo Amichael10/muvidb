@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "react-router dev --port=3001 --host=0.0.0.0",
+    "dev": "react-router dev --port=3001 --host=127.0.0.1",
     "dev:opencut": "npm --prefix apps/opencut run dev",
     "build": "react-router build",
     "build:opencut": "npm --prefix apps/opencut run build",
@@ -110,10 +110,18 @@
     "scrapegraph-js": "^2.1.0",
     "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0",
-    "undici": "^5.28.4",
+    "undici": "^7.30.0",
     "vite": "^6.2.0",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
+  },
+  "overrides": {
+    "axios": "^1.20.0",
+    "qs": "^6.15.4",
+    "ajv": "^8.18.0",
+    "@fastify/busboy": "^3.2.3",
+    "@vercel/node": { "path-to-regexp": "^6.3.0", "esbuild": "^0.28.1" },
+    "tsx": { "esbuild": "^0.28.1" }
   },
   "devDependencies": {
     "@react-router/dev": "^7.18.1",

@@ -9,9 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg nodejs c
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application files and cookies
+# Cookies must be supplied as runtime secrets or a mounted private file.
 COPY main.py .
-COPY cookies.txt* .
 
 EXPOSE 8000
 

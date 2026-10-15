@@ -1,3 +1,4 @@
+import PendingMediaReview from '../../components/admin/PendingMediaReview';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { searchPeopleByName } from '../../lib/peopleSearch';
@@ -992,6 +993,7 @@ export default function AdminPeople() {
 
   return (
     <div className="admin-page space-y-6">
+      <PendingMediaReview />
       <div className="admin-page-header flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <p className="text-brand text-xs font-bold mb-1">Database</p>

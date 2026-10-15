@@ -1,6 +1,4 @@
-import { type LoaderFunctionArgs } from 'react-router';
-import fs from 'fs';
-import path from 'path';
+import { type ActionFunctionArgs } from 'react-router';
 import { supabaseServer } from '../lib/supabase.server';
 
 const TMDB_KEY = process.env.VITE_TMDB_API_KEY || process.env.TMDB_API_KEY;
@@ -71,10 +69,25 @@ Respond strictly in JSON format:
   }
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader() {
+  return new Response('Use an authenticated POST request', { status: 405, headers: { Allow: 'POST' } });
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
+  if (!token) return new Response('Administrator authentication required', { status: 401 });
+  const { data: auth, error: authError } = await supabaseServer.auth.getUser(token);
+  if (authError || !auth.user) return new Response('Invalid session', { status: 401 });
+  const { data: profile, error: profileError } = await supabaseServer.from('users').select('role').eq('id', auth.user.id).maybeSingle();
+  if (profileError || !profile || !['admin', 'admin_limited'].includes(profile.role)) {
+    return new Response('Administrator authentication required', { status: 403 });
+  }
   const url = new URL(request.url);
   const type = url.searchParams.get('type') || 'movies';
-  const limit = Math.min(Number(url.searchParams.get('limit') || 200), 500);
+  const requestedLimit = Number(url.searchParams.get('limit') || 5);
+  if (!Number.isFinite(requestedLimit) || requestedLimit < 1) return new Response('Invalid limit', { status: 400 });
+  const limit = Math.min(Math.floor(requestedLimit), 10);
 
   try {
     if (type === 'movies') {
@@ -131,14 +144,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
         });
       }
 
-      const outJsonPath = path.join(process.cwd(), 'movies_enrichment_candidates.json');
-      fs.writeFileSync(outJsonPath, JSON.stringify(candidates, null, 2), 'utf-8');
 
       return new Response(JSON.stringify({
         success: true,
         scannedCount: filmRows.length,
         candidatesSaved: candidates.length,
-        jsonPath: 'movies_enrichment_candidates.json',
+        candidates,
         sample: candidates.slice(0, 3)
       }), { headers: { 'Content-Type': 'application/json' } });
     }
@@ -240,8 +251,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
         });
       }
 
-      const outJsonPath = path.join(process.cwd(), 'google_socials_enriched_people.json');
-      fs.writeFileSync(outJsonPath, JSON.stringify(candidates, null, 2), 'utf-8');
 
       return new Response(JSON.stringify({
         success: true,
@@ -249,14 +258,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
         enrichedCount,
         skippedCount,
         candidatesSaved: candidates.length,
-        jsonPath: 'google_socials_enriched_people.json',
+        candidates,
         sample: candidates.slice(0, 3)
       }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     return new Response(JSON.stringify({ error: 'Invalid type parameter. Use ?type=movies or ?type=people' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message || String(err), stack: err.stack }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    console.error('[run-scanners]', err);
+    return new Response(JSON.stringify({ error: 'Scan failed' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }
 

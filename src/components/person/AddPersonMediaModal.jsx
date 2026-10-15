@@ -1,3 +1,5 @@
+import { authHeaders } from '../../lib/apiAuth';
+import { uploadPersonMediaFile } from '../../lib/personMedia';
 import { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -73,34 +75,7 @@ export default function AddPersonMediaModal({
 
     try {
       setIsUploadingVideo(true);
-      const presignRes = await fetch('/api/person-media?action=presign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          mimeType: file.type || 'video/mp4',
-          personName: person.name,
-          personId: person.id,
-        }),
-      });
-      const presignJson = await presignRes.json();
-      if (!presignRes.ok || !presignJson.uploadUrl) {
-        throw new Error(presignJson.error || 'Failed to prepare video upload');
-      }
-
-      const uploadRes = await fetch(presignJson.uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'video/mp4',
-        },
-        body: file,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error(`Video upload to Cloudflare failed (${uploadRes.status})`);
-      }
-
-      setUrl(presignJson.publicUrl);
+      setUrl(await uploadPersonMediaFile(file, person.id));
 
       if (!title) {
         const cleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
@@ -120,7 +95,7 @@ export default function AddPersonMediaModal({
       };
       videoEl.src = URL.createObjectURL(file);
 
-      toast.success('Video uploaded to Cloudflare R2!');
+      toast.success('Video uploaded for review.');
     } catch (err) {
       console.error('Video upload error:', err);
       toast.error('Video upload failed: ' + err.message);
@@ -132,91 +107,26 @@ export default function AddPersonMediaModal({
   const handlePhotoFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file (JPG, PNG, WebP)');
-      return;
-    }
-
+    if (!file.type.startsWith('image/')) return toast.error('Choose a JPG, PNG, WebP, or GIF photo.');
+    setIsUploadingPhoto(true);
     try {
-      setIsUploadingPhoto(true);
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64 = reader.result;
-          const res = await fetch('/api/person-media?action=upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileBase64: base64,
-              fileName: file.name,
-              mimeType: file.type,
-              personName: person.name,
-              personId: person.id,
-            }),
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || 'Upload failed');
-          setUrl(json.url);
-          if (!title) {
-            const cleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-            setTitle(cleanTitle);
-          }
-          toast.success('Photo uploaded to Cloudflare!');
-        } catch (err) {
-          toast.error('Photo upload failed: ' + err.message);
-        } finally {
-          setIsUploadingPhoto(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setIsUploadingPhoto(false);
-      toast.error(err.message);
-    }
+      setUrl(await uploadPersonMediaFile(file, person.id));
+      if (!title) setTitle(file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
+      toast.success('Photo uploaded for review.');
+    } catch (error) { toast.error(error.message || 'Unable to upload photo'); }
+    finally { setIsUploadingPhoto(false); }
   };
 
   const handleCoverFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file (JPG, PNG, WebP)');
-      return;
-    }
-
+    if (!file.type.startsWith('image/')) return toast.error('Choose an image file.');
+    setIsUploadingCover(true);
     try {
-      setIsUploadingCover(true);
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64 = reader.result;
-          const res = await fetch('/api/person-media?action=upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileBase64: base64,
-              fileName: file.name,
-              mimeType: file.type,
-              personName: person.name,
-              personId: person.id,
-            }),
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error || 'Upload failed');
-          setThumbnailUrl(json.url);
-          toast.success('Cover image uploaded to Cloudflare!');
-        } catch (err) {
-          toast.error('Cover upload failed: ' + err.message);
-        } finally {
-          setIsUploadingCover(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setIsUploadingCover(false);
-      toast.error(err.message);
-    }
+      setThumbnailUrl(await uploadPersonMediaFile(file, person.id));
+      toast.success('Cover uploaded for review.');
+    } catch (error) { toast.error(error.message || 'Unable to upload cover'); }
+    finally { setIsUploadingCover(false); }
   };
 
   const handleTypeSwitch = (type) => {
@@ -276,17 +186,6 @@ export default function AddPersonMediaModal({
 
       const durationSeconds = parseDurationToSeconds(durationStr);
 
-      // Moderation: Admins and verified profile owners are approved immediately.
-      // General public and unverified submissions are marked 'pending' for review.
-      const isOwner = Boolean(user && person?.claimed_by && person.claimed_by === user.id);
-      const isAdmin = Boolean(
-        user?.user_metadata?.role === 'admin' ||
-        user?.app_metadata?.role === 'admin' ||
-        user?.email?.endsWith('@muvidb.com') ||
-        user?.email === 'admin@muvidb.com'
-      );
-      const moderationStatus = (isAdmin || isOwner) ? 'approved' : 'pending';
-
       const payload = {
         person_id: person.id,
         media_type: mediaType,
@@ -302,13 +201,12 @@ export default function AddPersonMediaModal({
         character_name: characterName.trim() || null,
         photographer_credit: photographerCredit.trim() || null,
         year: year ? parseInt(year, 10) : null,
-        status: moderationStatus,
         uploaded_by: user?.id || null,
       };
 
       const res = await fetch('/api/person-media', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload)
       });
       const resJson = await res.json();
@@ -316,6 +214,7 @@ export default function AddPersonMediaModal({
         throw new Error(resJson.error || 'Failed to save media');
       }
       const data = resJson.data;
+      const moderationStatus = data.status;
 
       if (moderationStatus === 'pending') {
         toast.success('Thank you! Your submission was received and will be live once approved.', { duration: 5000 });

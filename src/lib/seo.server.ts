@@ -100,6 +100,7 @@ export async function personSeo(slug: string, base: string) {
       )
     `)
     .eq(keyFor(slug), slug)
+    .eq('person_media.status', 'approved')
     .maybeSingle();
 
   if (!data) return { seo: notFound(base, 'Person', 'profile'), status: 404, data: null };

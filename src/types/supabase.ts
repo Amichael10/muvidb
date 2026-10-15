@@ -2918,6 +2918,72 @@ export type Database = {
           },
         ]
       }
+      payment_orders: {
+        Row: {
+          amount_minor: number
+          company_id: string | null
+          created_at: string
+          currency: string
+          paid_at: string | null
+          plan_type: string
+          provider: string
+          provider_checkout_id: string | null
+          provider_event_id: string | null
+          provider_transaction_id: string | null
+          reference: string
+          sandbox: boolean
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          amount_minor: number
+          company_id?: string | null
+          created_at?: string
+          currency?: string
+          paid_at?: string | null
+          plan_type: string
+          provider: string
+          provider_checkout_id?: string | null
+          provider_event_id?: string | null
+          provider_transaction_id?: string | null
+          reference: string
+          sandbox?: boolean
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount_minor?: number
+          company_id?: string | null
+          created_at?: string
+          currency?: string
+          paid_at?: string | null
+          plan_type?: string
+          provider?: string
+          provider_checkout_id?: string | null
+          provider_event_id?: string | null
+          provider_transaction_id?: string | null
+          reference?: string
+          sandbox?: boolean
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_cinema_films: {
         Row: {
           admin_decision: string | null
@@ -3719,6 +3785,57 @@ export type Database = {
           },
         ]
       }
+      person_media_uploads: {
+        Row: {
+          approved_url: string | null
+          byte_size: number
+          created_at: string
+          id: string
+          mime_type: string
+          person_id: string
+          reviewed_at: string | null
+          storage_path: string
+          uploaded_by: string
+        }
+        Insert: {
+          approved_url?: string | null
+          byte_size: number
+          created_at?: string
+          id?: string
+          mime_type: string
+          person_id: string
+          reviewed_at?: string | null
+          storage_path: string
+          uploaded_by: string
+        }
+        Update: {
+          approved_url?: string | null
+          byte_size?: number
+          created_at?: string
+          id?: string
+          mime_type?: string
+          person_id?: string
+          reviewed_at?: string | null
+          storage_path?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_media_uploads_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_media_uploads_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_new_releases: {
         Row: {
           created_at: string
@@ -3922,6 +4039,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      request_quota_windows: {
+        Row: {
+          expires_at: string
+          requests: number
+          subject: string
+          window_start: string
+        }
+        Insert: {
+          expires_at: string
+          requests?: number
+          subject: string
+          window_start: string
+        }
+        Update: {
+          expires_at?: string
+          requests?: number
+          subject?: string
+          window_start?: string
+        }
+        Relationships: []
       }
       reviews: {
         Row: {
@@ -5825,6 +5963,10 @@ export type Database = {
         }
       }
       consume_api_key_quota: { Args: { p_key_id: string }; Returns: boolean }
+      consume_request_quota: {
+        Args: { p_limit: number; p_subject: string; p_window_seconds: number }
+        Returns: boolean
+      }
       create_pro_profile: {
         Args: {
           pro_bio: string
@@ -6353,6 +6495,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      settle_payment_order: {
+        Args: {
+          p_amount_minor: number
+          p_checkout_id?: string
+          p_currency: string
+          p_event_id: string
+          p_provider: string
+          p_reference: string
+          p_transaction_id: string
+        }
+        Returns: boolean
       }
       suggest_similar_people: {
         Args: { p_limit?: number; p_name: string }

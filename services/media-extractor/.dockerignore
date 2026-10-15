@@ -1,0 +1,4 @@
+cookies*.txt
+.env*
+__pycache__
+*.pyc
