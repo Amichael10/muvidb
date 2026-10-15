@@ -63,7 +63,11 @@ const AFRICAN_ISO_CODES = new Set([
 ]);
 
 const AFRICAN_LANGUAGES = new Set([
-  'yo', 'ig', 'ha', 'sw', 'zu', 'xh', 'tw', 'ak', 'sn', 'st', 'am', 'so', 'rw', 'ny'
+  'yo', 'ig', 'ha', 'sw', 'zu', 'xh', 'tw', 'ak', 'sn', 'st', 'am', 'so', 'rw', 'ny', 'af', 'ff', 'wo'
+]);
+
+const MAJOR_FOREIGN_STUDIO_COUNTRIES = new Set([
+  'US', 'GB', 'CA', 'FR', 'DE', 'AU', 'JP', 'CN', 'HK', 'KR', 'IN', 'BR', 'MX', 'IT', 'ES', 'AT', 'NZ', 'RU', 'DK', 'SE', 'NO', 'NL', 'BE', 'CH', 'IE', 'PL', 'CZ', 'BG'
 ]);
 
 
@@ -255,7 +259,7 @@ async function getOrCreatePerson(
       imdb_id: extra.imdbId || null,
       photo_url: extra.photoUrl || null,
       bio: extra.bio || null,
-      nationality: 'Nigerian',
+      nationality: extra.nationality || null,
       is_verified: false,
     })
     .select('id')
@@ -273,7 +277,7 @@ async function getOrCreatePerson(
           imdb_id: extra.imdbId || null,
           photo_url: extra.photoUrl || null,
           bio: extra.bio || null,
-          nationality: 'Nigerian',
+          nationality: extra.nationality || null,
         })
         .select('id')
         .single();
@@ -307,18 +311,33 @@ async function syncFilmAndEnsemble(
 
   const originCountries: string[] = (mediaDetails.origin_country || []).map((c: string) => c.toUpperCase());
   const prodCountries: string[] = (mediaDetails.production_countries || []).map((c: any) => (c.iso_3166_1 || '').toUpperCase());
-  const allCountries = [...originCountries, ...prodCountries];
-  const isAfricanCountry = allCountries.some(c => AFRICAN_ISO_CODES.has(c));
-  const isAfricanLang = AFRICAN_LANGUAGES.has((mediaDetails.original_language || '').toLowerCase());
-  const hasStrictForeignCountry = allCountries.some(c => ['US', 'GB', 'CA', 'FR', 'DE', 'AU', 'JP', 'CN', 'HK', 'KR', 'IN', 'BR', 'MX', 'IT', 'ES'].includes(c));
+  const allCountries = Array.from(new Set([...originCountries, ...prodCountries]));
+  const originalLang = (mediaDetails.original_language || '').toLowerCase();
 
-  // If origin/production countries are purely foreign without any African country, REJECT immediately!
-  if (hasStrictForeignCountry && !isAfricanCountry) {
-    console.log(`   ⏭️ Skipping foreign title: "${title}" (${allCountries.join(', ') || 'foreign'})`);
+  const isAfricanCountry = allCountries.some(c => AFRICAN_ISO_CODES.has(c));
+  const isAfricanLang = AFRICAN_LANGUAGES.has(originalLang);
+  const foreignInOrigin = originCountries.filter(c => MAJOR_FOREIGN_STUDIO_COUNTRIES.has(c));
+  const foreignInProd = prodCountries.filter(c => MAJOR_FOREIGN_STUDIO_COUNTRIES.has(c));
+
+  // 1. If origin_country contains any major foreign studio country (US, GB, CA, FR, DE, JP, etc.),
+  // it is a foreign production (even if shot on location in South Africa or Kenya).
+  // The ONLY exception is if the film's original language is a native African language.
+  if (foreignInOrigin.length > 0 && !isAfricanLang) {
+    console.log(`   ⏭️ Skipping foreign studio title: "${title}" (Origin: [${originCountries.join(', ')}], Lang: ${originalLang})`);
     return { filmId: '', wasCreated: false, ensembleAdded: 0 };
   }
 
-  // To create a NEW film, it MUST strictly have an African country or verified African language
+  // 2. If it has major foreign production countries and no African origin country (or no African language),
+  // e.g. US/DE/CA/FR co-productions filmed in ZA without African origin
+  if (foreignInProd.length > 0 && !isAfricanLang && !originCountries.some(c => ['NG', 'GH', 'UG', 'KE', 'RW', 'TZ'].includes(c))) {
+    const originIsAfrican = originCountries.length > 0 && originCountries.every(c => AFRICAN_ISO_CODES.has(c));
+    if (!originIsAfrican) {
+      console.log(`   ⏭️ Skipping foreign title: "${title}" (Countries: [${allCountries.join(', ')}])`);
+      return { filmId: '', wasCreated: false, ensembleAdded: 0 };
+    }
+  }
+
+  // 3. To create a NEW film, it MUST strictly have an African country or verified African language
   const isAfricanOrigin = isAfricanCountry || isAfricanLang;
 
   const imdbId = mediaDetails.external_ids?.imdb_id || mediaDetails.imdb_id || null;
