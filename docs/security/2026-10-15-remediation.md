@@ -34,9 +34,9 @@ This records changes against the 25 findings in the accompanying audit. The audi
 
 ## Database rollout
 
-Eight timestamped security migrations have been applied and registered in migration history. Normal db push encountered the pre-existing local/remote mismatch at `20260920`; only reviewed migrations were applied transactionally through the linked Management API. Unrelated history and catalogue data were preserved. Supabase types were regenerated.
+Nine timestamped security migrations have been applied and registered in migration history. Normal db push encountered the pre-existing local/remote mismatch at `20260920`; only reviewed migrations were applied transactionally through the linked Management API. Unrelated history and catalogue data were preserved. Supabase types were regenerated.
 
-The profile-media guard blocks direct non-admin changes to public portrait/highlight fields. Upload modals submit for review. Older direct profile-primary controls may receive a review-required error; they cannot bypass moderation.
+The profile-media guard blocks new public media through direct profile writes. Existing public highlights may be removed/reordered and existing photos selected as primary. New or changed media still requires review. Six live SQL fixture checks passed, including rejection of new URLs and invalid primary flags.
 
 ## Validation
 
@@ -53,9 +53,9 @@ The project uses ES256 for current user sessions, but an older HS256 signing key
 
 Vercel Production/Preview, GitHub Actions and local files now use modern publishable/secret keys and a new cron credential. VITE_CRON_SECRET was removed. Social-token encryption and OAuth state have separate configured secrets, preventing disruption from this credential migration.
 
-Wrangler is not authenticated on this workstation. A deployed content engine, if present, also needs SUPABASE_SERVICE_ROLE_KEY and PUBLISHER_TOKEN replaced. The extractor's external environment and the Google session represented by committed cookies require separate verification. Removing cookies from Git does not invalidate a stolen session. SEC-17 remains open until those checks and the old-JWT denial test pass.
+Wrangler is not authenticated on this workstation. The user confirmed the content engine and extractor are deployed. The content engine also needs SUPABASE_SERVICE_ROLE_KEY and PUBLISHER_TOKEN replaced. The extractor's external environment and the Google session represented by committed cookies require separate verification. Removing cookies from Git does not invalidate a stolen session. SEC-17 remains open until those checks and the old-JWT denial test pass.
 
-Final deployment and credential-revocation results will be appended after rollout.
+Both Vercel projects deployed successfully for commits 62e351a and 3ecf846. Live probes: home 200 with CSP/nosniff; media authentication 401; both sandbox grants 410; unsigned WhatsApp callback 401; new cron health 200; missing cron 401. The old generated deployment redirects to Vercel SSO (302). Vercel configuration confirms VITE_CRON_SECRET is absent. External credential migration and legacy signing-key revocation remain pending authenticated hosting access.
 
 ## References
 

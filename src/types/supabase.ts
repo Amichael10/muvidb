@@ -6248,6 +6248,10 @@ export type Database = {
       }
       person_alias_key: { Args: { value: string }; Returns: string }
       person_name_key: { Args: { n: string }; Returns: string }
+      profile_media_highlights_retained: {
+        Args: { p_new: Json; p_old: Json }
+        Returns: boolean
+      }
       promote_pending_cinema_film: {
         Args: {
           p_existing_film_id?: string
