@@ -627,7 +627,9 @@ export async function executeCopilotTool(
       const requirePortrait = params.require_portrait_poster !== false;
       const days = params.days ? Number(params.days) : null;
 
-      const filmSelect = `
+      // Widen the nested projection to avoid recursive SDK type expansion in
+      // Vercel's isolated function compiler. Results are validated below.
+      const filmSelect: string = `
         id, title, slug, year, synopsis, tagline, poster_url, backdrop_url,
         release_date, release_type, source, streaming_links, youtube_watch_url,
         genres, imdb_rating, liked_percent, view_count, is_in_cinemas, coming_soon,
