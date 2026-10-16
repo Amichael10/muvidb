@@ -158,7 +158,14 @@ const FRAME_EVERY_SEC = Number(arg('frame-every')) || 3; // Default: 1 frame eve
 const DEFAULT_VIDEO_FORMAT =
   'bestvideo[height<=720][protocol^=m3u8]/232/bestvideo[height<=1080][protocol^=m3u8]/270/bestvideo[height<=720][vcodec^=avc1]/136/best[height<=720]';
 const VIDEO_FORMAT = arg('format') ?? process.env.YTDLP_FORMAT ?? DEFAULT_VIDEO_FORMAT;
-const FRAME_WIDTH = Number(arg('frame-width')) || 1920;
+// MEASURED, not guessed: same film (Marital Disaster, 80 frames) at 1280 vs
+// 1920 produced an IDENTICAL set of 28 verified credits, and 1280 took ~33 min
+// against ~67 min. The one extra credit 1920 did not find was spurious - a
+// single-frame observation that turned the Gaffer Assistant into an actor
+// playing his own surname. Upscaling past 1280 buys nothing here and halves
+// throughput, which matters for a 24/7 run. Raise it per-film with
+// --frame-width if a specific film's credit roll is genuinely too small.
+const FRAME_WIDTH = Number(arg('frame-width')) || 1280;
 const ONCE = arg('once') !== undefined;
 const SINGLE_FILM = arg('film');
 const TITLE_FILTER = arg('title') ?? arg('query') ?? arg('search');
