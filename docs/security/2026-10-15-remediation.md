@@ -8,7 +8,7 @@ This records changes against the 25 findings in the accompanying audit. The audi
 |---|---|---|
 | 01: Public admin promotion | Removed the promotion RPC from the live database. | Ordinary accounts cannot promote themselves through it. |
 | 02: Editable metadata grants privileges | Trusted database roles govern signup, admin checks and WhatsApp profile sync; missing profiles fail closed. | Editing account metadata cannot grant administrator access. |
-| 03: Browser cron credential | Removed browser callers and VITE_CRON_SECRET; replaced CRON_SECRET in Vercel Production/Preview, GitHub Actions and local files. | Scheduled jobs use a new server-only credential. Final deployment checks remain required. |
+| 03: Browser cron credential | Removed browser callers and VITE_CRON_SECRET; replaced CRON_SECRET in Vercel Production/Preview, GitHub Actions, Cloudflare publishing and local files. | Scheduled jobs use a new server-only credential. Live authenticated and unauthenticated probes passed. |
 | 04: Anonymous company approval | Administrator-only approval; reviewer bound to the authenticated administrator. | Applicants cannot approve their own claims. |
 | 05: Public person-media mutation | Authentication, ownership checks, quotas, private staging, format validation and admin review. | Uploads remain allowed but stay private until approved. |
 | 06: Public channel linking | Administrator JWT and POST required. | Visitors cannot attach videos to catalogue records. |
@@ -22,7 +22,7 @@ This records changes against the 25 findings in the accompanying audit. The audi
 | 14: Paid AI/scanner abuse | Professional authorization, shared atomic user/IP/global quotas, bounded input and admin-only scanner POST. | Public search stays available within limits; paid tools require an appropriate account. |
 | 15: Image proxy SSRF | Validate every DNS answer and redirect; pin validated DNS, reject reserved networks, cap bytes/time. | Proxy cannot fetch internal services or buffer unlimited downloads. |
 | 16: Active SVG content | Raster-only proxy, sandbox response policies for SVG/storage, re-encoded uploaded photos. | These image paths cannot execute uploaded SVG scripts. |
-| 17: Tracked secrets/cookies | Remove credential-bearing scripts/cookies from tracking; exclude cookies from container images; migrate credentials. | Revocation and external session invalidation remain required below. |
+| 17: Tracked secrets/cookies | Removed credential-bearing scripts/cookies from tracking and the container image; migrated backend credentials; disabled legacy API keys; deleted exposed interim secret keys; revoked the old HS256 signer. | The committed Supabase JWT and both exposed replacement keys now return 401. Historical third-party browser sessions must still be invalidated at their providers. |
 | 18: Local clipper abuse | Loopback client/Host, exact trusted origins and per-process pairing token. | Unrelated websites cannot start jobs. Restart the desktop clipper to apply this. |
 | 19: Editable company entitlements | Database guards protect verification, claims and tiers; plaintext company API keys prohibited. | Profile edits cannot grant paid or verified status. |
 | 20: Unenforced API limits | Service-only row-locked quota consumption. | Concurrent requests count correctly toward each key's limit. |
@@ -49,13 +49,15 @@ The profile-media guard blocks new public media through direct profile writes. E
 
 ## Credential and deployment closure
 
-The project uses ES256 for current user sessions, but an older HS256 signing key remains trusted. Although legacy API keys are disabled, a previously committed service JWT still works alongside a modern public API key. **Disabling legacy API keys alone does not revoke that JWT.** Revoke the old signing key after checking all consumers use replacement credentials. Current sessions have used ES256 since June.
+The project now uses its ES256 signing key exclusively. Legacy API keys were already disabled, and the older HS256 signing key was revoked on 16 October 2026 after all known consumers were migrated. The previously committed service JWT and both exposed interim replacement keys now return 401; the final backend secret returns 200.
 
-Vercel Production/Preview, GitHub Actions and local files now use modern publishable/secret keys and a new cron credential. VITE_CRON_SECRET was removed. Social-token encryption and OAuth state have separate configured secrets, preventing disruption from this credential migration.
+Vercel Production/Preview, GitHub Actions, both Cloudflare Worker environments, Render and local files now use modern publishable/secret keys and the rotated cron credential. VITE_CRON_SECRET was removed. Social-token encryption and OAuth state have separate configured secrets, preventing disruption from this credential migration.
 
-Wrangler is not authenticated on this workstation. The user confirmed the content engine and extractor are deployed. The content engine also needs SUPABASE_SERVICE_ROLE_KEY and PUBLISHER_TOKEN replaced. The extractor's external environment and the Google session represented by committed cookies require separate verification. Removing cookies from Git does not invalidate a stolen session. SEC-17 remains open until those checks and the old-JWT denial test pass.
+Cloudflare production and staging run the corrected Worker bundle with rotated SUPABASE_SERVICE_ROLE_KEY and PUBLISHER_TOKEN values. Both health checks report configured secrets, and both database-backed destination endpoints return `source: supabase`. Render runs commit `60bcde2`, with the final secret stored in its environment; its deployment and health check are live. The Docker image no longer copies cookie files.
 
-Both Vercel projects deployed successfully for commits 62e351a and 3ecf846. Live probes: home 200 with CSP/nosniff; media authentication 401; both sandbox grants 410; unsigned WhatsApp callback 401; new cron health 200; missing cron 401. The old generated deployment redirects to Vercel SSO (302). Vercel configuration confirms VITE_CRON_SECRET is absent. External credential migration and legacy signing-key revocation remain pending authenticated hosting access.
+Vercel deployed the final environment configuration successfully as deployment `dpl_HXf1n3a832KtWXDY81oUf2TFGaHD`, aliased to `muvidb.com`. Live probes: home 200 with CSP/nosniff; media authentication 401; both sandbox grants 410; unsigned WhatsApp callback 401; rotated cron health 200; missing cron 401. The old generated deployment redirects to Vercel SSO (302). Vercel configuration confirms VITE_CRON_SECRET is absent.
+
+The remaining operational follow-up is provider-side invalidation of any historical Google/YouTube or Instagram browser session copied into the old tracked cookie file, plus replacement of any Meta access token that was displayed outside secret storage. Repository and current container copies have been removed, but deleting a file cannot invalidate a session or token already issued by those providers.
 
 ## References
 
