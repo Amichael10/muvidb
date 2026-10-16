@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isFaithfulPartition } from './credit_name_splitter';
-import { characterCandidate } from './credit_consensus_verifier';
+import { characterCandidate, extractCharacterFromName } from './credit_consensus_verifier';
 
 // The whole safety argument for letting a model touch credit data rests on
 // isFaithfulPartition: the model may choose a split POINT and nothing else.
@@ -80,5 +80,49 @@ describe('characterCandidate', () => {
 
   it('rejects a value too long to be a character name', () => {
     expect(characterCandidate('A'.repeat(61))).toBeNull();
+  });
+});
+
+// Regression cases taken from a real dry run over "Marital Disaster", where the
+// Gaffer Assistant was committed as "ACTOR: Issa Lateef as Fesemule" and seven
+// un-named actors were committed "as Prisoners".
+describe('character slot rejects non-characters seen in production', () => {
+  it('rejects crowd and group labels', () => {
+    for (const label of ['Prisoners', 'prisoner', 'Guards', 'Warder', 'Soldiers', 'Villagers', 'Dancers', 'Board Members', 'Thugs']) {
+      expect(characterCandidate(label)).toBeNull();
+    }
+  });
+
+  it('rejects crew job descriptors', () => {
+    for (const job of ['Gaffer Assistant', 'Asst Editor', 'Camera Operator', 'Continuity', 'Colorist', 'Subtitler', 'Focus Puller', 'Best Boy', 'Graphics']) {
+      expect(characterCandidate(job)).toBeNull();
+    }
+  });
+
+  it('still accepts genuine character names', () => {
+    for (const ch of ['Saamu', 'Jenifa', 'Gate-Keeper', 'Fisayo', 'Oluwaburna', 'Madam Comfort']) {
+      expect(characterCandidate(ch)).toBe(ch);
+    }
+  });
+});
+
+describe('extractCharacterFromName reports how it split', () => {
+  it('marks an explicit separator as explicit', () => {
+    expect(extractCharacterFromName('Rhoda Inaju as Kemi').split).toBe('explicit');
+    expect(extractCharacterFromName('Rhoda Inaju - Kemi').split).toBe('explicit');
+    expect(extractCharacterFromName('Rhoda Inaju (Kemi)').split).toBe('explicit');
+  });
+
+  it('marks a bare word-position guess as positional', () => {
+    // Indistinguishable from a three-part personal name, so it needs a second
+    // frame before it may vote on the character.
+    expect(extractCharacterFromName('Issa Lateef Fesemule').split).toBe('positional');
+    expect(extractCharacterFromName('Mercy Johnson Okojie').split).toBe('positional');
+  });
+
+  it('marks a plain two-word name as no split', () => {
+    const r = extractCharacterFromName('Odunlade Adekola');
+    expect(r.split).toBe('none');
+    expect(r.characterName).toBeNull();
   });
 });

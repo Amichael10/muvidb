@@ -172,6 +172,15 @@ import { validateCreditsWithAi } from './ai_credit_validator';
 // Group labels the credit-roll parser attaches to actors that are NOT characters.
 const GENERIC_CAST_LABEL = /^(?:actor|actress|cast|casts|cast list|main cast|lead cast|supporting cast|additional cast|other cast|extra|extras|cameo|special appearance|guest|guests|featuring|artiste|artistes|artist|artists)$/i;
 
+// Crowd/group labels a credit roll hangs over several un-named actors. These are
+// not characters: committing "as Prisoners" is wrong for every actor it touches.
+const GROUP_LABEL = /^(?:prisoners?|inmates?|guards?|warders?|soldiers?|police(?:men|man)?|officers?|villagers?|crowd|mob|thugs?|cultists?|dancers?|singers?|students?|pupils?|nurses?|doctors?|patients?|customers?|traders?|passengers?|mourners?|congregation|church\s+members?|board\s+members?|members?|others?|friends?|neighbours?|neighbors?|family|kids|children|twins)$/i;
+
+// Crew job descriptors that reach the character slot when the roll's columns are
+// misread. normalizeRole() only recognises the canonical departments, so these
+// slip through as plausible-looking "characters".
+const CREW_DESCRIPTOR = /\b(?:assistant|asst|operator|gaffer|grip|best\s+boy|continuity|colou?rist|subtitler|translator|dop|focus\s+puller|wrangler|runner|production|unit|location|logistics|welfare|catering|publicist|still|stills|bts|graphics?|poster|art\s+director|set\s+design|wardrobe|costumier|props?|armou?rer|driver|security)\b/i;
+
 /**
  * For an actor observation the parser stores the character in `role`. Decide
  * whether a given value is usable as a character name rather than a group
@@ -182,32 +191,38 @@ export function characterCandidate(value: string | null | undefined): string | n
   const trimmed = String(value).trim();
   if (!trimmed || trimmed.length > 60) return null;
   if (GENERIC_CAST_LABEL.test(trimmed)) return null;
+  if (GROUP_LABEL.test(trimmed)) return null;
+  if (CREW_DESCRIPTOR.test(trimmed)) return null;
   // A crew job title is never a character name.
   if (normalizeRole(trimmed, 'crew') !== 'crew') return null;
   if (NOISE_WORDS.some((nw) => trimmed.toUpperCase().includes(nw))) return null;
   return trimmed;
 }
 
+export type CharacterSplitKind = 'explicit' | 'positional' | 'none';
+
 const CHARACTER_HINT = /\b(?:MR|MRS|MISS|MS|DR|DOCTOR|PROF|PROFESSOR|PRINCIPAL|TEACHER|KING|QUEEN|CHIEF|PRINCE|PRINCESS|PASTOR|IMAM|ALFA|BABA|MAMA|MOTHER|FATHER|OFFICER|POLICE|INSPECTOR|LAWYER|BARRISTER|NURSE|JUDGE|ELDER|LANDLORD|LANDLADY|CHAIRMAN|MADAM|SIR|MAID|GUARD|GATEMAN|GATE MAN|BOSS|DRIVER|WIFE|HUSBAND|SON|DAUGHTER|FRIEND|NEIGHBOUR|NEIGHBOR|CUSTOMER|VENDOR|VILLAGER|CHILD|RECEPTIONIST|BESTIE|GIRLFRIEND|BOYFRIEND|EXTRA|LADY)\b/i;
 
-export function extractCharacterFromName(raw: string): { name: string; characterName: string | null } {
-  if (!raw) return { name: '', characterName: null };
+export function extractCharacterFromName(
+  raw: string,
+): { name: string; characterName: string | null; split: CharacterSplitKind } {
+  if (!raw) return { name: '', characterName: null, split: 'none' };
   const clean = raw.trim();
 
   // 1. Explicit separators: "Rhoda Inaju as Kemi", "Rhoda Inaju - Kemi", "Rhoda Inaju (Kemi)"
   const asMatch = clean.match(/^(.+?)\s+(?:as|AS|role\s+of|featuring\s+as)\s+(.+)$/i);
   if (asMatch) {
-    return { name: asMatch[1].trim(), characterName: asMatch[2].trim() };
+    return { name: asMatch[1].trim(), characterName: asMatch[2].trim(), split: 'explicit' };
   }
 
   const dashMatch = clean.match(/^(.+?)\s+[-–:]\s+(.+)$/);
   if (dashMatch) {
-    return { name: dashMatch[1].trim(), characterName: dashMatch[2].trim() };
+    return { name: dashMatch[1].trim(), characterName: dashMatch[2].trim(), split: 'explicit' };
   }
 
   const parenMatch = clean.match(/^(.+?)\s*\(([^)]+)\)$/);
   if (parenMatch) {
-    return { name: parenMatch[1].trim(), characterName: parenMatch[2].trim() };
+    return { name: parenMatch[1].trim(), characterName: parenMatch[2].trim(), split: 'explicit' };
   }
 
   // 2. Multi-word string splitting (3 to 5 words):
@@ -216,13 +231,17 @@ export function extractCharacterFromName(raw: string): { name: string; character
   if (words.length >= 3 && words.length <= 5) {
     const actorName = `${words[0]} ${words[1]}`;
     const characterName = words.slice(2).join(' ');
+    // Positional guess only: with no separator this is indistinguishable from a
+    // three-part personal name ("Issa Lateef Fesemule", "Mercy Johnson Okojie").
+    // Callers must corroborate before trusting the character half.
     return {
       name: actorName,
       characterName: characterName,
+      split: 'positional',
     };
   }
 
-  return { name: clean, characterName: null };
+  return { name: clean, characterName: null, split: 'none' };
 }
 
 /**
@@ -468,13 +487,26 @@ export async function reconcileAndVerifyCredits(
     // Collect character readings for actors, weighted by how many frames backed
     // this observation, so a one-frame misread loses to a repeated one.
     if (obs.creditType === 'actor') {
-      for (const raw of [extracted.characterName, obs.role]) {
+      const frames = Math.max(1, obs.frameSupport || 1);
+
+      // A positional split had no separator to go on, so on a single frame it is
+      // just as likely to be slicing a three-part personal name. This is how the
+      // Gaffer Assistant "Issa Lateef Fesemule" became an actor playing his own
+      // surname. Require a second frame before such a reading may vote at all;
+      // explicit "X as Y" splits need no corroboration.
+      const positionalUncorroborated = extracted.split === 'positional' && frames < 2;
+
+      const readings: Array<string | null | undefined> = [
+        positionalUncorroborated ? null : extracted.characterName,
+        obs.role,
+      ];
+
+      for (const raw of readings) {
         const character = characterCandidate(raw);
         if (!character) continue;
-        const weight = Math.max(1, obs.frameSupport || 1);
         matchedCluster.characterVotes.set(
           character,
-          (matchedCluster.characterVotes.get(character) || 0) + weight,
+          (matchedCluster.characterVotes.get(character) || 0) + frames,
         );
       }
     }
