@@ -169,6 +169,25 @@ export function normalizeRole(rawRole: string | null | undefined, creditType: 'a
 
 import { validateCreditsWithAi } from './ai_credit_validator';
 
+// Group labels the credit-roll parser attaches to actors that are NOT characters.
+const GENERIC_CAST_LABEL = /^(?:actor|actress|cast|casts|cast list|main cast|lead cast|supporting cast|additional cast|other cast|extra|extras|cameo|special appearance|guest|guests|featuring|artiste|artistes|artist|artists)$/i;
+
+/**
+ * For an actor observation the parser stores the character in `role`. Decide
+ * whether a given value is usable as a character name rather than a group
+ * heading or a crew job title.
+ */
+export function characterCandidate(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed || trimmed.length > 60) return null;
+  if (GENERIC_CAST_LABEL.test(trimmed)) return null;
+  // A crew job title is never a character name.
+  if (normalizeRole(trimmed, 'crew') !== 'crew') return null;
+  if (NOISE_WORDS.some((nw) => trimmed.toUpperCase().includes(nw))) return null;
+  return trimmed;
+}
+
 const CHARACTER_HINT = /\b(?:MR|MRS|MISS|MS|DR|DOCTOR|PROF|PROFESSOR|PRINCIPAL|TEACHER|KING|QUEEN|CHIEF|PRINCE|PRINCESS|PASTOR|IMAM|ALFA|BABA|MAMA|MOTHER|FATHER|OFFICER|POLICE|INSPECTOR|LAWYER|BARRISTER|NURSE|JUDGE|ELDER|LANDLORD|LANDLADY|CHAIRMAN|MADAM|SIR|MAID|GUARD|GATEMAN|GATE MAN|BOSS|DRIVER|WIFE|HUSBAND|SON|DAUGHTER|FRIEND|NEIGHBOUR|NEIGHBOR|CUSTOMER|VENDOR|VILLAGER|CHILD|RECEPTIONIST|BESTIE|GIRLFRIEND|BOYFRIEND|EXTRA|LADY)\b/i;
 
 export function extractCharacterFromName(raw: string): { name: string; characterName: string | null } {
@@ -374,6 +393,9 @@ export async function reconcileAndVerifyCredits(
     roles: Set<string>;
     creditType: 'actor' | 'crew';
     characterNames: Set<string>;
+    // For actors the parser puts the CHARACTER in `role`; count every reading so
+    // the most-supported spelling wins instead of the arbitrary first one.
+    characterVotes: Map<string, number>;
     sources: Set<string>;
   };
 
@@ -410,6 +432,7 @@ export async function reconcileAndVerifyCredits(
         roles: new Set(),
         creditType: obs.creditType,
         characterNames: new Set(),
+        characterVotes: new Map(),
         sources: new Set(),
       };
       if (extracted.characterName) {
@@ -440,6 +463,20 @@ export async function reconcileAndVerifyCredits(
 
     if (obs.role) {
       matchedCluster.roles.add(obs.role);
+    }
+
+    // Collect character readings for actors, weighted by how many frames backed
+    // this observation, so a one-frame misread loses to a repeated one.
+    if (obs.creditType === 'actor') {
+      for (const raw of [extracted.characterName, obs.role]) {
+        const character = characterCandidate(raw);
+        if (!character) continue;
+        const weight = Math.max(1, obs.frameSupport || 1);
+        matchedCluster.characterVotes.set(
+          character,
+          (matchedCluster.characterVotes.get(character) || 0) + weight,
+        );
+      }
     }
   }
 
@@ -559,11 +596,21 @@ export async function reconcileAndVerifyCredits(
 
     let consensusScore = isKnownStar ? 0.95 : (aiCheck?.confidence ? aiCheck.confidence / 100 : 0.85);
 
+    // Best-supported character reading, then anything the name string carried,
+    // then whatever the DB lookup recovered. Previously this only ever used the
+    // DB value, so every newly-created actor was committed with no character.
+    const bestCharacter = cluster.creditType === 'actor'
+      ? ([...cluster.characterVotes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+        ?? characterCandidate([...cluster.characterNames][0])
+        ?? (dbPerson as any)?.characterName
+        ?? null)
+      : null;
+
     verifiedCredits.push({
       personId,
       personName: finalPersonName,
       role: normalizedRole,
-      characterName: dbPerson?.characterName || null,
+      characterName: bestCharacter,
       billingOrder: billingOrder++,
       consensusScore: Number(consensusScore.toFixed(2)),
       verifiedSources: Array.from(cluster.sources),

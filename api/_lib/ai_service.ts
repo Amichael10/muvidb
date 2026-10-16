@@ -161,7 +161,11 @@ let _CohereClient: any = null;
 async function cohereClientFor() {
   if (!_CohereClient) {
     const mod = await import('cohere-ai');
-    _CohereClient = (mod as any).CohereClient || (mod as any).CohereClientV2 || (mod as any).default;
+    // Every call site here speaks Cohere v2 — chat sends `messages` and reads
+    // `response.message.content`, embed reads `embeddings.float`. Preferring the
+    // v1 CohereClient made every chat call fail with 'Missing required key
+    // "message"' and silently fall through to another provider.
+    _CohereClient = (mod as any).CohereClientV2 || (mod as any).CohereClient || (mod as any).default;
   }
   return new _CohereClient({ token: COHERE_KEYS[cohereKeyIdx] || '' });
 }

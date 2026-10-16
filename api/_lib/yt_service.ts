@@ -236,6 +236,7 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
   }
 
   base = base.replace(/\s*\/.*$/, ''); // strip slash cast chains
+  base = base.replace(/^(?:[A-Za-z0-9_\s]{2,20}\s+[-–—:]\s*)?(?:FLASHBACK\s+(?:MOVIE|FILM)?|FLASHBACK)\s*[-–—:]\s*/i, '');
   base = base.replace(/^(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA)\s+(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA|NIGERIAN|NOLLYWOOD|AFRICAN|YORUBA|IGBO)?\s*(?:MOVIE|FILM|MOVIES|FILMS|NOLLYWOOD|NIGERIAN|AFRICAN)?\s*(?:\d{4})?\s*[-–—:]\s*/i, '');
   base = base.replace(/\s*\[[^\]]+\]/g, '');
   base = base.replace(/\s*\{[^}]+\}/g, '');

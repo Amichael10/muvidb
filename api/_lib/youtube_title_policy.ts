@@ -23,13 +23,13 @@ export type YouTubeTitleDecision =
       reason: 'sensational-title-without-film-title';
     };
 
-const STRONG_CLICKBAIT = /(not knowing|you won'?t believe|will shock|shocked everyone|made everyone cry|real tears|i (?:ask|urge|beg) (?:every|everyone)|leaving everyone in tears|turned out to be a (?:billionaire|prince|princess|ceo)|for true love|jaw.?dropping|see what happened next|changed (?:his|her) life forever|fell in love with (?:a|the|d) (?:poor|humble|maid|garbage|local|village|orphan)|kicked out to suffer|poor (?:village|orphan|helpless)|billionaire (?:lady|ceo|daughter)|in disguise|mocked (?:and|&) (?:rejected|humiliated)|how (?:a|an|the) (?:king|prince|princess|billionaire|ceo|man|lady|woman|girl|maid|orphan|husband|wife)|(?:marry|marries|married|marrying) (?:a|the) (?:poor|local|village|humble|maid|orphan|helpless|destitute)|(?:became|got) pregnant for|impregnated (?:a|the) (?:poor|local|village|maid)|disowned (?:his|her) (?:son|daughter|wife)|chased out (?:a|the) (?:poor|village|wife|maid|orphan))/i;
+const STRONG_CLICKBAIT = /(not knowing|you won'?t believe|will shock|shocked everyone|made everyone cry|real tears|i (?:ask|urge|beg) (?:every|everyone)|leaving everyone in tears|turned out to be a (?:billionaire|prince|princess|ceo)|for true love|jaw.?dropping|see what happened next|changed (?:his|her) life forever|fell in love with (?:a|the|d) (?:poor|humble|maid|garbage|local|village|orphan)|kicked out to suffer|poor (?:village|orphan|helpless)|billionaire (?:lady|ceo|daughter)|in disguise|mocked (?:and|&) (?:rejected|humiliated)|how (?:a|an|the) (?:king|prince|princess|billionaire|ceo|man|lady|woman|girl|maid|orphan|husband|wife)|(?:marry|marries|married|marrying) (?:a|the) (?:poor|local|village|humble|maid|orphan|helpless|destitute)|(?:became|got) pregnant for|impregnated (?:a|the) (?:poor|local|village|maid)|disowned (?:his|her) (?:son|daughter|wife)|chased out (?:a|the) (?:poor|village|wife|maid|orphan)|took in (?:a|the|his|her) (?:homeless|poor|orphan|pregnant|single)|homeless single mom)/i;
 
 const EMOTIONAL_PROMO = /(watch (?:this|dis|it|for|to)|watch it for|it'?s amazing|don'?t (?:skip|watch)|dn'?t (?:skip|watch)|do not (?:skip|watch)|must watch|will (?:make you|shock you|blow your mind)|cry (?:like a baby|real|hot|many|tears)|cried .*tears|control (?:ur|your|my) tears|not to skip|smile at end|touching (?:&|and) interesting|true life story|interesting family|family drama|mind.?blow|life.?changing|learn a (?:life )?lesson|keep .* aside|drop whatever|you will (?:laugh|cry)|you'?ll (?:cry|laugh|regret)|no one will .*watch|no matter .*watch|what happened next)/i;
 
 const SUBJECT = /\b(he|she|they|her|his|him|my|i|you|everyone|everylady|girl|lady|man|woman|wife|husband|mother|father|maid|orphan|billionaire|ceo|prince|princess|king|queen)\b/i;
 
-const PLOT_VERB = /(?:fell|falls|falling|fall) (?:deeply )?(?:in|for) love|not knowing|never knew|never expected|pretend|disguis|maltreat|humiliat|reject|abandon|threw|throw|chased out|treated .*trash|married|marry|marries|marrying|saved|rescued|killed|destroyed|betrayed|cheat|chose|picked|hired|helped|used|sacrific|changed .*life|came back|returned|found out|thought .*poor|thinking .*poor|searching for (?:true )?love|looking for (?:true )?love/i;
+const PLOT_VERB = /(?:fell|falls|falling|fall) (?:deeply )?(?:in|for) love|not knowing|never knew|never expected|pretend|disguis|maltreat|humiliat|reject|abandon|threw|throw|chased out|treated .*trash|married|marry|marries|marrying|saved|rescued|killed|destroyed|betrayed|cheat|chose|picked|hired|helped|used|sacrific|changed .*life|came back|returned|found out|thought .*poor|thinking .*poor|searching for (?:true )?love|looking for (?:true )?love|took in/i;
 
 const SENSATIONAL_VOCAB = /\b(poor|wicked|evil|shock(?:ing|ed)?|mind.?blow|emotional|tears?|billionaire|orphan|maid|humble|helpless|worthless|betray|revenge|pregnan|ghost|disown|crippl|blind|beggar|homeless|heartbroken|jealous|abused|mistreated)\b/i;
 
@@ -171,7 +171,8 @@ export function extractEmbeddedFilmTitle(raw: string): EmbeddedTitle | null {
     if (pipeParts.length > 1) {
       const stripPartNoise = (part: string) => {
         let s = part.trim();
-        // Leading promotional markers
+        // Leading channel / promotional markers including Flashback
+        s = s.replace(/^(?:[A-Za-z0-9_\s]{2,20}\s+[-–—:]\s*)?(?:FLASHBACK\s+(?:MOVIE|FILM)?|FLASHBACK)\s*[-–—:]\s*/i, '');
         s = s.replace(/^(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA)\s+(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA|NIGERIAN|NOLLYWOOD|AFRICAN|YORUBA|IGBO)?\s*(?:MOVIE|FILM|MOVIES|FILMS|NOLLYWOOD|NIGERIAN|AFRICAN)?\s*(?:\d{4})?\s*[-–—:]\s*/i, '');
         // Trailing dash with noise / year / metadata
         s = s.replace(/\s*[-–—:]\s*(?:Full|Latest|New|Nigerian|Nollywood|Yoruba|African|Watch|Movie|\d{4}).*/i, '');

@@ -21,7 +21,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, rm, readdir, mkdir } from 'node:fs/promises';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, statSync, copyFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import dotenv from 'dotenv';
@@ -37,6 +37,44 @@ import {
 } from './lib/credit_consensus_verifier';
 import { parseCreditFrameWithOcr, parseCreditFramesBatchWithOcr } from './lib/credit_frame_ocr';
 import { consolidateCreditObservations, type CreditObservation } from './lib/credit_roll_parser';
+import { splitCreditNames } from './lib/credit_name_splitter';
+
+// winget installs ffmpeg into a VERSIONED directory, e.g.
+//   %LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg_*\ffmpeg-8.1.1-full_build\bin
+// so any hardcoded version stops resolving the next time ffmpeg is upgraded.
+// That does not fail loudly: with no ffmpeg on PATH every film still "succeeds"
+// as a metadata-only pass with zero frames and zero OCR. Discover the bin dir
+// rather than naming it, newest build first.
+function discoverFfmpegDirs(): string[] {
+  const roots = [
+    join(process.env.LOCALAPPDATA || '', 'Microsoft\\WinGet\\Packages'),
+    join(process.env.PROGRAMFILES || '', 'ffmpeg'),
+    'C:\\ffmpeg',
+  ].filter(Boolean);
+
+  const readDir = (dir: string): string[] => {
+    try {
+      return readdirSync(dir);
+    } catch {
+      return [];
+    }
+  };
+
+  const found: string[] = [];
+  for (const root of roots) {
+    if (!existsSync(root)) continue;
+    for (const entry of readDir(root)) {
+      // Matches both <root>/<build>/bin and <root>/<package>/<build>/bin.
+      const direct = join(root, entry, 'bin');
+      const nested = readDir(join(root, entry)).map((b) => join(root, entry, b, 'bin'));
+      for (const bin of [direct, ...nested]) {
+        if (existsSync(join(bin, 'ffmpeg.exe'))) found.push(bin);
+      }
+    }
+  }
+  return [...new Set(found)].sort().reverse();
+}
+
 
 if (process.platform === 'win32') {
   const extraPaths = [
@@ -48,6 +86,7 @@ if (process.platform === 'win32') {
     join(process.cwd(), '.local-clipper-venv\\Scripts'),
     'C:\\ffmpeg\\ffmpeg-8.1.1-essentials_build\\bin',
     'C:\\ffmpeg\\bin',
+    ...discoverFfmpegDirs(),
   ].filter((p) => p && existsSync(p));
 
   if (extraPaths.length > 0) {
@@ -59,6 +98,23 @@ const execFileAsync = promisify(execFile);
 const run = (file: string, args: string[], options: any = {}) =>
   execFileAsync(file, args, { maxBuffer: 64 * 1024 * 1024, ...options });
 
+// YouTube answers sustained harvesting from one residential IP with a bot
+// challenge. Retrying through it makes the block worse and burns the queue, so
+// it is detected and surfaced as its own error for the caller to back off on.
+const BOT_BLOCK_RE = /sign in to confirm|not a bot|HTTP Error 429|Too Many Requests|rate.?limit|temporarily blocked/i;
+
+export class BotBlockError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BotBlockError';
+  }
+}
+
+function asBotBlock(err: any): BotBlockError | null {
+  const text = `${err?.message || ''} ${err?.stderr || ''}`;
+  return BOT_BLOCK_RE.test(text) ? new BotBlockError(text.trim().slice(0, 300)) : null;
+}
+
 async function runWithRetry(file: string, args: string[], options: any = {}, retries = 3): Promise<any> {
   let lastErr: any;
   for (let i = 0; i < retries; i++) {
@@ -66,6 +122,8 @@ async function runWithRetry(file: string, args: string[], options: any = {}, ret
       return await run(file, args, options);
     } catch (err: any) {
       lastErr = err;
+      const blocked = asBotBlock(err);
+      if (blocked) throw blocked;
       const isDnsError = /getaddrinfo|ETIMEDOUT|ENOTFOUND|socket timeout|HTTPSConnection/i.test(err.message || '');
       if (isDnsError && i < retries - 1) {
         console.warn(`      ⚠️ Network/DNS error on ${file}. Retrying attempt ${i + 2}/${retries} in ${(i + 1) * 4}s...`);
@@ -91,6 +149,16 @@ const arg = (n: string) => {
 
 const TAIL_SECONDS = Number(arg('tail')) || 240; // Default: last 4 minutes
 const FRAME_EVERY_SEC = Number(arg('frame-every')) || 3; // Default: 1 frame every 3 seconds (~80 frames for 240s tail)
+// Credit text is small; reading it off a 360p stream upscaled to 1280 was the
+// main source of OCR gibberish. Prefer a real HD stream, fall back downward.
+// HLS (m3u8) is the ONLY variant that supports --download-sections reliably:
+// the DASH progressive URLs stall indefinitely and, when they do move, are
+// throttled to ~116 KB/s vs ~513 KB/s over HLS. 720p is the sweet spot — the
+// frames are upscaled to FRAME_WIDTH for OCR anyway.
+const DEFAULT_VIDEO_FORMAT =
+  'bestvideo[height<=720][protocol^=m3u8]/232/bestvideo[height<=1080][protocol^=m3u8]/270/bestvideo[height<=720][vcodec^=avc1]/136/best[height<=720]';
+const VIDEO_FORMAT = arg('format') ?? process.env.YTDLP_FORMAT ?? DEFAULT_VIDEO_FORMAT;
+const FRAME_WIDTH = Number(arg('frame-width')) || 1920;
 const ONCE = arg('once') !== undefined;
 const SINGLE_FILM = arg('film');
 const TITLE_FILTER = arg('title') ?? arg('query') ?? arg('search');
@@ -104,11 +172,55 @@ const COOKIES_PATH = [
   'C:\\Users\\User\\Downloads\\cookies.txt',
 ].find((p) => p && existsSync(p) && statSync(p).size > 100);
 
+// yt-dlp REWRITES whatever cookie jar it is handed. Hand it a disposable copy
+// so a blocked or throttled run cannot degrade the master file, which is the
+// only thing standing between this harvester and the bot wall.
+const COOKIES_FILE = (() => {
+  if (!COOKIES_PATH) return undefined;
+  try {
+    const copy = join(tmpdir(), `harvest-cookies-${process.pid}.txt`);
+    copyFileSync(COOKIES_PATH, copy);
+    return copy;
+  } catch {
+    return COOKIES_PATH;
+  }
+})();
+
+// Seconds to wait between films. 3s was effectively a flood; YouTube notices.
+const PAUSE_SECONDS = Number(arg('pause')) || 20;
+
+// Run the full pipeline but commit nothing. Use this to inspect what the
+// harvester WOULD write before letting it near curated films.
+const DRY_RUN = arg('dry-run') !== undefined;
+
+// A stale cookies.txt makes YouTube reject requests that succeed perfectly
+// well anonymously. Rather than failing every film, try once without the jar
+// and, if that works, run cookie-free for the rest of the session.
+let cookiesEnabled = !!COOKIES_FILE;
+
+async function ytdlp(args: string[], options: any = {}): Promise<any> {
+  const withCookies = cookiesEnabled && COOKIES_FILE
+    ? [...args, '--cookies', COOKIES_FILE]
+    : args;
+  try {
+    return await runWithRetry('yt-dlp', withCookies, options);
+  } catch (err: any) {
+    if (err instanceof BotBlockError || !cookiesEnabled) throw err;
+    const result = await runWithRetry('yt-dlp', args, options);
+    console.warn('      ⚠️ cookies.txt looks stale — continuing WITHOUT cookies for this run.');
+    cookiesEnabled = false;
+    return result;
+  }
+}
+
 const configuredClient = arg('client') ?? process.env.YTDLP_YOUTUBE_CLIENT;
+// yt-dlp's own default client selection works; the previously hardcoded
+// 'mweb,web' now returns "Video unavailable" for every video, which silently
+// turned the whole harvester into a metadata-only pass.
 const YT_CLIENT = configuredClient && configuredClient !== 'default' && configuredClient !== 'auto'
   ? configuredClient
-  : 'mweb,web';
-const clientArgs = ['--extractor-args', `youtube:player_client=${YT_CLIENT}`];
+  : null;
+const clientArgs = YT_CLIENT ? ['--extractor-args', `youtube:player_client=${YT_CLIENT}`] : [];
 
 function cleanTitle(raw: string): string {
   return raw
@@ -149,14 +261,14 @@ async function extractTailFrames(url: string, dir: string): Promise<{
     const probeArgs = [
       '--dump-json', '--no-warnings', '--no-playlist', '--skip-download',
       ...clientArgs,
-      ...(COOKIES_PATH ? ['--cookies', COOKIES_PATH] : []),
-      url,
+        url,
     ];
-    const probeProc = await runWithRetry('yt-dlp', probeArgs, { timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
+    const probeProc = await ytdlp(probeArgs, { timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
     const rawOutput = (probeProc.stdout || '').trim();
     const lastLine = rawOutput.split('\n').filter(Boolean).at(-1) || rawOutput;
     probe = JSON.parse(lastLine);
   } catch (err: any) {
+    if (err instanceof BotBlockError) throw err;
     console.warn(`   ⚠️ Metadata probe warning: ${err.message?.slice(0, 120) || 'Unknown'}`);
   }
 
@@ -170,19 +282,22 @@ async function extractTailFrames(url: string, dir: string): Promise<{
 
   // Request 720p HD stream with fallback
   const downloadArgs = [
-    '-f', '18/22/best[height<=720]/best',
+    '-f', VIDEO_FORMAT,
     '--download-sections', `*${startSec}-${durationSec}`,
     '--retries', '2', '--fragment-retries', '2', '--socket-timeout', '20',
     ...clientArgs,
-    ...(COOKIES_PATH ? ['--cookies', COOKIES_PATH] : []),
     '-o', tailFile,
     '--no-warnings', '--no-part', '--no-playlist',
     url,
   ];
 
   try {
-    await runWithRetry('yt-dlp', downloadArgs, { timeout: 240_000 });
+    await ytdlp(downloadArgs, { timeout: 240_000 });
   } catch (dlErr: any) {
+    if (dlErr instanceof BotBlockError) {
+      await safeRm(tailFile);
+      throw dlErr;
+    }
     console.warn(`   ⚠️ Tail download failed or timed out: ${dlErr.message?.slice(0, 120) || 'Unknown'}. Skipping tail OCR.`);
     await safeRm(tailFile);
     return { frames: [], durationSec, startSec, youtubeTitle: probe.title, youtubeDescription: probe.description };
@@ -198,7 +313,7 @@ async function extractTailFrames(url: string, dir: string): Promise<{
   try {
     await run('ffmpeg', [
       '-i', tailFile,
-      '-vf', `fps=1/${FRAME_EVERY_SEC},scale=1280:-2`,
+      '-vf', `fps=1/${FRAME_EVERY_SEC},scale=${FRAME_WIDTH}:-2`,
       '-q:v', '2',
       join(dir, 'f_%03d.jpg'),
       '-hide_banner', '-loglevel', 'error', '-y',
@@ -223,18 +338,17 @@ async function extractHeadFrames(url: string, dir: string): Promise<{ frames: st
   const headEndSec = 150; // first 2.5 minutes
 
   const downloadArgs = [
-    '-f', '18/22/best[height<=720]/best',
+    '-f', VIDEO_FORMAT,
     '--download-sections', `*15-${headEndSec}`,
     '--retries', '2', '--socket-timeout', '20',
     ...clientArgs,
-    ...(COOKIES_PATH ? ['--cookies', COOKIES_PATH] : []),
     '-o', headFile,
     '--no-warnings', '--no-part', '--no-playlist',
     url,
   ];
 
   try {
-    await runWithRetry('yt-dlp', downloadArgs, { timeout: 120_000 });
+    await ytdlp(downloadArgs, { timeout: 120_000 });
     if (!existsSync(headFile) || statSync(headFile).size < 100_000) {
       await safeRm(headFile);
       return { frames: [], startSec: 15 };
@@ -242,7 +356,7 @@ async function extractHeadFrames(url: string, dir: string): Promise<{ frames: st
 
     await run('ffmpeg', [
       '-i', headFile,
-      '-vf', 'fps=1/2,scale=1280:-2', // 1 frame every 2 seconds = ~60 frames
+      '-vf', `fps=1/2,scale=${FRAME_WIDTH}:-2`, // 1 frame every 2 seconds = ~60 frames
       '-q:v', '2',
       join(dir, 'h_%03d.jpg'),
       '-hide_banner', '-loglevel', 'error', '-y',
@@ -386,7 +500,7 @@ function extractMetadataCandidates(title: string, description: string | null): R
 }
 
 /** Process a single film through the 3-Worker pipeline */
-async function processFilm(film: any): Promise<boolean> {
+async function processFilm(film: any): Promise<boolean | 'blocked'> {
   const filmId = film.id;
   const filmTitle = film.title || 'Untitled';
   const url = film.youtube_watch_url || (film.trailer_youtube_id ? `https://www.youtube.com/watch?v=${film.trailer_youtube_id}` : null);
@@ -455,10 +569,31 @@ async function processFilm(film: any): Promise<boolean> {
         }
       }
 
+      // PaddleOCR emits a whole text region as one box, so on many films the
+      // actor and their character arrive glued ("Odunlade Adekola Saamu").
+      // Split before consensus, or the character is lost. Only lines sitting
+      // under a generic cast heading are candidates — under "Extra"/"Cameo" a
+      // three-word string is far more likely to just be a long personal name.
+      const GENERIC_CAST_HEADING = /^(?:actor|actress|cast|casts|main cast|lead cast|supporting cast|featuring)$/i;
+      const glued = consolidated.filter((p) => p.creditType === 'actor'
+        && GENERIC_CAST_HEADING.test(String(p.roleOrCharacter || '').trim())
+        && String(p.name || '').trim().split(/\s+/).length >= 3);
+
+      let splits = new Map<string, { name: string; characterName: string | null }>();
+      if (glued.length) {
+        console.log(`   ✂️  Splitting ${glued.length} glued actor/character line(s)...`);
+        try {
+          splits = await splitCreditNames(filmTitle, glued.map((p) => String(p.name).trim()));
+        } catch (err: any) {
+          console.warn(`      ⚠️ Name split unavailable (${err?.message}); keeping lines whole.`);
+        }
+      }
+
       for (const p of consolidated) {
+        const split = splits.get(String(p.name || '').trim());
         worker1Raw.push({
-          name: p.name,
-          role: p.roleOrCharacter,
+          name: split?.name || p.name,
+          role: split?.characterName || p.roleOrCharacter,
           creditType: p.creditType,
           confidence: p.ocrConfidence,
           frameIndex: p.frameIndex,
@@ -498,10 +633,15 @@ async function processFilm(film: any): Promise<boolean> {
 
     console.log(`   📋 Worker 3 Verified ${verifiedCredits.length} credits:`);
     for (const c of verifiedCredits) {
-      console.log(`      • ${c.role.toUpperCase()}: ${c.personName} (Score: ${(c.consensusScore * 100).toFixed(0)}%, Sources: ${c.verifiedSources.join('+')})`);
+      const asChar = c.characterName ? ` as ${c.characterName}` : '';
+      console.log(`      • ${c.role.toUpperCase()}: ${c.personName}${asChar} (Score: ${(c.consensusScore * 100).toFixed(0)}%, Sources: ${c.verifiedSources.join('+')})`);
     }
 
     if (verifiedCredits.length > 0) {
+      if (DRY_RUN) {
+        console.log(`   🧪 --dry-run: would commit ${verifiedCredits.length} credits; nothing written.`);
+        return true;
+      }
       const committed = await commitVerifiedCredits(filmId, verifiedCredits);
       console.log(`   ✅ Successfully committed ${committed} credits to database!`);
       return true;
@@ -510,6 +650,10 @@ async function processFilm(film: any): Promise<boolean> {
       return false;
     }
   } catch (err: any) {
+    if (err instanceof BotBlockError) {
+      console.error(`   🛑 YouTube bot-check hit on "${filmTitle}".`);
+      return 'blocked';
+    }
     console.error(`   ❌ Error processing film ${filmTitle}:`, err.message);
     return false;
   } finally {
@@ -517,10 +661,51 @@ async function processFilm(film: any): Promise<boolean> {
   }
 }
 
+/**
+ * ffmpeg and yt-dlp are both hard requirements: without ffmpeg there are no
+ * frames, so every film completes as a metadata-only pass and the run looks
+ * healthy while harvesting nothing. For an unattended 24/7 deployment that is
+ * the worst failure mode available, so refuse to start instead.
+ */
+async function assertDependencies() {
+  const checks: Array<[string, string[]]> = [
+    ['ffmpeg', ['-version']],
+    ['yt-dlp', ['--version']],
+  ];
+
+  const missing: string[] = [];
+  for (const [bin, args] of checks) {
+    try {
+      await run(bin, args, { timeout: 30_000 });
+    } catch {
+      missing.push(bin);
+    }
+  }
+
+  if (missing.length) {
+    console.error('================================================================');
+    console.error(`FATAL: required executable(s) not found on PATH: ${missing.join(', ')}`);
+    console.error('');
+    if (missing.includes('ffmpeg')) {
+      console.error('  ffmpeg:  winget install Gyan.FFmpeg');
+      console.error('           (installs under a versioned WinGet\\Packages dir,');
+      console.error('            which discoverFfmpegDirs() picks up automatically)');
+    }
+    if (missing.includes('yt-dlp')) {
+      console.error('  yt-dlp:  pip install -U yt-dlp');
+    }
+    console.error('================================================================');
+    process.exit(1);
+  }
+}
+
+
 async function main() {
   console.log('================================================================');
   console.log('🚀 AUTOMATED 3-WORKER CREDIT HARVESTER & CONSENSUS DAEMON');
   console.log('================================================================');
+
+  await assertDependencies();
 
   if (SINGLE_FILM) {
     const { data: film } = await serviceSupabase.from('films').select('*').eq('id', SINGLE_FILM).single();
@@ -530,6 +715,7 @@ async function main() {
   }
 
   let processedCount = 0;
+  let blockStreak = 0;
   let dbErrorCount = 0;
   const attemptedFilmIds = new Set<string>();
 
@@ -654,7 +840,26 @@ async function main() {
 
     for (const film of batchFilms) {
       attemptedFilmIds.add(film.id);
-      await processFilm(film);
+      const outcome = await processFilm(film);
+
+      if (outcome === 'blocked') {
+        // Do not count this film as attempted: nothing was actually read.
+        attemptedFilmIds.delete(film.id);
+        blockStreak++;
+        const waitMinutes = Math.min(60, 5 * 2 ** (blockStreak - 1));
+        console.error('================================================================');
+        console.error(`🛑 YouTube is bot-challenging this IP (strike ${blockStreak}).`);
+        console.error('   Continuing would deepen the block and burn the queue.');
+        console.error(`   Sleeping ${waitMinutes} minutes before trying again.`);
+        console.error('   If this repeats, re-export cookies.txt from a logged-in');
+        console.error('   private/incognito window and close it WITHOUT logging out.');
+        console.error('================================================================');
+        if (ONCE) return;
+        await new Promise(r => setTimeout(r, waitMinutes * 60_000));
+        break; // re-query from the top after the cooldown
+      }
+
+      blockStreak = 0;
       processedCount++;
 
       if (ONCE) {
@@ -663,7 +868,7 @@ async function main() {
       }
 
       // Gentle pacing
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, PAUSE_SECONDS * 1000));
     }
   }
 }

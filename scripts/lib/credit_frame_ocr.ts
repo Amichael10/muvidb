@@ -6,12 +6,18 @@ import {
   parseTesseractTsv,
   groupWordsIntoOcrLines,
   type CreditObservation,
+  type OcrWord,
 } from './credit_roll_parser';
 
 const localTessdata = join(process.cwd(), 'tessdata');
 if (existsSync(join(localTessdata, 'eng.traineddata'))) {
   process.env.TESSDATA_PREFIX = localTessdata;
-} else if (process.platform === 'win32') {
+}
+
+// NOTE: the PATH setup below must run whether or not a local tessdata/ exists.
+// It was previously an `else if` on that check, so adding tessdata/ silently
+// removed tesseract, yt-dlp and ffmpeg from PATH for every child process.
+if (process.platform === 'win32') {
   const tesseractDir = existsSync('C:\\Program Files\\Tesseract-OCR')
     ? 'C:\\Program Files\\Tesseract-OCR'
     : existsSync(join(process.env.LOCALAPPDATA || '', 'Programs\\Tesseract-OCR'))
