@@ -1,6 +1,5 @@
 import { ytGet, parseDuration, cleanTitle } from '../api/_lib/yt_service.js';
 import { curateYouTubeTitle, isBloggerOrNonFilm, isSensationalizedYouTubeTitle } from '../api/_lib/youtube_title_policy.js';
-import { pickTmdbMatch } from '../api/_lib/tmdb_match.js';
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -21,39 +20,6 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-/** Try to find a TMDB movie match and return enriched metadata */
-async function enrichFromTMDB(title: string, year?: number | null): Promise<{
-  synopsis?: string;
-  poster_url?: string;
-  backdrop_url?: string;
-  tmdb_id?: number;
-  tmdb_rating?: number;
-} | null> {
-  const TMDB_KEY = process.env.TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
-  if (!TMDB_KEY) return null;
-  try {
-    const query = encodeURIComponent(title);
-    const yearParam = year ? `&year=${year}` : '';
-    const res = await fetch(
-      `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${query}${yearParam}&with_origin_country=NG`,
-      { signal: AbortSignal.timeout(30000) }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const result = pickTmdbMatch(data.results, { title, year });
-    if (!result) return null;
-    return {
-      synopsis: result.overview?.trim() || undefined,
-      poster_url: result.poster_path ? `https://image.tmdb.org/t/p/w500${result.poster_path}` : undefined,
-      backdrop_url: result.backdrop_path ? `https://image.tmdb.org/t/p/w780${result.backdrop_path}` : undefined,
-      tmdb_id: result.id,
-      tmdb_rating: result.vote_average || undefined,
-    };
-  } catch {
-    return null;
-  }
-}
 
 async function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -252,7 +218,23 @@ async function main() {
                     }
 
                     const vidYear = v.published_at ? new Date(v.published_at).getFullYear() : null;
-                    const tmdb = await enrichFromTMDB(cleanedTitle, vidYear);
+                    // NO TMDB/IMDb ENRICHMENT ON A YOUTUBE FILM.
+                    //
+                    // A YouTube upload was never released to TMDB or IMDb, so
+                    // there is no record of it to enrich from and a title search
+                    // can only ever return a DIFFERENT film. That is exactly how
+                    // Wazo, Omo Ghetto, Aje Meta, Taiwo Taiwo and The Return of
+                    // Jenifa were all stamped with tmdb 522406 "Flashback", then
+                    // served that film's poster, synopsis and rating.
+                    //
+                    // The previous call also carried `with_origin_country=NG`,
+                    // which looks like a Nigeria-only restriction but is a
+                    // /discover parameter: /search/movie ignores it silently, so
+                    // nothing was ever filtered by country.
+                    //
+                    // Artwork comes from the video thumbnail, which is the
+                    // canonical image for these films, and the synopsis is left
+                    // for the Cohere pass below via needs_review.
                     filmsToInsert.push({
                       title: cleanedTitle, 
                       original_title: decision.originalTitle || null,
@@ -262,12 +244,12 @@ async function main() {
                       source_video_id: v.video_id,
                       youtube_watch_url: `https://www.youtube.com/watch?v=${v.video_id}`,
                       trailer_youtube_id: v.video_id, 
-                      poster_url: tmdb?.poster_url || v.thumbnail_url,
-                      backdrop_url: tmdb?.backdrop_url || v.thumbnail_url,
-                      synopsis: tmdb?.synopsis || null,
-                      tmdb_id: tmdb?.tmdb_id || null,
-                      tmdb_rating: tmdb?.tmdb_rating || null,
-                      needs_review: !tmdb?.synopsis, 
+                      poster_url: v.thumbnail_url,
+                      backdrop_url: v.thumbnail_url,
+                      synopsis: null,
+                      tmdb_id: null,
+                      tmdb_rating: null,
+                      needs_review: true, 
                       status: 'released',
                       runtime_minutes: Math.round(v.duration_seconds / 60),
                       language: ch.primary_language || 'English'
