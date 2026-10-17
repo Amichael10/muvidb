@@ -8,7 +8,8 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const TMDB_KEY = process.env.VITE_TMDB_API_KEY || '4edb739fa9f16d24f0aecf6a0dbcaab8';
+const TMDB_KEY = process.env.VITE_TMDB_API_KEY || process.env.TMDB_API_KEY || '';
+if (!TMDB_KEY) throw new Error('VITE_TMDB_API_KEY or TMDB_API_KEY must be set');
 const YT_KEY = process.env.YOUTUBE_API_KEY || process.env.VITE_YOUTUBE_API_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {

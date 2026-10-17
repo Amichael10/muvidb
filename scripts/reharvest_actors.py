@@ -11,7 +11,9 @@ load_dotenv(".env")
 
 SUPABASE_URL = os.getenv("VITE_SUPABASE_URL") or os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-TMDB_KEY = os.getenv("VITE_TMDB_API_KEY") or "4edb739fa9f16d24f0aecf6a0dbcaab8"
+TMDB_KEY = os.getenv("VITE_TMDB_API_KEY") or os.getenv("TMDB_API_KEY") or ""
+if not TMDB_KEY:
+    raise SystemExit("VITE_TMDB_API_KEY or TMDB_API_KEY must be set")
 YT_KEY = os.getenv("YOUTUBE_API_KEY") or os.getenv("VITE_YOUTUBE_API_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:

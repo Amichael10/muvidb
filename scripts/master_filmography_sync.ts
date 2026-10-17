@@ -16,11 +16,13 @@
 
 import { supabase } from './lib/db';
 import dotenv from 'dotenv';
+import { pathToFileURL } from 'node:url';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-const TMDB_API_KEY = process.env.VITE_TMDB_API_KEY || process.env.TMDB_API_KEY || '4edb739fa9f16d24f0aecf6a0dbcaab8';
+const TMDB_API_KEY = process.env.VITE_TMDB_API_KEY || process.env.TMDB_API_KEY || '';
+if (!TMDB_API_KEY) throw new Error('VITE_TMDB_API_KEY or TMDB_API_KEY must be set');
 
 // Known aliases mapping for actors with fragmented profiles
 const KNOWN_ALIASES: Record<string, string[]> = {
@@ -293,7 +295,7 @@ async function getOrCreatePerson(
 /**
  * Ingest or Match Film with full metadata, poster, genres, and ensemble
  */
-async function syncFilmAndEnsemble(
+export async function syncFilmAndEnsemble(
   tmdbCredit: any,
   genresMap: Map<string, string>
 ): Promise<{ filmId: string; wasCreated: boolean; ensembleAdded: number }> {
@@ -337,8 +339,13 @@ async function syncFilmAndEnsemble(
     }
   }
 
-  // 3. To create a NEW film, it MUST strictly have an African country or verified African language
+  // Require positive African-origin evidence before any database lookup or write.
+  // An existing catalogue row is not evidence: it may itself be an earlier bad import.
   const isAfricanOrigin = isAfricanCountry || isAfricanLang;
+  if (!isAfricanOrigin) {
+    console.log(`   ⏭️ Skipping unverified African origin: "${title}" (${allCountries.join(', ') || 'unknown origin'})`);
+    return { filmId: '', wasCreated: false, ensembleAdded: 0 };
+  }
 
   const imdbId = mediaDetails.external_ids?.imdb_id || mediaDetails.imdb_id || null;
   const synopsis = mediaDetails.overview || tmdbCredit.overview || null;
@@ -376,12 +383,6 @@ async function syncFilmAndEnsemble(
       .lte('year', year + 1)
       .maybeSingle();
     if (byTitleYear) filmId = byTitleYear.id;
-  }
-
-  // Guard: If film does not already exist in Muvidb, NEVER create it unless it is genuine African!
-  if (!filmId && !isAfricanOrigin) {
-    console.log(`   ⏭️ Skipping foreign non-African title: "${title}" (${allCountries.join(', ') || 'foreign'})`);
-    return { filmId: '', wasCreated: false, ensembleAdded: 0 };
   }
 
   if (filmId) {
@@ -884,7 +885,9 @@ async function main() {
   process.exit(0);
 }
 
-main().catch(err => {
-  console.error('Fatal engine error:', err);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(err => {
+    console.error('Fatal engine error:', err);
+    process.exit(1);
+  });
+}
