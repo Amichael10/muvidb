@@ -97,7 +97,9 @@ describe('renderSnapshotAsset', () => {
     expect(result.height).toBe(1350);
     expect(result.png).toBeInstanceOf(Buffer);
     expect(result.png.length).toBeGreaterThan(1000);
-  }, 15_000);
+  // Satori + resvg rasterisation is CPU-bound and measured 14.6s of a 15s
+  // budget on an idle machine, so this flaked the moment anything else ran.
+  }, 60_000);
 
   it('renders an actor spotlight card into a valid square PNG buffer', async () => {
     const { renderSnapshotAsset } = await import('./social_render.js');
@@ -131,5 +133,5 @@ describe('renderSnapshotAsset', () => {
     expect(result.height).toBe(ASSET_FORMAT_DIMENSIONS.square_1_1.height);
     expect(result.png).toBeInstanceOf(Buffer);
     expect(result.png.length).toBeGreaterThan(1000);
-  }, 15_000);
+  }, 60_000);
 });

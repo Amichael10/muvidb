@@ -7,6 +7,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Unauthenticated callers could previously drive this endpoint directly. It
+  // writes with the service-role client (RLS does not apply) and spends paid
+  // third-party quota, so it is gated like every other automation trigger.
+  // isValidAuth accepts an x-cron-secret header, so an external scheduler only
+  // needs that header added.
+  const { isValidAuth } = await import('../_lib/auth.js');
+  if (!(await isValidAuth(req)).valid) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   await supabase.from('automation_jobs').upsert({
     id: 'actor_enricher',
     status: 'running',
