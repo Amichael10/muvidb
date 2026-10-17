@@ -124,8 +124,11 @@ describe('renderSnapshotAsset', () => {
     });
 
     expect(result.format).toBe('square_1_1');
-    expect(result.width).toBe(1080);
-    expect(result.height).toBe(1080);
+    // Bound to the exported constant: the square card moved to 1254x1254 in
+    // 74184c7 and this assertion kept asserting the old 1080, so the suite went
+    // red for a change that was intentional and consistent everywhere else.
+    expect(result.width).toBe(ASSET_FORMAT_DIMENSIONS.square_1_1.width);
+    expect(result.height).toBe(ASSET_FORMAT_DIMENSIONS.square_1_1.height);
     expect(result.png).toBeInstanceOf(Buffer);
     expect(result.png.length).toBeGreaterThan(1000);
   }, 15_000);

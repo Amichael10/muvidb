@@ -84,6 +84,12 @@ export function isFilmEligibleForIntent(film: any, intent: EditorialSeriesIntent
   // Films must have artwork (either poster, square artwork, or landscape thumbnail/backdrop)
   if (!film?.poster_url && !film?.backdrop_url && !film?.backdrop) return false;
 
+  // A landscape thumbnail cannot stand in for a portrait poster on a social
+  // card. Every downstream consumer already rejects these one by one
+  // (morning_social_briefing, calendar_service, social_studio), so letting them
+  // through here only made the ranked pool look larger than it really was.
+  if (film?.poster_url && isLikelyLandscapeOrThumbnailUrl(film.poster_url)) return false;
+
   const lifecycle = classifyFilmLifecycle(film, referenceDate);
   if (intent === 'streaming') return lifecycle === 'now_streaming';
   if (intent === 'upcoming') {

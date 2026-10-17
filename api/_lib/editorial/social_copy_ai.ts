@@ -450,6 +450,14 @@ function applyVerifiedMovieAttribution(req: AICopyRequest, variations: AICopyVar
       if (castNames.length && !captions[platform].toLowerCase().includes('starring:') && !captions[platform].toLowerCase().includes('starring')) {
         additions.push(`Starring: ${castNames.join(', ')}`);
       }
+      // Instagram is the only surface that carries @handles, and
+      // areGeneratedVariationsGrounded refuses any variation whose Instagram
+      // caption is missing one. The handles were being resolved above and then
+      // dropped, so generated copy could never satisfy its own validator.
+      if (platform === 'instagram' && handles.length) {
+        const missing = handles.filter(handle => !captions.instagram.toLowerCase().includes(handle.toLowerCase()));
+        if (missing.length) additions.push(`Credits: ${missing.join(' ')}`);
+      }
       captions[platform] = appendBeforeHashtags(captions[platform], additions, COPY_LIMITS[platform]);
     }
     return { ...variation, captions };
