@@ -16,6 +16,16 @@ export interface AlertDispatchResult {
   sentCount: number;
   skippedAlreadyNotified: number;
   failedCount: number;
+  /**
+   * True when the film has no credits yet, so there was nobody to match
+   * followers against. This is NOT the same as "no followers": YouTube films
+   * are published the moment they are synced but only get credits once the
+   * harvester reaches them, so the caller must wait rather than treat the
+   * alert as delivered.
+   */
+  creditsMissing: boolean;
+  /** Users skipped because WhatsApp is off, or the number is absent/too short. */
+  skippedNotReachable: number;
   errors: Array<{ userId: string; error: string }>;
 }
 
@@ -41,6 +51,8 @@ export async function dispatchMovieWhatsAppAlerts(
     sentCount: 0,
     skippedAlreadyNotified: 0,
     failedCount: 0,
+    creditsMissing: false,
+    skippedNotReachable: 0,
     errors: [],
   };
 
@@ -59,6 +71,7 @@ export async function dispatchMovieWhatsAppAlerts(
   if (creditErr) throw new Error(`Cannot read film credits: ${creditErr.message}`);
   if (!credits || credits.length === 0) {
     console.log('[WhatsApp Alert] No credits found for film:', filmId);
+    result.creditsMissing = true;
     return result;
   }
 
@@ -154,11 +167,13 @@ export async function dispatchMovieWhatsAppAlerts(
 
     // Check if user disabled WhatsApp or has no phone
     if (!userRow.whatsapp_enabled || !userRow.whatsapp_phone) {
+      result.skippedNotReachable++;
       continue;
     }
 
     const phone = normalizeWhatsAppNumber(userRow.whatsapp_phone);
     if (!phone || phone.length < 9) {
+      result.skippedNotReachable++;
       continue;
     }
 

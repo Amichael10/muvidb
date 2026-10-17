@@ -13,7 +13,7 @@ import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
 import { sweepAndUpdatePlayStatuses } from '../_lib/theatre_service.js';
 import { runYouTubeUploadWatch } from '../_lib/youtube_upload_notify.js';
 import { runCriticsSync } from '../_lib/critics_sync.js';
-import { runWhatsAppAlertQueue } from '../_lib/whatsapp_alert_queue.js';
+import { runWhatsAppAlertQueue, backfillMovieWhatsAppAlertQueue } from '../_lib/whatsapp_alert_queue.js';
 import { monitorWhatsAppAlerts } from '../_lib/whatsapp_monitor.js';
 
 
@@ -123,7 +123,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           monitoring = { error: error.message };
           console.error('[WhatsApp monitoring]', error.message);
         }
-        result = { ...(await runWhatsAppAlertQueue()), monitoring };
+        // Fill the queue before draining it. No publish path enqueues alerts,
+        // so without this the drain below runs against an empty queue forever.
+        // Isolated from the drain: a scan failure must not stop delivery of
+        // whatever is already queued.
+        let backfill: any;
+        try { backfill = await backfillMovieWhatsAppAlertQueue(); }
+        catch (error: any) {
+          backfill = { error: error.message };
+          console.error('[WhatsApp backfill]', error.message);
+        }
+        result = { ...(await runWhatsAppAlertQueue()), backfill, monitoring };
         break;
       }
       case 'showtimes':      result = await runShowtimesSync(); break;
