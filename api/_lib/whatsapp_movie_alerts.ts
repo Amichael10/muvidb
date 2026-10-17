@@ -11,6 +11,27 @@ import { whatsappRetryAt, MAX_WHATSAPP_ATTEMPTS } from './whatsapp_retry_policy.
 import { supabase } from './supabase.js';
 import { sendMetaWhatsAppTemplate, isWhatsAppConfigured, normalizeWhatsAppNumber } from './meta_whatsapp.js';
 
+/**
+ * Writes an alert-log row, retrying briefly.
+ *
+ * This row is the only record that a user has been messaged: the queue backfill
+ * and the idempotency check both read it. If the write is lost, that user looks
+ * un-alerted and will be messaged again. The send has already left, so failing
+ * loudly cannot undo it -- the useful thing is to try hard, then report.
+ */
+async function writeAlertLog(payload: Record<string, unknown>): Promise<string | null> {
+  let last = '';
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const { error } = await supabase
+      .from('whatsapp_movie_alert_log')
+      .upsert(payload, { onConflict: 'user_id,film_id' });
+    if (!error) return null;
+    last = error.message;
+    if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 250));
+  }
+  return last;
+}
+
 export interface AlertDispatchResult {
   totalEligibleUsers: number;
   sentCount: number;
@@ -26,6 +47,13 @@ export interface AlertDispatchResult {
   creditsMissing: boolean;
   /** Users skipped because WhatsApp is off, or the number is absent/too short. */
   skippedNotReachable: number;
+  /**
+   * Messages that went out but whose log row could not be written. These are
+   * the only cases that can produce a duplicate on a later pass, so they are
+   * reported separately rather than folded into failedCount -- counting them
+   * as failures would make the queue retry the whole film and resend.
+   */
+  unloggedSends: number;
   errors: Array<{ userId: string; error: string }>;
 }
 
@@ -53,6 +81,7 @@ export async function dispatchMovieWhatsAppAlerts(
     failedCount: 0,
     creditsMissing: false,
     skippedNotReachable: 0,
+    unloggedSends: 0,
     errors: [],
   };
 
@@ -210,8 +239,7 @@ export async function dispatchMovieWhatsAppAlerts(
 
     if (sendRes.ok) {
       result.sentCount++;
-      // Log to whatsapp_movie_alert_log
-      const { error: logError } = await supabase.from('whatsapp_movie_alert_log').upsert({
+      const logError = await writeAlertLog({
         user_id: uId,
         film_id: filmId,
         phone,
@@ -220,19 +248,28 @@ export async function dispatchMovieWhatsAppAlerts(
         status: 'sent', attempts, last_attempt_at: attemptedAt,
         next_retry_at: null, error_code: null, issue_notified_at: null,
         error_message: null,
-      }, { onConflict: 'user_id,film_id' });
-      if (logError) throw new Error(`Message accepted but alert history could not be saved: ${logError.message}`);
+      });
+      if (logError) {
+        // Keep going. Aborting here stranded every remaining follower without
+        // undoing the message that already went out.
+        result.unloggedSends++;
+        result.errors.push({ userId: uId, error: `Message sent but alert history could not be saved: ${logError}` });
+        console.error(`[WhatsApp Alert] Sent to ${uId} but could not record it:`, logError);
+      }
     } else {
       result.failedCount++;
       result.errors.push({ userId: uId, error: sendRes.error || 'Failed to send' });
       console.error(`[WhatsApp Alert] Failed sending to user ${uId}:`, sendRes.error);
-      const { error: logError } = await supabase.from('whatsapp_movie_alert_log').upsert({
+      const logError = await writeAlertLog({
         user_id: uId, film_id: filmId, phone, followed_people_names: actorNames,
         status: 'failed', message_id: null, error_message: sendRes.error || 'Failed to send',
         attempts, last_attempt_at: attemptedAt, error_code: sendRes.details?.code || null,
         next_retry_at: whatsappRetryAt(sendRes.details?.code, attempts), issue_notified_at: null,
-      }, { onConflict: 'user_id,film_id' });
-      if (logError) throw new Error(`Cannot save alert failure: ${logError.message}`);
+      });
+      if (logError) {
+        result.errors.push({ userId: uId, error: `Cannot save alert failure: ${logError}` });
+        console.error(`[WhatsApp Alert] Could not record failure for ${uId}:`, logError);
+      }
     }
   }
 
