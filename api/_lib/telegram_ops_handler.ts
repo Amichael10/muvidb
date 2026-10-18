@@ -1417,17 +1417,28 @@ async function handleCallback(query: any) {
           .replace(/^-+|-+$/g, '')
           .slice(0, 80);
 
+        // These must match the real `people` columns. Five of the names used
+        // here previously did not exist -- primary_role, roles, image_url,
+        // instagram_handle, twitter_handle -- and PostgREST rejects an unknown
+        // column even when its value is null, so "Create Person" failed every
+        // single time rather than only when a handle was present.
+        const socialUrl = (value: unknown, base: string): string | null => {
+          const raw = String(value || '').trim();
+          if (!raw) return null;
+          if (/^https?:\/\//i.test(raw)) return raw;
+          return `${base}/${raw.replace(/^@/, '')}`;
+        };
+
         const { data: newPerson, error } = await supabase
           .from('people')
           .insert({
             name: payload.name,
             slug: personSlug,
-            primary_role: payload.primary_role || 'actor',
-            roles: payload.roles?.length ? payload.roles : [payload.primary_role || 'actor'],
+            known_for_department: payload.primary_role || 'Acting',
             bio: payload.bio,
-            image_url: photoUrl,
-            instagram_handle: payload.instagram_handle ? payload.instagram_handle.replace(/^@/, '') : null,
-            twitter_handle: payload.twitter_handle ? payload.twitter_handle.replace(/^@/, '') : null,
+            photo_url: photoUrl,
+            instagram_url: socialUrl(payload.instagram_handle, 'https://instagram.com'),
+            twitter_url: socialUrl(payload.twitter_handle, 'https://x.com'),
           })
           .select()
           .single();
