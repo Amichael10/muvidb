@@ -16,16 +16,33 @@ import {
   handleFromUrl,
 } from '../lib/socialPlatforms';
 
+/**
+ * MuviDB brand orange. Not Tailwind's `amber` — that is a different, yellower
+ * hue that had been hardcoded across this page, which is why portfolios all
+ * looked yellow regardless of the theme their creator picked.
+ */
+const BRAND_ACCENT = '#FF5A1F';
+
+/** The amber the filmmaker_portfolios.accent_color column defaults to. */
+const LEGACY_DEFAULT_ACCENT = '#f59e0b';
+
+/**
+ * `accent` is injected as the --color-brand CSS variable on the page root, so
+ * every `brand` utility below it (bg-brand, text-brand, border-brand/30 ...)
+ * resolves to the creator's chosen colour automatically.
+ */
 const THEME_STYLES = {
   midnight: {
+    accent: BRAND_ACCENT,
     bg: 'bg-[#0a0a0c]',
-    heroGlow: 'from-amber-500/10 via-transparent to-transparent',
-    accentText: 'text-amber-400',
-    accentBorder: 'border-amber-500/30',
-    accentBg: 'bg-amber-500',
-    badgeTone: 'border-amber-500/20 bg-amber-500/10 text-amber-300',
+    heroGlow: 'from-brand/10 via-transparent to-transparent',
+    accentText: 'text-brand',
+    accentBorder: 'border-brand/30',
+    accentBg: 'bg-brand',
+    badgeTone: 'border-brand/20 bg-brand/10 text-brand',
   },
   gold: {
+    accent: '#EAB308',
     bg: 'bg-[#0f0e0c]',
     heroGlow: 'from-yellow-500/15 via-transparent to-transparent',
     accentText: 'text-yellow-400',
@@ -34,6 +51,7 @@ const THEME_STYLES = {
     badgeTone: 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300',
   },
   neon: {
+    accent: '#22D3EE',
     bg: 'bg-[#080b11]',
     heroGlow: 'from-cyan-500/15 via-transparent to-transparent',
     accentText: 'text-cyan-400',
@@ -42,6 +60,7 @@ const THEME_STYLES = {
     badgeTone: 'border-cyan-500/20 bg-cyan-500/10 text-cyan-300',
   },
   minimal: {
+    accent: '#FFFFFF',
     bg: 'bg-[#111113]',
     heroGlow: 'from-white/10 via-transparent to-transparent',
     accentText: 'text-white',
@@ -154,8 +173,8 @@ export default function FilmmakerPortfolio() {
     return (
       <div className="min-h-screen bg-[#0a0a0c] text-white flex flex-col items-center justify-center p-6">
         <div className="relative w-16 h-16 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full border-2 border-amber-500/20 animate-ping" />
-          <div className="w-10 h-10 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+          <div className="absolute inset-0 rounded-full border-2 border-brand/20 animate-ping" />
+          <div className="w-10 h-10 rounded-full border-2 border-brand border-t-transparent animate-spin" />
         </div>
         <p className="mt-4 text-xs font-mono uppercase tracking-[0.2em] text-zinc-500">
           Loading Cinema Portfolio...
@@ -167,7 +186,7 @@ export default function FilmmakerPortfolio() {
   if (error || !data) {
     return (
       <div className="min-h-screen bg-[#0a0a0c] text-white flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-amber-400 mb-4">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-brand mb-4">
           <Icon icon="solar:clapperboard-broken" width="32" />
         </div>
         <h1 className="text-xl font-bold tracking-tight text-zinc-100">Filmmaker Portfolio Not Found</h1>
@@ -183,7 +202,7 @@ export default function FilmmakerPortfolio() {
           </Link>
           <Link
             to="/claim"
-            className="rounded-full bg-amber-500 text-black px-5 py-2.5 text-xs font-bold hover:bg-amber-400 transition"
+            className="rounded-full bg-brand text-black px-5 py-2.5 text-xs font-bold hover:bg-brand transition"
           >
             Claim Your Portfolio
           </Link>
@@ -194,6 +213,16 @@ export default function FilmmakerPortfolio() {
 
   const { portfolio, person, featuredFilms, allFilms, media } = data;
   const theme = THEME_STYLES[portfolio.theme_preset] || THEME_STYLES.midnight;
+  // A creator can store a free-form accent_color; fall back to the preset's
+  // colour, then to the MuviDB brand. Previously none of this was read at all.
+  //
+  // '#f59e0b' is skipped on purpose: it is the column default from the original
+  // migration, so EVERY portfolio carries it whether or not anyone chose it.
+  // Treating it as a real choice is what kept these pages amber instead of
+  // MuviDB orange. A creator who genuinely wants amber can pick the gold theme.
+  const storedAccent = String(portfolio.accent_color || '').trim().toLowerCase();
+  const creatorPicked = /^#[0-9a-f]{6}$/i.test(storedAccent) && storedAccent !== LEGACY_DEFAULT_ACCENT;
+  const accentColor = creatorPicked ? storedAccent : (theme.accent || BRAND_ACCENT);
   const embedUrl = formatVideoEmbed(portfolio.featured_reel_url);
 
   // Every social the person has, in registry order, resolved to a real URL.
@@ -236,15 +265,22 @@ export default function FilmmakerPortfolio() {
   });
 
   return (
-    <div className={`min-h-screen ${theme.bg} text-white selection:bg-amber-500 selection:text-black font-sans`}>
+    <div
+      className={`min-h-screen ${theme.bg} text-white selection:bg-brand selection:text-black font-sans`}
+      style={{ '--color-brand': accentColor, '--color-brand-hover': accentColor }}
+    >
       {/* Top Floating Cinema Bar */}
       <nav className="sticky top-0 z-40 backdrop-blur-md bg-black/60 border-b border-white/5 px-4 lg:px-8 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="w-6 h-6 rounded-md bg-amber-500 text-black font-black text-xs flex items-center justify-center font-mono">
-            M
-          </span>
-          <span className="text-xs font-black tracking-wider uppercase text-zinc-300 group-hover:text-white transition">
-            MuviDB <span className="text-amber-400 font-mono text-[10px]">CREATOR</span>
+        <Link to="/" className="flex items-center gap-2.5 group" aria-label="MuviDB home">
+          {/* The real wordmark, same asset the site navbar uses. The previous
+              hand-drawn "M" square was not the brand mark. */}
+          <img
+            src="/images/MuviDB Brand/White Wordmark.svg"
+            alt="MuviDB"
+            className="h-5 w-auto opacity-90 group-hover:opacity-100 transition"
+          />
+          <span className={`${theme.accentText} font-mono text-[10px] uppercase tracking-widest`}>
+            Creator
           </span>
         </Link>
 
@@ -284,7 +320,7 @@ export default function FilmmakerPortfolio() {
                 />
               </div>
               {person.is_verified && (
-                <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-amber-500 text-black flex items-center justify-center shadow-lg border-2 border-black" title="Verified Creator">
+                <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-brand text-black flex items-center justify-center shadow-lg border-2 border-black" title="Verified Creator">
                   <Icon icon="solar:verified-check-bold" width="18" />
                 </div>
               )}
@@ -324,7 +360,7 @@ export default function FilmmakerPortfolio() {
                       rel="noopener noreferrer"
                       aria-label={platform.label}
                       title={platform.label}
-                      className="w-9 h-9 rounded-full grid place-items-center text-white/90 border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 transition-all duration-200"
+                      className="w-9 h-9 rounded-full grid place-items-center text-white/90 border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200"
                     >
                       <Icon icon={platform.icon} width="17" />
                     </a>
@@ -340,7 +376,7 @@ export default function FilmmakerPortfolio() {
                 </div>
                 {person.awards?.length > 0 && (
                   <div>
-                    <span className="block text-lg font-black text-amber-400">{person.awards.length}</span>
+                    <span className="block text-lg font-black text-brand">{person.awards.length}</span>
                     <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Festival Awards</span>
                   </div>
                 )}
@@ -356,7 +392,7 @@ export default function FilmmakerPortfolio() {
               <div className="mt-6 flex flex-wrap items-center justify-center sm:justify-start gap-3">
                 <button
                   onClick={() => setContactModalOpen(true)}
-                  className="rounded-full bg-amber-500 text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-amber-400 transition flex items-center gap-2 shadow-lg shadow-amber-500/20"
+                  className="rounded-full bg-brand text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-brand transition flex items-center gap-2 shadow-lg shadow-brand/20"
                 >
                   <Icon icon="solar:letter-bold" width="16" />
                   <span>Work Inquiry</span>
@@ -391,7 +427,7 @@ export default function FilmmakerPortfolio() {
           <section className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:videocamera-record-bold" className="text-amber-400" width="18" />
+                <Icon icon="solar:videocamera-record-bold" className="text-brand" width="18" />
                 <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Featured Showreel</h2>
               </div>
               <span className="text-[10px] font-mono text-zinc-500 uppercase">Cinema 1080p</span>
@@ -414,7 +450,7 @@ export default function FilmmakerPortfolio() {
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:stars-bold" className="text-amber-400" width="18" />
+                <Icon icon="solar:stars-bold" className="text-brand" width="18" />
                 <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Featured Showcase</h2>
               </div>
               <span className="text-xs text-zinc-500">{featuredFilms.length} Curated Titles</span>
@@ -428,7 +464,7 @@ export default function FilmmakerPortfolio() {
                 return (
                   <article
                     key={film.id}
-                    className="group relative rounded-2xl border border-white/10 bg-zinc-950/60 hover:border-amber-500/40 transition duration-300 overflow-hidden flex flex-col justify-between"
+                    className="group relative rounded-2xl border border-white/10 bg-zinc-950/60 hover:border-brand/40 transition duration-300 overflow-hidden flex flex-col justify-between"
                   >
                     {/* Backdrop / Poster Top */}
                     <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-900">
@@ -446,7 +482,7 @@ export default function FilmmakerPortfolio() {
                       )}
 
                       <div className="absolute bottom-3 left-3 right-3">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold block mb-0.5">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-brand font-bold block mb-0.5">
                           {film.roles.join(' • ')}
                         </span>
                         <h3 className="text-base font-bold text-white tracking-tight leading-snug truncate">
@@ -489,7 +525,7 @@ export default function FilmmakerPortfolio() {
 
                         <Link
                           to={`/film/${film.slug}`}
-                          className="shrink-0 text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                          className="shrink-0 text-xs font-bold text-brand hover:text-brand flex items-center gap-1"
                         >
                           <span>Details</span>
                           <Icon icon="solar:arrow-right-linear" width="12" />
@@ -507,7 +543,7 @@ export default function FilmmakerPortfolio() {
         {(bioLinks.length > 0 || socialLinks.length > 0) && (
           <section className="space-y-3">
             <div className="flex items-center gap-2">
-              <Icon icon="solar:link-bold" className="text-amber-400" width="18" />
+              <Icon icon="solar:link-bold" className="text-brand" width="18" />
               <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Links</h2>
             </div>
 
@@ -519,14 +555,14 @@ export default function FilmmakerPortfolio() {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex items-stretch overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 transition-all duration-200"
+                  className="group relative flex items-stretch overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200"
                 >
                   <span className={`w-16 sm:w-20 shrink-0 grid place-items-center ${link.art.tint} ${link.art.fg}`}>
                     <Icon icon={link.art.icon} width="24" />
                   </span>
                   <span className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-4">
                     <span className="min-w-0">
-                      <span className="block text-sm font-bold text-white truncate group-hover:text-amber-300 transition">
+                      <span className="block text-sm font-bold text-white truncate group-hover:text-brand transition">
                         {link.title}
                       </span>
                       <span className="block text-[11px] text-zinc-500 truncate">{link.subtitle}</span>
@@ -547,14 +583,14 @@ export default function FilmmakerPortfolio() {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex items-stretch overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 transition-all duration-200"
+                  className="group relative flex items-stretch overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200"
                 >
                   <span className={`w-16 sm:w-20 shrink-0 grid place-items-center ${platform.tint} ${platform.fg}`}>
                     <Icon icon={platform.icon} width="24" />
                   </span>
                   <span className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-4">
                     <span className="min-w-0">
-                      <span className="block text-sm font-bold text-white truncate group-hover:text-amber-300 transition">
+                      <span className="block text-sm font-bold text-white truncate group-hover:text-brand transition">
                         {platform.label}
                       </span>
                       <span className="block text-[11px] text-zinc-500 truncate">
@@ -577,7 +613,7 @@ export default function FilmmakerPortfolio() {
         <section className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Icon icon="solar:clapperboard-play-bold" className="text-amber-400" width="18" />
+              <Icon icon="solar:clapperboard-play-bold" className="text-brand" width="18" />
               <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Complete Filmography</h2>
             </div>
 
@@ -589,7 +625,7 @@ export default function FilmmakerPortfolio() {
                   onClick={() => setActiveTab(tab)}
                   className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition ${
                     activeTab === tab
-                      ? 'bg-amber-500 text-black shadow-sm'
+                      ? 'bg-brand text-black shadow-sm'
                       : 'text-zinc-400 hover:text-white'
                   }`}
                 >
@@ -617,7 +653,7 @@ export default function FilmmakerPortfolio() {
                     </div>
 
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-white group-hover:text-amber-400 transition truncate">
+                      <p className="text-sm font-bold text-white group-hover:text-brand transition truncate">
                         {formatFilmTitle(film.title)}
                       </p>
                       <p className="text-xs text-zinc-400">
@@ -649,16 +685,16 @@ export default function FilmmakerPortfolio() {
               to={`/people/${person.slug || person.id}`}
               className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 px-5 py-3 text-xs font-bold text-white transition hover:scale-[1.02] shadow-lg"
             >
-              <Icon icon="solar:user-bold" className="text-amber-400" width="16" />
+              <Icon icon="solar:user-bold" className="text-brand" width="16" />
               <span>See Full Profile on MuviDB</span>
               <Icon icon="solar:arrow-right-up-linear" width="14" className="text-zinc-400" />
             </Link>
 
             <Link
               to="/claim"
-              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-5 py-3 text-xs font-bold text-amber-300 transition hover:scale-[1.02] shadow-lg"
+              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-brand/30 bg-brand/10 hover:bg-brand/20 px-5 py-3 text-xs font-bold text-brand transition hover:scale-[1.02] shadow-lg"
             >
-              <Icon icon="solar:shield-check-bold" className="text-amber-400" width="16" />
+              <Icon icon="solar:shield-check-bold" className="text-brand" width="16" />
               <span>Claim Your Profile on MuviDB</span>
             </Link>
           </div>
@@ -678,8 +714,8 @@ export default function FilmmakerPortfolio() {
       {/* Floating Linktree-style Bottom Brand Bar */}
       <div className="fixed bottom-4 inset-x-0 z-40 pointer-events-none flex justify-center px-4">
         <div className="pointer-events-auto flex items-center gap-3 px-4 py-2 rounded-full border border-white/20 bg-black/80 backdrop-blur-xl shadow-2xl text-xs text-white">
-          <Link to="/" className="flex items-center gap-1.5 font-black tracking-wider hover:text-amber-400 transition">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          <Link to="/" className="flex items-center gap-1.5 font-black tracking-wider hover:text-brand transition">
+            <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
             <span className="text-[11px] font-mono uppercase tracking-widest text-zinc-200">MuviDB</span>
           </Link>
           <span className="h-3 w-px bg-white/20" />
@@ -693,7 +729,7 @@ export default function FilmmakerPortfolio() {
           <span className="h-3 w-px bg-white/20" />
           <Link
             to="/claim"
-            className="text-[11px] text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1"
+            className="text-[11px] text-brand hover:text-brand font-bold transition flex items-center gap-1"
           >
             <span>Claim Yours</span>
           </Link>
@@ -725,8 +761,8 @@ export default function FilmmakerPortfolio() {
             </button>
 
             <div className="flex items-center gap-2 mb-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400">Official Channel</span>
+              <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+              <span className="text-[10px] font-mono uppercase tracking-widest text-brand">Official Channel</span>
             </div>
 
             <h3 className="text-xl font-black text-white">
@@ -747,7 +783,7 @@ export default function FilmmakerPortfolio() {
                   value={inquiryForm.name}
                   onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
                   placeholder="e.g. Adeola Johnson"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                 />
               </div>
 
@@ -762,7 +798,7 @@ export default function FilmmakerPortfolio() {
                     value={inquiryForm.email}
                     onChange={(e) => setInquiryForm({ ...inquiryForm, email: e.target.value })}
                     placeholder="name@production.com"
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                   />
                 </div>
 
@@ -773,7 +809,7 @@ export default function FilmmakerPortfolio() {
                   <select
                     value={inquiryForm.projectType}
                     onChange={(e) => setInquiryForm({ ...inquiryForm, projectType: e.target.value })}
-                    className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-white/10 bg-zinc-900 px-3.5 py-2.5 text-xs text-white focus:border-brand focus:outline-none"
                   >
                     <option value="Directing">Feature / Series Directing</option>
                     <option value="Cinematography">Cinematography / DP</option>
@@ -795,7 +831,7 @@ export default function FilmmakerPortfolio() {
                   value={inquiryForm.budget}
                   onChange={(e) => setInquiryForm({ ...inquiryForm, budget: e.target.value })}
                   placeholder="e.g. $50k - $200k / Commercial / Independent"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                 />
               </div>
 
@@ -809,7 +845,7 @@ export default function FilmmakerPortfolio() {
                   value={inquiryForm.message}
                   onChange={(e) => setInquiryForm({ ...inquiryForm, message: e.target.value })}
                   placeholder="Brief summary of the script, timeline, location, and your company..."
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-amber-500 focus:outline-none resize-none"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none resize-none"
                 />
               </div>
 
@@ -824,7 +860,7 @@ export default function FilmmakerPortfolio() {
                 <button
                   type="submit"
                   disabled={inquirySent}
-                  className="rounded-full bg-amber-500 text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-amber-400 transition flex items-center gap-2"
+                  className="rounded-full bg-brand text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-brand transition flex items-center gap-2"
                 >
                   <Icon icon="solar:plain-bold" width="14" />
                   <span>{inquirySent ? 'Opening Mail...' : 'Send Inquiry'}</span>

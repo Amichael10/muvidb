@@ -170,8 +170,13 @@ function AppChrome({ children }: { children: ReactNode }) {
   const isAdminPath = location.pathname.startsWith('/admin');
   const isOnboardingPath = location.pathname === '/onboarding';
   const isWaitlistPath = location.pathname === '/waitlist';
+  // A creator portfolio is a standalone share link: it brings its own header
+  // and footer, so the site chrome must not render on top of it. App.tsx has
+  // always had this check; it was missed when the SSR layout was introduced,
+  // which is why /@handle showed two navs and two footers.
+  const isPortfolioPath = location.pathname.startsWith('/@') || location.pathname.startsWith('/portfolio/');
 
-  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath;
+  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath || isPortfolioPath;
 
   return (
     <div className="min-h-screen flex flex-col bg-bg text-text-primary">
