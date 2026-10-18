@@ -5,7 +5,9 @@
 import { supabase } from './supabase.js';
 import { sendTelegramMessage, telegramConfigured } from './telegram.js';
 import { ytGet, parseDuration, cleanTitle } from './yt_service.js';
-import { curateYouTubeTitle } from './youtube_title_policy.js';
+import { curateYouTubeTitle, isValidEnrichedTitle } from './youtube_title_policy.js';
+import { attachCreditsBatch, attachGenresBatch, enrichFilmsFromAI, type EnrichedFilm } from './film_enrichment.js';
+import { enrichMissingSynopsesConcurrent, synopsisNeedsRewrite } from './cohere_enrichment.js';
 
 const FILM_MIN_SEC = 1800;
 
@@ -24,6 +26,7 @@ export type ChannelRow = {
 export type UploadCandidate = {
   video_id: string;
   title: string;
+  description?: string | null;
   duration_seconds: number;
   published_at?: string | null;
   thumbnail_url?: string | null;
@@ -78,7 +81,6 @@ async function releaseFailedClaim(channelId: string, videoId: string, message: s
 }
 
 export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidate, source: string) {
-  if (!telegramConfigured()) return { ok: false, skipped: 'telegram not configured' };
   if (!(await claimAlert(channel.id, video, source))) return { ok: false, skipped: 'already claimed' };
 
   const url = `https://www.youtube.com/watch?v=${video.video_id}`;
@@ -87,7 +89,25 @@ export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidat
 
   // 1. Curate and clean title
   const titleDecision = curateYouTubeTitle(video.title);
-  const displayTitle = titleDecision.action !== 'skip' ? cleanTitle(titleDecision.title) : video.title;
+  let enrichment: EnrichedFilm | undefined;
+  if (titleDecision.action !== 'skip') {
+    const enriched = await enrichFilmsFromAI([{
+      videoId: video.video_id,
+      title: video.title,
+      description: video.description || '',
+    }]);
+    enrichment = enriched.get(video.video_id);
+  }
+  const enrichedTitle = enrichment?.title?.trim();
+  const canUseEnrichedTitle = isValidEnrichedTitle(
+    enrichedTitle,
+    titleDecision,
+    video.title,
+    enrichment?.cast,
+  );
+  const displayTitle = titleDecision.action !== 'skip'
+    ? cleanTitle(canUseEnrichedTitle ? enrichedTitle! : titleDecision.title)
+    : video.title;
 
   // 2. Real-time auto-import into films and channel_videos
   let filmId: string | null = null;
@@ -96,7 +116,7 @@ export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidat
   try {
     const { data: existingFilm } = await supabase
       .from('films')
-      .select('id, title, poster_url')
+      .select('id, title, poster_url, synopsis')
       .eq('source_video_id', video.video_id)
       .maybeSingle();
 
@@ -122,8 +142,9 @@ export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidat
           trailer_youtube_id: video.video_id,
           poster_url: video.thumbnail_url,
           backdrop_url: video.thumbnail_url,
+          synopsis: enrichment?.synopsis || null,
           runtime_minutes: Math.round((video.duration_seconds || 0) / 60),
-          needs_review: true,
+          needs_review: !enrichment?.synopsis,
           status: 'released',
           content_type: 'movie',
         })
@@ -134,6 +155,31 @@ export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidat
         console.warn('[youtube_upload_notify] film auto-insert warning:', filmErr.message);
       }
       filmId = insertedFilm?.id || null;
+    }
+
+    // Keep the real-time path on the same metadata pipeline as the scheduled
+    // importer. The helpers reconcile people/credits in place and skip rows
+    // that already exist, so WebSub retries cannot create duplicate actors.
+    if (filmId) {
+      if (existingFilm) {
+        const patch: Record<string, unknown> = {};
+        if (enrichment?.synopsis && synopsisNeedsRewrite(existingFilm.synopsis)) {
+          patch.synopsis = enrichment.synopsis;
+          patch.needs_review = false;
+        }
+        if (Object.keys(patch).length) await supabase.from('films').update(patch).eq('id', filmId);
+      }
+
+      const people = [
+        ...(enrichment?.cast || []).map((name) => ({ name, role: 'actor' })),
+        ...(enrichment?.director ? [{ name: enrichment.director, role: 'director' }] : []),
+      ];
+      if (people.length) await attachCreditsBatch([{ filmId, people }]);
+      if (enrichment?.genres?.length) await attachGenresBatch([{ filmId, genres: enrichment.genres }]);
+
+      if (!enrichment?.synopsis) {
+        await enrichMissingSynopsesConcurrent([filmId], { replaceNoisy: true });
+      }
     }
 
     // Link channel_videos
@@ -357,14 +403,18 @@ export async function pollChannelUploads(channel: ChannelRow, baselineAt?: strin
 
           const targetEntries = relevant.length > 0 ? relevant : entries.slice(0, 5);
           const ids = targetEntries.map(e => e.videoId).join(',');
-          const vData = await ytGet('videos', { part: 'contentDetails', id: ids });
+          const vData = await ytGet('videos', { part: 'snippet,contentDetails', id: ids });
           const durations = new Map<string, number>(
             (vData.items || []).map((v: any) => [v.id, parseDuration(v.contentDetails?.duration ?? '')]),
+          );
+          const descriptions = new Map<string, string>(
+            (vData.items || []).map((v: any) => [v.id, v.snippet?.description || '']),
           );
 
           return targetEntries.map(e => ({
             video_id: e.videoId,
             title: e.title,
+            description: descriptions.get(e.videoId) || '',
             published_at: e.publishedAt,
             thumbnail_url: `https://i.ytimg.com/vi/${e.videoId}/hqdefault.jpg`,
             duration_seconds: durations.get(e.videoId) ?? 0,
@@ -417,6 +467,7 @@ export async function pollChannelUploads(channel: ChannelRow, baselineAt?: strin
     return {
       video_id: vid,
       title: item.snippet.title,
+      description: item.snippet.description || '',
       published_at: item.snippet.publishedAt,
       thumbnail_url: item.snippet.thumbnails?.medium?.url ?? null,
       duration_seconds: durations.get(vid) ?? 0,

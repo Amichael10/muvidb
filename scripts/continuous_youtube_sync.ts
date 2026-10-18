@@ -277,6 +277,7 @@ async function main() {
                             {
                               video_id: matchedVid.video_id,
                               title: matchedVid.title,
+                              description: matchedVid._description || '',
                               duration_seconds: matchedVid.duration_seconds,
                               published_at: matchedVid.published_at,
                               thumbnail_url: matchedVid.thumbnail_url,

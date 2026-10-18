@@ -186,20 +186,28 @@ async function loadChannel(channelId: string): Promise<ChannelRow | null> {
   return data as ChannelRow | null;
 }
 
+export function uploadCandidateFromYouTubeVideo(
+  entry: YouTubeWebSubEntry,
+  video: any,
+): UploadCandidate | null {
+  if (!video || video.status?.privacyStatus === 'private') return null;
+  return {
+    video_id: entry.videoId,
+    title: video.snippet?.title || entry.title,
+    description: video.snippet?.description || '',
+    duration_seconds: parseDuration(video.contentDetails?.duration || ''),
+    published_at: video.snippet?.publishedAt || entry.publishedAt,
+    thumbnail_url: video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || null,
+  };
+}
+
 async function videoCandidate(entry: YouTubeWebSubEntry): Promise<UploadCandidate | null> {
   const response = await ytGet('videos', {
     part: 'snippet,contentDetails,status',
     id: entry.videoId,
   });
   const video = response?.items?.[0];
-  if (!video || video.status?.privacyStatus === 'private') return null;
-  return {
-    video_id: entry.videoId,
-    title: video.snippet?.title || entry.title,
-    duration_seconds: parseDuration(video.contentDetails?.duration || ''),
-    published_at: video.snippet?.publishedAt || entry.publishedAt,
-    thumbnail_url: video.snippet?.thumbnails?.medium?.url || video.snippet?.thumbnails?.default?.url || null,
-  };
+  return uploadCandidateFromYouTubeVideo(entry, video);
 }
 
 export async function processYouTubeWebSubEntries(

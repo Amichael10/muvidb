@@ -4,6 +4,7 @@ import {
   isAfterWebSubBaseline,
   parseYouTubeAtomFeed,
   processYouTubeWebSubEntries,
+  uploadCandidateFromYouTubeVideo,
   verifyWebSubSignature,
   youtubeTopicChannelId,
 } from './youtube_websub';
@@ -53,6 +54,24 @@ describe('YouTube WebSub', () => {
     const baseline = '2026-08-26T08:00:00.000Z';
     expect(isAfterWebSubBaseline('2026-08-26T08:30:00.000Z', baseline)).toBe(true);
     expect(isAfterWebSubBaseline('2026-08-26T07:59:59.000Z', baseline)).toBe(false);
+  });
+
+  it('keeps the YouTube description for real-time film enrichment', () => {
+    const [entry] = parseYouTubeAtomFeed(atomPayload);
+    expect(uploadCandidateFromYouTubeVideo(entry, {
+      snippet: {
+        title: 'A Better Title | Actor One, Actor Two',
+        description: 'A family returns home and uncovers a secret. Starring Actor One and Actor Two.',
+        publishedAt: '2026-08-26T08:30:00.000Z',
+        thumbnails: { medium: { url: 'https://example.test/thumb.jpg' } },
+      },
+      contentDetails: { duration: 'PT1H30M' },
+      status: { privacyStatus: 'public' },
+    })).toEqual(expect.objectContaining({
+      video_id: 'video-new',
+      duration_seconds: 5400,
+      description: 'A family returns home and uncovers a secret. Starring Actor One and Actor Two.',
+    }));
   });
 
   it('processes a signed-feed entry through metadata lookup and notification once', async () => {
