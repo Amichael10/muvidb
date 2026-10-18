@@ -1031,6 +1031,17 @@ async function syncToDatabase(scrapedMovies) {
 async function run() {
   try {
     const movies = await scrapeNetflix();
+
+    // A scrape that returns nothing is a broken scrape, not a quiet day.
+    // Netflix always has catalogue to find, so exiting 0 here reported
+    // success to the workflow and left the homepage rail dormant with no
+    // red build to notice. Fail loudly instead.
+    if (!movies.length) {
+      console.error('❌ Netflix returned 0 titles. Failing so the sync is visibly broken rather than silently idle.');
+      process.exitCode = 1;
+      return;
+    }
+
     await syncToDatabase(movies);
   } catch (e) {
     console.error('💀 Fatal error:', e);
