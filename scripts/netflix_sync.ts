@@ -51,7 +51,11 @@ async function login(page) {
     if (signInBtn && page.url().includes('netflix.com/') && !page.url().includes('/login')) {
        console.log('➡️ Clicking initial "Sign In" button...');
        await signInBtn.click();
-       await page.waitForURL(url => url.includes('/login'), { timeout: 15000 });
+       // NOTE: Playwright passes this predicate a URL object, not a string.
+       // `url.href.includes(...)` throws TypeError instantly, which .catch() then
+       // swallows as a "timeout" -- the 30s wait below was completing in 0.5ms
+       // and the scraper carried on logged out, finding 0 titles for 10 weeks.
+       await page.waitForURL(url => url.href.includes('/login'), { timeout: 15000 });
     }
 
     // 1. Enter Email
@@ -109,7 +113,7 @@ async function login(page) {
     
     // 4. Finalize Login
     console.log('⌛ Waiting for login to finalize...');
-    await page.waitForURL(url => url.includes('/browse') || url.includes('/ProfilesGate') || url.includes('/browse/genre/') || url.includes('/account') || url.includes('/household'), { timeout: 30000 }).catch(() => {
+    await page.waitForURL(url => url.href.includes('/browse') || url.href.includes('/ProfilesGate') || url.href.includes('/browse/genre/') || url.href.includes('/account') || url.href.includes('/household'), { timeout: 30000 }).catch(() => {
       console.log('⚠️ Navigation timeout after login. Checking for errors...');
     });
     
@@ -203,7 +207,7 @@ async function handleProfileSelection(page) {
         
         // Wait for navigation or the browse page to load
         console.log('⌛ Waiting for redirect to /browse...');
-        await page.waitForURL(url => url.includes('/browse'), { timeout: 45000 }).catch(() => {
+        await page.waitForURL(url => url.href.includes('/browse'), { timeout: 45000 }).catch(() => {
           console.log('⚠️ Navigation to /browse timed out after profile selection. Checking if we are already there.');
         });
         

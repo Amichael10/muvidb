@@ -24,6 +24,8 @@ jobs:
         run: npx playwright install --with-deps chromium
         
       - name: Run Netflix Sync
+        id: netflix
+        continue-on-error: true
         run: npm run scrape:netflix
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
@@ -34,6 +36,8 @@ jobs:
           NETFLIX_NO_PROXY: 'true'
           
       - name: Run Prime Sync
+        id: prime
+        continue-on-error: true
         run: npm run scrape:prime
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
@@ -43,6 +47,8 @@ jobs:
           PRIME_PASSWORD: ${{ secrets.PRIME_PASSWORD }}
           
       - name: Run Feed Zeta Sync
+        id: feedzeta
+        continue-on-error: true
         run: npm run scrape:docuth
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
@@ -51,6 +57,8 @@ jobs:
           FEED_ZETA_URL: ${{ secrets.FEED_ZETA_URL }}
 
       - name: Run Circuits Sync
+        id: circuits
+        continue-on-error: true
         run: npm run sync:circuits
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
@@ -59,3 +67,20 @@ jobs:
           CIRCUITS_EMAIL: ${{ secrets.CIRCUITS_EMAIL }}
           CIRCUITS_PASSWORD: ${{ secrets.CIRCUITS_PASSWORD }}
 
+      # Each platform runs independently: a broken Netflix scraper must not stop
+      # Prime, Feed Zeta or Circuits from syncing, which is what would happen
+      # with the default fail-fast behaviour. This final step still turns the
+      # run red so a dead scraper cannot sit unnoticed for weeks.
+      - name: Report sync outcomes
+        if: always()
+        run: |
+          failed=""
+          [ "${{ steps.netflix.outcome }}"  = "failure" ] && failed="$failed netflix"
+          [ "${{ steps.prime.outcome }}"    = "failure" ] && failed="$failed prime"
+          [ "${{ steps.feedzeta.outcome }}" = "failure" ] && failed="$failed feed-zeta"
+          [ "${{ steps.circuits.outcome }}" = "failure" ] && failed="$failed circuits"
+          if [ -n "$failed" ]; then
+            echo "::error::Streaming syncs failed:$failed"
+            exit 1
+          fi
+          echo "All streaming syncs completed."
