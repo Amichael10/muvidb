@@ -222,6 +222,9 @@ function isUsableEntry(e: Entry) {
 /** Map AMAA category → credit role + known_for_department */
 function roleFromCategory(category: string): { role: string; dept: string; isCast: boolean } {
   const c = (category || '').toUpperCase();
+  if (/YOUNG|PROMISING|CHILD ACTOR|KID ACTOR|UP-?COMING/.test(c)) {
+    return { role: 'actor', dept: 'Acting', isCast: true };
+  }
   if (/LEAD ACTOR|LEAD ACTRESS|SUPPORTING ACTOR|SUPPORTING ACTRESS|BEST ACTOR|BEST ACTRESS|SUPPORT ACTRESS|SUPPORT ACTOR|ACTOR IN A COMEDY|ACTRESS IN A COMEDY/.test(c)) {
     return { role: 'actor', dept: 'Acting', isCast: true };
   }

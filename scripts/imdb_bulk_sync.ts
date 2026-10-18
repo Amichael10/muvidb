@@ -591,25 +591,71 @@ async function matchFilm(title: string, year: number | null = null, imdbId: stri
   return film;
 }
 
-async function matchPerson(name: string) {
-  const { data: exact } = await supabase
-    .from('people')
-    .select('id,name,bio,photo_url,date_of_birth,birthplace,nationality,source')
-    .ilike('name', name)
-    .limit(5);
-  if (exact?.length) {
-    return [...exact].sort((a, b) => personRichness(b) - personRichness(a))[0];
-  }
+let peopleLookup: any[] | null = null;
+let peopleByNormalizedName: Map<string, any[]> | null = null;
 
-  const { data } = await supabase.rpc('match_person_fuzzy', { query_name: name, threshold: 0.7 });
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row?.id) return null;
-  const { data: person } = await supabase
-    .from('people')
-    .select('id,name,bio,photo_url,date_of_birth,birthplace,nationality,source')
-    .eq('id', row.id)
-    .maybeSingle();
-  return person;
+function normPersonName(value: string) {
+  return (value || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').replace(/\b(jr|sr|ii|iii)\b/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function editDistance(a: string, b: string) {
+  const row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const old = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = old;
+    }
+  }
+  return row[b.length];
+}
+
+async function ensurePeopleLookup() {
+  if (peopleLookup && peopleByNormalizedName) return;
+  peopleLookup = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from('people')
+      .select('id,name,bio,photo_url,date_of_birth,birthplace,nationality,source').order('id').range(from, from + 999);
+    if (error) throw error;
+    peopleLookup.push(...(data || []));
+    if ((data?.length || 0) < 1000) break;
+  }
+  peopleByNormalizedName = new Map();
+  for (const person of peopleLookup) {
+    const key = normPersonName(person.name);
+    const rows = peopleByNormalizedName.get(key) || [];
+    rows.push(person);
+    peopleByNormalizedName.set(key, rows);
+  }
+  console.log(`   people lookup loaded: ${peopleLookup.length}`);
+}
+
+async function matchPerson(name: string) {
+  await ensurePeopleLookup();
+  const wanted = normPersonName(name);
+  const exact = peopleByNormalizedName!.get(wanted);
+  if (exact?.length) return [...exact].sort((a, b) => personRichness(b) - personRichness(a))[0];
+
+  // Conservative fuzzy/alias check. Only compare names sharing a first or last
+  // token and require near-identity, avoiding cross-person award/credit merges.
+  const tokens = wanted.split(' ').filter(Boolean);
+  if (tokens.length >= 2) {
+    const first = tokens[0];
+    const last = tokens[tokens.length - 1];
+    let best: { person: any; score: number } | null = null;
+    for (const person of peopleLookup!) {
+      const candidate = normPersonName(person.name);
+      const ct = candidate.split(' ').filter(Boolean);
+      if (ct.length < 2 || (ct[0] !== first && ct[ct.length - 1] !== last)) continue;
+      const score = 1 - editDistance(wanted, candidate) / Math.max(wanted.length, candidate.length, 1);
+      if (score >= 0.88 && (!best || score > best.score)) best = { person, score };
+    }
+    if (best) return best.person;
+  }
+  return null;
 }
 
 function filmPatch(existing: any, imdb: FilmMeta) {
@@ -1018,7 +1064,21 @@ async function upsertPerson(
       console.log(`   👤 created ${name}`);
     } else {
       console.log(`   +person ${name}`);
-      return;
+      existing = {
+        id: `dry-${makeSlug(name)}`,
+        name,
+        bio: null,
+        photo_url: photo,
+        date_of_birth: null,
+        birthplace: null,
+        nationality: null,
+        source: 'imdb',
+      };
+    }
+    if (existing && peopleLookup && peopleByNormalizedName) {
+      peopleLookup.push(existing);
+      const key = normPersonName(existing.name);
+      peopleByNormalizedName.set(key, [...(peopleByNormalizedName.get(key) || []), existing]);
     }
   } else if (!existing.photo_url && photo && !DRY) {
     await supabase.from('people').update({ photo_url: photo }).eq('id', existing.id);
