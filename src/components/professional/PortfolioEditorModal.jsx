@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
+import { detectPlatform, GENERIC_LINK } from '../../lib/socialPlatforms';
 import { fetchPortfolioByHandle, savePortfolio, sanitizeHandle, formatVideoEmbed } from '../../lib/portfolioClient';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { supabase } from '../../lib/supabase';
@@ -101,18 +102,16 @@ const LAYOUT_OPTIONS = [
   { id: 'shape', label: 'Shape', desc: 'Geometric squircle frame' },
 ];
 
-function getLinkIcon(url = '', title = '') {
-  const lower = (url + ' ' + title).toLowerCase();
-  if (lower.includes('instagram')) return 'simple-icons:instagram';
-  if (lower.includes('imdb')) return 'simple-icons:imdb';
-  if (lower.includes('twitter') || lower.includes('x.com')) return 'simple-icons:x';
-  if (lower.includes('youtube')) return 'simple-icons:youtube';
-  if (lower.includes('linkedin')) return 'simple-icons:linkedin';
-  if (lower.includes('tiktok')) return 'simple-icons:tiktok';
-  if (lower.includes('spotify')) return 'simple-icons:spotify';
-  if (lower.includes('vimeo')) return 'simple-icons:vimeo';
-  if (lower.includes('variety') || lower.includes('deadline') || lower.includes('hollywood')) return 'solar:newspaper-bold';
-  return 'solar:link-bold';
+/**
+ * Icon for a saved link. Delegates to the shared registry so the editor
+ * preview and the public portfolio page can never disagree.
+ *
+ * The previous implementation substring-matched `url + title`, so an article
+ * titled "my instagram tips" was given the Instagram mark. Detection is now on
+ * the URL host only.
+ */
+function getLinkIcon(url = '') {
+  return (detectPlatform(url) || GENERIC_LINK).icon;
 }
 
 export default function PortfolioEditorModal({ isOpen = true, onClose, person, onSaved, isInline = false }) {
@@ -413,7 +412,14 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
     const cleanUrl = newLink.url.startsWith('http') ? newLink.url.trim() : `https://${newLink.url.trim()}`;
     const updated = [
       ...(portfolio.custom_links || []),
-      { id: Date.now().toString(), title: newLink.title.trim(), url: cleanUrl },
+      {
+        id: Date.now().toString(),
+        title: newLink.title.trim(),
+        url: cleanUrl,
+        // Recorded at save time so the public page does not have to re-detect,
+        // and so a later registry change cannot silently alter saved links.
+        platform: detectPlatform(cleanUrl)?.key || null,
+      },
     ];
     setPortfolio({ ...portfolio, custom_links: updated });
     setNewLink({ title: '', url: '' });
@@ -1071,7 +1077,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-white/10 bg-white/5"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <Icon icon={getLinkIcon(link.url, link.title)} className="text-brand shrink-0" width="16" />
+                              <Icon icon={getLinkIcon(link.url)} className="text-brand shrink-0" width="16" />
                               <div className="min-w-0">
                                 <p className="text-xs font-bold text-white truncate">{link.title}</p>
                                 <p className="text-[10px] text-zinc-400 truncate">{link.url}</p>
@@ -1433,7 +1439,7 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                       style={{ backgroundColor: currentTheme.cardBg }}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <Icon icon={getLinkIcon(link.url, link.title)} className="text-brand shrink-0" width="13" />
+                        <Icon icon={getLinkIcon(link.url)} className="text-brand shrink-0" width="13" />
                         <span className="text-[10px] font-bold text-white truncate">{link.title}</span>
                       </div>
                       <Icon icon="solar:arrow-right-linear" width="10" className="text-zinc-500" />

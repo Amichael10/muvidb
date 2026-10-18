@@ -6,6 +6,15 @@ import { fetchPortfolioByHandle, formatVideoEmbed } from '../lib/portfolioClient
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { formatFilmTitle, toTitleCase } from '../utils/format';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import {
+  SOCIAL_PLATFORMS,
+  GENERIC_LINK,
+  detectPlatform,
+  platformFor,
+  resolveSocialUrl,
+  prettyUrl,
+  handleFromUrl,
+} from '../lib/socialPlatforms';
 
 const THEME_STYLES = {
   midnight: {
@@ -187,6 +196,34 @@ export default function FilmmakerPortfolio() {
   const theme = THEME_STYLES[portfolio.theme_preset] || THEME_STYLES.midnight;
   const embedUrl = formatVideoEmbed(portfolio.featured_reel_url);
 
+  // Every social the person has, in registry order, resolved to a real URL.
+  // Previously only Instagram and YouTube were rendered, so twitter/tiktok/
+  // facebook were fetched from the people table and silently dropped.
+  const socialLinks = SOCIAL_PLATFORMS
+    .map((platform) => {
+      const stored = person.socials?.[platform.key]
+        ?? (platform.key === 'x' ? person.socials?.twitter : undefined);
+      const url = resolveSocialUrl(platform.key, stored);
+      return url ? { platform, url } : null;
+    })
+    .filter(Boolean);
+
+  // custom_links doubles as a store for a `_meta: 'layout'` config row. The
+  // editor filters it out; this page did not, and the row has no `url`, so
+  // `link.url.replace(...)` threw and took the whole page down.
+  const bioLinks = (portfolio.custom_links || [])
+    .filter((link) => link && !link._meta && typeof link.url === 'string' && link.url.trim())
+    .map((link) => {
+      const platform = platformFor(link.platform) || detectPlatform(link.url) || null;
+      return {
+        key: link.id || link.url,
+        url: link.url.trim(),
+        title: link.title?.trim() || platform?.label || prettyUrl(link.url),
+        subtitle: handleFromUrl(link.url) || prettyUrl(link.url),
+        art: platform || GENERIC_LINK,
+      };
+    });
+
   // Filter filmography tabs
   const filteredFilms = allFilms.filter((film) => {
     if (activeTab === 'all') return true;
@@ -275,6 +312,25 @@ export default function FilmmakerPortfolio() {
               <p className="mt-1.5 text-sm sm:text-base font-medium text-zinc-300 max-w-xl">
                 {portfolio.tagline || person.bio || 'Director, Screenwriter & Creative Producer.'}
               </p>
+
+              {/* Brand icon row — appears the moment a social is added. */}
+              {socialLinks.length > 0 && (
+                <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  {socialLinks.map(({ platform, url }) => (
+                    <a
+                      key={platform.key}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={platform.label}
+                      title={platform.label}
+                      className="w-9 h-9 rounded-full grid place-items-center text-white/90 border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 transition-all duration-200"
+                    >
+                      <Icon icon={platform.icon} width="17" />
+                    </a>
+                  ))}
+                </div>
+              )}
 
               {/* Stats Bar */}
               <div className="mt-5 flex items-center justify-center sm:justify-start gap-6 text-xs text-zinc-400 border-t border-white/5 pt-4">
@@ -448,72 +504,71 @@ export default function FilmmakerPortfolio() {
         )}
 
         {/* Linktree-Style Custom Links / Press Section */}
-        {((portfolio.custom_links && portfolio.custom_links.length > 0) || Object.values(person.socials).some(Boolean)) && (
+        {(bioLinks.length > 0 || socialLinks.length > 0) && (
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <Icon icon="solar:link-bold" className="text-amber-400" width="18" />
-              <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Press, Honors & Links</h2>
+              <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Links</h2>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {/* Custom Links from Portfolio */}
-              {(portfolio.custom_links || []).map((link) => (
+            <div className="space-y-2.5">
+              {/* Custom links first: these are what the creator chose to feature. */}
+              {bioLinks.map((link) => (
                 <a
-                  key={link.id || link.url}
+                  key={link.key}
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/20 transition flex items-center justify-between group"
+                  className="group relative flex items-stretch overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 transition-all duration-200"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
-                      <Icon icon={link.icon || 'solar:link-circle-bold'} width="18" />
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold text-white group-hover:text-amber-300 transition">
+                  <span className={`w-16 sm:w-20 shrink-0 grid place-items-center ${link.art.tint} ${link.art.fg}`}>
+                    <Icon icon={link.art.icon} width="24" />
+                  </span>
+                  <span className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-4">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-white truncate group-hover:text-amber-300 transition">
                         {link.title}
-                      </p>
-                      <p className="text-[10px] text-zinc-500 truncate max-w-xs">{link.url.replace(/^https?:\/\//, '')}</p>
-                    </div>
-                  </div>
-                  <Icon icon="solar:arrow-right-up-linear" className="text-zinc-500 group-hover:text-white transition" width="16" />
+                      </span>
+                      <span className="block text-[11px] text-zinc-500 truncate">{link.subtitle}</span>
+                    </span>
+                    <Icon
+                      icon="solar:arrow-right-up-linear"
+                      className="shrink-0 text-zinc-600 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all"
+                      width="18"
+                    />
+                  </span>
                 </a>
               ))}
 
-              {/* Verified Socials */}
-              {person.socials.instagram && (
+              {/* Then every verified social, driven entirely by the registry. */}
+              {socialLinks.map(({ platform, url }) => (
                 <a
-                  href={person.socials.instagram}
+                  key={platform.key}
+                  href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] transition flex items-center justify-between group"
+                  className="group relative flex items-stretch overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 transition-all duration-200"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center shrink-0">
-                      <Icon icon="simple-icons:instagram" width="16" />
+                  <span className={`w-16 sm:w-20 shrink-0 grid place-items-center ${platform.tint} ${platform.fg}`}>
+                    <Icon icon={platform.icon} width="24" />
+                  </span>
+                  <span className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-4">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-white truncate group-hover:text-amber-300 transition">
+                        {platform.label}
+                      </span>
+                      <span className="block text-[11px] text-zinc-500 truncate">
+                        {handleFromUrl(url) || prettyUrl(url)}
+                      </span>
                     </span>
-                    <span className="text-xs font-bold text-white">Instagram</span>
-                  </div>
-                  <Icon icon="solar:arrow-right-up-linear" className="text-zinc-500 group-hover:text-white transition" width="16" />
+                    <Icon
+                      icon="solar:arrow-right-up-linear"
+                      className="shrink-0 text-zinc-600 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all"
+                      width="18"
+                    />
+                  </span>
                 </a>
-              )}
-
-              {person.socials.youtube && (
-                <a
-                  href={person.socials.youtube.startsWith('http') ? person.socials.youtube : `https://youtube.com/${person.socials.youtube}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] transition flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center shrink-0">
-                      <Icon icon="simple-icons:youtube" width="16" />
-                    </span>
-                    <span className="text-xs font-bold text-white">YouTube Channel</span>
-                  </div>
-                  <Icon icon="solar:arrow-right-up-linear" className="text-zinc-500 group-hover:text-white transition" width="16" />
-                </a>
-              )}
+              ))}
             </div>
           </section>
         )}
