@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
-import { detectPlatform, GENERIC_LINK } from '../../lib/socialPlatforms';
+import { detectPlatform, platformFor, resolveSocialUrl, GENERIC_LINK, SOCIAL_PLATFORMS } from '../../lib/socialPlatforms';
 import { fetchPortfolioByHandle, savePortfolio, sanitizeHandle, formatVideoEmbed } from '../../lib/portfolioClient';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { supabase } from '../../lib/supabase';
@@ -110,10 +110,6 @@ const LAYOUT_OPTIONS = [
  * titled "my instagram tips" was given the Instagram mark. Detection is now on
  * the URL host only.
  */
-function getLinkIcon(url = '') {
-  return (detectPlatform(url) || GENERIC_LINK).icon;
-}
-
 export default function PortfolioEditorModal({ isOpen = true, onClose, person, onSaved, isInline = false }) {
   useBodyScrollLock(isOpen && !isInline);
   const scrollBodyRef = useRef(null);
@@ -404,25 +400,35 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
     });
   }, [availableFilms, filmSearch, filmFilter, portfolio.featured_film_ids]);
 
-  const handleAddLink = () => {
-    if (!newLink.title.trim() || !newLink.url.trim()) {
-      toast.error('Please enter both title and URL.');
+  const handleAddLink = (preset) => {
+    const rawUrl = (preset?.url ?? newLink.url).trim();
+    if (!rawUrl) {
+      toast.error('Paste a link or handle first.');
       return;
     }
-    const cleanUrl = newLink.url.startsWith('http') ? newLink.url.trim() : `https://${newLink.url.trim()}`;
+    // A bare handle is fine when we know the platform — "rinaboyxx" under
+    // Instagram becomes the full profile URL.
+    const presetPlatform = preset?.platformKey ? platformFor(preset.platformKey) : null;
+    const cleanUrl = presetPlatform
+      ? resolveSocialUrl(presetPlatform.key, rawUrl)
+      : (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+    const matched = presetPlatform || detectPlatform(cleanUrl);
+    // Title is optional: the platform name is a better default than making
+    // someone type "Instagram" every time.
+    const title = (preset?.title ?? newLink.title).trim() || matched?.label || 'Link';
     const updated = [
       ...(portfolio.custom_links || []),
       {
         id: Date.now().toString(),
-        title: newLink.title.trim(),
+        title,
         url: cleanUrl,
         // Recorded at save time so the public page does not have to re-detect,
         // and so a later registry change cannot silently alter saved links.
-        platform: detectPlatform(cleanUrl)?.key || null,
+        platform: matched?.key || null,
       },
     ];
     setPortfolio({ ...portfolio, custom_links: updated });
-    setNewLink({ title: '', url: '' });
+    setNewLink({ title: '', url: '', platformKey: null });
   };
 
   const handleRemoveLink = (id) => {
@@ -1043,22 +1049,61 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         </span>
                       </div>
 
+                      {/* Pick a platform to pre-fill it, or just paste any link below. */}
+                      <div className="flex flex-wrap gap-1.5 mb-2.5">
+                        {SOCIAL_PLATFORMS.slice(0, 8).map((sp) => {
+                          const active = newLink.platformKey === sp.key;
+                          return (
+                            <button
+                              key={sp.key}
+                              type="button"
+                              onClick={() => setNewLink({
+                                ...newLink,
+                                platformKey: active ? null : sp.key,
+                                title: active ? newLink.title : sp.label,
+                              })}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition ${
+                                active
+                                  ? 'border-brand bg-brand/15 text-white'
+                                  : 'border-white/10 bg-white/5 text-zinc-300 hover:border-white/25 hover:text-white'
+                              }`}
+                            >
+                              <Icon icon={sp.icon} width="13" />
+                              {sp.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       {/* Add New Link Inputs */}
                       <div className="flex flex-col sm:flex-row gap-2 mb-3">
                         <input
                           type="text"
                           value={newLink.title}
                           onChange={(e) => setNewLink({ ...newLink, title: e.target.value })}
-                          placeholder="Title (e.g. IMDb Profile)"
+                          placeholder="Title (optional)"
                           className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                         />
-                        <input
-                          type="text"
-                          value={newLink.url}
-                          onChange={(e) => setNewLink({ ...newLink, url: e.target.value })}
-                          placeholder="https://..."
-                          className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
-                        />
+                        <div className="flex-1 relative">
+                          <input
+                            type="text"
+                            value={newLink.url}
+                            onChange={(e) => setNewLink({ ...newLink, url: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddLink(); } }}
+                            placeholder={newLink.platformKey ? '@handle or full link' : 'https://...'}
+                            className="w-full rounded-xl border border-white/10 bg-white/5 pl-3 pr-9 py-2 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
+                          />
+                          {/* Live proof the icon was recognised, before saving. */}
+                          {(() => {
+                            const live = platformFor(newLink.platformKey) || detectPlatform(newLink.url);
+                            if (!live) return null;
+                            return (
+                              <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 ${live.fg}`} title={`Detected: ${live.label}`}>
+                                <Icon icon={live.icon} width="15" />
+                              </span>
+                            );
+                          })()}
+                        </div>
                         <button
                           type="button"
                           onClick={handleAddLink}
@@ -1077,7 +1122,11 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-white/10 bg-white/5"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <Icon icon={getLinkIcon(link.url)} className="text-brand shrink-0" width="16" />
+                              <Icon
+                                icon={(platformFor(link.platform) || detectPlatform(link.url) || GENERIC_LINK).icon}
+                                className={`shrink-0 ${(platformFor(link.platform) || detectPlatform(link.url) || GENERIC_LINK).fg}`}
+                                width="16"
+                              />
                               <div className="min-w-0">
                                 <p className="text-xs font-bold text-white truncate">{link.title}</p>
                                 <p className="text-[10px] text-zinc-400 truncate">{link.url}</p>
@@ -1439,7 +1488,11 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                       style={{ backgroundColor: currentTheme.cardBg }}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <Icon icon={getLinkIcon(link.url)} className="text-brand shrink-0" width="13" />
+                        <Icon
+                          icon={(platformFor(link.platform) || detectPlatform(link.url) || GENERIC_LINK).icon}
+                          className={`shrink-0 ${(platformFor(link.platform) || detectPlatform(link.url) || GENERIC_LINK).fg}`}
+                          width="13"
+                        />
                         <span className="text-[10px] font-bold text-white truncate">{link.title}</span>
                       </div>
                       <Icon icon="solar:arrow-right-linear" width="10" className="text-zinc-500" />
