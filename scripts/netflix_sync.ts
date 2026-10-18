@@ -33,6 +33,32 @@ const NETFLIX_URLS = [
 const LOGIN_URL = 'https://www.netflix.com/login';
 const STATE_FILE = 'netflix_playwright_state.json';
 
+/**
+ * CI has no human to type a password, and Netflix flags Playwright-launched
+ * browsers regardless of credentials -- see scripts/netflix_capture.ts, which
+ * exists precisely because of that. The only thing that reliably works is a
+ * session captured from a real browser, so allow one to arrive as an env var
+ * that GitHub Actions can hold as a secret.
+ *
+ * Refresh it with:
+ *   npx tsx scripts/netflix_capture.ts
+ *   gh secret set NETFLIX_SESSION_STATE < netflix_playwright_state.json
+ */
+function restoreSessionFromEnv(): boolean {
+  const raw = process.env.NETFLIX_SESSION_STATE;
+  if (!raw || fs.existsSync(STATE_FILE)) return false;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') throw new Error('not a storageState object');
+    fs.writeFileSync(STATE_FILE, JSON.stringify(parsed));
+    console.log('📄 Restored Netflix session from NETFLIX_SESSION_STATE.');
+    return true;
+  } catch (err: any) {
+    console.error(`⚠️ NETFLIX_SESSION_STATE is set but unusable (${err.message}). Falling back to login.`);
+    return false;
+  }
+}
+
 async function login(page) {
   const email = process.env.NETFLIX_EMAIL;
   const password = process.env.NETFLIX_PASSWORD;
@@ -1034,6 +1060,7 @@ async function syncToDatabase(scrapedMovies) {
 
 async function run() {
   try {
+    restoreSessionFromEnv();
     const movies = await scrapeNetflix();
 
     // A scrape that returns nothing is a broken scrape, not a quiet day.
@@ -1042,6 +1069,10 @@ async function run() {
     // red build to notice. Fail loudly instead.
     if (!movies.length) {
       console.error('❌ Netflix returned 0 titles. Failing so the sync is visibly broken rather than silently idle.');
+      console.error('   Netflix flags Playwright-launched browsers, so an automated login will not get past it.');
+      console.error('   Capture a session from your real Chrome and store it as a secret:');
+      console.error('     npx tsx scripts/netflix_capture.ts');
+      console.error('     gh secret set NETFLIX_SESSION_STATE < netflix_playwright_state.json');
       process.exitCode = 1;
       return;
     }

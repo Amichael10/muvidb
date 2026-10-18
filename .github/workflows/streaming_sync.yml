@@ -34,6 +34,9 @@ jobs:
           NETFLIX_EMAIL: ${{ secrets.NETFLIX_EMAIL }}
           NETFLIX_PASSWORD: ${{ secrets.NETFLIX_PASSWORD }}
           NETFLIX_NO_PROXY: 'true'
+          # A session captured from a real browser. Netflix blocks automated
+          # logins, so without this the scraper browses logged out.
+          NETFLIX_SESSION_STATE: ${{ secrets.NETFLIX_SESSION_STATE }}
           
       - name: Run Prime Sync
         id: prime
