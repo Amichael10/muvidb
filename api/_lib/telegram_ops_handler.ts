@@ -24,6 +24,40 @@ import {
 import { recentHitsForIp, topHitters } from './scrape_guard.js';
 import { supabase } from './supabase.js';
 import { generateAIContent } from './ai_service.js';
+
+/**
+ * Telegram button handlers run inside a 60s Vercel function. Any external call
+ * without its own bound -- Cohere stalling, a sleeping Render dyno -- simply
+ * outlives the function, Vercel kills the process, and the catch blocks below
+ * never execute. That is why the bot used to sit on "Extracting..." forever and
+ * never reported an error: the error path was never reached.
+ *
+ * Racing slow work against a deadline well under the limit means we always get
+ * back in time to tell the user what happened.
+ */
+const TELEGRAM_WORK_DEADLINE_MS = Number(process.env.TELEGRAM_WORK_DEADLINE_MS || 35_000);
+
+export function withDeadline<T>(work: Promise<T>, label: string, ms = TELEGRAM_WORK_DEADLINE_MS): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const bail = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} took longer than ${Math.round(ms / 1000)}s, so I stopped it to get back to you. Please try again.`)),
+      ms,
+    );
+  });
+  return Promise.race([work, bail]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
+
+/**
+ * Wakes the media extractor without blocking. It runs on a free Render plan
+ * that sleeps after ~15 minutes idle and needs ~25s to come back, which alone
+ * can exhaust the function budget. Pinging it the moment a post arrives means
+ * it is usually awake by the time a button is tapped.
+ */
+function warmMediaExtractor(): void {
+  const url = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
+  fetch(`${url}/`, { method: 'GET', signal: AbortSignal.timeout(2_000) }).catch(() => {});
+}
 import { extractInstagramMedia } from './instagram_downloader.js';
 import { extractFacebookMedia } from './facebook_downloader.js';
 import { extractThreadsMedia } from './threads_downloader.js';
@@ -1008,7 +1042,7 @@ async function handleCallback(query: any) {
     }
 
     try {
-      const aiRes = await generateAIContent(prompt);
+      const aiRes = await withDeadline(generateAIContent(prompt), 'The AI extraction');
       const payload = parseAiJson(aiRes.text || '');
 
       const metadata = intakeMetadata(event.metadata);
@@ -1487,7 +1521,7 @@ async function handleCallback(query: any) {
     await answerTelegramCallback(callbackId, 'Preparing playable video…');
     if (chatId) await reply(chatId, '⏳ Downloading and preparing the Short for Telegram…');
     try {
-      const media = await extractRemoteMedia(event.source_url);
+      const media = await withDeadline(extractRemoteMedia(event.source_url), 'Preparing the video');
       const metadata = intakeMetadata(event.metadata);
       const sent = await sendTelegramVideo({
         video: media.video_url,
@@ -1613,7 +1647,7 @@ Respond ONLY with a valid JSON object matching this schema:
   "tiktok_caption": "..."
 }`;
 
-      const aiRes = await generateAIContent(prompt);
+      const aiRes = await withDeadline(generateAIContent(prompt), 'The AI extraction');
       let aiJson: any = {};
       try {
         const cleaned = (aiRes.text || '').replace(/```json/g, '').replace(/```/g, '').trim();
@@ -2002,7 +2036,8 @@ async function extractRemoteMedia(url: string) {
     method: 'POST',
     headers,
     body: JSON.stringify({ url, cookies }),
-    signal: AbortSignal.timeout(45_000),
+    // 45s left no room for the reply inside a 60s function.
+    signal: AbortSignal.timeout(30_000),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.success || !data.video_url) {
@@ -2054,7 +2089,7 @@ async function prepareStructuredIntake(eventId: string, kind: 'film' | 'critic_r
   }
 
   try {
-    const ai = await generateAIContent(prompt);
+    const ai = await withDeadline(generateAIContent(prompt), 'The AI extraction');
     const payload = parseAiJson(ai.text || '');
     if (kind === 'film' && !payload.poster_url && metadata.image_url) payload.poster_url = metadata.image_url;
     if (kind === 'critic_review' && !payload.review_url) payload.review_url = event.source_url;
@@ -2470,6 +2505,11 @@ async function handleSocialIntake(chatId: string | number, message: any) {
       if (!text) meta.title = 'Video forwarded from Telegram';
     }
   }
+
+  // Wake the media extractor now, while the admin is still reading the card.
+  // It sleeps on Render's free plan and costs ~25s to start cold, which on its
+  // own could blow the whole function budget once a button is tapped.
+  warmMediaExtractor();
 
   const { data: newEvent, error } = await supabase
     .from('social_news_events')

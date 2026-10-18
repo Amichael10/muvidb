@@ -221,3 +221,30 @@ describe('Telegram content intake', () => {
   });
 });
 
+describe('withDeadline keeps the bot able to reply', () => {
+  it('passes a fast result straight through', async () => {
+    const { withDeadline } = await import('./telegram_ops_handler');
+    await expect(withDeadline(Promise.resolve('done'), 'Work', 1000)).resolves.toBe('done');
+  });
+
+  it('rejects slow work instead of letting it run past the function limit', async () => {
+    const { withDeadline } = await import('./telegram_ops_handler');
+    // Stands in for Cohere stalling or a sleeping Render dyno. Before this
+    // guard the call outlived the 60s Vercel budget, the process was killed,
+    // the catch never ran, and the bot sat on "Extracting..." with no error.
+    const neverSettles = new Promise(() => {});
+    await expect(withDeadline(neverSettles, 'The AI extraction', 20)).rejects.toThrow(/took longer than/i);
+  });
+
+  it('names the step in the error so the reply is useful', async () => {
+    const { withDeadline } = await import('./telegram_ops_handler');
+    await expect(withDeadline(new Promise(() => {}), 'Preparing the video', 20))
+      .rejects.toThrow(/Preparing the video/);
+  });
+
+  it('surfaces a real failure rather than masking it as a timeout', async () => {
+    const { withDeadline } = await import('./telegram_ops_handler');
+    await expect(withDeadline(Promise.reject(new Error('Cohere 401')), 'Work', 1000))
+      .rejects.toThrow('Cohere 401');
+  });
+});
