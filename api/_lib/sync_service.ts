@@ -822,6 +822,7 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
                         {
                           video_id: matchedVideo.video_id,
                           title: matchedVideo.title,
+                          description: matchedVideo._description || '',
                           duration_seconds: matchedVideo.duration_seconds,
                           published_at: matchedVideo.published_at,
                           thumbnail_url: matchedVideo.thumbnail_url,
@@ -1153,7 +1154,14 @@ export async function refreshYouTubeViewCounts(options: { maxBatches?: number; o
     .not('source_video_id', 'is', null);
 
   if (options.onlyMissing) {
-    query = query.or('view_count.is.null,view_count.eq.0');
+    // Ordered for the same reason as the round-robin below: without it every
+    // run re-reads the same first page, and because films whose video was
+    // deleted can never be filled, they sit at the top blocking progress
+    // forever. A backfill went 277 -> 3 -> 441 -> 6 updates across four runs
+    // before this was noticed.
+    query = query
+      .or('view_count.is.null,view_count.eq.0')
+      .order('updated_at', { ascending: true, nullsFirst: true });
   } else {
     // Round-robin over all films by updated_at ascending so every film gets periodically refreshed
     query = query.order('updated_at', { ascending: true, nullsFirst: true });
