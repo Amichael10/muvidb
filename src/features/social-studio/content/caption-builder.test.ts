@@ -97,7 +97,7 @@ describe('buildVariantContent', () => {
     expect(content.hashtags).toContain('ComingSoon');
   });
 
-  it('names the YouTube channel and includes verified cast and crew Instagram handles', () => {
+  it('names the YouTube channel and includes cast and crew names', () => {
     const snapshot = buildUpcomingMovieSnapshot({
       capturedAt: CAPTURED_AT,
       film: {
@@ -114,8 +114,9 @@ describe('buildVariantContent', () => {
     const content = buildVariantContent({ snapshot, platform: 'instagram' });
 
     expect(content.caption).toContain('Watch on YouTube via Example Pictures');
-    expect(content.caption).toContain('Starring:\n@actor.one');
-    expect(content.caption).toContain('Crew:\ndirector — @director.one');
+    expect(content.caption).toContain('Starring:\nActor One');
+    expect(content.caption).toContain('Crew:\ndirector — Director One');
+    expect(content.caption).not.toContain('@');
   });
 
   it('only sets a title for TikTok', () => {

@@ -250,7 +250,7 @@ export function buildMovieHook(tagline: string | null, synopsis: string | null, 
 
 function formatCastList(cast: SnapshotCastMember[], platform: SocialPlatform): string {
   if (!cast.length) return '';
-  const handlesOrNames = cast.map(c => (platform === 'instagram' ? c.handle : platform === 'tiktok' ? c.tiktokHandle : null) || c.name);
+  const handlesOrNames = cast.map(c => c.name);
   return `Starring:\n${handlesOrNames.join('\n')}`;
 }
 
@@ -267,12 +267,12 @@ function formatCrewList(credits: SnapshotCreditedPerson[], platform: SocialPlatf
     return 0;
   });
   const picked = sortedCrew.slice(0, maxCrew);
-  return `Crew:\n${picked.map(credit => `${credit.role.replace(/_/g, ' ')} — ${(platform === 'instagram' ? credit.instagramHandle : platform === 'tiktok' ? credit.tiktokHandle : null) || credit.name}`).join('\n')}`;
+  return `Crew:\n${picked.map(credit => `${credit.role.replace(/_/g, ' ')} — ${credit.name}`).join('\n')}`;
 }
 
 function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
   const lines: string[] = [];
-  const handleOrName = snapshot.handle ? `${snapshot.name} (${snapshot.handle})` : snapshot.name;
+  const handleOrName = snapshot.name;
   lines.push(`Star Spotlight: ${handleOrName} 🌟`);
 
   const titles = snapshot.knownFor.map(film => film.title).filter(Boolean);
@@ -291,7 +291,7 @@ function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
 
 function birthdayBody(snapshot: BirthdaySpotlightSnapshot): string[] {
   const lines: string[] = [];
-  const handleOrName = snapshot.handle ? `${snapshot.name} (${snapshot.handle})` : snapshot.name;
+  const handleOrName = snapshot.name;
   lines.push(
     snapshot.age === null
       ? `Happy Birthday to the incredible ${handleOrName}! 🎂🎉✨`
@@ -331,7 +331,7 @@ function movieBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlatform): s
     lines.push(hookText);
   }
 
-  // 4. Starring line-by-line with direct @handles (5-6 cast members)
+  // 4. Cast names only; Social Studio never tags people.
   const castBlock = formatCastList(snapshot.topCast.slice(0, 6), platform);
   if (castBlock) {
     lines.push(castBlock);
@@ -401,7 +401,7 @@ function theatreBody(snapshot: TheatrePlaySnapshot, platform: SocialPlatform = '
   if (snapshot.creditedPeople && snapshot.creditedPeople.length > 0) {
     const otherCrew = snapshot.creditedPeople.filter(c => c.role !== 'actor' && c.name !== snapshot.director && c.name !== snapshot.playwright && c.name !== snapshot.producer);
     for (const c of otherCrew.slice(0, 3)) {
-      crewLines.push(`${c.role.replace(/_/g, ' ')} — ${(platform === 'instagram' ? c.instagramHandle : platform === 'tiktok' ? c.tiktokHandle : null) || c.name}`);
+      crewLines.push(`${c.role.replace(/_/g, ' ')} — ${c.name}`);
     }
   }
   if (crewLines.length > 0) {

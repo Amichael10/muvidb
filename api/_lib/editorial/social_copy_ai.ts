@@ -1,4 +1,5 @@
 import { generateAIContent, parseJSON } from '../ai_service.js';
+import { namesOnlyCaption } from '../social-studio/content/names-only.js';
 
 import { selectCaptionBankStarters } from './caption_bank.js';
 
@@ -392,27 +393,6 @@ const COPY_LIMITS: Record<keyof PlatformCaptions, number> = {
   tiktok: 2200,
 };
 
-function verifiedInstagramHandles(data: any): string[] {
-  const rows = Array.isArray(data?.creditedPeople) ? data.creditedPeople : [];
-  const fallbackRows = [
-    ...(Array.isArray(data?.topCast) ? data.topCast : []),
-    ...(Array.isArray(data?.directors) ? data.directors : []),
-  ];
-  const seen = new Set<string>();
-  const handles: string[] = [];
-
-  for (const row of [...rows, ...fallbackRows]) {
-    const raw = String(row?.handle || row?.instagramHandle || '').trim();
-    if (!/^@[a-zA-Z0-9._]+$/.test(raw)) continue;
-    const key = raw.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    handles.push(raw);
-  }
-
-  return handles;
-}
-
 function appendBeforeHashtags(text: string, additions: string[], limit: number): string {
   const cleanAdditions = additions.filter(Boolean);
   if (!cleanAdditions.length) return text.slice(0, limit).trim();
@@ -432,15 +412,14 @@ function appendBeforeHashtags(text: string, additions: string[], limit: number):
 
 /** Enforce verified attribution even when the model or fallback omits it. */
 function applyVerifiedMovieAttribution(req: AICopyRequest, variations: AICopyVariation[]): AICopyVariation[] {
-  if (req.candidate?.type !== 'movie') return variations;
   const data = req.candidate.data || {};
   const channelName = String(data.youtubeChannelName || '').trim();
-  const handles = verifiedInstagramHandles(data);
 
   return variations.map(variation => {
     const captions = { ...variation.captions };
     for (const platform of Object.keys(captions) as Array<keyof PlatformCaptions>) {
       const additions: string[] = [];
+      captions[platform] = namesOnlyCaption(captions[platform], data);
       if (channelName && !captions[platform].toLowerCase().includes(channelName.toLowerCase())) {
         additions.push(`Watch on YouTube via ${channelName}.`);
       }
@@ -450,14 +429,10 @@ function applyVerifiedMovieAttribution(req: AICopyRequest, variations: AICopyVar
       if (castNames.length && !captions[platform].toLowerCase().includes('starring:') && !captions[platform].toLowerCase().includes('starring')) {
         additions.push(`Starring: ${castNames.join(', ')}`);
       }
-      // Instagram is the only surface that carries @handles, and
-      // areGeneratedVariationsGrounded refuses any variation whose Instagram
-      // caption is missing one. The handles were being resolved above and then
-      // dropped, so generated copy could never satisfy its own validator.
-      if (platform === 'instagram' && handles.length) {
-        const missing = handles.filter(handle => !captions.instagram.toLowerCase().includes(handle.toLowerCase()));
-        if (missing.length) additions.push(`Credits: ${missing.join(' ')}`);
-      }
+      const crewNames = Array.isArray(data.creditedPeople)
+        ? data.creditedPeople.filter((c: any) => c?.role && c.role !== 'actor' && c.name).map((c: any) => c.name)
+        : [];
+      if (crewNames.length && !captions[platform].includes('Crew:')) additions.push(`Crew: ${[...new Set(crewNames)].join(', ')}`);
       captions[platform] = appendBeforeHashtags(captions[platform], additions, COPY_LIMITS[platform]);
     }
     return { ...variation, captions };
@@ -720,7 +695,6 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
   const seriesSlug = (req.series?.slug || '').toLowerCase();
   const platform = req.candidate?.data?.platformDisplayName;
   const youtubeChannelName = String(req.candidate?.data?.youtubeChannelName || '').trim();
-  const requiredInstagramHandles = verifiedInstagramHandles(req.candidate?.data || {});
   const allCaptions = variations.flatMap(variation => Object.values(variation.captions));
 
   if (allCaptions.some(caption => /\[[^\]]+\]/.test(caption))) return false;
@@ -744,7 +718,7 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
     if (allCaptions.some(caption => !caption.toLowerCase().includes(normalizedPlatform))) return false;
   }
   if (youtubeChannelName && allCaptions.some(caption => !caption.toLowerCase().includes(youtubeChannelName.toLowerCase()))) return false;
-  if (requiredInstagramHandles.length && variations.some(variation => requiredInstagramHandles.some(handle => !variation.captions.instagram.toLowerCase().includes(handle.toLowerCase())))) return false;
+  if (allCaptions.some(caption => /(^|\s)@[a-zA-Z0-9._]+/.test(caption))) return false;
   return true;
 }
 

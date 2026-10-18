@@ -20,6 +20,7 @@ import { deleteFromR2 } from './r2.js';
 export { parseGenerateDraftRequest };
 import type { SocialContentType } from './social-studio/domain/content-types.js';
 import { preferredAssetFormat, type SocialPlatform } from './social-studio/domain/platform-types.js';
+import { namesOnlyCaption } from './social-studio/content/names-only.js';
 import {
   PLATFORM_CAPTION_LIMITS,
   buildVariantContent,
@@ -1091,7 +1092,7 @@ async function processJob(job: any, lockedBy: string, now: Date) {
           jobId: job.id,
           variantId: variant.id,
           platform: variant.platform,
-          caption: variant.caption || '',
+          caption: namesOnlyCaption(variant.caption || '', contentItem.source_snapshot),
           title: variant.title,
           assetUrl,
           assetUrls,
@@ -1771,7 +1772,7 @@ export async function syncContentItemWithSource(
       platform: variant.platform as SocialPlatform,
     });
 
-    const variantUpdates: Record<string, any> = {
+    const variantUpdates: Record<string, any> = variant.platform_options?.caption_locked ? {} : {
       caption: freshContent.caption,
       title: freshContent.title,
       hashtags: freshContent.hashtags,

@@ -114,19 +114,19 @@ export function buildMovieHook(tagline: string | null, synopsis: string | null, 
 
 function formatCastList(cast: SnapshotCastMember[]): string {
   if (!cast.length) return '';
-  const handlesOrNames = cast.map(c => (c.handle ? c.handle : c.name));
+  const handlesOrNames = cast.map(c => c.name);
   return `Starring:\n${handlesOrNames.join('\n')}`;
 }
 
 function formatCrewList(credits: SnapshotCreditedPerson[]): string {
   const crew = credits.filter(credit => credit.role !== 'actor');
   if (!crew.length) return '';
-  return `Crew:\n${crew.map(credit => `${credit.role.replace(/_/g, ' ')} — ${credit.instagramHandle}`).join('\n')}`;
+  return `Crew:\n${crew.map(credit => `${credit.role.replace(/_/g, ' ')} — ${credit.name}`).join('\n')}`;
 }
 
 function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
   const lines: string[] = [];
-  const handleOrName = snapshot.handle ? `${snapshot.name} (${snapshot.handle})` : snapshot.name;
+  const handleOrName = snapshot.name;
   lines.push(`Star Spotlight: ${handleOrName} 🌟`);
 
   const titles = snapshot.knownFor.map(film => film.title).filter(Boolean);
@@ -145,7 +145,7 @@ function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
 
 function birthdayBody(snapshot: BirthdaySpotlightSnapshot): string[] {
   const lines: string[] = [];
-  const handleOrName = snapshot.handle ? `${snapshot.name} (${snapshot.handle})` : snapshot.name;
+  const handleOrName = snapshot.name;
   lines.push(
     snapshot.age === null
       ? `Happy Birthday to the incredible ${handleOrName}! 🎂🎉✨`
@@ -185,7 +185,7 @@ function movieBody(snapshot: UpcomingMovieSnapshot): string[] {
     lines.push(hook);
   }
 
-  // 4. Starring line-by-line with direct @handles
+  // 4. Cast names only; Social Studio never tags people.
   const castBlock = formatCastList(snapshot.topCast);
   if (castBlock) {
     lines.push(castBlock);

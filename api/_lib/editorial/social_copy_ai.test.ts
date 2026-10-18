@@ -55,7 +55,7 @@ describe('generated social copy grounding', () => {
     expect(fallback.every(variation => Object.values(variation.captions).every(caption => caption.includes('Docuth')))).toBe(true);
   });
 
-  it('enforces a linked YouTube channel and verified Instagram credit tags in fallback copy', () => {
+  it('enforces a linked YouTube channel and names-only crew attribution', () => {
     const req: AICopyRequest = {
       candidate: {
         id: 'youtube-film',
@@ -76,7 +76,7 @@ describe('generated social copy grounding', () => {
 
     const fallback = generateGroundedFallbackCaptions(req);
     expect(fallback.every(variation => Object.values(variation.captions).every(caption => caption.includes('Example Pictures')))).toBe(true);
-    expect(fallback.every(variation => variation.captions.instagram.includes('@actor.one') && variation.captions.instagram.includes('@director.one'))).toBe(true);
+    expect(fallback.every(variation => variation.captions.instagram.includes('Director One') && !variation.captions.instagram.includes('@'))).toBe(true);
     expect(areGeneratedVariationsGrounded(req, fallback)).toBe(true);
   });
 

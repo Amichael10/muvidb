@@ -28,7 +28,7 @@ export type SnapshotCastMember = {
 export type SnapshotCreditedPerson = {
   personId: string;
   name: string;
-  instagramHandle: string;
+  instagramHandle: string | null;
   role: string;
   character: string | null;
 };
@@ -384,8 +384,7 @@ export function buildUpcomingMovieSnapshot(input: {
       instagramHandle: extractInstagramHandle(credit.people),
       role: String(text(credit.role) || 'actor').toLowerCase(),
       character: text(credit.character_name),
-    }))
-    .filter((credit): credit is SnapshotCreditedPerson => Boolean(credit.instagramHandle));
+    }));
 
   const liked = input.film.liked_percent;
   const likedPercent = liked === null || liked === undefined ? null : integer(liked);

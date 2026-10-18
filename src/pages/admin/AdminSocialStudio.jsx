@@ -1077,15 +1077,15 @@ export default function AdminSocialStudio() {
     const cast = rawCredits
       .filter(c => (c.role === 'cast' || c.role === 'actor' || !c.role) && c.people?.name)
       .sort((a, b) => (a.billing_order || 99) - (b.billing_order || 99))
-      .map(c => ({ name: c.people.name, instagram_handle: extractSocialHandle(c.people) }));
+      .map(c => ({ name: c.people.name }));
     
     const directors = rawCredits
       .filter(c => (c.role === 'director' || (c.role && String(c.role).toLowerCase().includes('director'))) && c.people?.name)
-      .map(c => ({ name: c.people.name, instagram_handle: extractSocialHandle(c.people) }));
+      .map(c => ({ name: c.people.name }));
 
     const producers = rawCredits
       .filter(c => (c.role === 'producer' || (c.role && String(c.role).toLowerCase().includes('producer'))) && c.people?.name)
-      .map(c => ({ name: c.people.name, instagram_handle: extractSocialHandle(c.people) }));
+      .map(c => ({ name: c.people.name }));
 
     let sourceMetadata = {
       title: film.title,

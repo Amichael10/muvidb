@@ -11,7 +11,7 @@ import { SOCIAL_PLATFORMS } from '../domain/platform-types';
 
 const CAPTURED_AT = '2026-07-30T21:00:00.000Z';
 
-it('uses platform-specific handles and retains crew without social handles', () => {
+it('uses names on every platform even when social handles exist', () => {
   const snapshot = buildUpcomingMovieSnapshot({ capturedAt: CAPTURED_AT,
     film: { id: 'film', title: 'Example', synopsis: 'Two sisters return home to settle an inheritance.', youtube_watch_url: 'https://youtube.com/watch?v=abc' },
     credits: [
@@ -22,8 +22,10 @@ it('uses platform-specific handles and retains crew without social handles', () 
   const instagram = buildVariantContent({ snapshot, platform: 'instagram' }).caption;
   const tiktok = buildVariantContent({ snapshot, platform: 'tiktok' }).caption;
   const facebook = buildVariantContent({ snapshot, platform: 'facebook' }).caption;
-  expect(instagram).toContain('@actor.ig');
-  expect(tiktok).toContain('@actor.tt');
+  expect(instagram).toContain('Actor One');
+  expect(instagram).not.toContain('@');
+  expect(tiktok).toContain('Actor One');
+  expect(tiktok).not.toContain('@');
   expect(tiktok).not.toContain('@actor.ig');
   expect(facebook).toContain('Actor One');
   expect(facebook).not.toContain('@actor.ig');
@@ -117,7 +119,7 @@ describe('buildVariantContent', () => {
     expect(content.hashtags).toContain('ComingSoon');
   });
 
-  it('names the YouTube channel and includes verified cast and crew Instagram handles', () => {
+  it('names the YouTube channel and includes cast and crew names', () => {
     const snapshot = buildUpcomingMovieSnapshot({
       capturedAt: CAPTURED_AT,
       film: {
@@ -134,8 +136,9 @@ describe('buildVariantContent', () => {
     const content = buildVariantContent({ snapshot, platform: 'instagram' });
 
     expect(content.caption).toContain('Watch on YouTube via Example Pictures');
-    expect(content.caption).toContain('Starring:\n@actor.one');
-    expect(content.caption).toContain('Crew:\ndirector — @director.one');
+    expect(content.caption).toContain('Starring:\nActor One');
+    expect(content.caption).toContain('Crew:\ndirector — Director One');
+    expect(content.caption).not.toContain('@');
   });
 
   it('uses the verified streaming destination before a stale YouTube URL', () => {
