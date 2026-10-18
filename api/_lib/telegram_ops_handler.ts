@@ -84,6 +84,7 @@ function helpText() {
     '🎬 Database Lookup & Tools:',
     '/film <title> — search films, streaming platforms, and posters',
     '/people <name> — search actors, directors, credits & social handles',
+    '/ig <@handle> — look up an Instagram handle and stage the person for approval',
     '/critics <query> — search Nollywood critic reviews and ratings',
     '/stageplay [query] — search upcoming or running Nigerian theatre plays',
     '',
@@ -112,6 +113,60 @@ async function handleCommand(chatId: string | number, text: string) {
 
   if (cmd === '/start' || cmd === '/help') {
     await reply(chatId, helpText());
+    return;
+  }
+
+  if (cmd === '/ig' || cmd === '/instagram') {
+    const raw = arg.split(/\s+/)[0] || '';
+    if (!raw) {
+      await reply(chatId, 'Give me a handle, e.g. `/ig @funkejenifaakindele`');
+      return;
+    }
+
+    const { resolveInstagramHandle, stageInstagramPerson } = await import('./instagram_person_lookup.js');
+    await reply(chatId, `🔎 Looking up @${raw.replace(/^@/, '')}…`);
+
+    let lookup;
+    try {
+      lookup = await withDeadline(resolveInstagramHandle(raw), 'The Instagram lookup', 25_000);
+    } catch (err: any) {
+      await reply(chatId, `❌ ${err?.message || 'Lookup failed'}`);
+      return;
+    }
+
+    if (lookup.status === 'known') {
+      await reply(chatId, `✅ Already in the database.
+
+👤 *${lookup.person.name}*
+@${lookup.handle} is already attached to them.`);
+      return;
+    }
+
+    if (lookup.status === 'unresolved') {
+      await reply(chatId, `🤷 Could not resolve @${lookup.handle}.
+
+${lookup.reason}
+
+Nothing was saved.`);
+      return;
+    }
+
+    // match | new -> stage it and show the card the admin already knows.
+    const staged = await stageInstagramPerson(lookup, { chatId });
+    if (!staged) {
+      await reply(chatId, '❌ Found the profile but could not stage it for review.');
+      return;
+    }
+
+    const header = lookup.status === 'match'
+      ? `🔗 *@${lookup.handle}* looks like *${lookup.person.name}*, who is already in the database.
+
+Approving will attach the handle to them — no duplicate is created.`
+      : `🆕 *@${lookup.handle}* is *${lookup.profile.name}*, who is not in the database yet.
+
+Approving will create them.`;
+    await reply(chatId, header);
+    await showWizardCard(chatId, staged.eventId, 'person');
     return;
   }
 
@@ -1409,6 +1464,39 @@ async function handleCallback(query: any) {
           });
         }
       } else if (action === 'person') {
+        // An Instagram lookup that matched someone we already have proposes a
+        // LINK, not a new person. Inserting here would create a duplicate of a
+        // real actor, which is exactly what staging is meant to prevent.
+        const linkToPersonId = meta.link_to_person_id || null;
+        if (linkToPersonId) {
+          const handle = String(payload.instagram_handle || meta.instagram_handle || '').replace(/^@/, '');
+          const { data: linked, error: linkErr } = await supabase
+            .from('people')
+            .update({ instagram_url: handle ? `https://instagram.com/${handle}` : null })
+            .eq('id', linkToPersonId)
+            .select('name,slug')
+            .single();
+          if (linkErr) throw linkErr;
+
+          if (chatId) {
+            await sendTelegramMessage({
+              text: `🔗 *Instagram Linked!*
+
+@${handle} is now attached to *"${linked.name}"*.`,
+              chatId: String(chatId),
+              replyMarkup: {
+                inline_keyboard: [
+                  [{ text: '🌐 View Person Profile', url: `${site}/person/${linked.slug}` }],
+                ],
+              },
+            });
+          }
+          await supabase.from('social_news_events')
+            .update({ status: 'processed', metadata: { ...meta, workflow_status: 'saved' } })
+            .eq('id', eventId);
+          return;
+        }
+
         const personSlug = (payload.name || `person-${Date.now()}`)
           .normalize('NFKD')
           .replace(/[\u0300-\u036f]/g, '')
