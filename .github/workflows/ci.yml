@@ -43,5 +43,23 @@ jobs:
       - name: Typecheck
         run: npm run lint
 
+      # Several modules build a Supabase client or assert on a TMDB key at
+      # IMPORT time, so a handful of test files cannot even load without these
+      # being set. They are deliberately throwaway placeholders, not secrets:
+      # the suite is unit-level and never reaches the network, it just needs
+      # createClient() to stop refusing a malformed url. Adding real
+      # credentials here would hand every workflow run access to production.
       - name: Tests
         run: npm test
+        env:
+          SUPABASE_URL: http://localhost:54321
+          VITE_SUPABASE_URL: http://localhost:54321
+          SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-key
+          VITE_SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-key
+          SUPABASE_KEY: ci-placeholder-service-key
+          SUPABASE_SERVICE_KEY: ci-placeholder-service-key
+          SUPABASE_SECRET_KEY: ci-placeholder-service-key
+          TMDB_API_KEY: ci-placeholder-tmdb-key
+          VITE_TMDB_API_KEY: ci-placeholder-tmdb-key
