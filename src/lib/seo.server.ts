@@ -21,6 +21,28 @@ const UUID_RE =
 
 export const clean = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim();
 
+/**
+ * A place/label safe to emit as structured data.
+ *
+ * `clean` only collapses whitespace, so corrupted rows pass straight through.
+ * 73 people currently hold tails of serialised JSON in `birthplace`, e.g.
+ *   \":null,\"popularity\":null,\"knownFor\":[\"acting\"],\"professions\":[]
+ * which an import wrote into the column. Emitting that as schema.org
+ * birthPlace hands Google malformed JSON-LD, and one invalid property can make
+ * it discard the whole Person block — losing the rich result for that profile.
+ *
+ * Real place and nationality names carry no JSON punctuation, so anything with
+ * quotes, braces, brackets, backslashes or a bare `: null` is dropped rather
+ * than published. Returning null simply omits the property.
+ */
+const safeLabel = (value: unknown): string | null => {
+  const text = clean(value);
+  if (!text) return null;
+  if (/["\\{}\[\]]/.test(text)) return null;
+  if (/:\s*null/i.test(text)) return null;
+  return text;
+};
+
 /** Profiles worth indexing — mirrors isIndexablePerson in api/seo.ts. */
 const isIndexablePerson = (person: any, creditCount: number) => {
   if (person?.is_verified || person?.is_spotlight) return true;
@@ -145,9 +167,9 @@ export async function personSeo(slug: string, base: string) {
           '@type': 'Person',
           name, url: canonical, image, description, jobTitle: job,
           ...(data.date_of_birth ? { birthDate: data.date_of_birth } : {}),
-          ...(data.birthplace ? { birthPlace: clean(data.birthplace) } : {}),
-          ...(data.nationality ? { nationality: clean(data.nationality) } : {}),
-          ...(data.gender ? { gender: clean(data.gender) } : {}),
+          ...(safeLabel(data.birthplace) ? { birthPlace: safeLabel(data.birthplace) } : {}),
+          ...(safeLabel(data.nationality) ? { nationality: safeLabel(data.nationality) } : {}),
+          ...(safeLabel(data.gender) ? { gender: safeLabel(data.gender) } : {}),
           ...(sameAs.length ? { sameAs } : {}),
         },
         crumbs([
