@@ -71,3 +71,65 @@ export const AFRICAN_LANGUAGES = [
   // North Africa / diaspora linguae francae
   'Arabic', 'French', 'Portuguese', 'Spanish',
 ];
+
+/**
+ * How speakers name their own language. Only languages whose endonym actually
+ * differs from the English exonym appear here — for Hausa, Twi, Wolof and
+ * others the two are the same, so they fall through and the English name is
+ * used as-is.
+ *
+ * The Bantu entries keep their noun-class prefix (isiZulu, Kiswahili, Sesotho)
+ * because that prefix is part of the name, not decoration.
+ */
+const LANGUAGE_ENDONYMS = {
+  // Nigeria
+  Yoruba: 'Yorùbá',
+  Igbo: 'Ìgbò',
+  Pidgin: 'Naijá',
+  'Nigerian Pidgin': 'Naijá',
+  Fulani: 'Fulfulde',
+  Edo: 'Ẹ̀dó',
+  Efik: 'Efịk',
+  Ijaw: 'Ìzon',
+  // Ghana / wider West Africa
+  Ewe: 'Eʋegbe',
+  Ga: 'Gã',
+  Fante: 'Mfantse',
+  Bambara: 'Bamanankan',
+  // Central Africa
+  Lingala: 'Lingála',
+  // East Africa
+  Swahili: 'Kiswahili',
+  Kinyarwanda: 'Ikinyarwanda',
+  Kirundi: 'Ikirundi',
+  Luganda: 'Oluganda',
+  Kikuyu: 'Gĩkũyũ',
+  Somali: 'Soomaali',
+  Oromo: 'Afaan Oromoo',
+  // Southern Africa
+  Zulu: 'isiZulu',
+  Xhosa: 'isiXhosa',
+  Sotho: 'Sesotho',
+  Tswana: 'Setswana',
+  Shona: 'chiShona',
+  Ndebele: 'isiNdebele',
+  Tsonga: 'Xitsonga',
+  Venda: 'Tshivenḓa',
+  Bemba: 'Ichibemba',
+  // Linguae francae
+  French: 'Français',
+  Portuguese: 'Português',
+  Spanish: 'Español',
+};
+
+/**
+ * A display name -> how its own speakers write it, plus the English name to
+ * keep alongside it. `endonym` is null when the two are identical, which lets
+ * callers skip the redundant "Hausa (Hausa)".
+ */
+export function getLanguageEndonym(language) {
+  const name = normalizeLanguage(language);
+  if (!name) return null;
+  const endonym = LANGUAGE_ENDONYMS[name] || null;
+  return { name, endonym, label: endonym || name };
+}
