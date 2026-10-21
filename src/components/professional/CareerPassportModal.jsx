@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
-import { supabase } from '../../lib/supabase';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import {
   buildCareerPassportModel,
@@ -24,9 +23,14 @@ function downloadBlob(blob, filename) {
 async function getCollaboratorCount(person, credits) {
   const filmIds = [...new Set(credits.map((credit) => credit.film_id || credit.films?.id).filter(Boolean))];
   if (!person?.id || !filmIds.length) return 0;
-  const { data, error } = await supabase.from('credits').select('person_id').in('film_id', filmIds).neq('person_id', person.id);
-  if (error) return 0;
-  return new Set((data || []).map((credit) => credit.person_id).filter(Boolean)).size;
+  // Counted server-side via /api/content so the browser never reads credits.
+  try {
+    const res = await fetch(`/api/content?resource=costar-count&personId=${encodeURIComponent(person.id)}`);
+    if (!res.ok) return 0;
+    return (await res.json()).count || 0;
+  } catch {
+    return 0;
+  }
 }
 
 export default function CareerPassportModal({ person, credits = [], stageCredits = [], personalized = false, onClose }) {

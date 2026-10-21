@@ -808,20 +808,11 @@ const PeopleList = () => {
           `)
           .or(`known_for_department.ilike.%${roleLabel}%,known_for_department.ilike.%${roleValue}%`)
 
-        const credsQuery = supabase
-          .from('credits')
-          .select(`
-            person_id, role,
-            people(
-              id, slug, name, photo_url,
-              popularity_score, is_verified, is_spotlight,
-              known_for_department, film_count, gender, nationality,
-              created_at, updated_at,
-              credits(id, role)
-            )
-          `)
-          .ilike('role', `%${roleValue}%`)
-          .limit(150)
+        // Via /api/content so the browser never reads the credits table. Shaped
+        // as { data } to keep the Promise.all + merge below unchanged.
+        const credsQuery = fetch(
+          `/api/content?resource=role-people&role=${encodeURIComponent(roleValue)}`
+        ).then(async (res) => ({ data: res.ok ? ((await res.json()).credits || []) : [] }))
 
         const [deptRes, credsRes] = await Promise.all([
           deptQuery.limit(100),

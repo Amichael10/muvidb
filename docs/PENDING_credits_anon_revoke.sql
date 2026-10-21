@@ -1,0 +1,83 @@
+-- ============================================================================
+-- PENDING — DO NOT APPLY YET. Deliberately NOT in supabase/migrations/ so that
+-- `supabase db push` cannot pick it up before the blockers below are cleared.
+--
+-- Goal: stop the anon (publishable) key reading public.credits in bulk.
+-- As of 2026-10-21 the table holds ~174,946 rows with NO row filter, so anyone
+-- who greps the anon key out of build/client/assets/*.js can page the whole
+-- harvested-credits dataset in roughly 7 minutes.
+--
+-- WHY THE ORDER MATTERS (learned the hard way on talent_representations):
+-- PostgREST returns 401 for the ENTIRE query when any requested column lacks
+-- SELECT privilege. Revoking while a deployed bundle still reads the table
+-- breaks those pages instantly. Code ships first, revoke second — always.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- BLOCKERS — every one must be cleared before running this
+-- ---------------------------------------------------------------------------
+-- 1. DEPLOY the /api/content work and confirm in PRODUCTION that these five
+--    new resources answer 200 (they are proxied from local dev to muvidb.com,
+--    so they cannot be exercised locally until deployed):
+--      films-credits, person-credit-rows, costar-count, role-people, site-stats
+--
+-- 2. REMOVE the direct-Supabase fallbacks that still exist as safety nets:
+--      src/pages/FilmDetail.jsx:~340   fetchDirect() + the import.meta.env.DEV branch
+--      src/lib/search.js:~166          direct read behind the /api/content call
+--    These are intentionally still present: this deploy keeps the API as
+--    primary WITH the fallback intact, so nothing can break. They must go in a
+--    second deploy, once the API path is proven in production.
+--
+-- 3. MIGRATE the remaining anon-reachable embedded reads (a `credits(...)`
+--    embed inside a people/film select is still an anon read of credits):
+--      src/pages/PersonDetailV2.jsx:~262   person + credits + person_media in one
+--                                          query; /api/content?resource=person-credits
+--                                          already serves this shape
+--      src/pages/PeopleList.jsx:~713, ~900 people selects embedding credits(id, role)
+--
+-- 4. VERIFY the authenticated-only assumption. These keep direct access on
+--    purpose, because `authenticated` retains its grant — but if ANY of them
+--    can run for a signed-out visitor, this revoke breaks them:
+--      src/lib/companyClient.ts:383,419,437,448
+--      src/lib/portfolioClient.ts:169
+--      src/pages/Dashboard.jsx:147
+--      src/lib/peopleEnrichmentClient.js:117
+--
+-- 5. Re-run the anon-key probe below and confirm it already returns 0 rows for
+--    every migrated page BEFORE revoking (i.e. no page needs the grant).
+
+-- ---------------------------------------------------------------------------
+-- THE CHANGE
+-- ---------------------------------------------------------------------------
+-- Note: no DROP, no DELETE. This only removes a privilege; all data is intact
+-- and `authenticated` plus `service_role` are untouched, so admin screens, the
+-- company roster editor, the portfolio pages and every api/ function keep
+-- working exactly as before.
+
+revoke select on public.credits from anon;
+
+-- Keep the RLS policy in place. Policies and GRANTs are independent: the
+-- policy stays correct for `authenticated`, and removing the GRANT is what
+-- actually stops anon. (See the filmmaker_portfolios incident — perfect RLS
+-- with no GRANT read as silently empty for days.)
+
+-- ---------------------------------------------------------------------------
+-- VERIFY AFTER APPLYING (must use the ANON key, not service_role)
+-- ---------------------------------------------------------------------------
+--   # expect 401 — the bulk path is closed
+--   curl -s -o /dev/null -w '%{http_code}\n' \
+--     "$SUPABASE_URL/rest/v1/credits?select=*&limit=1" \
+--     -H "apikey: $ANON_KEY"
+--
+--   # expect 200 — the website's own path still works
+--   curl -s -o /dev/null -w '%{http_code}\n' \
+--     "https://muvidb.com/api/content?resource=film-credits&filmId=<published-uuid>"
+--
+-- Then click through, signed OUT: a film page (cast list), a person page
+-- (filmography), /people with a role filter, a company page (collaborators),
+-- advanced search by cast, the two compare tools, and the footer counters.
+
+-- ---------------------------------------------------------------------------
+-- ROLLBACK (instant, non-destructive)
+-- ---------------------------------------------------------------------------
+--   grant select on public.credits to anon;

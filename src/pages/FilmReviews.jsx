@@ -155,10 +155,11 @@ export default function FilmReviews() {
         let directorName = filmData.director || null;
         if (!directorName) {
           try {
-            const { data: creditsData } = await supabase
-              .from('credits')
-              .select('role, people(name)')
-              .eq('film_id', filmData.id);
+            // Via /api/content so the browser never reads the credits table.
+            const dirRes = await fetch(
+              `/api/content?resource=film-credits&filmId=${encodeURIComponent(filmData.id)}`
+            );
+            const creditsData = dirRes.ok ? ((await dirRes.json()).credits || []) : [];
             if (creditsData && creditsData.length > 0) {
               const dirCredit = creditsData.find((c) =>
                 (c.role || '').toLowerCase().includes('director')

@@ -331,12 +331,15 @@ export default function AdvancedSearch() {
 
         if (matchedPeople && matchedPeople.length > 0) {
           const personIds = matchedPeople.map(p => p.id);
-          let creditQuery = supabase.from('credits').select('film_id').in('person_id', personIds);
-          if (talentRole !== 'all') {
-            creditQuery = creditQuery.ilike('role', `%${talentRole}%`);
-          }
-          const { data: creditRows } = await creditQuery.limit(300);
-          const filmIds = [...new Set((creditRows || []).map(c => c.film_id).filter(Boolean))];
+          // Via /api/content so the browser never reads the credits table.
+          const creditParams = new URLSearchParams({
+            resource: 'person-films',
+            personIds: personIds.join(','),
+            limit: '300',
+          });
+          if (talentRole !== 'all') creditParams.set('role', talentRole);
+          const creditRes = await fetch(`/api/content?${creditParams.toString()}`);
+          const filmIds = creditRes.ok ? ((await creditRes.json()).filmIds || []) : [];
           if (filmIds.length > 0) {
             query = query.in('id', filmIds);
           } else {
@@ -445,10 +448,14 @@ export default function AdvancedSearch() {
       }
 
       // 2. Fetch credits for both persons
-      const [credits1, credits2] = await Promise.all([
-        supabase.from('credits').select('film_id, role, character_name, billing_order').eq('person_id', person1.id),
-        supabase.from('credits').select('film_id, role, character_name, billing_order').eq('person_id', person2.id)
-      ]);
+      // One /api/content call for both people, split locally by person_id, so
+      // the browser never reads the credits table.
+      const cmpRes = await fetch(
+        `/api/content?resource=person-credit-rows&personIds=${encodeURIComponent([person1.id, person2.id].join(','))}`
+      );
+      const cmpRows = cmpRes.ok ? ((await cmpRes.json()).credits || []) : [];
+      const credits1 = { data: cmpRows.filter((c) => c.person_id === person1.id) };
+      const credits2 = { data: cmpRows.filter((c) => c.person_id === person2.id) };
 
       const c1Map = new Map((credits1.data || []).map(c => [c.film_id, c]));
       const sharedFilmIds = (credits2.data || [])
@@ -536,10 +543,13 @@ export default function AdvancedSearch() {
       }
 
       // Fetch credits for both to identify shared cast members
-      const [credits1, credits2] = await Promise.all([
-        supabase.from('credits').select('person_id, role, character_name, people(id, name, slug, photo_url)').eq('film_id', film1.id),
-        supabase.from('credits').select('person_id, role, character_name, people(id, name, slug, photo_url)').eq('film_id', film2.id)
-      ]);
+      // One /api/content call for both films, split locally by film_id.
+      const castRes = await fetch(
+        `/api/content?resource=films-credits&filmIds=${encodeURIComponent([film1.id, film2.id].join(','))}`
+      );
+      const castRows = castRes.ok ? ((await castRes.json()).credits || []) : [];
+      const credits1 = { data: castRows.filter((c) => c.film_id === film1.id) };
+      const credits2 = { data: castRows.filter((c) => c.film_id === film2.id) };
 
       const c1People = new Map((credits1.data || []).map(c => [c.person_id, c]));
       const sharedCast = [];

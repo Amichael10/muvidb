@@ -4,7 +4,6 @@ import { Icon } from '@iconify/react';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { SOCIAL_LINKS } from '../../config/socialLinks';
-import { supabase } from '../../lib/supabase';
 
 const footerGroups = [
   {
@@ -79,21 +78,17 @@ export default function Footer() {
     let isMounted = true;
     async function fetchLiveMetrics() {
       try {
-        const [filmsRes, creditsRes, cinemasRes, boRes] = await Promise.all([
-          supabase.from('films').select('*', { count: 'exact', head: true }),
-          supabase.from('credits').select('*', { count: 'exact', head: true }),
-          supabase.from('cinemas').select('*', { count: 'exact', head: true }),
-          supabase.from('films').select('box_office_domestic').not('box_office_domestic', 'is', null),
-        ]);
+        // Counts come from /api/content so the browser never reads the credits
+        // table, and so summing box office doesn't pull a column for every film.
+        const statsRes = await fetch('/api/content?resource=site-stats');
+        if (!statsRes.ok) throw new Error(`site-stats ${statsRes.status}`);
+        const stats = await statsRes.json();
 
-        const filmsCount = filmsRes.count || 17584;
-        const creditsCount = creditsRes.count || 103782;
-        const cinemasCount = cinemasRes.count || 185;
+        const filmsCount = stats.films || 17584;
+        const creditsCount = stats.credits || 103782;
+        const cinemasCount = stats.cinemas || 185;
 
-        let totalBo = 0;
-        boRes.data?.forEach(r => {
-          totalBo += (Number(r.box_office_domestic) || 0);
-        });
+        const totalBo = Number(stats.boxOfficeTotal) || 0;
         const boFormatted = totalBo > 0 ? `₦${(totalBo / 1e9).toFixed(1)}B+` : '₦35.5B+';
 
         const updated = [

@@ -170,21 +170,11 @@ export default function CompanyDetail() {
     // 5. Fetch Frequent Collaborators from Credits
     const filmIds = comp.filmsWithRole.map((f) => f.film?.id).filter(Boolean);
     if (filmIds.length > 0) {
-      const { data: creditsData } = await supabase
-        .from('credits')
-        .select(`
-          person_id,
-          role,
-          character_name,
-          people (
-            id,
-            name,
-            slug,
-            photo_url,
-            known_for_department
-          )
-        `)
-        .in('film_id', filmIds.slice(0, 100));
+      // Via /api/content so the browser never reads the credits table.
+      const collabRes = await fetch(
+        `/api/content?resource=films-credits&filmIds=${encodeURIComponent(filmIds.slice(0, 100).join(','))}`
+      );
+      const creditsData = collabRes.ok ? ((await collabRes.json()).credits || []) : [];
 
       const collabMap = new Map();
       (creditsData || []).forEach((c) => {
