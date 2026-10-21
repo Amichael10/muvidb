@@ -93,9 +93,13 @@ export async function handleContent(req: VercelRequest, res: VercelResponse) {
       if (!personId) return res.status(400).json({ error: 'Missing personId' });
       if (!UUID_RE.test(personId)) return res.status(400).json({ error: 'Invalid personId' });
 
+      // film_genres is additive (existing callers ignore it) and lets
+      // PersonDetailV2 drop its own credits embed without losing genre chips.
+      // films!inner + is_published matches what anon could already see: RLS
+      // hides unpublished films, so the page's old left join returned nulls.
       const { data, error } = await supabase
         .from('credits')
-        .select('*, films!inner(*)')
+        .select('*, films!inner(*, film_genres(genres(name)))')
         .eq('person_id', personId)
         .eq('films.is_published', true);
       if (error) throw error;
@@ -248,6 +252,33 @@ export async function handleContent(req: VercelRequest, res: VercelResponse) {
 
       setCatalogCache(res);
       return res.status(200).json({ credits: data ?? [] });
+    }
+
+    // ---- roles held by each of a list of people --------------------------
+    // PeopleList's role filter matches on credit roles as well as
+    // known_for_department. Returns role strings only — no film ids, no
+    // character names — so it can't be assembled into a filmography.
+    if (resource === 'people-roles') {
+      const personIds = parseIdList(one(req.query.personIds), MAX_ID_BATCH);
+      if (!personIds) return res.status(400).json({ error: 'Missing or invalid personIds' });
+
+      const { data, error } = await supabase
+        .from('credits')
+        .select('person_id, role')
+        .in('person_id', personIds)
+        .limit(MAX_ROWS);
+      if (error) throw error;
+
+      // Shaped as { personId: [role, ...] } with duplicates collapsed.
+      const roles: Record<string, string[]> = {};
+      for (const row of (data ?? []) as any[]) {
+        if (!row.person_id || !row.role) continue;
+        const list = roles[row.person_id] ?? (roles[row.person_id] = []);
+        if (!list.includes(row.role)) list.push(row.role);
+      }
+
+      setCatalogCache(res);
+      return res.status(200).json({ roles });
     }
 
     // ---- catalogue counts for the footer ---------------------------------

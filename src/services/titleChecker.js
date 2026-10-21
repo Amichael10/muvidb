@@ -1,6 +1,37 @@
 import { supabase } from '../lib/supabase.js';
 import { parseDuration, formatViewCount } from '../utils/youtube.js';
 
+/**
+ * Attach each film's cast via /api/content, so this public page never reads the
+ * credits table with the anon key. Shaped as credits[{ role, person }] to match
+ * the embed it replaces. Mutates in place; failures leave cast empty rather
+ * than failing the whole title search.
+ */
+async function attachFilmCredits(films) {
+  const ids = [...new Set((films || []).map((f) => f?.id).filter(Boolean))].slice(0, 100);
+  if (!ids.length) return films;
+  try {
+    const res = await fetch(
+      `/api/content?resource=films-credits&filmIds=${encodeURIComponent(ids.join(','))}`
+    );
+    if (!res.ok) return films;
+    const { credits = [] } = await res.json();
+    const byFilm = new Map();
+    for (const row of credits) {
+      if (!row?.film_id) continue;
+      const list = byFilm.get(row.film_id) || [];
+      list.push({ role: row.role, person: row.people || null });
+      byFilm.set(row.film_id, list);
+    }
+    for (const film of films) {
+      if (film?.id) film.credits = byFilm.get(film.id) || [];
+    }
+  } catch {
+    // Non-fatal: the page renders without cast names.
+  }
+  return films;
+}
+
 export const COUNTRY_LOOKUP = {
   NG: { code: 'NG', name: 'Nigeria', flag: '🇳🇬' },
   GH: { code: 'GH', name: 'Ghana', flag: '🇬🇭' },
@@ -98,13 +129,6 @@ async function searchDatabaseFilms(query) {
             country,
             thumbnail_url
           )
-        ),
-        credits (
-          role,
-          person:people (
-            id,
-            name
-          )
         )
       `)
       .ilike('title', clean)
@@ -130,13 +154,6 @@ async function searchDatabaseFilms(query) {
             country,
             thumbnail_url
           )
-        ),
-        credits (
-          role,
-          person:people (
-            id,
-            name
-          )
         )
       `)
       .ilike('title', `%${clean}%`)
@@ -146,6 +163,10 @@ async function searchDatabaseFilms(query) {
 
     // Deduplicate
     const combined = [...(exactFilms || []), ...(partialFilms || [])];
+
+    // Cast comes from /api/content so the browser never reads the credits
+    // table. Shaped as credits[{ role, person }] to match what's rendered below.
+    await attachFilmCredits(combined);
     const seen = new Set();
     const unique = [];
 

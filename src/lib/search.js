@@ -162,17 +162,8 @@ export async function searchAll(query) {
     // api/content.ts (keeps the cast graph from being bulk-scraped).
     let filmIds = [];
     try {
-      const fetchDirect = async () => {
-        const { data } = await supabase.from('credits').select('film_id').in('person_id', ids).limit(100);
-        return [...new Set((data || []).map((credit) => credit.film_id).filter(Boolean))];
-      };
-
-      if (typeof window !== 'undefined') {
-        const res = await fetch(`/api/content?resource=person-films&personIds=${encodeURIComponent(ids.join(','))}`);
-        filmIds = res.ok ? (await res.json()).filmIds || [] : await fetchDirect();
-      } else {
-        filmIds = await fetchDirect();
-      }
+      const res = await fetch(`/api/content?resource=person-films&personIds=${encodeURIComponent(ids.join(','))}`);
+      filmIds = res.ok ? (await res.json()).filmIds || [] : [];
     } catch (e) {
       // Search still works on title matches alone if the cast lookup fails.
       console.warn('cast film lookup failed:', e);

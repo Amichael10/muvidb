@@ -100,6 +100,30 @@ const NATIONALITY_OPTIONS = [
 ]
 
 // Modal for selecting from all technical & creative roles
+/**
+ * Fill in each person's `credits` from /api/content so the role and experience
+ * filters keep working without the browser reading the credits table. Returns
+ * role strings only, shaped as a credits array so every consumer below is
+ * unchanged. Mutates in place and returns the same list for convenience.
+ */
+async function attachRoles(people) {
+  const ids = [...new Set((people || []).map((p) => p?.id).filter(Boolean))].slice(0, 100)
+  if (!ids.length) return people
+  try {
+    const res = await fetch(
+      `/api/content?resource=people-roles&personIds=${encodeURIComponent(ids.join(','))}`
+    )
+    if (!res.ok) return people
+    const { roles = {} } = await res.json()
+    for (const p of people) {
+      if (p?.id) p.credits = (roles[p.id] || []).map((role) => ({ role }))
+    }
+  } catch {
+    // Leave credits unset; the role filter falls back to known_for_department.
+  }
+  return people
+}
+
 const RolesModal = ({ isOpen, onClose, selectedRole, onSelectRole }) => {
   const [query, setQuery] = useState('')
 
@@ -709,10 +733,11 @@ const PeopleList = () => {
             id, slug, name, photo_url,
             popularity_score, is_verified, is_spotlight,
             known_for_department, film_count, gender, nationality,
-            created_at, updated_at,
-            credits(id, role)
+            created_at, updated_at
           `,
         })
+
+        await attachRoles(rows)
 
         let filtered = rows
 
@@ -803,8 +828,7 @@ const PeopleList = () => {
             id, slug, name, photo_url,
             popularity_score, is_verified, is_spotlight,
             known_for_department, film_count, gender, nationality,
-            created_at, updated_at,
-            credits(id, role)
+            created_at, updated_at
           `)
           .or(`known_for_department.ilike.%${roleLabel}%,known_for_department.ilike.%${roleValue}%`)
 
@@ -830,6 +854,10 @@ const PeopleList = () => {
         })
 
         let merged = Array.from(map.values())
+
+        // The credits-side rows already carry their roles; the department-side
+        // ones don't, so fill them in before the credit-role check below.
+        await attachRoles(merged)
 
         // Double check canonical department/credit match
         merged = merged.filter((p) => {
@@ -896,8 +924,7 @@ const PeopleList = () => {
         id, slug, name, photo_url,
         popularity_score, is_verified, is_spotlight,
         known_for_department, film_count, gender, nationality,
-        created_at, updated_at,
-        credits(id, role)
+        created_at, updated_at
       `)
 
       if (verifiedOnly) {

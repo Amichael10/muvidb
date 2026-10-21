@@ -259,16 +259,6 @@ export default function PersonDetailV2() {
       .select(`
         *,
         person_aliases(alias),
-        credits(
-          id, role, character_name, billing_order,
-          films(
-            id, title, year, poster_url, trailer_youtube_id,
-            view_count, average_rating, liked_percent, slug,
-            release_type, streaming_links,
-            box_office_domestic, box_office_currency, box_office_source,
-            film_genres(genres(name))
-          )
-        ),
         person_media(
           id, media_type, category, title, description,
           url, thumbnail_url, r2_key, embed_provider, embed_id,
@@ -291,9 +281,24 @@ export default function PersonDetailV2() {
       return
     }
 
+    // Credits come from /api/content (service-role) so the browser never reads
+    // the credits table. The SSR loader still embeds them, so a seeded render
+    // already has them and skips this round-trip.
+    let creditRows = data.credits
+    if (!creditRows) {
+      try {
+        const creditsRes = await fetch(
+          `/api/content?resource=person-credits&personId=${encodeURIComponent(data.id)}`
+        )
+        creditRows = creditsRes.ok ? ((await creditsRes.json()).credits || []) : []
+      } catch {
+        creditRows = []
+      }
+    }
+
     const basePerson = {
       ...data,
-      credits: (data.credits || []).map((credit) => ({
+      credits: (creditRows || []).map((credit) => ({
         ...credit,
         role: canonicalizeRole(credit.role),
       })),
