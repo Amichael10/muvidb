@@ -1,0 +1,47 @@
+name: CI
+
+# Nothing gated code quality before this: `npm run build` is `react-router
+# build`, which bundles without typechecking, and every other workflow here is
+# a data-sync cron. A production deploy failed on 2026-10-21 because
+# FilmDetail.jsx imported an export that existed only in an uncommitted local
+# file — the local build passed, Vercel's did not. A typecheck of the committed
+# tree catches exactly that, in well under a minute.
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch makes an in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # `npm ci` rather than `npm install`: it installs exactly the lockfile, so
+      # CI can't pass on a dependency tree that nobody else has.
+      - name: Install dependencies
+        run: npm ci
+
+      # The check that would have caught the 2026-10-21 deploy failure. Runs
+      # against the committed tree only, so a missing-but-locally-present file
+      # shows up here instead of in a failed production build.
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Tests
+        run: npm test

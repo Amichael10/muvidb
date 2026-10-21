@@ -1,3 +1,11 @@
+# Vercel turns every file under api/ into a Serverless Function, so a vitest
+# file there gets deployed and counts against the Hobby 12-function cap.
+# api/media.test.ts was live at /api/media.test returning 500. Tests under
+# api/_lib/ are unaffected (underscore dirs aren't routed) but are excluded
+# too, so vitest deps never ship.
+api/**/*.test.ts
+api/**/*.test.tsx
+
 # Ignore local test and temp folders
 temp_lumi_*
 temp_lumi/
