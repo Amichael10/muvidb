@@ -1,0 +1,17 @@
+-- URGENT PARTIAL REVERT of 20261021064457.
+--
+-- That migration revoked anon SELECT on talent_representations.notes, but the
+-- deployed bundle still requests `notes` inside the people -> talent_representations
+-- embed in PersonDetailV2's client-side fetch. PostgREST rejects the whole query
+-- with 401 when any embedded column lacks privilege, so client-side navigation to
+-- a person profile showed "Could not load this profile".
+--
+-- Direct page loads were unaffected (the react-router loader uses the service-role
+-- client via seo.server.ts), which is why this did not show up as a total outage.
+--
+-- `notes` is re-granted here to restore the live site. The revoke must be re-applied
+-- only AFTER the code change removing `notes` from those select lists is deployed.
+-- The person_aliases restriction from 20261021064457 is intentionally left in place:
+-- public code only ever selects (person_id, alias) and filters on alias_key, all of
+-- which are still granted.
+grant select (notes) on public.talent_representations to anon;

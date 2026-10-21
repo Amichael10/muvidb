@@ -95,7 +95,7 @@ export async function personSeo(slug: string, base: string) {
         )
       ),
       talent_representations(
-        id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary, notes,
+        id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary,
         companies(id, name, slug, logo_url, company_type, headquarters, website, instagram_url)
       )
     `)

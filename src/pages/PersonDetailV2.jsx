@@ -278,7 +278,7 @@ export default function PersonDetailV2() {
           films(id, title, year, poster_url, slug)
         ),
         talent_representations(
-          id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary, notes,
+          id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary,
           companies(id, name, slug, logo_url, company_type, headquarters, website, instagram_url)
         )
       `)
@@ -310,7 +310,7 @@ export default function PersonDetailV2() {
       supabase
         .from('talent_representations')
         .select(`
-          id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary, notes,
+          id, representation_type, agent_name, contact_email, contact_phone, booking_url, is_primary,
           companies(id, name, slug, logo_url, company_type, headquarters, website, instagram_url)
         `)
         .eq('person_id', data.id)
