@@ -31,15 +31,23 @@ export const clean = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim()
  * birthPlace hands Google malformed JSON-LD, and one invalid property can make
  * it discard the whole Person block — losing the rich result for that profile.
  *
- * Real place and nationality names carry no JSON punctuation, so anything with
- * quotes, braces, brackets, backslashes or a bare `: null` is dropped rather
- * than published. Returning null simply omits the property.
+ * Square brackets are deliberately ALLOWED: historical birthplaces legitimately
+ * use them, e.g. "Rovigno, Istria, Italy [now Rovinj, Istria, Croatia]" and
+ * "Putyvl, Sumy Oblast, Ukrainian SSR, USSR [now Ukraine]". An earlier version
+ * of this guard rejected those two real profiles along with the junk.
+ *
+ * What does get dropped is the shape of serialised data rather than prose:
+ * quotes, braces, backslashes, a bare `: null`, or a React className.
  */
 const safeLabel = (value: unknown): string | null => {
   const text = clean(value);
   if (!text) return null;
-  if (/["\\{}\[\]]/.test(text)) return null;
+  if (/["\\{}]/.test(text)) return null;
   if (/:\s*null/i.test(text)) return null;
+  if (/className|__next|\$\$typeof/i.test(text)) return null;
+  // `String(someObject)` leaves this behind. 1,018 people carry it in `awards`
+  // from a stringification bug, so guard the label fields against it too.
+  if (/\[object\s+\w+\]/i.test(text)) return null;
   return text;
 };
 
