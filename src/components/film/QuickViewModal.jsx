@@ -6,6 +6,7 @@ import { useQuickView } from '../../context/QuickViewContext';
 import ImageWithFallback from '../ui/ImageWithFallback';
 import FilmCard from './FilmCard';
 import { supabase } from '../../lib/supabase';
+import { PUBLIC_FILM_COLUMNS } from '../../lib/publicSelects';
 import { formatFilmTitle } from '../../utils/format';
 import { formatRole } from '../../lib/creditRoles';
 import { getFilmBackdrop } from '../../lib/filmImages';
@@ -56,7 +57,7 @@ export default function QuickViewModal() {
       try {
         const { data: related } = await supabase
           .from('films')
-          .select('*, film_genres(genres(name))')
+          .select(`${PUBLIC_FILM_COLUMNS}, film_genres(genres(name))`)
           .neq('id', selectedFilm.id)
           .limit(SIMILAR_FILMS_LIMIT);
           

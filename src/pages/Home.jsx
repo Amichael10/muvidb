@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { PUBLIC_PERSON_COLUMNS, PUBLIC_FILM_COLUMNS } from '../lib/publicSelects';
 import { getPersonYoutubeChannelUrl } from '../lib/youtube';
 import HeroSection from '../components/film/HeroSection';
 import FilmRow from '../components/film/FilmRow';
@@ -485,7 +486,7 @@ export default function Home() {
     if (nowIds.size > 0) {
       const { data } = await supabase
         .from('films')
-        .select(`*, film_genres(genres(name))`)
+        .select(`${PUBLIC_FILM_COLUMNS}, film_genres(genres(name))`)
         .in('id', Array.from(nowIds))
         // Newest cinema arrivals first: a freshly-fetched title leads the slider
         // so viewers slide right to reach the ones already showing.
@@ -664,7 +665,7 @@ export default function Home() {
   const fetchCrewMembers = async () => {
     const { data, error } = await supabase
       .from('people')
-      .select('*')
+      .select(PUBLIC_PERSON_COLUMNS)
       .not('known_for_department', 'in', '("Acting","Directing","Skit Maker","Unknown")')
       .order('popularity_score', { ascending: false })
       .limit(12);
@@ -835,7 +836,7 @@ export default function Home() {
   const fetchPeople = async () => {
     const { data } = await supabase
       .from('people')
-      .select('*')
+      .select(PUBLIC_PERSON_COLUMNS)
       .eq('is_spotlight', true)
       .order('popularity_score', { ascending: false })
       .limit(4);
@@ -849,7 +850,7 @@ export default function Home() {
   const fetchCreators = async () => {
     const { data } = await supabase
       .from('people')
-      .select('*')
+      .select(PUBLIC_PERSON_COLUMNS)
       .eq('is_spotlight', true)
       .or('youtube_handle.neq.null,youtube_handle.neq."",youtube_channel_id.neq.null,youtube_channel_id.neq.""')
       .order('popularity_score', { ascending: false })
