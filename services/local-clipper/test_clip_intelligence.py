@@ -18,6 +18,46 @@ def _load(name: str):
 
 transcribe = _load("transcribe")
 scene_snap = _load("scene_snap")
+caption_quality = _load("caption_quality")
+
+
+class CaptionQualityTests(unittest.TestCase):
+    """Thresholds are pinned to the two films they were measured on."""
+
+    # Shape of the real Omije track: markers and fragments, barely any speech.
+    OMIJE = " ".join(
+        f"[{i:02d}:00] [music] >> {'Hey.' if i % 2 else 'Okay.'} [music]" for i in range(0, 70)
+    )
+    # Shape of the real Hollow Vows track: continuous dialogue.
+    HOLLOW = " ".join(
+        f"[{i // 60:02d}:{i % 60:02d}] I told you this marriage was never going to survive the "
+        f"things we buried together." for i in range(0, 140)
+    )
+
+    def test_rejects_the_yoruba_auto_caption_track(self):
+        result = caption_quality.assess_captions(self.OMIJE, 4220)
+        self.assertFalse(result["usable"])
+        self.assertLess(result["words_per_minute"], caption_quality.MIN_WORDS_PER_MINUTE)
+
+    def test_accepts_a_real_english_dialogue_track(self):
+        result = caption_quality.assess_captions(self.HOLLOW, 8657)
+        self.assertTrue(result["usable"], result["reason"])
+
+    def test_music_markers_never_count_as_speech(self):
+        result = caption_quality.assess_captions("[00:00] [music] [music] [music] [10:00] [music]", 1200)
+        self.assertEqual(result["real_words"], 0)
+        self.assertFalse(result["usable"])
+
+    def test_empty_transcript_is_unusable(self):
+        self.assertFalse(caption_quality.assess_captions("", 3600)["usable"])
+
+    def test_rate_uses_the_span_the_timestamps_cover(self):
+        # Truncated at the character cap: 2 minutes of dense speech out of a
+        # 2-hour film must not be judged against the full runtime.
+        dense = " ".join(f"[00:{i:02d}] the quick brown fox jumped over the lazy dog again" for i in range(0, 60))
+        result = caption_quality.assess_captions(dense, 7200)
+        self.assertLessEqual(result["covered_minutes"], 2.0)
+        self.assertTrue(result["usable"], result["reason"])
 
 
 class TranscriptionWindowTests(unittest.TestCase):

@@ -31,6 +31,7 @@ import sys as _sys
 if str(Path(__file__).resolve().parent) not in _sys.path:
     _sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import caption_quality
 import scene_snap
 import transcribe as transcribe_mod
 from fastapi.middleware.cors import CORSMiddleware
@@ -366,6 +367,20 @@ def metadata(payload: MetadataRequest):
     duration_seconds = float(info.get("duration") or 0)
     transcript_source = "captions" if transcript else "none"
     transcribed_windows: list[dict] = []
+    caption_report: dict | None = None
+
+    # A caption track existing is not the same as it being usable. YouTube
+    # auto-captions a Yoruba film as English and returns mostly `[music]` and
+    # fragments; handing that to the clip picker is worse than handing it
+    # nothing, and it also suppressed the transcription fallback.
+    if transcript:
+        caption_report = caption_quality.assess_captions(transcript, duration_seconds)
+        if not caption_report["usable"]:
+            print(f"[Clipper] Discarding caption track: {caption_report['reason']} "
+                  f"({caption_report['real_words']} words, {caption_report['markers']} markers "
+                  f"over {caption_report['covered_minutes']} min).")
+            transcript = ""
+            transcript_source = "captions_unusable"
 
     # No captions means the picker would otherwise be asked to guess a scene
     # from the synopsis alone. Transcribe a bounded set of windows instead.
@@ -403,6 +418,7 @@ def metadata(payload: MetadataRequest):
         "description": desc,
         "transcript": transcript,
         "transcript_source": transcript_source,
+        "caption_quality": caption_report,
         "transcribed_windows": transcribed_windows,
         "chapters": chapters,
         "heatmap_peaks": heatmap_peaks,
