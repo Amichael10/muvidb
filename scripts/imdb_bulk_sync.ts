@@ -51,6 +51,14 @@ const MAX_SEARCH_PAGES = Number(args[args.indexOf('--max-pages') + 1]) || 6;
 /** Films with fewer than this many credits are candidates for --from-db. */
 const MAX_CREDITS = Number(args[args.indexOf('--max-credits') + 1]) || 8;
 const ENRICH_PEOPLE = !args.includes('--skip-people-pages');
+/** Restrict --from-db to films that carry a box office figure. These are
+ *  verified theatrical releases, so the usual year ceiling doesn't apply —
+ *  a 2026 cinema title is exactly the kind of row worth completing. */
+const BOX_OFFICE_ONLY = args.includes('--box-office');
+/** Specific films by slug, bypassing the batch ranking entirely. */
+const SLUGS = args.includes('--slugs')
+  ? String(args[args.indexOf('--slugs') + 1] || '').split(',').map((s) => s.trim()).filter(Boolean)
+  : [];
 const ID_LIST = args.includes('--ids')
   ? String(args[args.indexOf('--ids') + 1] || '')
       .split(',')
@@ -96,6 +104,8 @@ type FilmMeta = {
   /** IMDb aggregate rating 0–10 (official score only — no user review text). */
   rating: number | null;
   voteCount: number | null;
+  /** ISO country codes from IMDb's "Country of origin", lower-cased. */
+  originCountries: string[];
   cast: Array<{ name: string; character: string | null; img: string | null; imdbUrl: string | null }>;
   directors: Array<{ name: string; imdbUrl: string | null }>;
   /** Extra crew from /fullcredits/ (producers, designers, etc.) */
@@ -356,6 +366,16 @@ function parseFilmFromHtml(html: string, fallbackTitle: string): FilmMeta {
     }
   }
 
+  // "Country of origin" links carry the ISO code in the query string, e.g.
+  // /search/title/?country_of_origin=NG — the most reliable origin signal on
+  // the page, and the only thing that can tell a Nollywood title apart from a
+  // same-named Hollywood one.
+  const originCountries: string[] = [];
+  $('a[href*="country_of_origin="]').each((_i, el) => {
+    const code = (String($(el).attr('href') || '').match(/country_of_origin=([A-Za-z]{2})/) || [])[1];
+    if (code && !originCountries.includes(code.toLowerCase())) originCountries.push(code.toLowerCase());
+  });
+
   return {
     imdbId,
     title: title || fallbackTitle,
@@ -366,6 +386,7 @@ function parseFilmFromHtml(html: string, fallbackTitle: string): FilmMeta {
     genres,
     rating,
     voteCount,
+    originCountries,
     cast,
     directors,
     crew: [],
@@ -424,7 +445,7 @@ function parseFullCredits(html: string, markdown: string): { cast: FilmMeta['cas
     const tag = ((el as any).tagName || (el as any).name || '').toLowerCase();
     if (tag === 'h4' || tag === 'h3' || $(el).hasClass('ipc-title__text')) {
       const mapped = mapCreditsSection($(el).text());
-      if (mapped) currentRole = mapped;
+      currentRole = mapped;
       return;
     }
     if (tag !== 'table' || !currentRole) return;
@@ -451,7 +472,7 @@ function parseFullCredits(html: string, markdown: string): { cast: FilmMeta['cas
       if (!line) continue;
       const header = line.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim();
       const mapped = mapCreditsSection(header);
-      if (mapped && line.length < 80) {
+      if (/^#+\s*/.test(line) && line.length < 80) {
         role = mapped;
         continue;
       }
@@ -470,7 +491,7 @@ function parseFullCredits(html: string, markdown: string): { cast: FilmMeta['cas
       // Plain name line under a section (no link)
       if (
         /^[A-ZÀ-ÖØ-öø-ÿ][\w.'’\- ]{1,60}$/.test(line)
-        && !/^(?:edit|suggest an edit|clear all|see all|contribute|learn more|add missing.*)$/i.test(line.trim())
+        && !/^(?:edit|suggest an edit|clear all|see all|contribute|learn more|add missing.*|rest of cast.*|you have no recently viewed pages)$/i.test(line.trim())
       ) {
         push(line, role, null, null);
       }
@@ -673,6 +694,10 @@ function filmPatch(existing: any, imdb: FilmMeta) {
   if (imdb.imdbId && existing.imdb_id !== imdb.imdbId) patch.imdb_id = imdb.imdbId;
   if (imdb.rating != null && existing.imdb_rating !== imdb.rating) patch.imdb_rating = imdb.rating;
   if (imdb.voteCount != null && existing.imdb_vote_count !== imdb.voteCount) patch.imdb_vote_count = imdb.voteCount;
+  const originCountries = imdb.originCountries.map(code => new Intl.DisplayNames(['en'], { type: 'region' }).of(code.toUpperCase())).filter(Boolean);
+  if (originCountries.length && (!existing.countries?.length || (existing.countries.length === 1 && existing.countries[0] === 'Nigeria' && !imdb.originCountries.includes('ng')))) {
+    patch.countries = originCountries;
+  }
 
   if (ours >= theirs + 10 && !isJunkSynopsis(existing.synopsis) && textLen(existing.synopsis) >= 120 && existing.poster_url) {
     return { patch, skip: true };
@@ -784,6 +809,14 @@ function normTitle(s: string) {
     .trim();
 }
 
+/** ISO codes used to confirm an IMDb match is actually an African title. */
+const AFRICAN_COUNTRY_CODES = new Set([
+  'ng', 'gh', 'za', 'ke', 'tz', 'ug', 'rw', 'bi', 'sn', 'ci', 'cm', 'et', 'er', 'dj', 'so', 'ss', 'sd',
+  'zw', 'zm', 'mw', 'mz', 'ao', 'bj', 'bf', 'td', 'cg', 'cd', 'cf', 'ga', 'gq', 'gw', 'gn', 'gm', 'sl',
+  'lr', 'tg', 'ml', 'ne', 'mr', 'bw', 'na', 'ls', 'sz', 'mg', 'mu', 'sc', 'km', 'cv', 'st', 'eg', 'ma',
+  'dz', 'tn', 'ly',
+]);
+
 function isJunkImdbCandidateTitle(title: string) {
   const t = title.toLowerCase();
   if (
@@ -806,14 +839,19 @@ async function collectThinFilmsFromDb(limit: number, maxCredits: number, doneIds
   ]);
 
   while (candidates.length < limit * 4) {
-    const { data: films, error } = await supabase
+    let query = supabase
       .from('films')
-      .select('id,title,year,imdb_id,synopsis,poster_url,is_published,status,source')
-      .eq('is_published', true)
-      .lte('year', 2024)
-      .gte('year', 1985)
-      .order('year', { ascending: true })
-      .range(from, from + pageSize - 1);
+      .select('id,title,year,imdb_id,synopsis,poster_url,is_published,status,source,source_video_id,box_office_domestic');
+
+    if (BOX_OFFICE_ONLY) {
+      // A recorded gross is itself the quality signal, so the published/year
+      // gates that keep the general sweep sane are not needed here.
+      query = query.not('box_office_domestic', 'is', null).order('box_office_domestic', { ascending: false });
+    } else {
+      query = query.eq('is_published', true).lte('year', 2024).gte('year', 1985).order('year', { ascending: true });
+    }
+
+    const { data: films, error } = await query.range(from, from + pageSize - 1);
     if (error) throw error;
     if (!films?.length) break;
 
@@ -834,9 +872,14 @@ async function collectThinFilmsFromDb(limit: number, maxCredits: number, doneIds
       const title = (f.title || '').trim();
       if (title.length < 2) continue;
       if (isJunkImdbCandidateTitle(title)) continue;
+      // A YouTube upload was never on IMDb, so any id matched for one is wrong
+      // by construction. Never hand those rows to the scraper.
+      if (BOX_OFFICE_ONLY && (f.source_video_id || /youtube/i.test(String(f.source || '')))) continue;
       if (!f.imdb_id && !f.year) continue;
       // Most brand-new YouTube-year rows aren't on IMDb with usable credits yet.
-      if (!f.imdb_id && f.year && f.year >= 2026) continue;
+      // A theatrical release with a recorded gross gets the benefit of the
+      // doubt — the empty-page guard still refuses to stamp a bad imdb_id.
+      if (!BOX_OFFICE_ONLY && !f.imdb_id && f.year && f.year >= 2026) continue;
 
       let score = 0;
       if (f.imdb_id) score += 1000;
@@ -948,7 +991,6 @@ async function upsertFilm(meta: FilmMeta, cp: Checkpoint, forceFilmId?: string) 
 
   if (existing) {
     const { patch, skip } = filmPatch(existing, meta);
-    if (!existing.countries?.length) patch.countries = ['Nigeria'];
     const ratingOnly =
       Object.keys(patch).every((k) => ['imdb_id', 'imdb_rating', 'imdb_vote_count', 'countries'].includes(k));
     if (skip && Object.keys(patch).length === 0) {
@@ -1004,7 +1046,7 @@ async function upsertFilm(meta: FilmMeta, cp: Checkpoint, forceFilmId?: string) 
       synopsis: meta.synopsis,
       poster_url: upgradeImdbImage(meta.posterUrl),
       genres: meta.genres.length ? meta.genres : null,
-      countries: ['Nigeria'],
+      countries: meta.originCountries.map(code => new Intl.DisplayNames(['en'], { type: 'region' }).of(code.toUpperCase())).filter(Boolean),
       imdb_id: meta.imdbId,
       imdb_rating: meta.rating,
       imdb_vote_count: meta.voteCount,
@@ -1049,7 +1091,7 @@ async function upsertPerson(
           slug,
           photo_url: photo,
           source: 'imdb',
-          nationality: 'Nigerian',
+          nationality: null,
           known_for_department: role === 'director' ? 'Directing' : 'Acting',
           needs_review: false,
           is_verified: true,
@@ -1120,6 +1162,30 @@ async function main() {
       title: id,
       url: `https://www.imdb.com/title/${id}/`,
     }));
+  } else if (SLUGS.length) {
+    // Name the films outright. The batch selector ranks by gross and credit
+    // count, so a specific title you care about can sit below the cut run
+    // after run — this skips the ranking entirely and binds each queue item to
+    // its existing row, so credits cannot land on a same-named duplicate.
+    const { data, error } = await supabase
+      .from('films')
+      .select('id,title,year,imdb_id,source,source_video_id')
+      .in('slug', SLUGS);
+    if (error) throw error;
+
+    const targets: DbFilmTarget[] = [];
+    for (const row of data || []) {
+      if (row.source_video_id || /youtube/i.test(String(row.source || ''))) {
+        console.warn(`  ⚠️  skipping "${row.title}" — YouTube-origin rows were never on IMDb`);
+        continue;
+      }
+      targets.push({ id: row.id, title: row.title, year: row.year, imdb_id: row.imdb_id, creditCount: 0 });
+    }
+    const missing = SLUGS.length - (data || []).length;
+    if (missing > 0) console.warn(`  ⚠️  ${missing} slug(s) not found`);
+    console.log(`\n🎯 ${targets.length} film(s) named by slug`);
+    links = await resolveDbTargetsToQueue(targets, cp);
+    saveCheckpoint(cp);
   } else if (FROM_DB) {
     const doneIds = new Set(cp.doneFilmIds);
     const targets = await collectThinFilmsFromDb(MAX_FILMS, MAX_CREDITS, doneIds);
@@ -1166,6 +1232,17 @@ async function main() {
       // From-db search can latch onto empty/wrong IMDb pages — don't stamp a bad imdb_id.
       if (item.forceFilmId && creditHits === 0 && meta.rating == null) {
         console.log(`   ✗ empty IMDb page — skip (no cast/rating)`);
+        cp.stats.filmsUnmatched++;
+        if (item.forceFilmId) cp.doneFilmIds.push(item.forceFilmId);
+        continue;
+      }
+
+      // Title search is blind to origin, so "Call of Duty" or "Mission:
+      // Impossible" sitting in the catalogue will happily match the real
+      // Hollywood record. Refuse to write a title IMDb says is from nowhere
+      // in Africa — a wrong cast list is far worse than a missing one.
+      if (BOX_OFFICE_ONLY && meta.originCountries.length && !meta.originCountries.some((c) => AFRICAN_COUNTRY_CODES.has(c))) {
+        console.log(`   ✗ origin ${meta.originCountries.join('/')} — not African, skip`);
         cp.stats.filmsUnmatched++;
         if (item.forceFilmId) cp.doneFilmIds.push(item.forceFilmId);
         continue;

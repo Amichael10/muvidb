@@ -48,10 +48,18 @@ export type AICopyVariation = {
   key: 'A' | 'B' | 'C';
   label: 'Career Story' | 'Why Now' | 'Discovery' | 'Informative' | 'Editorial' | 'Conversational' | string;
   captions: PlatformCaptions;
+  graphic?: {
+    eyebrow: string;
+    headline: string;
+    supportLine: string;
+    contextLine: string;
+    evidenceLine?: string;
+  };
 };
 
 export type AICopyResponse = {
   success: boolean;
+  reason?: string;
   variations: AICopyVariation[];
   selectedVariation: 'A' | 'B' | 'C';
   instagram: string;
@@ -94,13 +102,14 @@ Goal: A precise release announcement, never a streaming claim.
     return `
 CONTENT TYPE: WHERE TO WATCH / STREAMING ALERT
 Goal: Utility-first discovery.
-- Lead with the film title and viewing destination immediately.
-- The first two lines MUST answer: 1. What film? 2. Where can I watch it?
+- The exact first line MUST be: "Now streaming on [verified platform or channel]."
+- Put the film title and editorial body in the following paragraph.
 - Then optionally use synopsis or cast details to give the reader a concrete reason to care.
 - Do NOT call a film "new" unless explicitly indicated in data.
 - Example structure:
-  Now streaming: [Film Title] 📺
-  You can currently watch [Film Title] on [Platform].
+  Now streaming on [Platform].
+
+  [Film Title] [factual, spoiler-free reason to watch].
   Starring [selected cast names without @ handles].
   [1 factual sentence about the premise].
   Have you seen it already, or is this going on your watchlist?
@@ -110,18 +119,13 @@ Goal: Utility-first discovery.
 
   if (seriesSlug.includes('critic') || seriesSlug === 'critics_say' || seriesSlug === 'the_critic') {
     return `
-CONTENT TYPE: WHAT THE CRITICS SAY
-Goal: Frame the critical observation, debate, or review without marketing fluff.
-- The critic's perspective is the subject. Do NOT turn criticism into promotional marketing copy.
-- Accurately represent praise and criticisms from the data.
-- Attribute the opinion clearly to the reviewer/publication.
-- Example structure:
-  What the critics are saying about [Film Title].
-  [Critic/Pub] describes the film as "[short quote/paraphrase]".
-  Their review highlights [theme/performance].
-  Have you seen the film? Did you come away with the same impression?
-  Read more critic reviews on MuviDB.
-  #MuviDB #AfricanCinema #[FilmTitle]`;
+CONTENT TYPE: THE CRITIC'S TAKE
+Goal: Surface an exact, clearly attributed critical observation and send readers to its original source.
+- Start with the supplied quote verbatim. Never paraphrase, shorten, combine, or improve text inside quotation marks.
+- Attribute it to the critic and publication.
+- Link readers to the critic/publication for the full review; never say the full review is on MuviDB.
+- A rating may appear only when explicitly supplied and must never replace the critic's idea.
+- Ask whether the audience agrees or disagrees with the take.`;
   }
 
   if (isPerson || seriesSlug.includes('behind') || seriesSlug === 'behind_the_camera' || seriesSlug.includes('filmography') || seriesSlug === 'you_know_the_face' || seriesSlug.includes('spotlight') || seriesSlug.includes('actor') || seriesSlug.includes('craft')) {
@@ -194,6 +198,85 @@ Goal: Make someone want to reply with an authentic opinion. NOT promotional.
   #MuviDB #AfricanCinema #[FilmTitle]`;
 }
 
+/** A distinct editorial job for every recurring MuviDB series. */
+function getSeriesStoryContract(seriesSlug: string): string {
+  const slug = seriesSlug.toLowerCase().replace(/-/g, '_');
+  const contracts: Record<string, string> = {
+    behind_the_camera: `STORY CONTRACT — BEHIND THE CAMERA
+- Subject: a specific creative decision or craft contribution, not a résumé.
+- Story movement: name the maker → identify the work → explain what their craft changes for the audience.
+- Graphic: maker's name + craft-led thesis. Credits belong only in a small evidence line.`,
+    film_conversation: `STORY CONTRACT — FILM CONVERSATION
+- Subject: one defensible tension, choice, theme, or unresolved question inside the film.
+- Story movement: establish the dilemma → offer two credible readings → invite a specific opinion.
+- Graphic: the question is the headline. Do not use “What did you think?” as the main idea.`,
+    muvidb_by_the_numbers: `STORY CONTRACT — MUVIDB BY THE NUMBERS
+- Subject: what a verified pattern reveals about African screen culture.
+- Story movement: lead with the finding → explain the comparison/context → state why it matters.
+- Graphic: a number may lead only here, but it must be paired with its meaning, scope, and timeframe.`,
+    by_the_numbers: `STORY CONTRACT — MUVIDB BY THE NUMBERS
+- Subject: what a verified pattern reveals about African screen culture.
+- Story movement: lead with the finding → explain the comparison/context → state why it matters.
+- Graphic: a number may lead only here, but it must be paired with its meaning, scope, and timeframe.`,
+    new_and_upcoming: `STORY CONTRACT — NEW & UPCOMING
+- Subject: the specific promise of an upcoming film, not generic anticipation.
+- Story movement: title/release context → premise or creative reason to notice → verified date/status.
+- Graphic: title and premise hook dominate; date/status is utility text, never the emotional headline.`,
+    new_upcoming: `STORY CONTRACT — NEW & UPCOMING
+- Subject: the specific promise of an upcoming film, not generic anticipation.
+- Story movement: title/release context → premise or creative reason to notice → verified date/status.
+- Graphic: title and premise hook dominate; date/status is utility text, never the emotional headline.`,
+    one_film_two_takes: `STORY CONTRACT — ONE FILM, TWO TAKES
+- Subject: a genuine critical disagreement about the same film.
+- Story movement: shared point of reference → Take One → Take Two → precise audience question.
+- Graphic: two short contrasting interpretations; never fabricate a second view when only one is supplied.`,
+    stage_to_screen: `STORY CONTRACT — STAGE TO SCREEN
+- Subject: what changes when a story crosses between theatre and film.
+- Story movement: identify both versions → compare one meaningful adaptation choice → explain its effect.
+- Graphic: transformation or contrast is the headline; “stage and film” is only a label.`,
+    the_critic: `STORY CONTRACT — THE CRITIC
+- Subject: the critic's way of seeing cinema, not their follower count or review total.
+- Story movement: introduce the critical voice → identify a recurring lens or concern → show it through one verified review.
+- Graphic: critic's name + critical perspective. Metrics are supporting evidence only.`,
+    critic_spotlight: `STORY CONTRACT — THE CRITIC
+- Subject: the critic's way of seeing cinema, not their follower count or review total.
+- Story movement: introduce the critical voice → identify a recurring lens or concern → show it through one verified review.
+- Graphic: critic's name + critical perspective. Metrics are supporting evidence only.`,
+    filmography: `STORY CONTRACT — THE FILMOGRAPHY
+- Subject: the shape, progression, range, or longevity of a career.
+- Story movement: human career thesis → 2–3 representative works as evidence → why the body of work matters.
+- Graphic: person's name + career thesis + roles. Credit count is tiny evidence, never the headline.`,
+    weekend_watchlist: `STORY CONTRACT — WEEKEND WATCHLIST
+- Subject: why this film suits a particular weekend mood or viewer.
+- Story movement: viewing mood → spoiler-free premise → where to watch → taste-based question.
+- Graphic: title + one specific viewing promise; availability remains secondary utility text.`,
+    critics_say: `STORY CONTRACT — THE CRITIC'S TAKE
+- Subject: one exact, clearly attributed critical claim about the film.
+- Story movement: verbatim quote → source attribution → outbound full-review direction → agree/disagree question.
+- Graphic: the verified quote + attribution. Never paraphrase it and never make the rating the headline.`,
+    whats_on_stage: `STORY CONTRACT — WHAT'S ON STAGE
+- Subject: why the live production is worth leaving home for.
+- Story movement: dramatic premise or theatrical draw → venue/date utility → audience invitation.
+- Graphic: production title + live-experience hook; venue and dates are compact supporting details.`,
+    on_stage: `STORY CONTRACT — WHAT'S ON STAGE
+- Subject: why the live production is worth leaving home for.
+- Story movement: dramatic premise or theatrical draw → venue/date utility → audience invitation.
+- Graphic: production title + live-experience hook; venue and dates are compact supporting details.`,
+    where_to_watch: `STORY CONTRACT — WHERE TO WATCH
+- Subject: useful discovery with a reason to press play.
+- Story movement: title + exact verified destination → spoiler-free reason to watch → availability caveat if needed.
+- Graphic: film title and platform are immediately legible; the premise hook prevents it becoming a directory listing.`,
+    you_know_the_face: `STORY CONTRACT — YOU KNOW THE FACE
+- Subject: recognition—connecting a familiar face to the roles and projects audiences remember.
+- Story movement: recognition hook → 2–3 carefully chosen credits → reveal/name the performer → invite memory.
+- Graphic: face and name dominate; do not lead with a credit count or generic “actor spotlight”.`,
+  };
+  return contracts[slug] || `STORY CONTRACT — EDITORIAL FEATURE
+- Find one human, cultural, critical, or craft-led idea in the verified facts.
+- Build a beginning, development, and payoff around that idea.
+- Metadata supports the story; it is not the story.`;
+}
+
 /**
  * Returns instructions for the chosen editorial angle
  */
@@ -231,7 +314,7 @@ function getAngleInstructions(angle: SocialAngle): string {
 function buildMuviDBPrompt(req: AICopyRequest): string {
   const { candidate, series, angle = 'streaming_alert' } = req;
   const data = candidate.data || {};
-  const isPerson = candidate.type === 'person';
+  const isPerson = candidate.type === 'person' || candidate.type === 'critic';
   const seriesSlug = series?.slug || '';
   const seriesName = series?.name || 'African Cinema Spotlight';
 
@@ -261,8 +344,9 @@ function buildMuviDBPrompt(req: AICopyRequest): string {
   const venue = data.venue || '';
 
   const contentTypeRules = getContentTypeInstructions(seriesSlug, isPerson);
+  const storyContract = getSeriesStoryContract(seriesSlug);
   const angleRules = getAngleInstructions(angle);
-  const captionVault = selectCaptionBankStarters({ seriesSlug, candidate, limit: 8 });
+  const captionVault = selectCaptionBankStarters({ seriesSlug, candidate, limit: 3 });
   const captionVaultExamples = captionVault.starters.length
     ? captionVault.starters.map((starter, index) => `${index + 1}. ${starter}`).join('\n')
     : 'No fully verifiable starter is available for this candidate. Write directly from source data.';
@@ -311,6 +395,8 @@ CORE RULES:
 
 ${contentTypeRules}
 
+${storyContract}
+
 ${angleRules}
 
 APPROVED MUVIDB COPY VAULT STRUCTURES (${captionVault.category}):
@@ -348,6 +434,7 @@ For EACH variation, provide tailored text for:
 - "threads": Punchy, conversation-first post strictly under 480 characters.
 - "facebook": Engaging storytelling paragraph with watch info and community discussion question.
 - "tiktok": Concise hook with key details and hashtags for video/slides.
+- "graphic": The exact concise on-image hierarchy. The headline must carry the editorial idea, not merely repeat a number, date, rating, platform, job title, or credit count.
 
 OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema without markdown code blocks outside:
 {
@@ -360,7 +447,8 @@ OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema without mark
         "threads": "...",
         "facebook": "...",
         "tiktok": "..."
-      }
+      },
+      "graphic": { "eyebrow": "...", "headline": "...", "supportLine": "...", "contextLine": "...", "evidenceLine": "..." }
     },
     {
       "key": "B",
@@ -370,7 +458,8 @@ OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema without mark
         "threads": "...",
         "facebook": "...",
         "tiktok": "..."
-      }
+      },
+      "graphic": { "eyebrow": "...", "headline": "...", "supportLine": "...", "contextLine": "...", "evidenceLine": "..." }
     },
     {
       "key": "C",
@@ -380,7 +469,103 @@ OUTPUT FORMAT: Return ONLY a valid JSON object matching this schema without mark
         "threads": "...",
         "facebook": "...",
         "tiktok": "..."
-      }
+      },
+      "graphic": { "eyebrow": "...", "headline": "...", "supportLine": "...", "contextLine": "...", "evidenceLine": "..." }
+    }
+  ]
+}`;
+}
+
+function parseVariations(parsed: any, defaultLabels: string[]): AICopyVariation[] {
+  if (Array.isArray(parsed?.variations) && parsed.variations.length > 0) {
+    return parsed.variations.map((v: any, i: number) => ({
+      key: (v.key || ['A', 'B', 'C'][i] || 'A') as 'A' | 'B' | 'C',
+      label: String(v.label || defaultLabels[i] || defaultLabels[0]),
+      captions: {
+        instagram: v.captions?.instagram || v.instagram || '',
+        threads: v.captions?.threads || v.threads || '',
+        facebook: v.captions?.facebook || v.facebook || '',
+        tiktok: v.captions?.tiktok || v.tiktok || '',
+      },
+      graphic: v.graphic ? {
+        eyebrow: String(v.graphic.eyebrow || ''),
+        headline: String(v.graphic.headline || ''),
+        supportLine: String(v.graphic.supportLine || ''),
+        contextLine: String(v.graphic.contextLine || ''),
+        evidenceLine: v.graphic.evidenceLine ? String(v.graphic.evidenceLine) : undefined,
+      } : undefined,
+    }));
+  }
+
+  if (parsed?.variationA || parsed?.variationB || parsed?.variationC) {
+    const map = [
+      { key: 'A' as const, label: defaultLabels[0], raw: parsed.variationA },
+      { key: 'B' as const, label: defaultLabels[1], raw: parsed.variationB },
+      { key: 'C' as const, label: defaultLabels[2], raw: parsed.variationC },
+    ];
+    return map.filter(m => m.raw).map(m => ({
+      key: m.key,
+      label: m.label,
+      captions: {
+        instagram: m.raw.instagram || '',
+        threads: m.raw.threads || '',
+        facebook: m.raw.facebook || '',
+        tiktok: m.raw.tiktok || '',
+      },
+      graphic: m.raw.graphic,
+    }));
+  }
+
+  if (parsed?.instagram || parsed?.threads) {
+    return [{
+      key: 'A',
+      label: defaultLabels[0],
+      captions: {
+        instagram: parsed.instagram || '',
+        threads: parsed.threads || '',
+        facebook: parsed.facebook || '',
+        tiktok: parsed.tiktok || '',
+      },
+      graphic: parsed.graphic,
+    }];
+  }
+  return [];
+}
+
+function buildGeminiEditorialReviewPrompt(req: AICopyRequest, cohereDraft: AICopyVariation[]): string {
+  const seriesSlug = req.series?.slug || '';
+  return `You are the senior editor at MuviDB. Cohere has submitted first drafts. Edit them; do not merely score them.
+
+${getSeriesStoryContract(seriesSlug)}
+
+NON-NEGOTIABLE EDIT:
+1. Use only facts present in SOURCE CANDIDATE. Delete every unsupported claim.
+2. The story must be a human, creative, cultural, critical, thematic, or utility-led idea—not a database row rewritten as prose.
+3. A number, rating, credit count, release date, platform, venue, or job title may lead only when the series contract explicitly requires it. Otherwise demote it to evidence or utility text.
+4. Reject generic openings, empty praise, promotional hype, résumé dumps, synopsis dumps, and questions that could apply to any film.
+5. Every Instagram/Facebook draft needs a clear hook, developed observation, MuviDB discovery CTA, and a specific answerable question.
+6. Keep platform versions genuinely adapted. Preserve lifecycle and availability exactly.
+7. On-graphic copy must be concise: eyebrow, editorial headline, one support line, one context line, optional evidence line.
+8. For The Filmography, model the hierarchy as: PERSON NAME → career thesis → roles → quiet documented-credit evidence.
+9. Keep each Instagram caption under 180 words, Facebook under 140 words, Threads under 350 characters, and TikTok under 220 characters. Keep graphic headlines under 9 words.
+
+SOURCE CANDIDATE:
+${JSON.stringify(req.candidate)}
+
+SERIES:
+${JSON.stringify(req.series || {})}
+
+COHERE DRAFTS:
+${JSON.stringify(cohereDraft)}
+
+Return ONLY valid JSON:
+{
+  "variations": [
+    {
+      "key": "A|B|C",
+      "label": "...",
+      "captions": { "instagram": "...", "threads": "...", "facebook": "...", "tiktok": "..." },
+      "graphic": { "eyebrow": "...", "headline": "...", "supportLine": "...", "contextLine": "...", "evidenceLine": "..." }
     }
   ]
 }`;
@@ -414,12 +599,21 @@ function appendBeforeHashtags(text: string, additions: string[], limit: number):
 function applyVerifiedMovieAttribution(req: AICopyRequest, variations: AICopyVariation[]): AICopyVariation[] {
   const data = req.candidate.data || {};
   const channelName = String(data.youtubeChannelName || '').trim();
+  const seriesSlug = String(req.series?.slug || '').toLowerCase().replace(/-/g, '_');
+  const destination = channelName || String(data.platformDisplayName || '').trim();
 
   return variations.map(variation => {
     const captions = { ...variation.captions };
     for (const platform of Object.keys(captions) as Array<keyof PlatformCaptions>) {
       const additions: string[] = [];
       captions[platform] = namesOnlyCaption(captions[platform], data);
+      if (seriesSlug === 'where_to_watch' && destination) {
+        const firstLine = `Now streaming on ${destination}.`;
+        captions[platform] = `${firstLine}\n\n${captions[platform]
+          .replace(/^Now streaming[^\n]*\n*/i, '')
+          .replace(/^Looking for something to watch\?\s*/i, '')
+          .trim()}`;
+      }
       if (channelName && !captions[platform].toLowerCase().includes(channelName.toLowerCase())) {
         additions.push(`Watch on YouTube via ${channelName}.`);
       }
@@ -437,6 +631,41 @@ function applyVerifiedMovieAttribution(req: AICopyRequest, variations: AICopyVar
     }
     return { ...variation, captions };
   });
+}
+
+function buildCriticTakeVariations(req: AICopyRequest): AICopyVariation[] {
+  const data = req.candidate.data || {};
+  const review = data.criticReview || data;
+  const quote = String(review.quote || '').trim().replace(/^[“"]|[”"]$/g, '');
+  const critic = String(review.criticName || review.critic_name || 'The critic').trim();
+  const publication = String(review.publication || '').trim();
+  const handle = String(review.socialHandle || review.social_handle || '').trim();
+  const reviewType = String(review.reviewType || review.review_type || 'article');
+  const source = handle || publication || critic;
+  const action = reviewType === 'video' ? 'Watch' : 'Read';
+  const title = String(req.candidate.name || data.title || 'the film').trim();
+  const cleanTag = title.replace(/[^a-zA-Z0-9]/g, '');
+  const attribution = [critic, publication && publication !== critic ? publication : ''].filter(Boolean).join(', ');
+  const body = `“${quote}”\n\nThat’s one of the standout observations from ${attribution}’s review of ${title}. We pulled this line because it raises an interesting question about the film, but there’s more to the critic’s argument.\n\n${action} the full review on ${source}.\n\nAgree or disagree with this take?`;
+  const captions: PlatformCaptions = {
+    instagram: `${body}\n\n#MuviDB #AfricanCinema #FilmCriticism #${cleanTag}`,
+    threads: body,
+    facebook: body,
+    tiktok: `${body}\n\n#MuviDB #FilmTok #${cleanTag}`,
+  };
+  const labels = ['Informative', 'Editorial', 'Conversational'];
+  return (['A', 'B', 'C'] as const).map((key, index) => ({
+    key,
+    label: labels[index],
+    captions: { ...captions },
+    graphic: {
+      eyebrow: 'THE CRITIC’S TAKE',
+      headline: quote,
+      supportLine: critic,
+      contextLine: publication || 'Film Critic',
+      evidenceLine: `FULL REVIEW → ${source}`,
+    },
+  }));
 }
 
 /**
@@ -718,7 +947,7 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
     if (allCaptions.some(caption => !caption.toLowerCase().includes(normalizedPlatform))) return false;
   }
   if (youtubeChannelName && allCaptions.some(caption => !caption.toLowerCase().includes(youtubeChannelName.toLowerCase()))) return false;
-  if (allCaptions.some(caption => /(^|\s)@[a-zA-Z0-9._]+/.test(caption))) return false;
+  if (seriesSlug !== 'critics_say' && allCaptions.some(caption => /(^|\s)@[a-zA-Z0-9._]+/.test(caption))) return false;
   return true;
 }
 
@@ -726,66 +955,69 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
  * Generates 3 intelligent, brand-aligned copy variations using Cohere / AI fallback
  */
 export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResponse> {
-  const preferred = req.preferredProvider || 'cohere';
-  const isPerson = req.candidate?.type === 'person';
+  const seriesSlug = String(req.series?.slug || '').toLowerCase().replace(/-/g, '_');
+  const data = req.candidate?.data || {};
+  if (seriesSlug === 'critics_say') {
+    const quote = String(data?.criticReview?.quote || data?.quote || '').trim();
+    if (!quote) {
+      return { success: false, reason: 'The Critic’s Take requires a verified verbatim review excerpt.', variations: [], selectedVariation: 'A', instagram: '', threads: '', facebook: '', tiktok: '', engine: 'muvidb_exact_quote_guard' };
+    }
+    const variations = buildCriticTakeVariations(req);
+    const primary = variations[1].captions;
+    return { success: true, variations, selectedVariation: 'B', ...primary, engine: 'muvidb_exact_quote_template' };
+  }
+  if (seriesSlug === 'one_film_two_takes' && (!Array.isArray(data.criticReviews) || data.criticReviews.length < 2)) {
+    return {
+      success: false,
+      reason: 'One Film, Two Takes requires two distinct verified reviews or audience perspectives.',
+      variations: [], selectedVariation: 'A', instagram: '', threads: '', facebook: '', tiktok: '',
+      engine: 'muvidb_editorial_guard',
+    };
+  }
+  if (seriesSlug === 'stage_to_screen' && !(data.stageVersion && data.screenVersion)) {
+    return {
+      success: false,
+      reason: 'Stage To Screen requires a verified relationship between a stage production and a screen adaptation.',
+      variations: [], selectedVariation: 'A', instagram: '', threads: '', facebook: '', tiktok: '',
+      engine: 'muvidb_editorial_guard',
+    };
+  }
+
+  const isPerson = req.candidate?.type === 'person' || req.candidate?.type === 'critic';
   const defaultLabels = isPerson
     ? ['Career Story', 'Why Now', 'Discovery']
     : ['Informative', 'Editorial', 'Conversational'];
 
   try {
     const prompt = buildMuviDBPrompt(req);
-    const aiRes = await withGenerationTimeout(
-      generateAIContent(prompt, { preferredProvider: preferred }),
-      25_000,
+    // Pass 1 — Cohere is the writer. strictProvider prevents the generic AI
+    // fallback pool from silently replacing it and breaking the requested order.
+    const cohereRes = await withGenerationTimeout(
+      generateAIContent(prompt, { preferredProvider: 'cohere', strictProvider: true }),
+      120_000,
     );
-    const parsed = parseJSON(aiRes.text);
+    const cohereDraft = parseVariations(parseJSON(cohereRes.text), defaultLabels);
+    if (!cohereDraft.length) throw new Error('Cohere returned no usable editorial variations');
 
+    // Pass 2 — Gemini is the editor. It receives the verified source and the
+    // Cohere draft, then returns publishable copy plus explicit graphic copy.
     let variations: AICopyVariation[] = [];
-
-    if (Array.isArray(parsed?.variations) && parsed.variations.length > 0) {
-      variations = parsed.variations.map((v: any, i: number) => ({
-        key: (v.key || ['A', 'B', 'C'][i] || 'A') as 'A' | 'B' | 'C',
-        label: (v.label || defaultLabels[i] || defaultLabels[0]) as string,
-        captions: {
-          instagram: v.captions?.instagram || v.instagram || '',
-          threads: v.captions?.threads || v.threads || '',
-          facebook: v.captions?.facebook || v.facebook || '',
-          tiktok: v.captions?.tiktok || v.tiktok || '',
-        },
-      }));
-    } else if (parsed?.variationA || parsed?.variationB || parsed?.variationC) {
-      const map = [
-        { key: 'A' as const, label: defaultLabels[0], raw: parsed.variationA },
-        { key: 'B' as const, label: defaultLabels[1], raw: parsed.variationB },
-        { key: 'C' as const, label: defaultLabels[2], raw: parsed.variationC },
-      ];
-      variations = map.filter(m => m.raw).map(m => ({
-        key: m.key,
-        label: m.label,
-        captions: {
-          instagram: m.raw.instagram || '',
-          threads: m.raw.threads || '',
-          facebook: m.raw.facebook || '',
-          tiktok: m.raw.tiktok || '',
-        },
-      }));
-    } else if (parsed?.instagram || parsed?.threads) {
-      variations = [
-        {
-          key: 'A',
-          label: defaultLabels[0],
-          captions: {
-            instagram: parsed.instagram || '',
-            threads: parsed.threads || '',
-            facebook: parsed.facebook || '',
-            tiktok: parsed.tiktok || '',
-          },
-        },
-      ];
+    let engine = `${cohereRes.telemetry?.engine || 'cohere'} → gemini`;
+    try {
+      const reviewPrompt = buildGeminiEditorialReviewPrompt(req, cohereDraft);
+      const geminiRes = await withGenerationTimeout(
+        generateAIContent(reviewPrompt, { preferredProvider: 'gemini', strictProvider: true }),
+        120_000,
+      );
+      variations = parseVariations(parseJSON(geminiRes.text), defaultLabels);
+      engine = `${cohereRes.telemetry?.engine || 'cohere'} → ${geminiRes.telemetry?.engine || 'gemini'}`;
+    } catch (reviewErr) {
+      console.warn('[social_copy_ai] Gemini editorial pass failed; retaining grounded Cohere draft:', (reviewErr as Error)?.message);
+      variations = cohereDraft;
+      engine = `${cohereRes.telemetry?.engine || 'cohere'} → gemini_unavailable`;
     }
 
     variations = applyVerifiedMovieAttribution(req, variations);
-
     if (areGeneratedVariationsGrounded(req, variations)) {
       // Default to Variation B (Editorial) if present, else first variation
       const editorialVar = variations.find(v => v.key === 'B') || variations[0];
@@ -798,7 +1030,7 @@ export async function generateAICaptions(req: AICopyRequest): Promise<AICopyResp
         threads: primary.threads,
         facebook: primary.facebook,
         tiktok: primary.tiktok,
-        engine: aiRes.telemetry?.engine || 'cohere',
+        engine,
       };
     }
   } catch (err) {

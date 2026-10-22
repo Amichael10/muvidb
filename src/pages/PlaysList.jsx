@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router';
+import ViewAllLink from '../components/ui/ViewAllLink';
 import { Icon } from '@iconify/react';
 import { fetchPlays, getPlayDateLabel } from '../lib/plays';
 import SEO from '../components/SEO';
@@ -392,13 +393,12 @@ export default function PlaysList() {
                     Currently Running Productions
                   </h2>
                 </div>
-                <button
+                <ViewAllLink
                   onClick={() => setActiveTab('currently_running')}
-                  className="text-xs font-bold text-brand hover:text-brand-hover flex items-center gap-1 transition-colors"
-                >
-                  View all on stage ({counts.currently_running})
-                  <Icon icon="solar:arrow-right-linear" />
-                </button>
+                  total={counts.currently_running}
+                  shown={runningPlays.length}
+                  label={(_remaining, total) => `View all on stage (${total})`}
+                />
               </div>
 
               {runningPlays.length === 0 ? (
@@ -430,13 +430,12 @@ export default function PlaysList() {
                     Upcoming Stage Productions
                   </h2>
                 </div>
-                <button
+                <ViewAllLink
                   onClick={() => setActiveTab('upcoming')}
-                  className="text-xs font-bold text-brand hover:text-brand-hover flex items-center gap-1 transition-colors"
-                >
-                  View all upcoming ({counts.upcoming})
-                  <Icon icon="solar:arrow-right-linear" />
-                </button>
+                  total={counts.upcoming}
+                  shown={upcomingPlays.length}
+                  label={(_remaining, total) => `View all upcoming (${total})`}
+                />
               </div>
 
               {upcomingPlays.length === 0 ? (

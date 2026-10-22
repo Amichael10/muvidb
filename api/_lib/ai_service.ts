@@ -273,7 +273,7 @@ export function parseJSON(text: string) {
  */
 export async function generateAIContent(
   prompt: string,
-  options?: { preferredProvider?: string }
+  options?: { preferredProvider?: string; strictProvider?: boolean }
 ) {
   const providers = [];
 
@@ -382,6 +382,16 @@ export async function generateAIContent(
     }
   } else {
     orderedProviders = providers.sort(() => Math.random() - 0.5);
+  }
+
+  // Editorial review and other ordered multi-model workflows must not silently
+  // substitute another model: doing so would collapse a writer → editor chain
+  // into two calls to whichever provider happened to be available.
+  if (options?.strictProvider && options.preferredProvider) {
+    orderedProviders = orderedProviders.filter(provider => provider.name === options.preferredProvider);
+    if (!orderedProviders.length) {
+      throw new Error(`Requested AI provider is not configured: ${options.preferredProvider}`);
+    }
   }
 
   let lastError = null;

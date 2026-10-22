@@ -35,6 +35,15 @@ describe('editorial candidate strategy', () => {
     expect(rankAndDedupeFilms(films, 'streaming', 10, now).map(f => f.id)).toEqual(['nolli', 'docuth', 'netflix']);
   });
 
+  it('prioritizes a newly uploaded YouTube film using the channel upload date', () => {
+    const october = new Date('2026-10-20T12:00:00.000Z');
+    const films = [
+      { id: 'old-upload', release_date: '2026-10-19', release_type: 'youtube', youtube_published_at: '2026-01-01', poster_url: 'old.jpg' },
+      { id: 'new-upload-old-film', release_date: '2014-01-01', release_type: 'youtube', youtube_published_at: '2026-10-19', poster_url: 'new.jpg' },
+    ];
+    expect(rankAndDedupeFilms(films, 'streaming', 10, october).map(f => f.id)[0]).toBe('new-upload-old-film');
+  });
+
   it('only selects dated future titles for upcoming posts', () => {
     const films = [
       { id: 'future', release_date: '2026-10-01', poster_url: 'x' },
@@ -42,6 +51,17 @@ describe('editorial candidate strategy', () => {
       { id: 'streaming', release_date: '2026-08-01', release_type: 'docuth', poster_url: 'x' },
     ];
     expect(rankAndDedupeFilms(films, 'upcoming', 10, now).map(f => f.id)).toEqual(['future']);
+  });
+
+  it('routes a released YouTube film to streaming instead of upcoming', () => {
+    const releasedYoutube = {
+      id: 'class-character', release_date: '2026-08-28', release_type: 'youtube',
+      youtube_watch_url: 'https://youtube.com/watch?v=example', poster_url: 'poster.jpg',
+    };
+    const october = new Date('2026-10-20T12:00:00.000Z');
+    expect(classifyFilmLifecycle(releasedYoutube, october)).toBe('now_streaming');
+    expect(rankAndDedupeFilms([releasedYoutube], 'upcoming', 10, october)).toEqual([]);
+    expect(rankAndDedupeFilms([releasedYoutube], 'streaming', 10, october)).toHaveLength(1);
   });
 
   it('excludes films whose poster URL is a landscape YouTube thumbnail or banner', () => {

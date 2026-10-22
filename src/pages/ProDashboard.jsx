@@ -10,6 +10,7 @@ import { professionalRoleLabel } from '../lib/professionalRoles';
 import { getProfileProgress } from '../lib/professionalProfile';
 import { formatViewCount } from '../utils/youtube';
 import { fetchPersonStageCredits } from '../lib/plays';
+import ViewAllLink from '../components/ui/ViewAllLink';
 import CreditRequestModal from '../components/professional/CreditRequestModal';
 import ProfileEditorModal from '../components/professional/ProfileEditorModal';
 import CareerPassportModal from '../components/professional/CareerPassportModal';
@@ -1096,13 +1097,13 @@ export default function ProDashboard() {
                     <h3 className="text-sm font-black text-white">Recent Filmography</h3>
                     <p className="text-xs text-zinc-400">Latest productions on your verified record</p>
                   </div>
-                  <button
+                  <ViewAllLink
                     onClick={() => setActiveTab('filmography')}
-                    className="text-xs font-black text-brand hover:underline flex items-center gap-1"
-                  >
-                    <span>View all {credits.length} credits</span>
-                    <Icon icon="solar:arrow-right-linear" width="14" />
-                  </button>
+                    total={credits.length}
+                    shown={4}
+                    className="font-black hover:underline"
+                    label={(_remaining, total) => `View all ${total} credits`}
+                  />
                 </div>
 
                 {credits.length === 0 ? (

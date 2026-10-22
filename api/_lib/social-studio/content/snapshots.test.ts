@@ -45,6 +45,19 @@ describe('buildActorSpotlightSnapshot', () => {
 
     expect(snapshot.knownFor[0].year).toBe(2019);
   });
+
+  it('uses the verified credit rows instead of a stale stored film count', () => {
+    const snapshot = buildActorSpotlightSnapshot({
+      capturedAt: CAPTURED_AT,
+      person: { id: 'p1', name: 'Jane Doe', film_count: 515 },
+      credits: [
+        { id: 'c1', role: 'actor', films: { id: 'f1', title: 'One' } },
+        { id: 'c2', role: 'director', films: { id: 'f1', title: 'One' } },
+        { id: 'c3', role: 'actor', films: { id: 'f2', title: 'Two' } },
+      ],
+    });
+    expect(snapshot.creditCount).toBe(3);
+  });
 });
 
 describe('buildUpcomingMovieSnapshot', () => {

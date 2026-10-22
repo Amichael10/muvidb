@@ -162,12 +162,13 @@ async function enrichFilmCandidates(films: any[]): Promise<any[]> {
       }
     }
 
-    const channelByFilm = new Map<string, { name: string; handle: string | null }>();
+    const channelByFilm = new Map<string, { name: string; handle: string | null; publishedAt: string | null }>();
     for (const video of (channelVideosResult.data || []) as any[]) {
       if (!video.film_id || channelByFilm.has(video.film_id) || !video.channels?.name) continue;
       channelByFilm.set(video.film_id, {
         name: video.channels.name,
         handle: video.channels.channel_handle || null,
+        publishedAt: video.published_at || null,
       });
     }
 
@@ -178,6 +179,7 @@ async function enrichFilmCandidates(films: any[]): Promise<any[]> {
       creditedPeople: creditsByFilm[f.id]?.creditedPeople || [],
       youtubeChannelName: channelByFilm.get(f.id)?.name || null,
       youtubeChannelHandle: channelByFilm.get(f.id)?.handle || null,
+      youtubePublishedAt: f.youtube_published_at || channelByFilm.get(f.id)?.publishedAt || null,
     }));
   } catch (err) {
     console.warn('Failed to enrich films with credits:', err);
@@ -201,8 +203,13 @@ async function enrichPeopleCandidates(people: any[]): Promise<any[]> {
       .order('billing_order', { ascending: true, nullsFirst: false });
 
     const filmsByPerson: Record<string, any[]> = {};
+    const creditCountByPerson: Record<string, number> = {};
+    const filmIdsByPerson: Record<string, Set<string>> = {};
     for (const c of (credits || []) as any[]) {
       if (!c.person_id || !c.films) continue;
+      creditCountByPerson[c.person_id] = (creditCountByPerson[c.person_id] || 0) + 1;
+      if (!filmIdsByPerson[c.person_id]) filmIdsByPerson[c.person_id] = new Set<string>();
+      filmIdsByPerson[c.person_id].add(c.films.id);
       if (!filmsByPerson[c.person_id]) filmsByPerson[c.person_id] = [];
       if (filmsByPerson[c.person_id].length < 5) {
         filmsByPerson[c.person_id].push({
@@ -218,6 +225,8 @@ async function enrichPeopleCandidates(people: any[]): Promise<any[]> {
     return people.map(p => ({
       ...p,
       knownFor: filmsByPerson[p.id] || [],
+      documentedCreditCount: creditCountByPerson[p.id] || 0,
+      documentedFilmCount: filmIdsByPerson[p.id]?.size || 0,
     }));
   } catch (err) {
     console.warn('Failed to enrich people with credits:', err);
@@ -269,8 +278,9 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       completenessScore: p.bio ? 0.9 : 0.75,
       data: {
         ...p,
-        creditCount: p.film_count || (p.knownFor?.length ?? 0),
-        creditsCount: p.film_count || (p.knownFor?.length ?? 0),
+        creditCount: p.documentedCreditCount || p.film_count || (p.knownFor?.length ?? 0),
+        creditsCount: p.documentedCreditCount || p.film_count || (p.knownFor?.length ?? 0),
+        documentedFilmCount: p.documentedFilmCount || p.film_count || 0,
         isRisingStar: true,
         handle: extractSocialHandle(p),
         socialHandles: {
@@ -320,8 +330,9 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
         completenessScore: p.bio ? 0.9 : 0.8,
         data: {
           ...p,
-          creditCount: p.film_count || (p.knownFor?.length ?? 0),
-          creditsCount: p.film_count || (p.knownFor?.length ?? 0),
+          creditCount: p.documentedCreditCount || p.film_count || (p.knownFor?.length ?? 0),
+          creditsCount: p.documentedCreditCount || p.film_count || (p.knownFor?.length ?? 0),
+          documentedFilmCount: p.documentedFilmCount || p.film_count || 0,
           isCrew: true,
           department,
           handle: extractSocialHandle(p),
@@ -382,8 +393,9 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       completenessScore: p.bio ? 0.9 : 0.8,
       data: {
         ...p,
-        creditCount: p.film_count || (p.knownFor?.length ?? 0),
-        creditsCount: p.film_count || (p.knownFor?.length ?? 0),
+        creditCount: p.documentedCreditCount || p.film_count || (p.knownFor?.length ?? 0),
+        creditsCount: p.documentedCreditCount || p.film_count || (p.knownFor?.length ?? 0),
+        documentedFilmCount: p.documentedFilmCount || p.film_count || 0,
         handle: extractSocialHandle(p),
       },
     }));
@@ -419,14 +431,17 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
 
   // ── 5. CRITICS ROUNDUP & VERDICTS (Recent movies only with critic reviews) ────────
   if (norm.includes('critic') || norm.includes('review') || norm.includes('take')) {
-    const currentYear = new Date().getFullYear();
-    const minRecentYear = currentYear - 2; // e.g. 2024+ for relevant current Nollywood/African films
+    const today = new Date();
+    const recentCutoff = new Date(today.getTime() - 14 * 86_400_000);
+    const todayDate = today.toISOString().slice(0, 10);
+    const cutoffDate = recentCutoff.toISOString().slice(0, 10);
 
     const { data: reviews } = await supabase
       .from('critic_reviews')
-      .select('id, film_id, critic_name, publication, quote, rating, films!inner(id, title, slug, poster_url, backdrop_url, release_date, year, synopsis, tagline, liked_percent, imdb_rating, view_count, genres)')
+      .select('id, film_id, critic_id, critic_name, critic_title, avatar_url, publication, social_handle, quote, rating, review_url, review_type, excerpt_context, critics(handle, publication, profile_url, platform), films!inner(id, title, slug, poster_url, backdrop_url, release_date, year, synopsis, tagline, liked_percent, imdb_rating, view_count, genres)')
       .not('quote', 'is', null)
-      .gte('films.year', minRecentYear)
+      .gte('films.release_date', cutoffDate)
+      .lte('films.release_date', todayDate)
       .order('created_at', { ascending: false })
       .limit(limit * 3);
 
@@ -438,9 +453,15 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
         criticReview: {
           id: r.id,
           criticName: r.critic_name,
-          publication: r.publication,
+          criticTitle: r.critic_title,
+          avatarUrl: r.avatar_url,
+          publication: r.publication || r.critics?.publication,
+          socialHandle: r.social_handle || r.critics?.handle,
           quote: r.quote,
           rating: r.rating,
+          reviewUrl: r.review_url,
+          reviewType: r.review_type,
+          excerptContext: r.excerpt_context,
         },
       }));
 
@@ -453,7 +474,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
         subtext: f.criticReview?.quote
           ? `“${f.criticReview.quote.slice(0, 70)}…” — ${f.criticReview.criticName || 'Critic'}`
           : `Reviewed by ${f.criticReview?.criticName || 'Critic'} (${f.criticReview?.publication || 'Review'})`,
-        imageUrl: f.poster_url,
+        imageUrl: f.backdrop_url || f.poster_url,
         country: 'Nollywood',
         category: 'Critic Verdict',
         completenessScore: 0.9,
@@ -478,6 +499,19 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   if (intent === 'streaming') {
     // Query active destinations directly so NolliStream/Docuth titles cannot be
     // pushed out of the pool by unrelated rows with newer update timestamps.
+    const recentUploadCutoff = new Date(Date.now() - 120 * 86_400_000).toISOString();
+    const { data: recentChannelVideos, error: recentChannelVideosError } = await supabase
+      .from('channel_videos')
+      .select(`film_id,published_at,channels(name,channel_handle),films!inner(${filmSelect})`)
+      .not('film_id', 'is', null)
+      .gte('published_at', recentUploadCutoff)
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .limit(500);
+    if (recentChannelVideosError) throw recentChannelVideosError;
+    const recentUploadByFilm = new Map<string, any>();
+    for (const video of (recentChannelVideos || []) as any[]) {
+      if (video.film_id && !recentUploadByFilm.has(video.film_id)) recentUploadByFilm.set(video.film_id, video);
+    }
     const platformQueries = ['nollistream', 'docuth', 'ebonylife', 'kava', 'circuits', 'netflix', 'prime_video'].map(platform =>
       supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
         .eq('release_type', platform).order('updated_at', { ascending: false }).limit(Math.max(limit * 2, 20))
@@ -493,12 +527,30 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     ]);
     const firstError = platformResults.find(result => result.error)?.error || youtubeRows.error || youtubeRecentRows.error || linkedRows.error;
     if (firstError) throw firstError;
+    const uploadedFilms = ((recentChannelVideos || []) as any[]).map((upload: any) => {
+      const film = Array.isArray(upload.films) ? upload.films[0] : upload.films;
+      return {
+        ...film,
+        youtube_published_at: upload?.published_at || null,
+        youtubeChannelName: upload?.channels?.name || null,
+        youtubeChannelHandle: upload?.channels?.channel_handle || null,
+      };
+    }).filter((film: any) => film?.id && film?.poster_url);
     filmRows = [
+      ...uploadedFilms,
       ...platformResults.flatMap(result => result.data || []),
       ...(youtubeRows.data || []),
       ...(youtubeRecentRows.data || []),
       ...(linkedRows.data || [])
-    ];
+    ].map((film: any) => {
+      const upload = recentUploadByFilm.get(film.id);
+      return upload ? {
+        ...film,
+        youtube_published_at: upload.published_at || film.youtube_published_at || null,
+        youtubeChannelName: upload.channels?.name || film.youtubeChannelName || null,
+        youtubeChannelHandle: upload.channels?.channel_handle || film.youtubeChannelHandle || null,
+      } : film;
+    });
   } else if (intent === 'upcoming') {
     const today = new Date();
     const horizon = new Date(today.getTime() + 366 * 86_400_000);
@@ -600,8 +652,9 @@ export async function searchCandidates(
           completenessScore: p.bio ? 0.9 : 0.8,
           data: {
             ...p,
-            creditCount: p.film_count || (p.knownFor?.length ?? 0),
-            creditsCount: p.film_count || (p.knownFor?.length ?? 0),
+            creditCount: p.documentedCreditCount || p.film_count || (p.knownFor?.length ?? 0),
+            creditsCount: p.documentedCreditCount || p.film_count || (p.knownFor?.length ?? 0),
+            documentedFilmCount: p.documentedFilmCount || p.film_count || 0,
             handle: extractSocialHandle(p),
             socialHandles: {
               instagram: p.instagram_url,

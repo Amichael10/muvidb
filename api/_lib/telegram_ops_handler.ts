@@ -292,9 +292,7 @@ Approving will create them.`;
   }
 
   if (cmd === '/briefing' || cmd === '/social') {
-    const { sendMorningSocialBriefing } = await import('./editorial/morning_social_briefing.js');
-    await reply(chatId, '⏳ Fetching today\'s social schedule…');
-    await sendMorningSocialBriefing(chatId);
+    await reply(chatId, 'The previous social briefing and scheduling workflow has been retired while the replacement is designed.');
     return;
   }
 
@@ -306,44 +304,12 @@ Approving will create them.`;
   }
 
   if (cmd === '/queue') {
-    const { sendMorningSocialBriefing } = await import('./editorial/morning_social_briefing.js');
-    await reply(chatId, "⏳ Fetching today's social schedule & queue…");
-    await sendMorningSocialBriefing(chatId);
+    await reply(chatId, 'The previous social queue has been retired. Nothing will be scheduled or published from it.');
     return;
   }
 
   if (cmd === '/aistudio' || cmd === '/copilot' || cmd === '/ai') {
-    if (!arg) {
-      await reply(
-        chatId,
-        [
-          '🤖 *MuviDB AI Studio Copilot*',
-          '',
-          'Give me any instruction across your database and publishing tools!',
-          '',
-          'Examples:',
-          '• `/aistudio schedule posts for 5 latest streaming movies with portrait posters`',
-          '• `/aistudio what posts are scheduled or drafted right now?`',
-          '• `/aistudio look up Timini Egbuson and draft an actor spotlight post`',
-          '• `/aistudio check critic reviews for A Tribe Called Judah and create a discussion post`',
-        ].join('\n')
-      );
-      return;
-    }
-
-    await reply(chatId, `🧠 *AI Copilot* thinking…\n\n_${arg}_`);
-    try {
-      const { runStudioCopilotChat } = await import('./copilot/cohere_studio_copilot.js');
-      const result = await runStudioCopilotChat({
-        message: arg,
-        chatHistory: [],
-        actor: { id: 'admin-telegram', email: 'admin@muvidb.com', role: 'admin' },
-      });
-      const responseText = result.response || 'Task completed successfully.';
-      await reply(chatId, responseText);
-    } catch (err: any) {
-      await reply(chatId, `⚠️ AI Studio Error: ${err.message || String(err)}`);
-    }
+    await reply(chatId, 'The legacy AI Social Studio has been retired. Its replacement will use a new content-selection and approval contract.');
     return;
   }
 
@@ -875,110 +841,6 @@ async function handleCallback(query: any) {
     return;
   }
 
-  if (data.startsWith('slot_yt:')) {
-    const draftId = data.slice('slot_yt:'.length).trim();
-    if (!draftId) {
-      await answerTelegramCallback(callbackId, 'Invalid draft ID');
-      return;
-    }
-    await answerTelegramCallback(callbackId, 'Slotting into today’s schedule…');
-    try {
-      const { scheduleContentItem } = await import('./social_studio.js');
-      const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
-
-      const { data: item, error: fetchErr } = await supabase
-        .from('social_content_items')
-        .select('id, title, status, scheduled_for, content_type')
-        .eq('id', draftId)
-        .maybeSingle();
-
-      if (fetchErr || !item) {
-        if (chatId) await reply(chatId, `❌ Draft ${draftId} not found in Social Studio.`);
-        return;
-      }
-
-      // Check if another post is already scheduled for today
-      const todayStart = new Date();
-      todayStart.setUTCHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setUTCHours(23, 59, 59, 999);
-
-      const { data: existingToday } = await supabase
-        .from('social_content_items')
-        .select('id, title, scheduled_for')
-        .eq('status', 'scheduled')
-        .gte('scheduled_for', todayStart.toISOString())
-        .lte('scheduled_for', todayEnd.toISOString())
-        .order('scheduled_for', { ascending: true });
-
-      let targetSlot = new Date();
-      // Target today at 11:00 AM WAT (10:00 UTC) or 30 mins from now if already past
-      targetSlot.setUTCHours(10, 0, 0, 0);
-      if (targetSlot.getTime() <= Date.now() + 15 * 60 * 1000) {
-        targetSlot = new Date(Date.now() + 30 * 60 * 1000);
-      }
-
-      // If an existing item is scheduled for today around this time, bump it forward by 24h
-      let bumpedTitle: string | null = null;
-      if (existingToday && existingToday.length > 0) {
-        const conflict = existingToday[0];
-        const bumpedTime = new Date(new Date(conflict.scheduled_for).getTime() + 24 * 3600 * 1000);
-        await supabase
-          .from('social_content_items')
-          .update({ scheduled_for: bumpedTime.toISOString() })
-          .eq('id', conflict.id);
-        bumpedTitle = conflict.title;
-      }
-
-      // Schedule the current draft
-      await scheduleContentItem({ contentItemId: draftId, scheduledFor: targetSlot.toISOString() }, systemActor);
-
-      if (chatId) {
-        const slotText = targetSlot.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos' });
-        const bumpMsg = bumpedTitle ? `\n(Previous scheduled post "${bumpedTitle}" was pushed forward by 24h).` : '';
-        await reply(
-          chatId,
-          `✅ *Slotted into Today's Queue!*\n\n🎬 "${item.title}" will publish at ${slotText} WAT.${bumpMsg}\n\n💡 *Tip:* Check Social Studio if you want to replace the landscape banner with an HD portrait poster.`
-        );
-      }
-    } catch (err: any) {
-      console.error('[telegram_ops_handler] slot_yt failed:', err);
-      if (chatId) await reply(chatId, `❌ Failed to slot post: ${err?.message || err}`);
-    }
-    return;
-  }
-
-  if (data.startsWith('pub_yt:')) {
-    const draftId = data.slice('pub_yt:'.length).trim();
-    if (!draftId) {
-      await answerTelegramCallback(callbackId, 'Invalid draft ID');
-      return;
-    }
-    await answerTelegramCallback(callbackId, 'Publishing to social media…');
-    try {
-      const { publishContentItemNow } = await import('./social_studio.js');
-      const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
-
-      const { data: item } = await supabase
-        .from('social_content_items')
-        .select('id, title')
-        .eq('id', draftId)
-        .maybeSingle();
-
-      await publishContentItemNow({ contentItemId: draftId }, systemActor);
-      if (chatId) {
-        await reply(
-          chatId,
-          `🚀 *Published Live!*\n\n"${item?.title || 'YouTube Film'}" has been published to Instagram, TikTok, and Facebook.`
-        );
-      }
-    } catch (err: any) {
-      console.error('[telegram_ops_handler] pub_yt failed:', err);
-      if (chatId) await reply(chatId, `❌ Failed to publish: ${err?.message || err}`);
-    }
-    return;
-  }
-
   if (data.startsWith('prompt_poster:')) {
     const parts = data.slice('prompt_poster:'.length).split(':');
     const draftId = parts[0]?.trim();
@@ -1010,7 +872,7 @@ async function handleCallback(query: any) {
     if (chatId) {
       await reply(
         chatId,
-        `📸 *Send Portrait Poster for "${film?.title || 'Film'}":*\n\nPlease send or forward the HD portrait photo now. I will download it, attach it to the movie, and update your Social Studio draft automatically!`
+        `📸 *Send Portrait Poster for "${film?.title || 'Film'}":*\n\nPlease send or forward the HD portrait photo now. I will attach it to the movie record.`
       );
     }
     return;
@@ -1262,40 +1124,10 @@ async function handleCallback(query: any) {
 
       const { data: film } = await supabase.from('films').select('title').eq('id', filmId).maybeSingle();
 
-      const { data: draftItem } = await supabase
-        .from('social_content_items')
-        .select('id')
-        .eq('source_entity_id', filmId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      let targetDraftId = draftItem?.id || null;
-      if (targetDraftId) {
-        try {
-          const { refreshStreamingPoster } = await import('./social_studio.js');
-          await refreshStreamingPoster(targetDraftId, true);
-        } catch (rErr: any) {
-          console.warn('[wiz_attach_yt] refreshStreamingPoster error:', rErr?.message);
-        }
-      }
-
-      const buttons: any[][] = [];
-      if (targetDraftId) {
-        buttons.push([
-          { text: "📅 Slot into Today's Queue", callback_data: `slot_yt:${targetDraftId}` },
-          { text: '🚀 Publish Now', callback_data: `pub_yt:${targetDraftId}` },
-        ]);
-        buttons.push([
-          { text: '🎨 Open in Social Studio', url: 'https://muvidb.com/admin/social-studio' },
-        ]);
-      }
-
       await sendTelegramPhoto({
         photo: mirroredUrl,
-        caption: `🖼️ *HD Poster Attached Successfully!*\n\n🎬 *Film:* "${film?.title || 'Film'}"\n🎨 *Social Studio Updated:* Vertical 9:16 and 4:5 assets generated!`,
+        caption: `🖼️ *HD Poster Attached Successfully!*\n\n🎬 *Film:* "${film?.title || 'Film'}"\nThe film record now uses this poster.`,
         chatId: String(chatId),
-        replyMarkup: buttons.length ? { inline_keyboard: buttons } : undefined,
       });
     } catch (err: any) {
       console.error('[wiz_attach_yt] error:', err);
@@ -1368,30 +1200,13 @@ async function handleCallback(query: any) {
 
         if (error) throw error;
 
-        let postMsg = '';
-        if (action === 'play_post') {
-          const { generateSocialDraft } = await import('./social_studio.js');
-          const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
-          await generateSocialDraft(
-            {
-              contentType: 'whats_on_stage',
-              sourceEntityId: newPlay.id,
-              templateSlug: 'on-stage-theatre-v1',
-              platforms: ['instagram', 'facebook', 'tiktok'],
-            },
-            systemActor,
-          );
-          postMsg = '\n🎨 *Social Studio Draft also created!*';
-        }
-
         if (chatId) {
           await sendTelegramMessage({
-            text: `✅ *Stage Play Saved to Database!*\n\n🎭 *"${newPlay.title}"* is now live.${postMsg}`,
+            text: `✅ *Stage Play Saved to Database!*\n\n🎭 *"${newPlay.title}"* is now live.`,
             chatId: String(chatId),
             replyMarkup: {
               inline_keyboard: [
                 [{ text: '🌐 View Stage Play', url: `${site}/stage-plays/${newPlay.slug}` }],
-                [{ text: '🎨 Open Social Studio', url: `${site}/admin/social-studio` }],
               ],
             },
           });
@@ -1435,30 +1250,13 @@ async function handleCallback(query: any) {
           await attachCreditsBatch([{ filmId: newFilm.id, people }]);
         }
 
-        let postMsg = '';
-        if (action === 'film_post') {
-          const { generateSocialDraft } = await import('./social_studio.js');
-          const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
-          await generateSocialDraft(
-            {
-              contentType: 'upcoming_movie',
-              sourceEntityId: newFilm.id,
-              templateSlug: 'now-showing-cinemas-v1',
-              platforms: ['instagram', 'facebook', 'tiktok'],
-            },
-            systemActor,
-          );
-          postMsg = '\n🎨 *Social Studio Draft also created!*';
-        }
-
         if (chatId) {
           await sendTelegramMessage({
-            text: `✅ *Film Saved to Database!*\n\n🎬 *"${newFilm.title}"* is now live.${postMsg}`,
+            text: `✅ *Film Saved to Database!*\n\n🎬 *"${newFilm.title}"* is now live.`,
             chatId: String(chatId),
             replyMarkup: {
               inline_keyboard: [
                 [{ text: '🌐 View Film', url: `${site}/film/${newFilm.slug}` }],
-                [{ text: '🎨 Open Social Studio', url: `${site}/admin/social-studio` }],
               ],
             },
           });
@@ -1632,10 +1430,7 @@ async function handleCallback(query: any) {
         ].filter(Boolean).join('\n'),
         chatId: String(chatId),
         replyMarkup: {
-          inline_keyboard: [
-            [{ text: '🎨 Create Social Post', callback_data: `intake_draft:${eventId}` }],
-            [{ text: '📥 Open Approval Inbox', url: `${(process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '')}/admin/social-studio?tab=intake` }],
-          ],
+          inline_keyboard: [[{ text: '📥 Open Editorial Review', url: `${(process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '')}/admin/editorial` }]],
         },
       });
       if (!sent.ok) throw new Error(sent.error || 'Telegram could not receive the video');
@@ -1669,7 +1464,7 @@ async function handleCallback(query: any) {
         await sendTelegramMessage({
           text: [...summary.filter(Boolean), '', 'Nothing is public yet. Review and approve it in the admin inbox.'].join('\n'),
           chatId: String(chatId),
-          replyMarkup: { inline_keyboard: [[{ text: '✅ Open Approval Inbox', url: `${site}/admin/social-studio?tab=intake` }]] },
+          replyMarkup: { inline_keyboard: [[{ text: '✅ Open Editorial Review', url: `${site}/admin/editorial` }]] },
         });
       }
     } catch (error: any) {
@@ -1808,10 +1603,10 @@ Respond ONLY with a valid JSON object matching this schema:
     if (chatId) {
       const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
       await sendTelegramMessage({
-        text: '📰 Added to the Content & News Opportunities queue in Social Studio.',
+        text: '📰 Added to the Content & News Opportunities queue.',
         chatId: String(chatId),
         replyMarkup: {
-          inline_keyboard: [[{ text: '🌐 View in Social Studio', url: `${site}/admin/social-studio` }]],
+          inline_keyboard: [[{ text: '🌐 Open Editorial', url: `${site}/admin/editorial` }]],
         },
       });
     }
@@ -1832,7 +1627,7 @@ Respond ONLY with a valid JSON object matching this schema:
         await sendTelegramMessage({
           text: [`🎭 *Credit intake prepared*`, `Film: ${payload.film_title || 'Needs matching'}`, '', ...(lines.length ? lines : ['No definite credits were found.']), '', 'Review and match these names before anything is added.'].join('\n'),
           chatId: String(chatId),
-          replyMarkup: { inline_keyboard: [[{ text: '✅ Open Approval Inbox', url: `${site}/admin/social-studio?tab=intake` }]] },
+          replyMarkup: { inline_keyboard: [[{ text: '✅ Open Editorial Review', url: `${site}/admin/editorial` }]] },
         });
       }
     } catch (e: any) {
@@ -2459,9 +2254,7 @@ async function handleSocialIntake(chatId: string | number, message: any) {
   if (repliedKeyboard) {
     for (const row of repliedKeyboard) {
       for (const btn of row) {
-        if (btn.callback_data?.startsWith('slot_yt:')) {
-          targetDraftId = btn.callback_data.slice('slot_yt:'.length).trim();
-        } else if (btn.callback_data?.startsWith('prompt_poster:')) {
+        if (btn.callback_data?.startsWith('prompt_poster:')) {
           const parts = btn.callback_data.slice('prompt_poster:'.length).split(':');
           targetDraftId = parts[0]?.trim() || null;
           targetFilmId = parts[1]?.trim() || null;
@@ -2548,31 +2341,10 @@ async function handleSocialIntake(chatId: string | number, message: any) {
           .eq('id', targetFilmId)
           .maybeSingle();
 
-        if (targetDraftId) {
-          try {
-            const { refreshStreamingPoster } = await import('./social_studio.js');
-            await refreshStreamingPoster(targetDraftId, true);
-          } catch (rErr: any) {
-            console.warn('[handleSocialIntake] refreshStreamingPoster error:', rErr?.message);
-          }
-        }
-
-        const buttons: any[][] = [];
-        if (targetDraftId) {
-          buttons.push([
-            { text: "📅 Slot into Today's Queue", callback_data: `slot_yt:${targetDraftId}` },
-            { text: '🚀 Publish Now', callback_data: `pub_yt:${targetDraftId}` },
-          ]);
-          buttons.push([
-            { text: '🎨 Open in Social Studio', url: 'https://muvidb.com/admin/social-studio' },
-          ]);
-        }
-
         await sendTelegramPhoto({
           photo: mirroredUrl,
-          caption: `🖼️ *HD Poster Attached Successfully!*\n\n🎬 *Film:* "${film?.title || 'Film'}"\n🎨 *Social Studio Updated:* Vertical 9:16 and 4:5 assets generated!\n\nReady to slot or publish:`,
+          caption: `🖼️ *HD Poster Attached Successfully!*\n\n🎬 *Film:* "${film?.title || 'Film'}"\nThe film record now uses this poster.`,
           chatId: String(chatId),
-          replyMarkup: buttons.length ? { inline_keyboard: buttons } : undefined,
         });
         return;
       } catch (err: any) {
@@ -2646,7 +2418,7 @@ async function handleSocialIntake(chatId: string | number, message: any) {
   }
 
   const site = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
-  const adminUrl = `${site}/admin/social-studio`;
+  const adminUrl = `${site}/admin/editorial`;
 
   const isLongCaption = meta.description && meta.description.length > 280;
   const snippet = isLongCaption ? meta.description.slice(0, 280) + '…' : meta.description;
@@ -2832,7 +2604,7 @@ export async function sendPreflightPostAlert(contentItemId: string, targetChatId
     ],
     [
       { text: '❌ Reject Post', callback_data: `post_reject:${item.id}` },
-      { text: '🎨 Edit in Studio', url: `${site}/admin/social-studio` },
+      { text: '📝 Open Editorial', url: `${site}/admin/editorial` },
     ],
   ];
 

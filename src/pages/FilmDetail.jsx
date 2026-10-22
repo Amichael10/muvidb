@@ -26,6 +26,7 @@ import ImageWithFallback from '../components/ui/ImageWithFallback';
 import AwardLogo from '../components/awards/AwardLogo';
 import { normOrg } from '../lib/awards';
 import { formatFilmTitle, toSentenceCase, formatPersonName, toTitleCase } from '../utils/format';
+import { getFilmLanguages, getLanguageEndonym } from '../utils/languages';
 import { formatRole } from '../lib/creditRoles';
 
 const RELATED_FILMS_LIMIT = 5;
@@ -563,6 +564,10 @@ export default function FilmDetail() {
 
   const trailerVideoId = youtubeId(film.trailer_youtube_id);
   const availablePlatforms = PLATFORMS.filter((platform) => isFilmOnPlatform(film, platform.id));
+  // Languages belong in the hero, not only in the specs table further down —
+  // the tongue a film is performed in is one of the first things a viewer here
+  // wants to know. Shown as the endonym, with the English name on hover.
+  const heroLanguages = getFilmLanguages(film).map(getLanguageEndonym).filter(Boolean);
   const fullYoutubeUrl = film.youtube_watch_url || (isFilmOnPlatform(film, 'youtube') ? getWatchUrl(film, 'youtube') : null);
 
   return (
@@ -688,8 +693,15 @@ export default function FilmDetail() {
                 {film.nfvcb_rating && (
                   <>
                     <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                    <span className="bg-brand text-white px-2 py-0.5 rounded text-[11px] font-bold">
-                      {film.nfvcb_rating}
+                    {/* Name the board, not just the letter. An unlabelled "15"
+                        could be anyone's rating; NFVCB is the Nigerian
+                        classifier, and saying so is the whole trust signal. */}
+                    <span
+                      className="inline-flex items-stretch rounded overflow-hidden border border-brand/50 text-[10px] font-bold leading-none"
+                      title={`Classified ${film.nfvcb_rating} by the National Film and Video Censors Board`}
+                    >
+                      <span className="bg-brand/20 text-brand px-1.5 py-1 uppercase tracking-wider">NFVCB</span>
+                      <span className="bg-brand text-white px-1.5 py-1">{film.nfvcb_rating}</span>
                     </span>
                   </>
                 )}
@@ -709,6 +721,22 @@ export default function FilmDetail() {
                     </span>
                   </>
                 )}
+                {heroLanguages.length > 0 && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {heroLanguages.map(({ name, endonym, label }) => (
+                        <span
+                          key={name}
+                          title={endonym ? `${endonym} — ${name}` : name}
+                          className="px-2.5 py-0.5 text-[10px] font-bold bg-brand/15 text-brand rounded-md border border-brand/30"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
                 {film.genres && film.genres.length > 0 && (
                   <>
                     <span className="w-1 h-1 rounded-full bg-white/30"></span>
@@ -723,7 +751,11 @@ export default function FilmDetail() {
                 )}
               </div>
 
-              <div className="w-full max-w-2xl mt-1">
+              {/* The gross is a peer of the score meters, not a smaller block
+                  floating off to the side. One stretched row keeps both cards
+                  the same height and level with each other. */}
+              <div className="flex flex-col lg:flex-row items-stretch gap-4 w-full mt-1">
+                <div className="w-full max-w-2xl">
                 <RottenTomatoesScorecard
                   film={film}
                   criticScore={criticSummary.score}
@@ -745,29 +777,15 @@ export default function FilmDetail() {
                     if (el) el.scrollIntoView({ behavior: 'smooth' });
                   } : null}
                 />
-              </div>
-            </div>
+                </div>
 
-            {/* Right-Hand Side Box inside Hero Section */}
-            {(() => {
+                {/* Box office card — the second peer in the row above. */}
+                {(() => {
+              // The figure is read-only here. Box office is edited in the
+              // admin area, not from the public page, so this renders nothing
+              // at all when a film has no gross recorded.
               const domGross = film.box_office_domestic || film.streaming_links?.box_office?.domestic;
-              if (!domGross && !isAdmin) return null;
-
-              if (!domGross && isAdmin) {
-                return (
-                  <div className="hidden lg:flex flex-col items-end justify-end shrink-0 z-10 self-end mb-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowBoxOfficeModal(true)}
-                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold backdrop-blur-xl transition-all shadow-lg active:scale-95 cursor-pointer"
-                      title="Set Box Office Revenue"
-                    >
-                      <Icon icon="solar:ticket-bold" className="text-amber-400" />
-                      <span>+ Set Box Office Revenue</span>
-                    </button>
-                  </div>
-                );
-              }
+              if (!domGross) return null;
 
               const currency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
               const symbol = currency === 'NGN' ? '₦' : `${currency} `;
@@ -778,38 +796,44 @@ export default function FilmDetail() {
               const sourceLabel = film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN';
 
               return (
-                <div className="hidden lg:flex flex-col items-end justify-end shrink-0 z-10 self-end mb-1">
-                  <div className="p-4 rounded-2xl bg-black/70 border border-amber-500/40 backdrop-blur-xl shadow-2xl shadow-amber-500/20 max-w-xs w-full text-right space-y-2">
+                /* Was desktop-only, which hid the single most distinctive
+                   number on the page from the majority of traffic. Now it
+                   flows full-width under the scorecard on small screens and
+                   keeps its right-hand slot from lg up. */
+                <div className="flex w-full lg:w-auto flex-col z-10">
+                  <div className="h-full flex flex-col justify-center p-4 sm:p-5 rounded-2xl bg-black/70 border border-amber-500/40 backdrop-blur-xl shadow-2xl shadow-amber-500/20 w-full lg:w-64 text-left lg:text-right space-y-2">
                     <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-widest">
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => setShowBoxOfficeModal(true)}
-                          className="hover:text-white transition-colors text-[10px] inline-flex items-center gap-1 font-mono uppercase bg-amber-500/20 hover:bg-amber-500/40 px-2 py-0.5 rounded border border-amber-500/30 cursor-pointer"
-                          title="Edit Box Office Revenue"
-                        >
-                          <Icon icon="solar:pen-bold" className="text-xs" />
-                          <span>Edit</span>
-                        </button>
-                      )}
                       <div className="flex items-center gap-1.5 ml-auto">
                         <Icon icon="solar:ticket-bold" className="text-amber-400 text-sm" />
                         <span>Box Office Revenue</span>
                       </div>
                     </div>
-                    <p className="text-2xl font-black text-white font-heading tracking-tight leading-none">
-                      {symbol}{rawFormatted}
+                    {/* One figure, not two. "₦74.1 Million" is what people
+                        quote; the exact naira amount is a tooltip rather than
+                        a second line saying the same thing. */}
+                    <p
+                      className="text-3xl md:text-2xl font-black text-white font-heading tracking-tight leading-none"
+                      title={`${symbol}${rawFormatted}`}
+                    >
+                      <span className="text-amber-400">{symbol}</span>{formatted}
                     </p>
-                    <div className="flex items-center justify-between pt-2 border-t border-amber-500/20 text-[10px] font-bold">
-                      <span className="text-amber-300/90 font-mono">({symbol}{formatted})</span>
-                      <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded uppercase text-[9px] border border-amber-500/30">
-                        {sourceLabel}
-                      </span>
-                    </div>
+                    {/* Provenance is an internal detail — it tells us where a
+                        figure came from, which matters when reconciling
+                        sources, but means nothing to a visitor. */}
+                    {isAdmin && (
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-amber-500/20 text-[10px] font-bold">
+                        <span className="text-amber-300/90 font-mono">{symbol}{rawFormatted}</span>
+                        <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded uppercase text-[9px] border border-amber-500/30">
+                          {sourceLabel}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              );
-            })()}
+                );
+                })()}
+              </div>
+            </div>
           </div>
         </div>
       </div>

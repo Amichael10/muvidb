@@ -71,7 +71,7 @@ export default function RottenTomatoesScorecard({
                   </span>
                 )}
               </div>
-              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5 flex items-center gap-1 group-hover/critic:text-white transition-colors">
+              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5 flex items-center gap-1 whitespace-nowrap group-hover/critic:text-white transition-colors">
                 <span>Critics Score</span>
                 <Icon icon="solar:alt-arrow-right-linear" className="text-[10px] opacity-0 group-hover/critic:opacity-100 transition-opacity" />
               </div>
@@ -104,7 +104,7 @@ export default function RottenTomatoesScorecard({
                   </span>
                 )}
               </div>
-              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5">
+              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5 whitespace-nowrap">
                 Critics Score
               </div>
               <div className="text-[10px] text-white/40 font-medium">
@@ -142,7 +142,7 @@ export default function RottenTomatoesScorecard({
                   </span>
                 )}
               </div>
-              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5 flex items-center gap-1 group-hover/audience:text-white transition-colors">
+              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5 flex items-center gap-1 whitespace-nowrap group-hover/audience:text-white transition-colors">
                 <span>Audience Score</span>
                 <Icon icon="solar:alt-arrow-right-linear" className="text-[10px] opacity-0 group-hover/audience:opacity-100 transition-opacity" />
               </div>
@@ -174,7 +174,7 @@ export default function RottenTomatoesScorecard({
                   </span>
                 )}
               </div>
-              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5">
+              <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mt-0.5 whitespace-nowrap">
                 Audience Score
               </div>
               <div className="text-[10px] text-white/40 font-medium">
@@ -198,7 +198,7 @@ export default function RottenTomatoesScorecard({
                   </span>
                   <span className="text-white/40 text-[10px] font-bold">/10</span>
                 </div>
-                <div className="text-[10px] text-amber-400/80 font-bold uppercase tracking-wider mt-0.5">
+                <div className="text-[10px] text-amber-400/80 font-bold uppercase tracking-wider mt-0.5 whitespace-nowrap">
                   MuviDB Score
                 </div>
               </div>

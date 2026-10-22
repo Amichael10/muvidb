@@ -53,6 +53,23 @@ describe('generated social copy grounding', () => {
     expect(fallback).toHaveLength(3);
     expect(fallback.every(variation => !Object.values(variation.captions).some(caption => /\[[^\]]+\]/.test(caption)))).toBe(true);
     expect(fallback.every(variation => Object.values(variation.captions).every(caption => caption.includes('Docuth')))).toBe(true);
+    expect(fallback.every(variation => Object.values(variation.captions).every(caption => caption.startsWith('Now streaming on Docuth.')))).toBe(true);
+  });
+
+  it('preserves critic copy verbatim and points to the original critic', async () => {
+    const quote = 'The beauty of the images cannot disguise how uncertain the film is about its own argument.';
+    const response = await generateAICaptions({
+      candidate: {
+        id: 'critic-film', type: 'movie', name: 'Example Film', data: {
+          criticReview: { quote, criticName: 'Seyi Lasisi', publication: 'Seyi Lasisi Reviews', socialHandle: '@seyilasisi', reviewType: 'article' },
+        },
+      },
+      series: { slug: 'critics_say' },
+    });
+    expect(response.engine).toBe('muvidb_exact_quote_template');
+    expect(response.instagram.startsWith(`“${quote}”`)).toBe(true);
+    expect(response.instagram).toContain('Read the full review on @seyilasisi.');
+    expect(response.instagram).not.toContain('full review on MuviDB');
   });
 
   it('enforces a linked YouTube channel and names-only crew attribution', () => {

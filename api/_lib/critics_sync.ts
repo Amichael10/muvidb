@@ -1,4 +1,16 @@
 import { supabase } from './supabase.js';
+import { extractAuthorAndAvatar, extractReviewText, selectCriticExcerpt } from './critic_review_extractor.js';
+
+export const PUBLICATION_LOGOS: Record<string, string> = {
+  'Nollywood Life': 'https://nollywoodlife.ng/wp-content/uploads/2024/09/cropped-Nollywood-Life-New-Logo-180x180.png',
+  'NollyCritic': 'https://i0.wp.com/nollycritic.com/wp-content/uploads/2025/02/cropped-nc-logo-new-scaled-1.jpg?fit=180%2C180&ssl=1',
+  'Afrocritik': 'https://afrocritik.com/wp-content/uploads/2021/04/cropped-Afrocritik-Favicon-1-192x192.png',
+  'What Kept Me Up': 'https://whatkeptmeup.com/wp-content/uploads/2020/07/cropped-Favicon-192x192.png',
+  'Film Efiko': 'https://filmefiko.com/wp-content/uploads/2021/05/cropped-FE-logo-192x192.png',
+  'Nigerian Movies Review': 'https://nigerianmoviesreview.com/wp-content/uploads/2023/08/NMR-WITHOUT-BG-150x150.png',
+  "It's A Wrap": 'https://static.wixstatic.com/media/f87a6d_4dd9e45b448549e1a4b6bfb6251af0d4~mv2.png',
+  'Movie Evolution': 'https://intro2filmclass.blogspot.com/favicon.ico',
+};
 
 interface DiscoveredReview {
   film_title: string;
@@ -8,6 +20,22 @@ interface DiscoveredReview {
   quote?: string;
   rating?: number;
   published_date?: string;
+}
+
+async function fetchReviewPage(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; MuviDBCritics/1.0; +https://muvidb.com)',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(20000),
+    });
+    return res.ok ? await res.text() : '';
+  } catch (error) {
+    console.warn(`[Critics Sync Page Warn] ${url}: ${(error as Error).message}`);
+    return '';
+  }
 }
 
 function cleanMovieTitle(raw: string): string {
@@ -98,8 +126,8 @@ export async function runCriticsSync(): Promise<{
     if (c.publication) criticMap.set(c.publication.toLowerCase(), c);
   });
 
-  const { data: existingRows } = await supabase.from('critic_reviews').select('review_url');
-  const existingUrls = new Set((existingRows || []).map(r => r.review_url).filter(Boolean));
+  const { data: existingRows } = await supabase.from('critic_reviews').select('id, review_url, extraction_version');
+  const existingByUrl = new Map((existingRows || []).filter(r => r.review_url).map(r => [r.review_url, r]));
 
   // 2. Fetch feeds from top critic publications
   const feeds = [
@@ -108,7 +136,9 @@ export async function runCriticsSync(): Promise<{
     { url: 'https://filmefiko.com/feed/', source: 'Film Efiko' },
     { url: 'https://nigerianmoviesreview.com/category/reviews/feed/', source: 'Nigerian Movies Review' },
     { url: 'https://www.itsawrapng.com/blog-feed.xml', source: "It's A Wrap" },
-    { url: 'https://intro2filmclass.blogspot.com/feeds/posts/default?alt=rss', source: 'Intro to Film Class' }
+    { url: 'https://intro2filmclass.blogspot.com/feeds/posts/default?alt=rss', source: 'Intro to Film Class' },
+    { url: 'https://nollywoodlife.ng/topics/movie-reviews/feed/', source: 'Nollywood Life' },
+    { url: 'https://nollycritic.com/category/reviews/feed/', source: 'NollyCritic' }
   ];
 
   const candidateReviews: DiscoveredReview[] = [];
@@ -123,28 +153,41 @@ export async function runCriticsSync(): Promise<{
   processed = candidateReviews.length;
 
   for (const item of candidateReviews) {
-    if (existingUrls.has(item.review_url)) {
+    const cleanUrl = item.review_url.split('?')[0];
+    const existingReview = existingByUrl.get(cleanUrl) || existingByUrl.get(item.review_url);
+    if (existingReview && Number(existingReview.extraction_version || 0) >= 1) {
       skipped++;
       continue;
     }
 
-    // Generate candidate titles (full, before colon, before dash, before comma)
+    // Generate candidate titles (quotes, before "Review", prefixes, punctuation splits)
     const titleCandidates = [
       item.film_title,
       item.film_title.split(':')[0].trim(),
       item.film_title.split('–')[0].trim(),
       item.film_title.split('-')[0].trim(),
       item.film_title.split(',')[0].trim()
-    ].filter(t => t.length >= 2);
+    ];
 
-    // Also extract 2-to-4 word prefix if title is long sentence-style editorial headline
+    const quoteMatches = item.film_title.matchAll(/['"“‘]([^'"”’]{2,60})['"”’]/g);
+    for (const m of quoteMatches) {
+      titleCandidates.push(m[1].replace(/,$/, '').trim());
+    }
+
+    const beforeReview = item.film_title.match(/^(.+?)(?:,\s*Review|\s+Review\s*:|\s+Movie Review|\s+Film Review)/i);
+    if (beforeReview) {
+      titleCandidates.push(beforeReview[1].trim());
+    }
+
     const words = item.film_title.split(/\s+/);
     if (words.length > 4) {
       titleCandidates.push(words.slice(0, 3).join(' '));
       titleCandidates.push(words.slice(0, 2).join(' '));
     }
 
-    const uniqueCandidates = [...new Set(titleCandidates)];
+    const uniqueCandidates = [...new Set(
+      titleCandidates.map(t => t.replace(/^['"“‘]|['"”’,]$/g, '').trim()).filter(t => t.length >= 2)
+    )];
 
     let film: any = null;
     for (const cand of uniqueCandidates) {
@@ -192,26 +235,61 @@ export async function runCriticsSync(): Promise<{
                           criticMap.get(item.source_publication.toLowerCase()) ||
                           critics?.find(c => c.publication?.includes(item.source_publication));
 
-    const payload = {
+    const defaultLogo = PUBLICATION_LOGOS[item.source_publication] || null;
+    let criticAvatar = matchedCritic?.avatar_url || null;
+    let criticName = matchedCritic?.name || item.critic_name || item.source_publication;
+
+    const pageHtml = await fetchReviewPage(cleanUrl);
+    if (pageHtml) {
+      const { authorName, avatarUrl } = extractAuthorAndAvatar(pageHtml, defaultLogo);
+      if (authorName && (!matchedCritic || criticName === item.source_publication)) {
+        criticName = authorName;
+      }
+      if (avatarUrl && !criticAvatar) {
+        criticAvatar = avatarUrl;
+      }
+    }
+    if (!criticAvatar) {
+      criticAvatar = defaultLogo;
+    }
+
+    const payload: Record<string, any> = {
       film_id: matchedFilmId,
       play_id: matchedPlayId,
       critic_id: matchedCritic?.id || null,
-      critic_name: matchedCritic?.name || item.critic_name || item.source_publication,
+      critic_name: criticName,
       critic_title: matchedCritic?.title || (matchedPlayId ? 'Theatre Critic' : 'Film Critic'),
-      avatar_url: matchedCritic?.avatar_url || null,
+      avatar_url: criticAvatar,
       quote: item.quote || `${item.source_publication} review of ${targetTitle}`,
-      rating: 3.0, // default baseline if not numeric in feed
-      review_url: item.review_url,
+      rating: null,
+      publication: matchedCritic?.publication || item.source_publication,
+      social_handle: matchedCritic?.handle || null,
+      review_type: 'article',
+      excerpt_context: null,
+      extraction_version: 1,
+      review_url: cleanUrl,
       is_featured: true,
       is_anonymous: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
-    const { error: insErr } = await supabase.from('critic_reviews').insert(payload);
+    const articleText = pageHtml ? extractReviewText(pageHtml) : '';
+    if (articleText) {
+      const extracted = await selectCriticExcerpt(articleText);
+      payload.quote = extracted.excerpt;
+      payload.rating = extracted.rating;
+      payload.excerpt_context = extracted.excerptContext;
+    }
+
+    if (existingReview) delete payload.created_at;
+    const write = existingReview
+      ? supabase.from('critic_reviews').update(payload).eq('id', existingReview.id)
+      : supabase.from('critic_reviews').insert(payload);
+    const { error: insErr } = await write;
     if (!insErr) {
       synced++;
-      existingUrls.add(item.review_url);
+      existingByUrl.set(cleanUrl, { id: existingReview?.id || '', review_url: cleanUrl, extraction_version: 1 });
       newReviews.push(`${payload.critic_name} -> "${targetTitle}"`);
     } else {
       console.warn(`[critics_sync] Failed to insert review for ${targetTitle}:`, insErr.message);

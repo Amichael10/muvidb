@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
+import { normalizeTitleStrict, pickBestFilmMatch } from './lib/yearbook_title_match';
+
 dotenv.config();
 
 const supabase = createClient(
@@ -26,36 +28,9 @@ async function retry<T>(fn: () => Promise<T>, retries = 3, delay = 500): Promise
   throw new Error('Retries exceeded');
 }
 
-function normalizeTitleStrict(t: string): string {
-  return t
-    .toLowerCase()
-    .replace(/^the\s+/, '')
-    .replace(/\*+$/, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function matchesExact(dbTitle: string, targetTitle: string): boolean {
-  const d = normalizeTitleStrict(dbTitle);
-  const t = normalizeTitleStrict(targetTitle);
-
-  if (d === t) return true;
-
-  // Never match across sequel boundaries (e.g. 2, 3, part 2)
-  const dNum = /\b(2|3|4|5|two|three|part\s*\d+)\b/i.test(d);
-  const tNum = /\b(2|3|4|5|two|three|part\s*\d+)\b/i.test(t);
-  if (dNum !== tNum) return false;
-
-  // Subtitle variants (e.g. "Omo Ghetto" vs "Omo Ghetto: The Saga", "Agesinkole: King of Thieves" vs "King of Thieves")
-  if (d.includes(':') || t.includes(':')) {
-    const dMain = d.split(':')[0].trim();
-    const tMain = t.split(':')[0].trim();
-    if (dMain === tMain && dMain.length > 5) return true;
-    if (d.includes(t) || t.includes(d)) return true;
-  }
-
-  return false;
-}
+// Matching lives in scripts/lib/yearbook_title_match.ts, where it is covered
+// by tests. It used to be inline here, and a substring rule quietly spread one
+// film's gross across every title that resembled it.
 
 async function runReconciliation() {
   console.log('🎬 Starting Precision Box Office & Credit Reconciliation across Productions...\n');
@@ -123,6 +98,8 @@ async function runReconciliation() {
   console.log(`📦 Compiled ${bestMovieMap.size} unique verified blockbuster grosses from FilmOne Yearbooks.\n`);
 
   let updatedCount = 0;
+  let skippedNoMatch = 0;
+  let skippedAmbiguous = 0;
   for (const item of bestMovieMap.values()) {
     const searchPart = normalizeTitleStrict(item.rawTitle).split(':')[0].trim();
     if (searchPart.length < 3) continue;
@@ -140,9 +117,19 @@ async function runReconciliation() {
         continue;
       }
 
-      for (const film of films || []) {
-        if (!matchesExact(film.title, item.rawTitle)) continue;
+      // Exactly one film may receive a figure. A yearbook row describes a
+      // single release, so anything else is a mis-assignment waiting to happen.
+      const best = pickBestFilmMatch(films || [], { rawTitle: item.rawTitle, year: item.year });
 
+      if (!best) {
+        skippedNoMatch++;
+      } else if (best.ambiguous) {
+        // Two candidates scored identically — usually duplicate catalogue rows.
+        // Writing to either would be a coin toss, so leave both alone and say so.
+        skippedAmbiguous++;
+        console.warn(`  ⚠️  ambiguous: "${item.rawTitle}" matches multiple rows equally — left unwritten`);
+      } else {
+        const film = best.film as any;
         const currentGross = Number(film.streaming_links?.box_office?.domestic || film.box_office_domestic || 0);
         if (currentGross < item.gross) {
           const currentLinks = film.streaming_links || {};
@@ -182,7 +169,10 @@ async function runReconciliation() {
     }
   }
 
-  console.log(`\n✅ Synced ${updatedCount} cinema productions with official FilmOne gross numbers.\n`);
+  console.log(`\n✅ Synced ${updatedCount} cinema productions with official FilmOne gross numbers.`);
+  console.log(`   skipped: ${skippedNoMatch} with no confident match, ${skippedAmbiguous} ambiguous.`);
+  console.log('   A skipped row leaves the figure missing, which is the intended trade — a');
+  console.log('   gross on the wrong film is far harder to notice than one that is absent.\n');
 
   // 3. Reconcile Cast Credits on Blockbusters (Mr Macaroni & core cast)
   console.log('🎭 Reconciling Adebowale Adedayo (Mr Macaroni) credits on verified blockbusters...');

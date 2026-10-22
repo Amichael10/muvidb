@@ -165,9 +165,13 @@ export default function FilmSpecsTable({
             <Icon icon="solar:ticket-bold" className="text-sm" />
             <span>{formattedBoxOffice}</span>
           </span>
-          <span className="text-[10px] uppercase font-bold text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
-            {film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN'}
-          </span>
+          {/* Where a figure came from is an internal reconciliation detail,
+              so it stays on the admin's view of the page only. */}
+          {isAdmin && (
+            <span className="text-[10px] uppercase font-bold text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
+              {film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN'}
+            </span>
+          )}
           {isAdmin && onEditBoxOffice && (
             <button
               type="button"

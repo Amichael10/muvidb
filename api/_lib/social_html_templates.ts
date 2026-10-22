@@ -18,43 +18,43 @@ const TEMPLATE_DIR = path.join(getLibDir(), 'social-html-templates');
 const DEFAULT_HANDLE = '@muvidb_';
 
 export const HTML_SOCIAL_TEMPLATES: Record<string, HtmlTemplateSpec> = {
-  'on-stage-theatre-v1': {
-    file: 'on-stage-theatre-v1.html',
-    formats: ['square_1_1'],
-    data: stageData,
-  },
-  'critics-say-v1': {
-    file: 'critics-say-v1.html',
-    formats: ['square_1_1', 'vertical_9_16'],
-    data: criticsData,
-    slides: 3,
-    ratio: format => (format === 'vertical_9_16' ? '9:16' : '1:1'),
-  },
-  'watchlist-this-week-v1': {
-    file: 'watchlist-this-week-v1.html',
-    formats: ['square_1_1'],
-    data: watchlistData,
-    slides: 5,
-  },
-  'nollywood-debate-v1': {
-    file: 'nollywood-debate-v1.html',
-    formats: ['square_1_1'],
-    data: debateData,
-  },
-  'now-showing-cinemas-v1': {
-    file: 'now-showing-cinemas-v1.html',
-    formats: ['square_1_1'],
-    data: nowShowingData,
-  },
-  'actor-spotlight-v1': {
-    file: 'actor-spotlight-v1.html',
-    formats: ['square_1_1'],
-    data: actorData,
-    dimensions: {
-      square_1_1: { width: 1280, height: 1280 },
-    },
-  },
+  'behind-camera-simple-v1': simpleSpec('behind_camera'),
+  'film-conversation-simple-v1': simpleSpec('film_conversation'),
+  'by-the-numbers-simple-v1': simpleSpec('by_the_numbers'),
+  'new-upcoming-simple-v1': simpleSpec('new_upcoming'),
+  'one-film-two-takes-simple-v1': simpleSpec('one_film_two_takes'),
+  'stage-to-screen-simple-v1': simpleSpec('stage_to_screen'),
+  'critic-spotlight-simple-v1': simpleSpec('critic_spotlight'),
+  'filmography-simple-v1': simpleSpec('filmography'),
+  'weekend-watchlist-simple-v1': simpleSpec('weekend_watchlist'),
+  'critics-say-simple-v1': simpleSpec('critics_say'),
+  'on-stage-simple-v1': simpleSpec('on_stage'),
+  'where-to-watch-simple-v1': simpleSpec('where_to_watch'),
+  'you-know-the-face-simple-v1': simpleSpec('you_know_the_face'),
 };
+
+type SimpleEditorialVariant =
+  | 'behind_camera'
+  | 'film_conversation'
+  | 'by_the_numbers'
+  | 'new_upcoming'
+  | 'one_film_two_takes'
+  | 'stage_to_screen'
+  | 'critic_spotlight'
+  | 'filmography'
+  | 'weekend_watchlist'
+  | 'critics_say'
+  | 'on_stage'
+  | 'where_to_watch'
+  | 'you_know_the_face';
+
+function simpleSpec(variant: SimpleEditorialVariant): HtmlTemplateSpec {
+  return {
+    file: 'simple-editorial-v1.html',
+    formats: ['portrait_4_5'],
+    data: snapshot => simpleEditorialData(snapshot, variant),
+  };
+}
 
 function getLibDir(): string {
   if (typeof __dirname !== 'undefined') return __dirname;
@@ -224,11 +224,110 @@ function actorData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   };
 }
 
+function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEditorialVariant): Record<string, unknown> {
+  const isPerson = snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight';
+  const isFilm = snapshot.kind === 'upcoming_movie';
+  const isPlay = snapshot.kind === 'whats_on_stage';
+
+  const person = isPerson ? snapshot : null;
+  const film = isFilm ? snapshot : null;
+  const stage = isPlay ? snapshot : null;
+  const image = person
+    ? (person.photoCutoutUrl || person.photoUrl || person.knownFor[0]?.posterUrl || '')
+    : film
+      ? (film.backdropUrl || film.posterUrl || '')
+      : stage
+        ? (stage.backdropUrl || stage.posterUrl || '')
+        : '';
+  const title = person?.name || film?.title || stage?.title || 'MuviDB';
+  const filmStatus = film?.watchAvailability || (film?.comingSoon ? 'Coming soon' : 'Discover');
+  const filmDetail = film?.genres?.slice(0, 2).join(' · ') || (film?.year ? String(film.year) : 'African cinema');
+  const suppliedRoles = 'roles' in (person || {}) && Array.isArray((person as any).roles)
+    ? (person as any).roles.filter(Boolean).join(' · ')
+    : '';
+  const personRole = suppliedRoles || person?.knownForDepartment || 'Screen professional';
+
+  const base = {
+    title,
+    image,
+    series: 'MuviDB Editorial',
+    badge: 'DISCOVER',
+    status: isFilm ? filmStatus : isPlay ? 'Live on stage' : 'Profile',
+    detail: isFilm ? filmDetail : isPlay ? ([stage?.venue, stage?.city].filter(Boolean).join(' · ') || 'Theatre') : personRole,
+    support: film?.synopsis || stage?.synopsis || person?.bio || 'Discover the people and stories shaping African screen culture.',
+    variant: 'default',
+    metric: '',
+    metricLabel: '',
+    quote: '',
+  };
+
+  switch (variant) {
+    case 'behind_camera':
+      return { ...base, series: 'Behind The Camera', badge: 'THE MAKERS', status: `${person?.creditCount || 0} credits`, detail: personRole };
+    case 'film_conversation':
+      return { ...base, image: film?.posterUrl || image, imagePosition: 'center top', series: 'Film Conversation', badge: 'JOIN IN', title: `What did you think of ${title}?`, status: 'Tell us', detail: 'In the comments' };
+    case 'by_the_numbers':
+      return { ...base, series: 'MuviDB By The Numbers', badge: 'DATABASE', variant: 'data', metric: film?.year || person?.creditCount || '', metricLabel: film ? 'YEAR' : 'CREDITS', title: film ? `${film.title}, indexed.` : `${title}, by the numbers.`, status: 'Verified data', detail: 'MuviDB' };
+    case 'new_upcoming':
+      return { ...base, series: 'New & Upcoming', badge: 'RELEASE RADAR', status: film?.comingSoon ? 'Coming soon' : filmStatus, detail: film?.releaseDate ? formatDate(film.releaseDate) : filmDetail };
+    case 'one_film_two_takes':
+      return { ...base, series: 'One Film, Two Takes', badge: 'CRITICS', quote: film?.criticReview?.quote || film?.tagline || '', status: film?.criticReview?.rating ? `${film.criticReview.rating}/5` : 'Two perspectives', detail: film?.criticReview?.criticName || 'Read the reviews' };
+    case 'stage_to_screen':
+      return { ...base, series: 'Stage To Screen', badge: 'CROSSOVER', status: 'Stage & film', detail: stage?.year ? String(stage.year) : 'African stories' };
+    case 'critic_spotlight':
+      return { ...base, image: film?.posterUrl || image, imagePosition: 'center top', criticAvatar: film?.criticReview?.avatarUrl || '', variant: 'critic_spotlight', series: 'The Critic', badge: 'CRITIC SPOTLIGHT', quote: film?.criticReview?.quote || film?.tagline || '', title: film?.criticReview?.criticName || title, status: film?.criticReview?.criticName || 'Film critic', detail: film?.criticReview?.publication || film?.criticReview?.criticTitle || 'African cinema' };
+    case 'filmography':
+      return {
+        ...base,
+        series: 'The Filmography',
+        badge: 'CAREER PROFILE',
+        variant: 'filmography',
+        title,
+        support: 'A career across generations of African cinema.',
+        status: personRole,
+        detail: '',
+        metric: person?.creditCount || '',
+        metricLabel: 'DOCUMENTED CREDITS',
+      };
+    case 'weekend_watchlist':
+      return { ...base, series: 'Weekend Watchlist', badge: 'FRI — SUN', status: filmStatus, detail: filmDetail };
+    case 'critics_say':
+      {
+        const review = film?.criticReview;
+        const destination = review?.socialHandle || review?.publication || review?.criticName || 'ORIGINAL REVIEW';
+        const fullReview = String(destination).startsWith('@') ? destination : String(destination).toUpperCase();
+        return {
+          ...base,
+          series: 'The Critic’s Take',
+          badge: 'CRITICISM',
+          variant: 'critic-quote',
+          image: film?.posterUrl || image,
+          imagePosition: 'center top',
+          criticAvatar: review?.avatarUrl || '',
+          title,
+          quote: review?.quote || '',
+          status: review?.criticName || 'Film critic',
+          detail: review?.publication || review?.criticTitle || '',
+          support: `FULL REVIEW → ${fullReview}`,
+        };
+      }
+    case 'on_stage':
+      return { ...base, series: "What’s On Stage", badge: formatDateRange(stage?.runStartDate, stage?.runEndDate, stage?.year), status: stage?.status || 'Live on stage', detail: [stage?.venue, stage?.city].filter(Boolean).join(' · ') || 'Theatre' };
+    case 'where_to_watch':
+      return { ...base, series: 'Now Streaming', badge: 'NEW TO STREAMING', variant: 'now-streaming', status: film?.youtubeChannelName || filmStatus, detail: film?.youtubeChannelName ? 'YouTube' : filmDetail };
+    case 'you_know_the_face':
+      return { ...base, series: 'You Know The Face', badge: 'PEOPLE', status: `${person?.creditCount || 0} credits`, detail: personRole };
+    default:
+      return base;
+  }
+}
+
 async function renderHtmlTemplate(input: {
   templateSlug: string;
   snapshot: SocialSourceSnapshot;
   format: SocialAssetFormat;
   slide?: number;
+  dataOverride?: Record<string, unknown>;
 }): Promise<Buffer> {
   const spec = HTML_SOCIAL_TEMPLATES[input.templateSlug];
   if (!spec) throw new Error(`Unknown HTML template: ${input.templateSlug}`);
@@ -270,7 +369,7 @@ async function renderHtmlTemplate(input: {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
     await page.addInitScript(data => {
       (window as any).MUVIDB_DATA = data;
-    }, spec.data(input.snapshot));
+    }, { ...spec.data(input.snapshot), ...(input.dataOverride || {}) });
     await page.goto(url.toString(), { waitUntil: 'load', timeout: 30_000 });
     await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
     await page.evaluate(() => {
@@ -293,6 +392,7 @@ export async function renderHtmlSocialTemplateAsset(input: {
   snapshot: SocialSourceSnapshot;
   format: SocialAssetFormat;
   slide?: number;
+  dataOverride?: Record<string, unknown>;
 }): Promise<RenderedAsset> {
   const spec = HTML_SOCIAL_TEMPLATES[input.templateSlug];
   const defaultDimensions = {

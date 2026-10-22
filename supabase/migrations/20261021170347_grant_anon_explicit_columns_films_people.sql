@@ -37,8 +37,6 @@
 --   grant select on public.people to anon;
 --   grant select on public.films  to anon;
 
-◇ injected env (106) from .env.local // tip: ◈ encrypted .env [www.dotenvx.com]
-◇ injected env (7) from .env // tip: ⌁ auth for agents [www.vestauth.com]
 revoke select on public.people from anon;
 grant select (
   availability_note,

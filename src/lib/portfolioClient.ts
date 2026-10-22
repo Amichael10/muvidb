@@ -165,16 +165,20 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
       `)
       .eq('id', personId)
       .single(),
-    supabase
-      .from('credits')
-      .select(`
-        id, role, character_name,
-        films!inner (
-          id, title, slug, year, poster_url, backdrop_url, synopsis,
-          release_type, streaming_links, status
-        )
-      `)
-      .eq('person_id', personId),
+    // Via /api/content: portfolio/:handle is a PUBLIC route, so the browser
+    // must not read the credits table directly. person-credits returns a
+    // superset of the fields aggregated below, and is_published matches what
+    // anon could already see (RLS hides unpublished films).
+    (async (): Promise<{ data: any[] }> => {
+      try {
+        const res = await fetch(
+          `/api/content?resource=person-credits&personId=${encodeURIComponent(personId)}`
+        );
+        return { data: res.ok ? ((await res.json()).credits || []) : [] };
+      } catch {
+        return { data: [] };
+      }
+    })(),
     supabase
       .from('person_media')
       .select('id, media_type, category, title, url, thumbnail_url, is_primary')

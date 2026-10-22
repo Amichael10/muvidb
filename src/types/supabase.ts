@@ -1768,14 +1768,19 @@ export type Database = {
           critic_id: string | null
           critic_name: string | null
           critic_title: string | null
+          excerpt_context: string | null
+          extraction_version: number
           film_id: string | null
           id: string
           is_anonymous: boolean
           is_featured: boolean
           play_id: string | null
+          publication: string | null
           quote: string
           rating: number | null
+          review_type: string
           review_url: string | null
+          social_handle: string | null
           updated_at: string
         }
         Insert: {
@@ -1784,14 +1789,19 @@ export type Database = {
           critic_id?: string | null
           critic_name?: string | null
           critic_title?: string | null
+          excerpt_context?: string | null
+          extraction_version?: number
           film_id?: string | null
           id?: string
           is_anonymous?: boolean
           is_featured?: boolean
           play_id?: string | null
+          publication?: string | null
           quote: string
           rating?: number | null
+          review_type?: string
           review_url?: string | null
+          social_handle?: string | null
           updated_at?: string
         }
         Update: {
@@ -1800,14 +1810,19 @@ export type Database = {
           critic_id?: string | null
           critic_name?: string | null
           critic_title?: string | null
+          excerpt_context?: string | null
+          extraction_version?: number
           film_id?: string | null
           id?: string
           is_anonymous?: boolean
           is_featured?: boolean
           play_id?: string | null
+          publication?: string | null
           quote?: string
           rating?: number | null
+          review_type?: string
           review_url?: string | null
+          social_handle?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -4311,6 +4326,10 @@ export type Database = {
           draft_id: string | null
           id: string
           notes: string | null
+          planner_key: string | null
+          preflight_checked_at: string | null
+          preflight_json: Json
+          preflight_status: string | null
           priority: string
           scheduled_date: string
           scheduled_time: string | null
@@ -4328,6 +4347,10 @@ export type Database = {
           draft_id?: string | null
           id?: string
           notes?: string | null
+          planner_key?: string | null
+          preflight_checked_at?: string | null
+          preflight_json?: Json
+          preflight_status?: string | null
           priority?: string
           scheduled_date: string
           scheduled_time?: string | null
@@ -4345,6 +4368,10 @@ export type Database = {
           draft_id?: string | null
           id?: string
           notes?: string | null
+          planner_key?: string | null
+          preflight_checked_at?: string | null
+          preflight_json?: Json
+          preflight_status?: string | null
           priority?: string
           scheduled_date?: string
           scheduled_time?: string | null

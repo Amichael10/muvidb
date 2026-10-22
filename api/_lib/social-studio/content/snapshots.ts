@@ -87,6 +87,11 @@ export type SnapshotCriticReview = {
   criticName: string | null;
   criticTitle: string | null;
   avatarUrl: string | null;
+  publication?: string | null;
+  socialHandle?: string | null;
+  reviewUrl?: string | null;
+  reviewType?: 'article' | 'video' | 'social_post' | null;
+  excerptContext?: string | null;
 };
 
 export type SnapshotWatchlistPick = {
@@ -218,7 +223,7 @@ export function buildActorSpotlightSnapshot(input: {
     knownForDepartment: text(input.person.known_for_department),
     bio: text(input.person.bio),
     knownFor,
-    creditCount: Number(input.person.film_count || input.person.creditCount || input.person.creditsCount) || credits.length,
+    creditCount: credits.length || Number(input.person.creditCount || input.person.creditsCount || input.person.film_count) || 0,
   };
 }
 

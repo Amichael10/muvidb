@@ -113,16 +113,19 @@ export function filmCandidateScore(film: any, intent: EditorialSeriesIntent, ref
     // High prominence to new YouTube uploads
     let youtubeRecencyBonus = 0;
     if (platform === 'youtube' && (film?.poster_url || film?.backdrop_url)) {
-      const uploadRecency = release ? Math.max(0, (referenceDate.getTime() - release) / 86_400_000) : freshnessDays;
-      if (uploadRecency <= 7) {
+      const uploadDate = dateValue(film?.youtubePublishedAt || film?.youtube_published_at);
+      const uploadRecency = uploadDate !== null
+        ? Math.max(0, (referenceDate.getTime() - uploadDate) / 86_400_000)
+        : null;
+      if (uploadRecency !== null && uploadRecency <= 7) {
         youtubeRecencyBonus = 1200; // Released in the last 7 days gets top prominence
-      } else if (uploadRecency <= 14) {
+      } else if (uploadRecency !== null && uploadRecency <= 14) {
         youtubeRecencyBonus = 900;  // Released in the last 2 weeks
-      } else if (uploadRecency <= 30) {
+      } else if (uploadRecency !== null && uploadRecency <= 30) {
         youtubeRecencyBonus = 600;  // Released in the last month
-      } else if (uploadRecency <= 90) {
+      } else if (uploadRecency !== null && uploadRecency <= 90) {
         youtubeRecencyBonus = 350;  // Released in the last 3 months
-      } else {
+      } else if (uploadRecency !== null) {
         youtubeRecencyBonus = 150;
       }
     }

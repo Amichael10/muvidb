@@ -7,7 +7,6 @@ import { enrichMissingSynopsesConcurrent } from '../_lib/cohere_enrichment.js';
 import { sweepStaleCinemas } from '../_lib/cinema-adapters/index.js';
 import refreshVideosHandler from '../_lib/refresh_videos_handler.js';
 import mirrorImagesHandler from '../_lib/mirror_images_handler.js';
-import { pruneSocialAssets, runSocialPublisher } from '../_lib/social_studio.js';
 import { classifyFilmKinds } from '../_lib/film_kind_classifier.js';
 import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
 import { sweepAndUpdatePlayStatuses } from '../_lib/theatre_service.js';
@@ -15,6 +14,8 @@ import { runYouTubeUploadWatch } from '../_lib/youtube_upload_notify.js';
 import { runCriticsSync } from '../_lib/critics_sync.js';
 import { runWhatsAppAlertQueue, backfillMovieWhatsAppAlertQueue } from '../_lib/whatsapp_alert_queue.js';
 import { monitorWhatsAppAlerts } from '../_lib/whatsapp_monitor.js';
+import { planRollingSocialCalendar } from '../_lib/editorial/monthly_planner.js';
+import { runSocialPreflight } from '../_lib/editorial/social_preflight.js';
 
 
 /**
@@ -55,7 +56,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { name: 'tmdb', fn: runTMDBSync },
         { name: 'theatre_status_sweep', fn: sweepAndUpdatePlayStatuses },
         ...(isSunday ? [{ name: 'critics', fn: runCriticsSync }] : []),
-        { name: 'ai_maintenance', fn: runAIMaintenance }
+        { name: 'ai_maintenance', fn: runAIMaintenance },
+        { name: 'social_plan', fn: () => planRollingSocialCalendar({ days: 30 }) }
       ];
 
       for (const t of tasks) {
@@ -152,11 +154,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         break;
       case 'refresh_videos': return await refreshVideosHandler(req, res);
       case 'mirror_images':  return await mirrorImagesHandler(req, res);
-      case 'social_publish': result = await runSocialPublisher({ lockedBy: 'cron-sync' }); break;
       // ~21s per person (upload, async add-on poll, download, store), against a
       // 60s function budget — so two per run, not a big batch.
       case 'people_cutouts': result = await runPeopleCutoutJob({ limit: 2 }); break;
-      case 'social_prune_assets': result = await pruneSocialAssets(); break;
       // Advisory only — records a verdict, never hides or deletes a film.
       case 'classify_film_kinds': result = await classifyFilmKinds({ limit: 100 }); break;
       case 'purge_stale_buffer': result = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 }); break;
@@ -168,46 +168,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = await runCommentMining({ scan: 50, aiCap: 10 });
         break;
       }
+      case 'social_plan':          result = await planRollingSocialCalendar({ days: 30 }); break;
+      case 'social_preflight':     result = await runSocialPreflight(); break;
       case 'morning_briefing': {
-        const { sendMorningSocialBriefing } = await import('../_lib/editorial/morning_social_briefing.js');
         const { sendMorningOutreachBriefing } = await import('../_lib/outreach/morning_outreach_briefing.js');
-        let socialRes: any = null;
         let outreachRes: any = null;
-        try {
-          socialRes = await sendMorningSocialBriefing();
-        } catch (e: any) {
-          console.error('[cron/sync] Morning social briefing error:', e?.message || e);
-          socialRes = { ok: false, error: e?.message || String(e) };
-        }
         try {
           outreachRes = await sendMorningOutreachBriefing();
         } catch (e: any) {
           console.error('[cron/sync] Morning outreach briefing error:', e?.message || e);
           outreachRes = { ok: false, error: e?.message || String(e) };
         }
-        result = { task: 'morning_briefing', social: socialRes, outreach: outreachRes };
-        break;
-      }
-      case 'morning_social': {
-        const { sendMorningSocialBriefing } = await import('../_lib/editorial/morning_social_briefing.js');
-        result = await sendMorningSocialBriefing();
+        result = { task: 'morning_briefing', outreach: outreachRes };
         break;
       }
       case 'morning_outreach': {
         const { sendMorningOutreachBriefing } = await import('../_lib/outreach/morning_outreach_briefing.js');
         result = await sendMorningOutreachBriefing();
-        break;
-      }
-      case 'daily_social_schedule':
-      case 'social_schedule': {
-        const { generateDailyScheduleDrafts } = await import('../_lib/editorial/calendar_service.js');
-        // 12:00 AM WAT is 23:00 UTC. Check DB and schedule for the upcoming days.
-        const todayWat = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 10);
-        result = await generateDailyScheduleDrafts({
-          startDate: todayWat,
-          daysAhead: 2,
-          actor: { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'amichaelwale@gmail.com', role: 'admin' },
-        });
         break;
       }
       case 'critics':              result = await runCriticsSync(); break;

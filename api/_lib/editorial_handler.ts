@@ -4,7 +4,6 @@ import { fetchSeriesCandidates } from './editorial/candidate_service.js';
 import { scoreCandidate } from './editorial/scoring_service.js';
 import { buildFactPack } from './editorial/fact_pack_service.js';
 import { generateEditorialAngles, generateEditorialCopy } from './editorial/copy_service.js';
-import { seedRollingCalendar } from './editorial/calendar_service.js';
 import { requireSocialStudioAdmin } from './social_studio.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -33,8 +32,6 @@ export async function handleEditorialTask(req: VercelRequest, res: VercelRespons
 
     // 2. GET calendar
     if (task === 'calendar') {
-      await seedRollingCalendar(30);
-
       const { data: slots, error } = await supabase
         .from('social_calendar')
         .select('*, social_content_series(*), social_drafts(*)')

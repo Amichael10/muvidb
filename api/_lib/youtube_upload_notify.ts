@@ -194,26 +194,6 @@ export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidat
       is_hidden: titleDecision.action === 'skip',
     }, { onConflict: 'channel_id,video_id' });
 
-    // 3. Auto-generate Social Studio Draft
-    if (filmId) {
-      try {
-        const { generateSocialDraft } = await import('./social_studio.js');
-        const systemActor = { id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37', email: 'admin@muvidb.com', role: 'admin' as const };
-        const draft = await generateSocialDraft(
-          {
-            contentType: 'where_to_watch',
-            sourceEntityId: filmId,
-            templateSlug: 'now-showing-cinemas-v1',
-            platforms: ['instagram', 'facebook', 'tiktok'],
-            skipAssets: true,
-          },
-          systemActor,
-        );
-        draftId = (draft as any)?.contentItem?.id || (draft as any)?.id || null;
-      } catch (err: any) {
-        console.warn('[youtube_upload_notify] Social draft generation skipped:', err?.message || err);
-      }
-    }
   } catch (err: any) {
     console.warn('[youtube_upload_notify] Instant drop processing error:', err?.message || err);
   }
@@ -225,24 +205,10 @@ export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidat
     `⏱️ *Length:* ${mins}${published ? ` · ${published} UTC` : ''}`,
     url,
     '',
-    draftId
-      ? '✨ *Social Studio Draft Ready*\n💡 *Tip:* To set an HD portrait poster, just *reply to this message with a photo*, or tap the button below.'
-      : '✅ Film imported to database catalogue.',
+    '✅ Film imported to database catalogue.',
   ].join('\n');
 
   const inlineKeyboard: any[][] = [];
-  if (draftId) {
-    inlineKeyboard.push([
-      { text: '📸 Set Portrait Poster (Send Photo)', callback_data: `prompt_poster:${draftId}` },
-    ]);
-    inlineKeyboard.push([
-      { text: '📅 Slot into Today\'s Queue', callback_data: `slot_yt:${draftId}` },
-      { text: '🚀 Publish Now', callback_data: `pub_yt:${draftId}` },
-    ]);
-    inlineKeyboard.push([
-      { text: '🎨 Open in Social Studio', url: 'https://muvidb.com/admin/social-studio' },
-    ]);
-  }
   inlineKeyboard.push([
     { text: '▶ Watch Video', url },
     { text: '🙈 Skip / Hide', callback_data: `hide_yt:${channel.id}:${video.video_id}` },
