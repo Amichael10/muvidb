@@ -3,140 +3,126 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MuviDB — Audience Verdict</title>
+<title>MuviDB — Audience Pulse</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700;800;900&display=swap');
 *{box-sizing:border-box}
-:root{--brand:#ff5a1f;--ink:#080a0d;--white:#fff}
+:root{--brand:#ff6a1a;--ink:#07090c;--white:#fff}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ink);font-family:'Barlow',sans-serif}
 .card{position:relative;width:100vw;height:100vh;overflow:hidden;color:var(--white);background:#0b0d10}
 .art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;z-index:0}
-/* Lighter than the editorial cards: the still has to stay readable behind the
-   comment cards, which already carry their own contrast. */
-.shade{position:absolute;inset:0;z-index:1;background:linear-gradient(to bottom,rgba(0,0,0,.55),rgba(0,0,0,.18) 30%,rgba(0,0,0,.30) 62%,rgba(0,0,0,.90) 100%)}
-.logo{position:absolute;left:6.5%;top:4.2%;width:17%;height:auto;z-index:6}
-.series{position:absolute;right:6.2%;top:4.4%;z-index:6;text-align:right;font-size:2.1vw;line-height:1.05;font-weight:800;letter-spacing:-.01em;text-shadow:0 .2vw .8vw rgba(0,0,0,.6)}
-.series .badge{display:inline-block;margin-top:.7vw;background:var(--brand);padding:.55vw .9vw;font-size:1.15vw;line-height:1;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+/* Moodier than the editorial cards. The comment cards are white, so the still
+   behind them has to sit back or everything fights. */
+.shade{position:absolute;inset:0;z-index:1;background:
+  radial-gradient(ellipse at 50% 55%,rgba(0,0,0,.30),rgba(0,0,0,.66) 70%),
+  linear-gradient(to bottom,rgba(0,0,0,.62),rgba(0,0,0,.34) 28%,rgba(0,0,0,.44) 70%,rgba(0,0,0,.82) 100%)}
+.logo{position:absolute;left:4.2%;top:4%;width:29%;height:auto;z-index:6;
+  filter:drop-shadow(0 .3vw 1vw rgba(0,0,0,.6))}
 
-/* Floating comment cards, scattered like the reference. */
+/* ---- comment cards ---- */
 .comments{position:absolute;inset:0;z-index:4}
-.comment{position:absolute;background:var(--white);color:#0b0d10;border-radius:1.1vw;padding:1.15vw 1.35vw 0.9vw;box-shadow:0 1.1vw 3vw rgba(0,0,0,.42);width:44%}
-.comment .who{font-size:1.45vw;font-weight:800;color:#111;margin-bottom:.35vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.comment .what{font-size:1.5vw;line-height:1.24;font-weight:600;color:#1b1f24}
-.comment .row{display:flex;gap:1.5vw;align-items:center;margin-top:.8vw;opacity:.62}
-.comment .row svg{width:1.5vw;height:1.5vw;fill:none;stroke:#4a4f57;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.comment .row .heart svg{fill:#ff2d55;stroke:#ff2d55}
-.c0{left:3.5%;top:10.5%}
-.c1{right:3.5%;top:22%;width:46%}
-.c2{left:3%;top:57.5%;width:42%}
-.c3{right:4%;top:70%;width:45%}
-.c4{left:6%;top:84%;width:43%}
+.comment{position:absolute;background:#fff;color:#0b0d10;border-radius:1.5vw;
+  padding:1.35vw 1.5vw 1.1vw;box-shadow:0 1.2vw 3.2vw rgba(0,0,0,.45);
+  border:.22vw solid var(--brand)}
+.comment .head{display:flex;align-items:center;gap:.9vw}
+.comment .pic{width:4.1vw;height:4.1vw;border-radius:50%;object-fit:cover;flex:0 0 auto;background:#d9d9d9}
+.comment .who{font-size:1.85vw;font-weight:700;color:#15181c;flex:1 1 auto;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comment .dots{flex:0 0 auto;color:#8b9099;font-size:2.1vw;line-height:.6;letter-spacing:.12em;font-weight:700}
+.comment .what{margin-top:.75vw;font-size:2.35vw;line-height:1.24;font-weight:600;color:#14171b}
+.comment .row{display:flex;gap:2.2vw;align-items:center;margin-top:1vw}
+.comment .row svg{width:1.95vw;height:1.95vw;fill:none;stroke:#9aa0a8;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.comment .row .heart svg{fill:#ff3b1f;stroke:#ff3b1f}
+.c0{left:7.5%;top:13.5%;width:38%}
+.c1{right:1.8%;top:20%;width:37%}
+.c2{left:2.5%;top:68.5%;width:37%}
+.c3{right:1.8%;top:68%;width:36%}
+.c4{left:27%;top:83%;width:44%}
 
-/* The rating block sits mid-card, where the reference puts its badge. */
-.verdict{position:absolute;left:0;right:0;top:40%;z-index:5;text-align:center;text-shadow:0 .3vw 1.2vw rgba(0,0,0,.75)}
-.stars{display:flex;justify-content:center;align-items:center;gap:1.1vw;line-height:1}
-.bucket{position:relative;width:8vw;height:8vw;display:block;filter:drop-shadow(0 .35vw .9vw rgba(0,0,0,.55))}
+/* ---- the pulse block ---- */
+.pulse{position:absolute;left:0;right:0;top:41.5%;z-index:5;text-align:center}
+.label{display:inline-block;border:.26vw solid var(--brand);border-radius:10vw;
+  padding:.75vw 2.6vw;font-size:1.95vw;font-weight:700;letter-spacing:.34em;
+  text-transform:uppercase;color:#fff;text-shadow:0 .2vw .7vw rgba(0,0,0,.6)}
+.figure{margin-top:.9vw;display:flex;align-items:center;justify-content:center;gap:0}
+.bucket{width:16vw;height:16vw;margin-right:-1.6vw;margin-top:1.5vw;flex:0 0 auto;
+  filter:drop-shadow(0 .6vw 1.4vw rgba(0,0,0,.6))}
 .bucket svg{display:block;width:100%;height:100%}
-/* An unearned bucket is drained of colour rather than hidden, so the scale
-   stays readable as "4 out of 5". */
-.bucket.off svg{filter:grayscale(1) brightness(.72);opacity:.42}
-.bucket.half .layer{position:absolute;inset:0}
-.bucket.half .layer.base svg{filter:grayscale(1) brightness(.72);opacity:.42}
-.bucket.half .layer.fill{width:50%;overflow:hidden}
-.bucket.half .layer.fill svg{width:200%}
-.score{margin-top:1.1vw;display:inline-flex;align-items:center;gap:1vw;font-size:4.6vw;line-height:1;font-weight:800;letter-spacing:-.03em}
-.score .mark{background:var(--brand);color:#fff;padding:.5vw .9vw;font-size:2.1vw;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:.35vw}
-.score .pct small{font-size:2vw;font-weight:700;letter-spacing:.02em}
-.talking{margin-top:1vw;font-size:1.7vw;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#e9e9e9}
-
-.foot{position:absolute;left:6.5%;right:6.5%;bottom:2.2%;z-index:6;display:flex;align-items:flex-end;justify-content:space-between;gap:2vw}
-.film{font-size:4.3vw;line-height:.95;font-weight:800;letter-spacing:-.04em;max-width:76%;text-shadow:0 .25vw 1vw rgba(0,0,0,.75)}
-.film.long{font-size:3.3vw}
-.film .yr{display:block;margin-top:.6vw;font-size:1.5vw;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#d8d8d8}
-.site{font-size:1.2vw;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#ddd;white-space:nowrap}
+.num{font-size:17vw;line-height:.82;font-weight:900;letter-spacing:-.045em;
+  text-shadow:0 .5vw 1.6vw rgba(0,0,0,.72)}
+.num .sign{color:var(--brand)}
+.like{margin-top:-.6vw;font-size:7.4vw;line-height:1;font-weight:900;letter-spacing:.01em;
+  text-shadow:0 .4vw 1.3vw rgba(0,0,0,.72)}
+.swoosh{display:block;margin:.5vw auto 0;width:26vw;height:2.2vw}
+.swoosh path{fill:none;stroke:var(--brand);stroke-width:7;stroke-linecap:round}
 body.render-mode *{animation:none!important;transition:none!important}
 </style>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="popcorn" viewBox="0 0 64 64"><path fill="#edd8b4" d="M51 11.9c1.9-5.8-5.4-9-8.4-5.8c-3.9-6.4-12.2-1.8-12.2-1.8s-4.5-5-10.3-.4c-2.1-2.1-8.4-2.6-8.2 7.6c-7 .6-6.9 10.4-3.7 11.9l46.2 4c4.5-1.8 6.2-13.8-3.4-15.5"/><path fill="#fff8d6" d="M21.8 4.8C22.3.5 14 1.3 15.3 6c-3.1 1.1-.9 5.8 1.6 4.6c.1 3.7 6.3 2.8 5.4-1.1c2.3 1 4.3-5.2-.5-4.7"/><path fill="#edd8b4" d="M20.7 6.1c.9-1.6-2.1-3.4-2.3-.5c-1.8-1.5-4.1 2.7-.9 2.8c-1.5 2.3 2.4 3.7 3.1 1.5c3.1-.3 2.2-4.3.1-3.8"/><path fill="#c9ae81" d="M20.8 7.7c-1.2-.3-1-.4-.9-1.3c.2-1.7-.8-1.7-.7-.1c.1 1-.1 1.4-1.1.6c-1.3-.9-1.4.1-.2.5c1.1.5.7.2.7 1.6c0 1.1.6 1.4.7 0s0-1.3 1.1-.6c1.1.6 1.5-.4.4-.7"/><path fill="#fff8d6" d="M17.9 15.8c2.3-2-3.3-7.4-5.4-1.9c-4.4-2.7-6.5 5.4-2.2 7.7c2.1 1.2 14.2.4 7.6-5.8"/><path fill="#edd8b4" d="M13.3 15.8c-1.2-1.8-4.8.5-1.9 2.3c-6.3 2.9 11.4 5 5.9-.3c1.4-3.6-3.3-4.6-4-2"/><path fill="#c9ae81" d="M15.1 16.5c-1 1.1-1 .9-1.9.4c-1.7-1.1-2.3.6-.4 1.4c1.1.4 1 .6 2.5 1.4c1.2.6 1.8 0 .3-.8s-1.4-.6 0-1.5c1.3-1.1.4-2-.5-.9"/><path fill="#fff8d6" d="M55.6 18.6c2.1-1.8-2.9-6.6-4.8-1.7c-3.9-2.4-7.3 6-2 6.9c-.4 3.6 5.2 3.6 5.2.6c3.6 1.7 5.9-4.8 1.6-5.8"/><path fill="#edd8b4" d="M51.5 18.6c-1.1-1.6-4.4.4-1.7 2c-2.4 1.1.6 5.2 2.3 2.1c1.6 2.5 4.8-.7 3.1-2.4c1.1-3.1-3.1-4-3.7-1.7"/><path fill="#c9ae81" d="M53.1 19.2c-.9 1-.9.8-1.7.3c-1.5-1-2.1-.1-.4.6c1 .4 1.3.7 0 1.4c-1.5.8-.5 1.4.4.5c1-1 .5-.7 1.8 0c1.1.5 1.6 0 .3-.7s-1.3-.6 0-1.4c1.2-.8.4-1.7-.4-.7"/><path fill="#fff8d6" d="M35.8 7c2.2-1.9-3.1-6.9-5-1.8c-4.1-2.5-7.6 6.2-2.1 7.2c-.4 3.7 5.4 3.8 5.5.6c3.7 1.8 6-5 1.6-6"/><path fill="#edd8b4" d="M31.5 7c-1.1-1.7-4.5.4-1.8 2.1c-2.5 1.1.6 5.4 2.4 2.2c1.6 2.6 5-.7 3.2-2.5c1.3-3.3-3.2-4.2-3.8-1.8"/><path fill="#c9ae81" d="M33.1 7.6c-1 1.1-.9.9-1.8.4c-1.6-1-2.2-.1-.4.6c1 .4 1.3.8.1 1.4c-1.6.9-.6 1.5.4.5s.5-.7 1.9 0c1.1.6 1.7 0 .3-.7c-1.4-.8-1.3-.6 0-1.4c1.2-.9.4-1.7-.5-.8"/><path fill="#fff8d6" d="M27.6 16.1c.6-2.9-7-4-5.3 1.6c-5 .4-2.9 7.4 2.9 7.4c8.2-.1 6.7-10.9 2.4-9"/><path fill="#edd8b4" d="M23.2 18.8c-1.6 7.9 9.9 5 5.1-.8c-1-3.6-4.5-1.8-5.1.8"/><path fill="#c9ae81" d="M25.7 18.2c-.1 1.5-1.2.8-2 1.5c-2.3 2 3.9 3.9 4.9.3c.2-.9-2.6.1-2.1-1.4c.6-1.5-.6-1.7-.8-.4"/><path fill="#fff8d6" d="M45.3 9.3c.6-2.9-6.9-3.9-5.2 1.6c-4.9.4-2.3 9.7 2.8 7.2c2 3.3 6.8-.1 4.9-2.7c4.1-.9 1.8-7.9-2.5-6.1"/><path fill="#edd8b4" d="M41.8 11.9c-2-.7-3.4 3.1-.1 2.8c-1.3 2.4 3.9 4.1 3.3.4c3 1.2 3.7-3.6 1.1-3.9c-1.1-3.6-5.3-1.7-4.3.7"/><path fill="#c9ae81" d="M43.6 11.4c-.1 1.5-.2 1.3-1.2 1.3c-1.9.1-1.8 1.2 0 .8c1.1-.3 1.6-.2.9 1.2c-.8 1.7.5 1.6.7.1s0-.9 1.5-1.1c1.3-.2 1.4-1-.2-.8s-1.4.3-.9-1.2c.5-1.4-.7-1.6-.8-.3"/><path fill="#ed4c5c" d="M7.8 22.4L15.7 62h6.5l-5.3-39.6c-.4-5.6-9.9-5.6-9.1 0"/><path fill="#f9f9f9" d="M16.9 22.4L22.2 62h6.5L26 22.4c0-5.6-9.5-5.6-9.1 0"/><path fill="#ed4c5c" d="M26 22.4L28.7 62h6.5V22.4c.3-5.6-9.2-5.6-9.2 0"/><path fill="#f9f9f9" d="M35.2 22.4V62h6.4l2.7-39.6c.6-5.6-8.8-5.6-9.1 0"/><path fill="#c94747" d="m41.6 62l4.1-2.8l1.9-35.5c.6-4.3-3-5.9-3.4-1.3z"/><path fill="#e8e8e8" d="M49.2 56.8L51.1 25c.7-4-2.8-5.6-3.4-1.3l-1.9 35.5z"/><path fill="#c94747" d="m52.1 54.9l2.3-28.5c.8-3.7-2.6-5.3-3.3-1.3l-1.9 31.8z"/><path fill="#e8e8e8" d="m54 53.6l2.3-26c.2-2.9-1.6-3.9-1.9-1.2l-2.3 28.5z"/></symbol></svg>
+
 <main class="card" id="card">
   <img class="art" id="art" alt="">
   <div class="shade"></div>
   <img class="logo" src="../../../public/images/MuviDB%20Brand/White%20Wordmark.svg" alt="MuviDB">
-  <div class="series"><span id="series"></span><span class="badge" id="badge"></span></div>
 
   <div class="comments" id="comments"></div>
 
-  <div class="verdict">
-    <div class="stars" id="stars"></div>
-    <div class="score">
-      <span class="mark">MuviDB</span>
-      <span class="pct" id="pct"></span>
+  <div class="pulse">
+    <span class="label" id="label">Audience Pulse</span>
+    <div class="figure">
+      <span class="bucket"><svg viewBox="0 0 64 64"><use href="#popcorn"/></svg></span>
+      <span class="num" id="num"></span>
     </div>
-    <div class="talking" id="talking"></div>
-  </div>
-
-  <div class="foot">
-    <div class="film" id="film"></div>
-    <div class="site" id="site">MUVIDB.COM</div>
+    <div class="like" id="like">LIKE</div>
+    <svg class="swoosh" viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M6 14C70 4 230 4 294 11"/>
+    </svg>
   </div>
 </main>
 <script>
-const DEFAULTS={series:'What Viewers’ Are Saying',badge:'Audience Verdict',title:'',year:'',image:'',likedPercent:null,commentCount:0,comments:[],footer:'MUVIDB.COM'};
+const DEFAULTS={label:'Audience Pulse',likeWord:'LIKE',image:'',likedPercent:null,comments:[]};
 
 function icons(){
-  return '<span class="bubble"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6a8 8 0 0 1 8-8h2a8 8 0 0 1 8 3Z"/></svg></span>'
+  return '<span><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6a8 8 0 0 1 8-8h2a8 8 0 0 1 8 3Z"/></svg></span>'
     + '<span><svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>'
     + '<span class="heart"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/></svg></span>'
-    + '<span><svg viewBox="0 0 24 24"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></svg></span>'
-    + '<span><svg viewBox="0 0 24 24"><path d="M12 16V3m0 0 5 5m-5-5L7 8"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></span>';
+    + '<span><svg viewBox="0 0 24 24"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></svg></span>';
+}
+
+// YouTube serves avatars at s48 by default, which is soft at this size.
+function bigAvatar(url){
+  return String(url||'').replace(/=s\d+-/,'=s176-');
 }
 
 function render(input={}){
   const d={...DEFAULTS,...(window.MUVIDB_DATA||{}),...input};
   document.getElementById('art').src=d.image||'';
-  document.getElementById('series').textContent=d.series||'';
-  document.getElementById('badge').textContent=d.badge||'';
-  document.getElementById('site').textContent=d.footer||'MUVIDB.COM';
+  document.getElementById('label').textContent=d.label||'';
+  document.getElementById('like').textContent=d.likeWord||'LIKE';
 
-  const film=document.getElementById('film');
-  const title=String(d.title||'');
-  film.innerHTML=title+(d.year?`<span class="yr">${d.year}</span>`:'');
-  film.classList.toggle('long',title.length>26);
-
-  // Stars come from the same number as the percentage, so the two can never
-  // disagree. Half-steps only; nothing is rounded up to a full star.
   const pct=Number(d.likedPercent);
-  const starsEl=document.getElementById('stars');
-  if(Number.isFinite(pct)){
-    const value=Math.round((pct/20)*2)/2;
-    const pc='<svg viewBox="0 0 64 64"><use href="#popcorn"/></svg>';
-    let html='';
-    for(let i=1;i<=5;i++){
-      if(value>=i) html+=`<span class="bucket">${pc}</span>`;
-      else if(value>=i-0.5) html+=`<span class="bucket half"><span class="layer base">${pc}</span><span class="layer fill">${pc}</span></span>`;
-      else html+=`<span class="bucket off">${pc}</span>`;
-    }
-    starsEl.innerHTML=html;
-    document.getElementById('pct').innerHTML=`${Math.round(pct)}% <small>LIKED</small>`;
-  } else { starsEl.innerHTML=''; document.getElementById('pct').textContent=''; }
-
-  // A small number is weaker proof than no number, so only claim a crowd when
-  // there genuinely is one.
-  const n=Number(d.commentCount)||0;
-  document.getElementById('talking').textContent=n>=250?`${n.toLocaleString()} viewers talking about it`:'';
+  document.getElementById('num').innerHTML=
+    Number.isFinite(pct)?`${Math.round(pct)}<span class="sign">%</span>`:'';
 
   const wrap=document.getElementById('comments');
   wrap.innerHTML='';
   (d.comments||[]).slice(0,5).forEach((c,i)=>{
     const el=document.createElement('div');
     el.className=`comment c${i}`;
+
+    const head=document.createElement('div');head.className='head';
+    const pic=document.createElement('img');pic.className='pic';pic.src=bigAvatar(c.avatar);pic.alt='';
     const who=document.createElement('div');who.className='who';who.textContent=c.author||'';
+    const dots=document.createElement('div');dots.className='dots';dots.textContent='•••';
+    head.appendChild(pic);head.appendChild(who);head.appendChild(dots);
+
     const what=document.createElement('div');what.className='what';
     const raw=String(c.body||'').replace(/\s+/g,' ').trim();
-    what.textContent=raw.length>118?raw.slice(0,115).replace(/[\s,.;:!-]+$/,'')+'…':raw;
+    what.textContent=raw.length>52?raw.slice(0,49).replace(/[\s,.;:!-]+$/,'')+'…':raw;
+
     const row=document.createElement('div');row.className='row';row.innerHTML=icons();
-    el.appendChild(who);el.appendChild(what);el.appendChild(row);
+    el.appendChild(head);el.appendChild(what);el.appendChild(row);
     wrap.appendChild(el);
   });
 }
