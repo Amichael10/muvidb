@@ -9,7 +9,7 @@ type HtmlTemplateSpec = {
   file: string;
   formats: SocialAssetFormat[];
   slides?: number;
-  data: (snapshot: SocialSourceSnapshot) => Record<string, unknown>;
+  data: (snapshot: SocialSourceSnapshot, slide?: number) => Record<string, unknown>;
   ratio?: (format: SocialAssetFormat) => string;
   dimensions?: Partial<Record<SocialAssetFormat, { width: number; height: number }>>;
 };
@@ -52,7 +52,8 @@ function simpleSpec(variant: SimpleEditorialVariant): HtmlTemplateSpec {
   return {
     file: 'simple-editorial-v1.html',
     formats: ['portrait_4_5'],
-    data: snapshot => simpleEditorialData(snapshot, variant),
+    slides: variant === 'weekend_watchlist' ? 3 : undefined,
+    data: (snapshot, slide) => simpleEditorialData(snapshot, variant, slide),
   };
 }
 
@@ -224,7 +225,7 @@ function actorData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   };
 }
 
-function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEditorialVariant): Record<string, unknown> {
+function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEditorialVariant, slide = 1): Record<string, unknown> {
   const isPerson = snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight';
   const isFilm = snapshot.kind === 'upcoming_movie';
   const isPlay = snapshot.kind === 'whats_on_stage';
@@ -290,7 +291,20 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
         metricLabel: 'DOCUMENTED CREDITS',
       };
     case 'weekend_watchlist':
-      return { ...base, series: 'Weekend Watchlist', badge: 'FRI — SUN', status: filmStatus, detail: filmDetail };
+      {
+        const pick = film?.watchlistPicks?.[Math.max(0, slide - 1)] || film;
+        return {
+          ...base,
+          series: 'Weekend Watchlist',
+          badge: `${slide}/3 · FRI — SUN`,
+          title: pick?.title || title,
+          image: pick?.posterUrl || pick?.backdropUrl || image,
+          imagePosition: 'center top',
+          status: pick?.watchAvailability || filmStatus,
+          detail: pick?.year ? String(pick.year) : filmDetail,
+          support: pick?.synopsis || base.support,
+        };
+      }
     case 'critics_say':
       {
         const review = film?.criticReview;
@@ -369,7 +383,7 @@ async function renderHtmlTemplate(input: {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
     await page.addInitScript(data => {
       (window as any).MUVIDB_DATA = data;
-    }, { ...spec.data(input.snapshot), ...(input.dataOverride || {}) });
+    }, { ...spec.data(input.snapshot, input.slide), ...(input.dataOverride || {}) });
     await page.goto(url.toString(), { waitUntil: 'load', timeout: 30_000 });
     await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
     await page.evaluate(() => {
