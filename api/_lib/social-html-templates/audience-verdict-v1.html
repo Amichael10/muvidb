@@ -33,11 +33,28 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ink);
 .comment .row{display:flex;gap:2.2vw;align-items:center;margin-top:1vw}
 .comment .row svg{width:1.95vw;height:1.95vw;fill:none;stroke:#9aa0a8;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .comment .row .heart svg{fill:#ff3b1f;stroke:#ff3b1f}
-.c0{left:7.5%;top:13.5%;width:38%}
-.c1{right:1.8%;top:20%;width:37%}
-.c2{left:2.5%;top:68.5%;width:37%}
-.c3{right:1.8%;top:68%;width:36%}
-.c4{left:27%;top:83%;width:44%}
+/* Quotes are never cut mid-sentence. When they run long the card shows fewer
+   of them and gives each more room, so the layout changes with the count. */
+.n5 .c0{left:7.5%;top:13.5%;width:38%}
+.n5 .c1{right:1.8%;top:20%;width:37%}
+.n5 .c2{left:2.5%;top:68.5%;width:37%}
+.n5 .c3{right:1.8%;top:68%;width:36%}
+.n5 .c4{left:27%;top:83%;width:44%}
+
+.n4 .c0{left:5%;top:12%;width:45%}
+.n4 .c1{right:2.5%;top:22.5%;width:44%}
+.n4 .c2{left:3.5%;top:68%;width:45%}
+.n4 .c3{right:2.5%;top:79%;width:44%}
+
+.n3 .c0{left:5%;top:12.5%;width:50%}
+.n3 .c1{right:2.5%;top:25%;width:48%}
+.n3 .c2{left:14%;top:72%;width:56%}
+
+/* A film can have fewer than three clearly-positive quotes. Without these the
+   container got a class with no rules and the cards piled up unpositioned. */
+.n2 .c0{left:6%;top:15%;width:54%}
+.n2 .c1{right:3%;top:72%;width:54%}
+.n1 .c0{left:12%;top:16%;width:60%}
 
 /* ---- the pulse block ---- */
 .pulse{position:absolute;left:0;right:0;top:41.5%;z-index:5;text-align:center}
@@ -83,6 +100,21 @@ body.render-mode *{animation:none!important;transition:none!important}
 <script>
 const DEFAULTS={label:'Audience Pulse',likeWord:'LIKE',image:'',likedPercent:null,comments:[]};
 
+function clean(text){return String(text||'').replace(/\s+/g,' ').trim();}
+
+// Five short quotes, or four longer ones, or three long ones — whichever the
+// comments actually allow. A quote is shown whole or not at all.
+const LAYOUTS=[{count:5,limit:52},{count:4,limit:95},{count:3,limit:150}];
+function chooseComments(pool){
+  const ranked=(pool||[]).filter(c=>clean(c.body).length>=12);
+  for(const {count,limit} of LAYOUTS){
+    const fits=ranked.filter(c=>clean(c.body).length<=limit);
+    if(fits.length>=count) return fits.slice(0,count);
+  }
+  // Nothing fits cleanly: take the shortest few so each still lands whole.
+  return [...ranked].sort((a,b)=>clean(a.body).length-clean(b.body).length).slice(0,3);
+}
+
 function icons(){
   return '<span><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6a8 8 0 0 1 8-8h2a8 8 0 0 1 8 3Z"/></svg></span>'
     + '<span><svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>'
@@ -107,7 +139,9 @@ function render(input={}){
 
   const wrap=document.getElementById('comments');
   wrap.innerHTML='';
-  (d.comments||[]).slice(0,5).forEach((c,i)=>{
+  const shown=chooseComments(d.comments||[]);
+  wrap.className=`comments n${shown.length}`;
+  shown.forEach((c,i)=>{
     const el=document.createElement('div');
     el.className=`comment c${i}`;
 
@@ -118,8 +152,7 @@ function render(input={}){
     head.appendChild(pic);head.appendChild(who);head.appendChild(dots);
 
     const what=document.createElement('div');what.className='what';
-    const raw=String(c.body||'').replace(/\s+/g,' ').trim();
-    what.textContent=raw.length>52?raw.slice(0,49).replace(/[\s,.;:!-]+$/,'')+'…':raw;
+    what.textContent=clean(c.body);
 
     const row=document.createElement('div');row.className='row';row.innerHTML=icons();
     el.appendChild(head);el.appendChild(what);el.appendChild(row);
