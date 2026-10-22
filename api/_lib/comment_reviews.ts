@@ -40,7 +40,44 @@ const stripHtml = (html: string) =>
 // Keep it short-but-real: a 20-char floor lets in terse criticism ("acting was
 // wooden", "the story dragged") that the old 60-char floor silently dropped —
 // exactly the commentary we WANT in the denominator, not just gushing praise.
-const isNoise = (t: string) => t.length < 20 || NOISE.some((re) => re.test(t.trim()));
+// Engagement bait ("gather here", "like my comment", "first to comment") was
+// slipping through: NOISE only matches at the START of a comment, and this
+// phrasing usually sits mid-sentence.
+//
+// Matching the phrase is not enough on its own to drop a comment. Plenty of
+// real opinions carry a bait tail — "I came from Facebook, this was a great
+// touching movie", or "I love the sister, she is so supportive. If you agree
+// with me please like". Those belong in the rating. A comment is only junk when
+// the bait IS the comment, so strip the bait and the emoji and see whether
+// anything of substance survives.
+const BAIT = [
+  /\bgather\s+(here|up)\b/gi,
+  /\blike\s+my\s+comment\b/gi,
+  /\b(first|1st)\s+(to\s+)?comment(er)?\b/gi,
+  /\bam\s+i\s+(the\s+)?first\b/gi,
+  /\b(hit|smash)\s+(the\s+)?(like|subscribe)\s*(button|bottom)?\b/gi,
+  /\btag\s+(someone|a\s+friend|your\s+\w+)\b/gi,
+  /\bdrop\s+a\s+(like|comment)\b/gi,
+  /\bmark\s+your\s+presence\b/gi,
+];
+const BAIT_RESIDUE_FLOOR = 25;
+
+export function isEngagementBait(text: string): boolean {
+  const t = (text || '').replace(/\s+/g, ' ').trim();
+  if (!BAIT.some((re) => { re.lastIndex = 0; return re.test(t); })) return false;
+
+  let residue = t;
+  for (const re of BAIT) { re.lastIndex = 0; residue = residue.replace(re, ' '); }
+  residue = residue
+    .replace(/[\p{Extended_Pictographic}]/gu, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return residue.length < BAIT_RESIDUE_FLOOR;
+}
+
+const isNoise = (t: string) =>
+  t.length < 20 || NOISE.some((re) => re.test(t.trim())) || isEngagementBait(t);
 
 // Rating math (shrink-to-average + the 0-10 -> % liked curve) lives in
 // ./rating.ts so the comment pipeline and the TMDB mapping stay in lockstep.
@@ -93,6 +130,10 @@ async function classify(comments: RawComment[]): Promise<Map<number, number>> {
 KEEP (keep=true) any comment that gives a genuine opinion or reaction about the FILM ITSELF — its story, acting, characters, pacing, ending, message, production, or emotional impact. This INCLUDES criticism, disappointment and mixed takes ("the story dragged", "the acting was wooden", "great plot but terrible sound"). We specifically WANT these — do NOT keep only praise.
 REJECT (keep=false): greetings, "first"/"who's watching", requests for where to watch, tagging or shout-outs to people, self-promotion or channel plugs, pure emoji, spam, and anything not about this film.
 
+ALSO REJECT engagement bait — comments written to farm replies or likes rather than to say anything about the film:
+  "if you like X gather here", "X fans gather here", "like my comment", "drop a like", "first to comment", "who else is watching in 2026", "I came from TikTok", "mark your presence", "count me in", "I'm here for <actor>".
+But KEEP a comment that carries a real opinion even when it also carries bait: "I came from Facebook, this was a great touching movie" says something about the film and counts; "Arinja fan gather here 😂" says nothing and does not. Decide by whether anything is actually said about the film once the bait is ignored.
+
 For each kept comment, score 1-10 = how positively that viewer truly regards the film. Be strict and use the WHOLE range — most films are ordinary:
   9-10 = genuinely exceptional, specific, strong praise
   7-8  = clearly liked it
@@ -133,7 +174,7 @@ export interface MineResult {
 export async function mineFilmComments(
   filmId: string,
   videoId: string,
-  opts: { maxKeep?: number; dryRun?: boolean } = {}
+  opts: { maxKeep?: number; dryRun?: boolean; replace?: boolean } = {}
 ): Promise<MineResult> {
   const maxKeep = opts.maxKeep ?? 8;
 
@@ -200,6 +241,20 @@ export async function mineFilmComments(
     sentiment_score: score,
     likes: c.likes,
   }));
+  // A re-mine has to clear first. Upsert only writes the comments this pass
+  // kept, so anything a previous, laxer pass stored — engagement bait, for
+  // instance — would otherwise survive forever and keep skewing the rating.
+  // Only mined YouTube rows are cleared; reviews written by real users are not
+  // ours to delete.
+  if (opts.replace) {
+    const { error: clearErr } = await supabase
+      .from('reviews')
+      .delete()
+      .eq('film_id', filmId)
+      .eq('source', 'youtube');
+    if (clearErr) return { status: 'skipped', reason: `clear:${clearErr.message.slice(0, 60)}` };
+  }
+
   const { error: upErr } = await supabase
     .from('reviews')
     .upsert(rows, { onConflict: 'film_id,external_id', ignoreDuplicates: false });
@@ -208,11 +263,17 @@ export async function mineFilmComments(
   // 5. Persist audience_rating (0-10) from mined opinions, then recompute
   //    liked_percent via SQL so user likes/dislikes are blended in (dampened).
   //    TMDB/IMDb still win as base when present; YouTube is the fallback base.
+  //
+  //    audience_rating_count is deliberately NOT written here. Despite the
+  //    name it holds the video's YouTube like count — the stats backfill fills
+  //    it, and rating.ts uses it as the vote weight in the composite blend.
+  //    Mining used to overwrite it with opinions.length (~30), which destroyed
+  //    that weight: films with 28,000 likes were suddenly weighted as if 30
+  //    people had voted.
   const { error: filmErr } = await supabase
     .from('films')
     .update({
       audience_rating: s10,
-      audience_rating_count: opinions.length,
       comments_synced_at: new Date().toISOString(),
     })
     .eq('id', filmId);
@@ -240,7 +301,21 @@ export async function mineFilmComments(
  * film it checks so 0-comment films get retried later (once they've grown) but
  * not every run.
  */
-export async function runCommentMining(opts: { scan?: number; aiCap?: number; minComments?: number; staleDays?: number } = {}) {
+export async function runCommentMining(opts: {
+  scan?: number;
+  aiCap?: number;
+  minComments?: number;
+  staleDays?: number;
+  /** Clear a film's previously mined comments before storing this pass. Use
+   *  when re-mining to flush rows an earlier, laxer filter let through. */
+  replace?: boolean;
+  /** Re-mine these films specifically, ignoring the staleness sweep. */
+  filmIds?: string[];
+  /** Re-mine films last mined before this ISO timestamp. Used to sweep the
+   *  catalogue after the filter changes, so ratings built on comments an
+   *  earlier pass should have rejected get rebuilt. */
+  remineBefore?: string;
+} = {}) {
   const scan = opts.scan ?? Number(process.env.COMMENT_MINE_SCAN || 300);
   const aiCap = opts.aiCap ?? Number(process.env.COMMENT_MINE_AICAP || 150);
   const minComments = opts.minComments ?? Number(process.env.COMMENT_MINE_MINCOMMENTS || 20);
@@ -274,6 +349,51 @@ export async function runCommentMining(opts: { scan?: number; aiCap?: number; mi
   const needsMining = (q: any) =>
     q.not('source_video_id', 'is', null)
       .or(`comments_synced_at.is.null,comments_synced_at.lt.${staleBefore}`);
+
+  // A targeted re-mine skips the staleness sweep entirely: these films were
+  // chosen because what is already stored is wrong, not because it is old.
+  if (opts.filmIds?.length || opts.remineBefore) {
+    const targeted: any[] = [];
+    if (opts.filmIds?.length) {
+      for (let i = 0; i < opts.filmIds.length; i += 200) {
+        const rows = await withRetry<any[]>(
+          () => supabase.from('films').select(COLS)
+            .in('id', opts.filmIds!.slice(i, i + 200))
+            .not('source_video_id', 'is', null),
+          'targeted re-mine lookup',
+        );
+        if (rows) targeted.push(...rows);
+      }
+    } else {
+      // Target films that actually carry a mined rating, most-opinions first.
+      // Sweeping oldest-first instead wasted calls on obscure films with no
+      // comments at all — nothing stored means no rating to correct.
+      const rows = await withRetry<any[]>(
+        () => supabase.from('films').select(COLS)
+          .not('source_video_id', 'is', null)
+          .not('comments_synced_at', 'is', null)
+          .lt('comments_synced_at', opts.remineBefore!)
+          .gt('audience_rating_count', 0)
+          .order('audience_rating_count', { ascending: false })
+          .limit(aiCap),
+        're-mine sweep lookup',
+      );
+      if (rows) targeted.push(...rows);
+    }
+    let remined = 0, failed = 0;
+    for (const f of targeted.slice(0, aiCap)) {
+      const res = await mineFilmComments(f.id, f.source_video_id, { replace: opts.replace });
+      if (res.status === 'ok') remined++;
+      else {
+        failed++;
+        if (res.reason === 'quota') {
+          console.warn('[comment-mining] quota hit during re-mine, stopping.');
+          break;
+        }
+      }
+    }
+    return { checked: targeted.length, mined: remined, skipped: failed, aiUsed: remined, viewsBackfilled: 0 };
+  }
 
   // 1. Mine the films the site actually surfaces FIRST (Top 10 / trending /
   //    featured). Newest-first alone buries ratings on obscure fresh uploads
@@ -375,7 +495,7 @@ export async function runCommentMining(opts: { scan?: number; aiCap?: number; mi
 
       if (c >= minComments && aiUsed < aiCap) {
         aiUsed++;
-        const res = await mineFilmComments(f.id, f.source_video_id);
+        const res = await mineFilmComments(f.id, f.source_video_id, { replace: opts.replace });
         if (res.status === 'ok') {
           mined++;
           // mineFilmComments already stamped comments_synced_at + rating; just

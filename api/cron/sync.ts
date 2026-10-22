@@ -169,6 +169,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = await runCommentMining({ scan: 50, aiCap: 10 });
         break;
       }
+      // One-off sweep: ratings mined before the engagement-bait filter landed
+      // were built partly on "gather here" and "first to comment" noise. This
+      // re-mines them oldest-first, clearing each film's stored comments so the
+      // junk actually goes rather than lingering beside the new rows.
+      case 'comments_remine': {
+        const { runCommentMining } = await import('../_lib/comment_reviews.js');
+        const cutoff = process.env.COMMENT_REMINE_BEFORE || '2026-10-22T00:00:00Z';
+        result = await runCommentMining({ remineBefore: cutoff, replace: true, aiCap: 10 });
+        break;
+      }
       case 'social_plan':
       // `daily_social_schedule` is the name the publisher workflow has always
       // dispatched. calendar_service was retired in 274e71b, so both names now
