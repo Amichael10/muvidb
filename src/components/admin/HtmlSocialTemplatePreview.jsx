@@ -1,0 +1,177 @@
+import { useEffect, useRef, useState } from 'react';
+
+const DEFAULT_HANDLE = '@muvidb_';
+const NATIVE_ARTBOARD_SIZE = {
+  'on-stage-theatre-v1': 1080,
+  'critics-say-v1': 1080,
+  'watchlist-this-week-v1': 1254,
+  'nollywood-debate-v1': 1254,
+  'now-showing-cinemas-v1': 1080,
+  'actor-spotlight-v1': 1280,
+};
+
+function formatDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+}
+
+function templateData(candidate, templateSlug) {
+  const source = candidate?.data || {};
+  const poster = candidate?.imageUrl || source.poster_url || source.backdrop_url || source.photo_url || source.posterUrl || source.backdropUrl || '';
+  const title = candidate?.name || source.title || 'MuviDB Pick';
+  const synopsis = source.synopsis || candidate?.subtext || '';
+  const genres = Array.isArray(source.genres) ? source.genres : [];
+  const date = formatDate(source.release_date);
+
+  if (templateSlug === 'on-stage-theatre-v1') {
+    const venue = [source.venue, source.city].filter(Boolean).join(', ') || 'Theatre venue TBA';
+    const start = formatDate(source.run_start_date);
+    const end = formatDate(source.run_end_date);
+    return { title, description: synopsis || `${title} is on stage soon. Save the date and follow MuviDB for the theatre run details.`, venue, date: start && end && start !== end ? `${start} - ${end}` : start || end || (source.year ? String(source.year) : 'Date TBA'), time: source.performance_time || 'Time TBA', poster, posterAlt: title, handle: DEFAULT_HANDLE };
+  }
+  if (templateSlug === 'critics-say-v1') return { poster, review: source.tagline || synopsis || `The conversation around ${title} is heating up.`, criticImage: '', criticName: 'MuviDB Critics', criticRole: 'African cinema review desk', rating: 4, ratingMax: 5, handle: DEFAULT_HANDLE };
+  if (templateSlug === 'watchlist-this-week-v1') {
+    const rawPicks = source.watchlistPicks || (source.picks ? source.picks : [source]);
+    const picksSource = [...rawPicks];
+    while (picksSource.length < 3) picksSource.push(picksSource[0]);
+    const picks = picksSource.slice(0, 3).map((film) => ({
+      title: film.title || film.name || title,
+      subtitle: film.year ? String(film.year) : '',
+      poster: film.poster_url || film.posterUrl || film.backdrop_url || film.backdropUrl || poster,
+      reason: film.watchAvailability || 'MuviDB pick',
+      description: film.synopsis || film.tagline || 'Add this to your weekend watchlist.',
+      platform: film.youtubeChannelName || film.youtube_channel_name ? 'youtube' : (film.watchAvailability || ''),
+      channelName: film.youtubeChannelName || film.youtube_channel_name || '',
+    }));
+    return {
+      picks,
+      backPosters: picks.map(p => p.poster).filter(Boolean),
+      handle: DEFAULT_HANDLE,
+    };
+  }
+  if (templateSlug === 'nollywood-debate-v1') return { poster, handle: DEFAULT_HANDLE };
+  if (templateSlug === 'actor-spotlight-v1') {
+    const name = candidate?.name || source.name || 'Featured Talent';
+    const parts = name.trim().split(/\s+/);
+    const firstName = candidate?.firstName || source.firstName || parts[0] || '';
+    const lastName = candidate?.lastName || source.lastName || parts.slice(1).join(' ') || '';
+    const dept = source.known_for_department || source.knownForDepartment || (source.roles && source.roles.length ? (Array.isArray(source.roles) ? source.roles.join(' . ') : source.roles) : 'ACTOR');
+    const rawCredits = source.film_count ?? source.creditCount ?? source.creditsCount ?? candidate?.film_count ?? (source.credits ? source.credits.length : null) ?? (source.knownFor && source.knownFor.length ? source.knownFor.length : 12);
+    const creditsCount = String(rawCredits);
+    const nationality = (source.nationality || source.country || 'NIGERIAN').toUpperCase();
+    return {
+      name,
+      firstName,
+      lastName,
+      nameLine1: firstName,
+      nameLine2: lastName,
+      roles: dept.toUpperCase(),
+      department: dept.toUpperCase(),
+      occupations: dept.toUpperCase(),
+      country: nationality,
+      nationality,
+      creditsCount,
+      creditsLabel: 'Verified Credits',
+      photo: poster,
+      portrait: poster,
+      handle: DEFAULT_HANDLE,
+    };
+  }
+  if (templateSlug === 'now-showing-cinemas-v1') {
+    const rawAvailability = `${source.watchAvailability || ''} ${source.platform || ''} ${candidate?.category || ''}`.toLowerCase();
+    let platform = 'docuth';
+    if (source.youtube_channel_name || source.youtubeChannelName || rawAvailability.includes('youtube')) {
+      platform = 'youtube';
+    } else if (rawAvailability.includes('docuth')) {
+      platform = 'docuth';
+    } else if (rawAvailability.includes('kav') || rawAvailability.includes('kàv')) {
+      platform = 'kava';
+    } else if (rawAvailability.includes('ebony')) {
+      platform = 'ebonyonplus';
+    } else if (rawAvailability.includes('circuit')) {
+      platform = 'circuits';
+    } else if (rawAvailability.includes('nollie')) {
+      platform = 'nolliestream';
+    } else if (rawAvailability.includes('netflix')) {
+      platform = 'netflix';
+    } else if (rawAvailability.includes('prime') || rawAvailability.includes('amazon')) {
+      platform = 'primevideo';
+    } else if (source.watchAvailability) {
+      platform = source.watchAvailability;
+    }
+
+    return {
+      title,
+      poster,
+      badge: source.watchAvailability || (source.coming_soon ? 'Coming Soon' : 'Now Streaming'),
+      platform,
+      year: source.year ? String(source.year) : '',
+      genres: genres,
+      synopsis: synopsis || source.tagline || title,
+      handle: DEFAULT_HANDLE,
+    };
+  }
+  return { poster, badge: source.platformDisplayName || source.watchAvailability || (source.coming_soon ? 'Coming Soon' : 'Now Showing'), description: source.tagline || synopsis || title, feature1Title: title, feature1Subtitle: source.year ? String(source.year) : 'MuviDB pick', feature2Title: date || 'Release date TBA', feature2Subtitle: genres.slice(0, 2).join(' / ') || 'African cinema', feature3Title: source.topCast?.[0]?.name || 'On MuviDB', feature3Subtitle: source.watchAvailability || 'Track, rate, and save', handle: DEFAULT_HANDLE };
+}
+
+function encodeData(data) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+}
+
+export default function HtmlSocialTemplatePreview({ candidate, templateSlug }) {
+  const containerRef = useRef(null);
+  const [availableSize, setAvailableSize] = useState(0);
+  const data = encodeData(templateData(candidate, templateSlug));
+  const params = new URLSearchParams({ render: '1', data });
+  const nativeSize = NATIVE_ARTBOARD_SIZE[templateSlug] || 1080;
+  const scale = availableSize ? Math.min(1, availableSize / nativeSize) : 0;
+  if (templateSlug === 'critics-say-v1') params.set('ratio', '1:1');
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return undefined;
+    const updateSize = () => {
+      const w = element.clientWidth || 0;
+      const h = element.clientHeight || 0;
+      if (w > 0 && h > 0) {
+        setAvailableSize(Math.min(w, h));
+      }
+    };
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden flex items-center justify-center">
+      {scale > 0 && (
+        <div
+          style={{
+            width: `${nativeSize}px`,
+            height: `${nativeSize}px`,
+            transform: `scale(${scale})`,
+            transformOrigin: 'center center',
+          }}
+          className="flex items-center justify-center shrink-0 pointer-events-none select-none"
+        >
+          <iframe
+            key={`${templateSlug}:${candidate?.id || candidate?.name || ''}`}
+            title={`${candidate?.name || 'MuviDB'} social graphic preview`}
+            src={`/social-templates/${templateSlug}.html?${params.toString()}`}
+            scrolling="no"
+            sandbox="allow-scripts allow-same-origin"
+            className="h-full w-full border-0 bg-transparent block"
+            style={{
+              width: `${nativeSize}px`,
+              height: `${nativeSize}px`,
+              overflow: 'hidden',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
