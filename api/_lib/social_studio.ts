@@ -2037,8 +2037,9 @@ export async function generateSocialDraft(
     .maybeSingle();
 
   if (templateError) throw templateError;
-  // If no graphic template matches, fall back to pure portrait poster format.
-  // The system posts pristine portrait posters directly without templates.
+  // If no graphic template matches, fall back to pure portrait-poster mode.
+  // A real template must always win over the poster fallback; otherwise every
+  // movie/play with artwork silently bypasses its assigned editorial template.
   const effectiveTemplate = template || (isHtmlSocialTemplate(input.templateSlug)
     ? {
         id: null,
@@ -2052,7 +2053,7 @@ export async function generateSocialDraft(
       }
     : {
         id: null,
-        slug: input.templateSlug || 'poster-only',
+        slug: 'poster-only',
         version: 1,
         is_active: true,
         template_config: { formats: ['portrait_4_5'] },
@@ -2079,10 +2080,11 @@ export async function generateSocialDraft(
     };
   }
 
-  // Pure Portrait Poster mode: all films and stage plays post their vertical portrait poster directly
+  // Pure portrait-poster mode is explicit. Having a poster is source material
+  // for an editorial template, not permission to bypass that template.
   const isPosterKind = snapshot.kind === 'upcoming_movie' || snapshot.kind === 'whats_on_stage';
   const posterSourceUrl = isPosterKind ? (snapshot as any).posterUrl : (snapshot as any).photoUrl;
-  const posterOnly = !input.skipAssets && Boolean(posterSourceUrl);
+  const posterOnly = effectiveTemplate.slug === 'poster-only' && !input.skipAssets && Boolean(posterSourceUrl);
   const poster = posterOnly
     ? await preparePoster(await downloadSocialImage(posterSourceUrl)).catch((err: any) => {
         console.warn(`[generateSocialDraft] Poster preparation rejected for ${posterSourceUrl}:`, err.message);
@@ -2136,7 +2138,7 @@ export async function generateSocialDraft(
         snapshot,
         templateSlug: effectiveTemplate.slug === 'poster-only' ? null : effectiveTemplate.slug,
         templateVersion: effectiveTemplate.version,
-        formats: isPosterKind ? ['square_1_1'] : templateFormats(effectiveTemplate.template_config, effectiveTemplate.slug),
+        formats: templateFormats(effectiveTemplate.template_config, effectiveTemplate.slug),
       });
 
   if (assets.error) warnings.push(`Asset rendering failed: ${assets.error}`);
