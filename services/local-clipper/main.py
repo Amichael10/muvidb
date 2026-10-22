@@ -32,6 +32,7 @@ if str(Path(__file__).resolve().parent) not in _sys.path:
     _sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import caption_quality
+import moment_score
 import scene_snap
 import transcribe as transcribe_mod
 from fastapi.middleware.cors import CORSMiddleware
@@ -139,6 +140,16 @@ class MetadataRequest(BaseModel):
     transcribe: Literal["auto", "off"] = "auto"
 
 
+class MomentsRequest(BaseModel):
+    url: HttpUrl
+    clip_seconds: float = Field(default=moment_score.DEFAULT_CLIP_SECONDS, ge=10, le=120)
+    shortlist: int = Field(default=moment_score.SHORTLIST_SIZE, ge=1, le=20)
+    # The caller already has /metadata output; passing the caption track lets
+    # music markers count against a window even when the track is unusable
+    # as dialogue.
+    transcript: str = ""
+
+
 class SnapRequest(BaseModel):
     url: HttpUrl
     start_time: float = Field(default=0, ge=0)
@@ -244,6 +255,7 @@ def health(request: Request):
         "version": "2.2.0",
         "ffmpeg": bool(shutil.which("ffmpeg")),
         "scene_snap": scene_snap.scenedetect_available(),
+        "moment_scoring": bool(shutil.which("ffmpeg")),
         "transcription": transcribe_mod.whisper_available(),
         "filmcraft": bool(fc_path),
         "filmcraft_version": "0.5.0" if fc_path else None,
@@ -510,6 +522,46 @@ def snap(payload: SnapRequest):
         "original_start_time": round(float(payload.start_time), 3),
         "original_end_time": round(float(payload.end_time), 3),
         **report,
+    }
+
+
+@app.post("/moments")
+def moments(payload: MomentsRequest):
+    """Rank the most dramatic stretches of a film using local signals only.
+
+    No transcription and no API calls, so this works on Yoruba films where
+    captions are noise and Whisper cannot help. Loudness is scanned over the
+    whole film, then speech detection refines a shortlist.
+    """
+    require_dependencies()
+    with tempfile.TemporaryDirectory(prefix="muvidb-moments-") as scratch:
+        work = Path(scratch)
+        audio = download_audio_for_transcription(str(payload.url), work)
+        if not audio:
+            raise HTTPException(status_code=502, detail="Could not fetch audio for analysis")
+
+        series = moment_score.scan_loudness(audio)
+        if not series:
+            raise HTTPException(status_code=500, detail="Loudness scan produced nothing")
+
+        duration = series[-1][0] + moment_score.DEFAULT_BLOCK_SECONDS
+        ranked = moment_score.rank_moments(
+            series,
+            clip_seconds=payload.clip_seconds,
+            music_seconds=moment_score.music_seconds_from_captions(payload.transcript),
+            duration=duration,
+        )
+        spread = moment_score.drop_overlaps(ranked)[: payload.shortlist]
+        fractions = moment_score.speech_fraction(
+            audio, [(c["start_time"], c["end_time"]) for c in spread], workdir=work
+        )
+        final = moment_score.apply_speech_scores(spread, fractions)
+
+    return {
+        "duration": round(duration, 1),
+        "blocks_scanned": len(series),
+        "candidates": final,
+        "best": final[0] if final else None,
     }
 
 

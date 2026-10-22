@@ -19,6 +19,7 @@ def _load(name: str):
 transcribe = _load("transcribe")
 scene_snap = _load("scene_snap")
 caption_quality = _load("caption_quality")
+moment_score = _load("moment_score")
 
 
 class CaptionQualityTests(unittest.TestCase):
@@ -137,6 +138,81 @@ class TranscriptTrustTests(unittest.TestCase):
 
     def test_threshold_is_adjustable(self):
         self.assertTrue(transcribe.is_transcript_trustworthy([("yo", 0.50)], min_confidence=0.4))
+
+
+class MomentScoreTests(unittest.TestCase):
+    """The language-independent scorer: loudness, dynamics, speech, music."""
+
+    def test_parses_ffmpeg_rms_output(self):
+        raw = ("frame:0 pts:0 pts_time:0\n"
+               "lavfi.astats.Overall.RMS_level=-25.3\n"
+               "frame:1 pts:160000 pts_time:10\n"
+               "lavfi.astats.Overall.RMS_level=-18.6\n")
+        self.assertEqual(moment_score.parse_rms_scan(raw), [(0.0, -25.3), (10.0, -18.6)])
+
+    def test_silent_blocks_are_ranked_badly_not_dropped(self):
+        raw = "pts_time:0\nRMS_level=-inf\npts_time:10\nRMS_level=-12.0\n"
+        series = moment_score.parse_rms_scan(raw)
+        self.assertEqual(len(series), 2)
+        self.assertLess(series[0][1], -100)
+
+    def _series(self, loud_at: float, total: float = 4000.0):
+        series = []
+        t = 0.0
+        while t < total:
+            quiet = -25.0
+            loud = -6.0 if loud_at <= t < loud_at + 45 else quiet
+            series.append((t, loud))
+            t += 10.0
+        return series
+
+    def test_ranks_the_loud_stretch_first(self):
+        ranked = moment_score.rank_moments(self._series(2000.0), duration=4000.0)
+        self.assertTrue(ranked)
+        self.assertLessEqual(abs(ranked[0]["start_time"] - 2000.0), 45.0)
+
+    def test_stays_inside_the_allowed_window(self):
+        ranked = moment_score.rank_moments(self._series(2000.0), duration=4000.0)
+        for candidate in ranked:
+            self.assertGreaterEqual(candidate["start_time"], 4000.0 * 0.15 - 1)
+            self.assertLessEqual(candidate["end_time"], 4000.0 * 0.88 + 1)
+
+    def test_music_markers_push_a_window_down(self):
+        series = self._series(2000.0)
+        clean = moment_score.rank_moments(series, duration=4000.0)
+        noisy = moment_score.rank_moments(series, duration=4000.0,
+                                          music_seconds=[2005.0, 2015.0, 2025.0])
+        best_clean = next(c for c in clean if abs(c["start_time"] - 2000.0) < 5)
+        best_noisy = next(c for c in noisy if abs(c["start_time"] - 2000.0) < 5)
+        self.assertLess(best_noisy["score"], best_clean["score"])
+
+    def test_drop_overlaps_spreads_picks_across_the_film(self):
+        candidates = [{"start_time": float(t), "end_time": t + 45.0, "score": -t} for t in (100, 110, 120, 900)]
+        kept = moment_score.drop_overlaps(candidates, min_gap=60.0)
+        self.assertEqual([c["start_time"] for c in kept], [100.0, 900.0])
+
+    def test_speech_demotes_a_loud_window_with_little_dialogue(self):
+        # The real case: 41:43 was loudest but only 28% speech, a music sting.
+        candidates = [
+            {"start_time": 2503.0, "end_time": 2548.0, "score": 2.089},
+            {"start_time": 3043.0, "end_time": 3088.0, "score": 1.695},
+        ]
+        fractions = {(2503.0, 2548.0): 0.281, (3043.0, 3088.0): 1.0}
+        ranked = moment_score.apply_speech_scores(candidates, fractions)
+        self.assertEqual(ranked[0]["start_time"], 3043.0)
+
+    def test_missing_speech_data_leaves_a_candidate_untouched(self):
+        candidates = [{"start_time": 10.0, "end_time": 55.0, "score": 1.0}]
+        ranked = moment_score.apply_speech_scores(candidates, {})
+        self.assertEqual(ranked[0]["score"], 1.0)
+        self.assertNotIn("speech_fraction", ranked[0])
+
+    def test_empty_series_ranks_nothing(self):
+        self.assertEqual(moment_score.rank_moments([]), [])
+
+    def test_reads_music_timestamps_out_of_a_caption_track(self):
+        track = "[12:30] [music] something [13:00] hello there [14:00] [music]"
+        self.assertEqual(moment_score.music_seconds_from_captions(track), [750.0, 840.0])
 
 
 class SceneSnapTests(unittest.TestCase):
