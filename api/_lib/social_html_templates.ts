@@ -235,9 +235,9 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
   const image = person
     ? (person.photoCutoutUrl || person.photoUrl || person.knownFor[0]?.posterUrl || '')
     : film
-      ? (film.backdropUrl || film.posterUrl || '')
+      ? (film.posterUrl || film.backdropUrl || '')
       : stage
-        ? (stage.backdropUrl || stage.posterUrl || '')
+        ? (stage.posterUrl || stage.backdropUrl || '')
         : '';
   const title = person?.name || film?.title || stage?.title || 'MuviDB';
   const filmStatus = film?.watchAvailability || (film?.comingSoon ? 'Coming soon' : 'Discover');
