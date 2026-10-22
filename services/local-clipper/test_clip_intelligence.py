@@ -78,6 +78,27 @@ class TranscriptionWindowTests(unittest.TestCase):
         self.assertEqual(transcribe.format_timestamp(3725), "01:02:05")
 
 
+class TranscriptTrustTests(unittest.TestCase):
+    """A confident fabrication is worse than no transcript, so low confidence is dropped."""
+
+    def test_rejects_the_yoruba_case_that_returned_gibberish(self):
+        # Measured on a real Yoruba feature: 'yo' at 0.44 and 0.50.
+        self.assertFalse(transcribe.is_transcript_trustworthy([("yo", 0.44), ("yo", 0.50)]))
+
+    def test_accepts_confident_english(self):
+        self.assertTrue(transcribe.is_transcript_trustworthy([("en", 0.97), ("en", 0.91)]))
+
+    def test_judges_on_the_best_window_not_the_average(self):
+        # A quiet window should not disqualify a clearly spoken one.
+        self.assertTrue(transcribe.is_transcript_trustworthy([("en", 0.12), ("en", 0.88)]))
+
+    def test_no_detections_is_not_trustworthy(self):
+        self.assertFalse(transcribe.is_transcript_trustworthy([]))
+
+    def test_threshold_is_adjustable(self):
+        self.assertTrue(transcribe.is_transcript_trustworthy([("yo", 0.50)], min_confidence=0.4))
+
+
 class SceneSnapTests(unittest.TestCase):
     def test_picks_the_closest_cut(self):
         self.assertEqual(scene_snap.nearest_cut(100.0, [96.0, 101.0, 140.0], max_shift=2.5), 101.0)

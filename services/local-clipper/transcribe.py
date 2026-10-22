@@ -34,6 +34,29 @@ DEFAULT_MODEL = "base"
 MODEL_FALLBACKS = ("base", "tiny")
 DEFAULT_CPU_THREADS = 2
 
+# Whisper transcribes Yoruba, Igbo and Hausa badly. On a Yoruba feature it
+# reported language 'yo' at 0.44-0.50 confidence and returned gibberish, and
+# forcing language='en' produced fluent English dialogue that was simply
+# invented. A confident-sounding fabrication is worse than no transcript at
+# all, because the clip picker would choose a scene from lines nobody speaks.
+# So the language is never forced, and a low-confidence result is discarded.
+MIN_LANGUAGE_CONFIDENCE = 0.6
+
+
+def is_transcript_trustworthy(
+    detections: list[tuple[str | None, float]],
+    min_confidence: float = MIN_LANGUAGE_CONFIDENCE,
+) -> bool:
+    """True when Whisper was confident enough about what it was listening to.
+
+    Judged on the best window rather than the average: one clear stretch of
+    dialogue is enough to trust, and quiet windows drag an average down.
+    """
+    confidences = [conf for _lang, conf in detections if conf is not None]
+    if not confidences:
+        return False
+    return max(confidences) >= min_confidence
+
 
 def format_timestamp(seconds: float) -> str:
     """Match the `[mm:ss]` / `[hh:mm:ss]` shape parse_vtt_with_timestamps emits."""
@@ -141,6 +164,9 @@ def plan_transcription_windows(
 def extract_audio_window(source: Path, start: float, end: float, destination: Path) -> bool:
     """Cut one window to 16 kHz mono WAV, which is what Whisper wants."""
     if not shutil.which("ffmpeg"):
+        # Silently returning here once made transcription look like it ran and
+        # found nothing, when in fact no audio was ever extracted.
+        print("[Clipper] Cannot extract audio for transcription: ffmpeg is not on PATH.")
         return False
     # `-ss` before `-i` seeks cheaply; `-t` (a duration) rather than `-to`,
     # because as an input option `-to` is not honoured consistently and silently
@@ -230,17 +256,23 @@ def transcribe_windows(
     scratch = workdir or audio_path.parent
     entries: list[tuple[float, str]] = []
 
+    detections: list[tuple[str | None, float]] = []
+
     for index, (start, end) in enumerate(windows):
         chunk = scratch / f"whisper-window-{index}.wav"
         try:
             if not extract_audio_window(audio_path, start, end, chunk):
                 continue
-            segments, _info = model.transcribe(
+            # The language is deliberately not pinned: forcing one makes Whisper
+            # invent plausible dialogue instead of admitting it cannot tell.
+            segments, info = model.transcribe(
                 str(chunk),
                 beam_size=1,
                 vad_filter=True,
                 condition_on_previous_text=False,
             )
+            detections.append((getattr(info, "language", None),
+                               float(getattr(info, "language_probability", 0.0) or 0.0)))
             for segment in segments:
                 text = (segment.text or "").strip()
                 if text:
@@ -249,6 +281,12 @@ def transcribe_windows(
             print(f"[Clipper] Whisper window {start:.0f}-{end:.0f}s skipped: {exc}")
         finally:
             chunk.unlink(missing_ok=True)
+
+    if not is_transcript_trustworthy(detections):
+        summary = ", ".join(f"{lang or '?'}@{conf:.2f}" for lang, conf in detections) or "nothing detected"
+        print(f"[Clipper] Discarding transcript: language confidence too low ({summary}). "
+              f"Better no dialogue than invented dialogue.")
+        return ""
 
     entries.sort(key=lambda item: item[0])
     rendered = " ".join(f"[{format_timestamp(at)}] {text}" for at, text in entries)
