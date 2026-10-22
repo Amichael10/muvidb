@@ -23,6 +23,16 @@ from typing import Literal
 
 import yt_dlp
 from fastapi import FastAPI, HTTPException, Request
+
+# These siblings are imported as top-level modules, which only resolves when
+# this directory is on sys.path. uvicorn's --app-dir arranges that, but loading
+# main.py by file path (as the tests do) does not, so make it explicit.
+import sys as _sys
+if str(Path(__file__).resolve().parent) not in _sys.path:
+    _sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import scene_snap
+import transcribe as transcribe_mod
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, HttpUrl
@@ -105,6 +115,8 @@ class ClipRequest(BaseModel):
     fit_mode: Literal["cover", "contain"] = "cover"
     title: str = "clip"
     engine: Literal["auto", "filmcraft", "ffmpeg"] = "auto"
+    # Nudge both ends onto the nearest real shot change before rendering.
+    snap_to_scene: bool = True
 
 
 def get_filmcraft_path() -> Path | None:
@@ -122,6 +134,15 @@ def get_filmcraft_path() -> Path | None:
 
 class MetadataRequest(BaseModel):
     url: HttpUrl
+    # "auto" transcribes locally only when YouTube has no usable captions.
+    transcribe: Literal["auto", "off"] = "auto"
+
+
+class SnapRequest(BaseModel):
+    url: HttpUrl
+    start_time: float = Field(default=0, ge=0)
+    end_time: float = Field(default=30, gt=0)
+    max_shift: float = Field(default=scene_snap.DEFAULT_MAX_SHIFT, ge=0, le=10)
 
 
 class BatchClipRequest(BaseModel):
@@ -221,6 +242,8 @@ def health(request: Request):
         "service": "muvidb-local-clipper",
         "version": "2.2.0",
         "ffmpeg": bool(shutil.which("ffmpeg")),
+        "scene_snap": scene_snap.scenedetect_available(),
+        "transcription": transcribe_mod.whisper_available(),
         "filmcraft": bool(fc_path),
         "filmcraft_version": "0.5.0" if fc_path else None,
         "pairing_token": PAIRING_TOKEN if request.headers.get("origin") in ALLOWED_ORIGINS else None,
@@ -340,14 +363,137 @@ def metadata(payload: MetadataRequest):
                     "intensity": round(float(pt.get("value", 0)), 3)
                 })
 
+    duration_seconds = float(info.get("duration") or 0)
+    transcript_source = "captions" if transcript else "none"
+    transcribed_windows: list[dict] = []
+
+    # No captions means the picker would otherwise be asked to guess a scene
+    # from the synopsis alone. Transcribe a bounded set of windows instead.
+    if not transcript and payload.transcribe == "auto" and duration_seconds > 0:
+        if not transcribe_mod.whisper_available():
+            print("[Clipper] No captions and faster-whisper is not installed; skipping transcription.")
+        else:
+            windows = transcribe_mod.plan_transcription_windows(
+                duration_seconds,
+                heatmap_peaks=heatmap_peaks,
+                max_total_seconds=float(os.getenv("CLIPPER_WHISPER_MAX_MINUTES", "6")) * 60.0,
+            )
+            if windows:
+                planned = sum(end - start for start, end in windows)
+                print(f"[Clipper] No captions; transcribing {planned/60:.1f} min across {len(windows)} window(s)…")
+                started = time.time()
+                with tempfile.TemporaryDirectory(prefix="muvidb-whisper-") as scratch:
+                    audio_path = download_audio_for_transcription(str(payload.url), Path(scratch))
+                    if audio_path:
+                        transcript = transcribe_mod.transcribe_windows(
+                            audio_path, windows, workdir=Path(scratch), max_chars=16000
+                        )
+                if transcript:
+                    transcript_source = "whisper"
+                    transcribed_windows = [
+                        {"start_time": round(start, 2), "end_time": round(end, 2)} for start, end in windows
+                    ]
+                    print(f"[Clipper] Transcribed in {time.time() - started:.0f}s ({len(transcript)} chars).")
+                else:
+                    print("[Clipper] Transcription produced no usable text.")
+
     return {
         "title": info.get("title") or "",
         "duration": info.get("duration") or 0,
         "description": desc,
         "transcript": transcript,
+        "transcript_source": transcript_source,
+        "transcribed_windows": transcribed_windows,
         "chapters": chapters,
         "heatmap_peaks": heatmap_peaks,
         "description_chapters": desc_chapters[:15]
+    }
+
+
+def download_audio_for_transcription(url: str, workdir: Path) -> Path | None:
+    """Fetch audio only. A film's audio track is a small fraction of the video."""
+    target = workdir / "source-audio.m4a"
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "format": "bestaudio/best",
+        "outtmpl": str(workdir / "source-audio.%(ext)s"),
+        **cookie_options(),
+    }
+    try:
+        with yt_dlp.YoutubeDL(opts) as downloader:
+            downloader.download([url])
+    except Exception as exc:
+        print(f"[Clipper] Audio download for transcription failed: {exc}")
+        return None
+    if target.exists():
+        return target
+    candidates = sorted(workdir.glob("source-audio.*"), key=lambda p: p.stat().st_size, reverse=True)
+    return candidates[0] if candidates else None
+
+
+def resolve_lowres_stream_url(url: str) -> str | None:
+    """A small video-only stream URL. Scene detection needs motion, not detail."""
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "format": "worstvideo[height>=144]/worstvideo/worst",
+        **cookie_options(),
+    }
+    try:
+        with yt_dlp.YoutubeDL(opts) as downloader:
+            info = downloader.extract_info(url, download=False)
+    except Exception as exc:
+        print(f"[Clipper] Could not resolve a proxy stream: {exc}")
+        return None
+    if info.get("url"):
+        return info["url"]
+    for fmt in info.get("formats") or []:
+        if fmt.get("url") and fmt.get("vcodec") not in (None, "none"):
+            return fmt["url"]
+    return None
+
+
+def snap_clip_range(url: str, start: float, end: float, max_shift: float) -> tuple[float, float, dict]:
+    """Move a proposed range onto nearby shot changes, or leave it untouched."""
+    if not scene_snap.scenedetect_available():
+        return start, end, {"snapped_start": False, "snapped_end": False, "reason": "scenedetect_not_installed"}
+
+    padding = scene_snap.DEFAULT_PROXY_PADDING
+    proxy_start = max(0.0, start - padding)
+    proxy_end = end + padding
+    source = url if not ("youtube.com" in url or "youtu.be" in url) else resolve_lowres_stream_url(url)
+    if not source:
+        return start, end, {"snapped_start": False, "snapped_end": False, "reason": "no_proxy_stream"}
+
+    with tempfile.TemporaryDirectory(prefix="muvidb-snap-") as scratch:
+        proxy = Path(scratch) / "proxy.mp4"
+        if not scene_snap.build_proxy(source, proxy_start, proxy_end, proxy):
+            return start, end, {"snapped_start": False, "snapped_end": False, "reason": "proxy_build_failed"}
+        cuts = scene_snap.detect_cuts(proxy, offset=proxy_start)
+
+    snapped_start, snapped_end, report = scene_snap.snap_range(start, end, cuts, max_shift=max_shift)
+    report["proxy_window"] = [round(proxy_start, 2), round(proxy_end, 2)]
+    return snapped_start, snapped_end, report
+
+
+@app.post("/snap")
+def snap(payload: SnapRequest):
+    """Report where a proposed clip range would land once snapped to shot changes."""
+    require_dependencies()
+    if payload.end_time <= payload.start_time:
+        raise HTTPException(status_code=400, detail="end_time must be after start_time")
+    start, end, report = snap_clip_range(
+        str(payload.url), float(payload.start_time), float(payload.end_time), float(payload.max_shift)
+    )
+    return {
+        "start_time": round(start, 3),
+        "end_time": round(end, 3),
+        "original_start_time": round(float(payload.start_time), 3),
+        "original_end_time": round(float(payload.end_time), 3),
+        **report,
     }
 
 
@@ -395,9 +541,28 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
     """Fast stream-based slicing and rendering in sub-30s with master segment sharing."""
     start = float(payload.start_time)
     end = float(payload.end_time)
-    duration = end - start
     require_dependencies()
     url = str(payload.url)
+
+    # Land both ends on real shot changes so the clip opens and closes cleanly
+    # instead of part-way through a shot. Failure here is never fatal: the
+    # originally chosen range is kept.
+    if payload.snap_to_scene:
+        try:
+            CLIP_JOBS[token].update({"message": "Finding the nearest shot changes…", "progress": 8})
+            snapped_start, snapped_end, report = snap_clip_range(
+                url, start, end, scene_snap.DEFAULT_MAX_SHIFT
+            )
+            if report.get("snapped_start") or report.get("snapped_end"):
+                print(f"[Clipper] Snapped {start:.2f}-{end:.2f} to {snapped_start:.2f}-{snapped_end:.2f} ({report})")
+                start, end = snapped_start, snapped_end
+                CLIP_JOBS[token]["scene_snap"] = report
+            else:
+                print(f"[Clipper] Left range unsnapped: {report.get('reason', 'no nearby cut')}")
+        except Exception as exc:
+            print(f"[Clipper] Scene snapping skipped: {exc}")
+
+    duration = end - start
     try:
         # Check if FilmCraft engine is requested or if it's the FilmCraft demo URL
         if payload.engine == "filmcraft" or "filmcraft" in url.lower():

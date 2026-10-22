@@ -3,3 +3,12 @@ uvicorn[standard]==0.35.0
 # Keep a broadly available floor; pip will install the newest compatible yt-dlp.
 yt-dlp>=2025.1.15
 pydantic==2.11.7
+# Shot-boundary detection, so a clip starts and ends on a real cut.
+scenedetect>=0.6.4
+# Local transcription for films with no YouTube captions. CPU int8 is enough;
+# weights download on first use.
+faster-whisper>=1.1.0
+# faster-whisper 1.2.x still calls av.open(..., metadata_errors=...), which PyAV
+# removed. Installing it unpinned pulls av 19 and every transcribe() call then
+# dies with "open() got an unexpected keyword argument 'metadata_errors'".
+av>=11,<15
