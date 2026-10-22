@@ -124,6 +124,11 @@ export type TelegramVideoOpts = {
   caption?: string;
   chatId?: string;
   replyMarkup?: { inline_keyboard: TelegramInlineButton[][] };
+  // Without these Telegram guesses, and a 1080x1920 review clip can render as
+  // a small square — which makes a vertical cut impossible to judge.
+  width?: number;
+  height?: number;
+  duration?: number;
 };
 
 export async function sendTelegramVideo(
@@ -154,6 +159,9 @@ export async function sendTelegramVideo(
     };
     if (opts.caption) body.caption = opts.caption.slice(0, 1024);
     if (opts.replyMarkup) body.reply_markup = opts.replyMarkup;
+    if (opts.width) body.width = Math.round(opts.width);
+    if (opts.height) body.height = Math.round(opts.height);
+    if (opts.duration) body.duration = Math.round(opts.duration);
 
     const res = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, {
       method: 'POST',
@@ -178,6 +186,9 @@ export async function sendTelegramVideo(
             const formData = new FormData();
             formData.append('chat_id', targetChatId);
             formData.append('video', blob, 'video.mp4');
+            if (opts.width) formData.append('width', String(Math.round(opts.width)));
+            if (opts.height) formData.append('height', String(Math.round(opts.height)));
+            if (opts.duration) formData.append('duration', String(Math.round(opts.duration)));
             formData.append('supports_streaming', 'true');
             if (opts.caption) formData.append('caption', opts.caption.slice(0, 1024));
             if (opts.replyMarkup) formData.append('reply_markup', JSON.stringify(opts.replyMarkup));
