@@ -16,6 +16,7 @@ import { runWhatsAppAlertQueue, backfillMovieWhatsAppAlertQueue } from '../_lib/
 import { monitorWhatsAppAlerts } from '../_lib/whatsapp_monitor.js';
 import { planRollingSocialCalendar } from '../_lib/editorial/monthly_planner.js';
 import { runSocialPreflight } from '../_lib/editorial/social_preflight.js';
+import { pruneSocialAssets, runSocialPublisher } from '../_lib/social_studio.js';
 
 
 /**
@@ -168,8 +169,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = await runCommentMining({ scan: 50, aiCap: 10 });
         break;
       }
-      case 'social_plan':          result = await planRollingSocialCalendar({ days: 30 }); break;
-      case 'social_preflight':     result = await runSocialPreflight(); break;
+      case 'social_plan':
+      // `daily_social_schedule` is the name the publisher workflow has always
+      // dispatched. calendar_service was retired in 274e71b, so both names now
+      // run the rolling planner.
+      case 'daily_social_schedule':
+      case 'social_schedule':       result = await planRollingSocialCalendar({ days: 30 }); break;
+      case 'social_preflight':      result = await runSocialPreflight(); break;
+      case 'social_publish':        result = await runSocialPublisher({ lockedBy: 'cron-sync' }); break;
+      case 'social_prune_assets':   result = await pruneSocialAssets(); break;
       case 'morning_briefing': {
         const { sendMorningOutreachBriefing } = await import('../_lib/outreach/morning_outreach_briefing.js');
         let outreachRes: any = null;
