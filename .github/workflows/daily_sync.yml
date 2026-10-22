@@ -6,6 +6,8 @@ on:
     - cron: '0 5 * * *'
     # YouTube Sync: 3 times a day (every 8 hours)
     - cron: '0 */8 * * *'
+    # Back-mine sweep: drains the pre-bait-filter backlog, then no-ops.
+    - cron: '30 */4 * * *'
     # 10:00 AM WAT (UTC+1) = 9:00 AM UTC (TMDB/Kava - Daily)
     - cron: '0 9 * * *'
     # AI Maintenance: Twice a day (every 12 hours)
@@ -29,6 +31,7 @@ on:
           - showtimes
           - videos
           - comments
+          - comments_remine
           - tmdb
           - feed_kappa
           - feed_gamma
@@ -205,6 +208,31 @@ jobs:
         run: |
           echo "Mining YouTube comments into audience reviews + ratings…"
           npx tsx scripts/sync-comments.ts
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY || secrets.VITE_YOUTUBE_API_KEY }}
+          VITE_YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY || secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_API_KEY_2: ${{ secrets.YOUTUBE_API_KEY_2 }}
+          YOUTUBE_API_KEY_3: ${{ secrets.YOUTUBE_API_KEY_3 }}
+          YOUTUBE_API_KEY_4: ${{ secrets.YOUTUBE_API_KEY_4 }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+          GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+          GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
+          GEMINI_API_KEY_5: ${{ secrets.GEMINI_API_KEY_5 }}
+          GEMINI_API_KEY_6: ${{ secrets.GEMINI_API_KEY_6 }}
+          GEMINI_API_KEY_7: ${{ secrets.GEMINI_API_KEY_7 }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Re-mine Comments After Bait Filter (Every 4 Hours)
+        if: github.event.schedule == '30 */4 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'comments_remine'))
+        run: |
+          echo "Re-mining films whose ratings predate the engagement-bait filter…"
+          npx tsx scripts/remine-comments.ts
         continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
