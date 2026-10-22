@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MuviDB — Audience Verdict</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700;800&display=swap');
+*{box-sizing:border-box}
+:root{--brand:#ff5a1f;--ink:#080a0d;--white:#fff}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ink);font-family:'Barlow',sans-serif}
+.card{position:relative;width:100vw;height:100vh;overflow:hidden;color:var(--white);background:#0b0d10}
+.art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;z-index:0}
+/* Lighter than the editorial cards: the still has to stay readable behind the
+   comment cards, which already carry their own contrast. */
+.shade{position:absolute;inset:0;z-index:1;background:linear-gradient(to bottom,rgba(0,0,0,.55),rgba(0,0,0,.18) 30%,rgba(0,0,0,.30) 62%,rgba(0,0,0,.90) 100%)}
+.logo{position:absolute;left:6.5%;top:4.2%;width:17%;height:auto;z-index:6}
+.series{position:absolute;right:6.2%;top:4.4%;z-index:6;text-align:right;font-size:2.1vw;line-height:1.05;font-weight:800;letter-spacing:-.01em;text-shadow:0 .2vw .8vw rgba(0,0,0,.6)}
+.series .badge{display:inline-block;margin-top:.7vw;background:var(--brand);padding:.55vw .9vw;font-size:1.15vw;line-height:1;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+
+/* Floating comment cards, scattered like the reference. */
+.comments{position:absolute;inset:0;z-index:4}
+.comment{position:absolute;background:var(--white);color:#0b0d10;border-radius:1.1vw;padding:1.15vw 1.35vw 0.9vw;box-shadow:0 1.1vw 3vw rgba(0,0,0,.42);width:44%}
+.comment .who{font-size:1.45vw;font-weight:800;color:#111;margin-bottom:.35vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comment .what{font-size:1.5vw;line-height:1.24;font-weight:600;color:#1b1f24}
+.comment .row{display:flex;gap:1.5vw;align-items:center;margin-top:.8vw;opacity:.62}
+.comment .row svg{width:1.5vw;height:1.5vw;fill:none;stroke:#4a4f57;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.comment .row .heart svg{fill:#ff2d55;stroke:#ff2d55}
+.c0{left:3.5%;top:10.5%}
+.c1{right:3.5%;top:22%;width:46%}
+.c2{left:3%;top:57.5%;width:42%}
+.c3{right:4%;top:70%;width:45%}
+.c4{left:6%;top:84%;width:43%}
+
+/* The rating block sits mid-card, where the reference puts its badge. */
+.verdict{position:absolute;left:0;right:0;top:40%;z-index:5;text-align:center;text-shadow:0 .3vw 1.2vw rgba(0,0,0,.75)}
+.stars{font-size:7.6vw;line-height:1;letter-spacing:.4vw}
+.star{color:#ffc93c}.star.off{color:rgba(255,255,255,.34)}
+.star.half{position:relative;color:rgba(255,255,255,.34)}
+.star.half:before{content:'★';position:absolute;left:0;top:0;width:50%;overflow:hidden;color:#ffc93c}
+.score{margin-top:1.1vw;display:inline-flex;align-items:center;gap:1vw;font-size:4.6vw;line-height:1;font-weight:800;letter-spacing:-.03em}
+.score .mark{background:var(--brand);color:#fff;padding:.5vw .9vw;font-size:2.1vw;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:.35vw}
+.score .pct small{font-size:2vw;font-weight:700;letter-spacing:.02em}
+.talking{margin-top:1vw;font-size:1.7vw;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#e9e9e9}
+
+.foot{position:absolute;left:6.5%;right:6.5%;bottom:2.2%;z-index:6;display:flex;align-items:flex-end;justify-content:space-between;gap:2vw}
+.film{font-size:4.3vw;line-height:.95;font-weight:800;letter-spacing:-.04em;max-width:76%;text-shadow:0 .25vw 1vw rgba(0,0,0,.75)}
+.film.long{font-size:3.3vw}
+.film .yr{display:block;margin-top:.6vw;font-size:1.5vw;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#d8d8d8}
+.site{font-size:1.2vw;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#ddd;white-space:nowrap}
+body.render-mode *{animation:none!important;transition:none!important}
+</style>
+</head>
+<body>
+<main class="card" id="card">
+  <img class="art" id="art" alt="">
+  <div class="shade"></div>
+  <img class="logo" src="../../../public/images/MuviDB%20Brand/White%20Wordmark.svg" alt="MuviDB">
+  <div class="series"><span id="series"></span><span class="badge" id="badge"></span></div>
+
+  <div class="comments" id="comments"></div>
+
+  <div class="verdict">
+    <div class="stars" id="stars"></div>
+    <div class="score">
+      <span class="mark">MuviDB</span>
+      <span class="pct" id="pct"></span>
+    </div>
+    <div class="talking" id="talking"></div>
+  </div>
+
+  <div class="foot">
+    <div class="film" id="film"></div>
+    <div class="site" id="site">MUVIDB.COM</div>
+  </div>
+</main>
+<script>
+const DEFAULTS={series:'What Viewers’ Are Saying',badge:'Audience Verdict',title:'',year:'',image:'',likedPercent:null,commentCount:0,comments:[],footer:'MUVIDB.COM'};
+
+function icons(){
+  return '<span class="bubble"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-6a8 8 0 0 1 8-8h2a8 8 0 0 1 8 3Z"/></svg></span>'
+    + '<span><svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>'
+    + '<span class="heart"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"/></svg></span>'
+    + '<span><svg viewBox="0 0 24 24"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z"/></svg></span>'
+    + '<span><svg viewBox="0 0 24 24"><path d="M12 16V3m0 0 5 5m-5-5L7 8"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></span>';
+}
+
+function render(input={}){
+  const d={...DEFAULTS,...(window.MUVIDB_DATA||{}),...input};
+  document.getElementById('art').src=d.image||'';
+  document.getElementById('series').textContent=d.series||'';
+  document.getElementById('badge').textContent=d.badge||'';
+  document.getElementById('site').textContent=d.footer||'MUVIDB.COM';
+
+  const film=document.getElementById('film');
+  const title=String(d.title||'');
+  film.innerHTML=title+(d.year?`<span class="yr">${d.year}</span>`:'');
+  film.classList.toggle('long',title.length>26);
+
+  // Stars come from the same number as the percentage, so the two can never
+  // disagree. Half-steps only; nothing is rounded up to a full star.
+  const pct=Number(d.likedPercent);
+  const starsEl=document.getElementById('stars');
+  if(Number.isFinite(pct)){
+    const value=Math.round((pct/20)*2)/2;
+    let html='';
+    for(let i=1;i<=5;i++){
+      if(value>=i) html+='<span class="star">★</span>';
+      else if(value>=i-0.5) html+='<span class="star half">★</span>';
+      else html+='<span class="star off">★</span>';
+    }
+    starsEl.innerHTML=html;
+    document.getElementById('pct').innerHTML=`${Math.round(pct)}% <small>LIKED</small>`;
+  } else { starsEl.innerHTML=''; document.getElementById('pct').textContent=''; }
+
+  // A small number is weaker proof than no number, so only claim a crowd when
+  // there genuinely is one.
+  const n=Number(d.commentCount)||0;
+  document.getElementById('talking').textContent=n>=250?`${n.toLocaleString()} viewers talking about it`:'';
+
+  const wrap=document.getElementById('comments');
+  wrap.innerHTML='';
+  (d.comments||[]).slice(0,5).forEach((c,i)=>{
+    const el=document.createElement('div');
+    el.className=`comment c${i}`;
+    const who=document.createElement('div');who.className='who';who.textContent=c.author||'';
+    const what=document.createElement('div');what.className='what';
+    const raw=String(c.body||'').replace(/\s+/g,' ').trim();
+    what.textContent=raw.length>118?raw.slice(0,115).replace(/[\s,.;:!-]+$/,'')+'…':raw;
+    const row=document.createElement('div');row.className='row';row.innerHTML=icons();
+    el.appendChild(who);el.appendChild(what);el.appendChild(row);
+    wrap.appendChild(el);
+  });
+}
+const q=new URLSearchParams(location.search);
+if(q.get('render')==='1')document.body.classList.add('render-mode');
+render();
+window.renderMuviDBCard=render;
+window.addEventListener('message',e=>{if(e.data?.type==='MUVIDB_UPDATE_DATA')render(e.data.data)});
+</script>
+</body>
+</html>
