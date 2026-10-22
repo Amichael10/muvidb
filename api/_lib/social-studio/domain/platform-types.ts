@@ -48,6 +48,21 @@ export function preferredAssetFormat(platform: SocialPlatform, available: string
   return available[0];
 }
 
+/**
+ * Default destinations by post kind.
+ *
+ * TikTok only earns a slot automatically when the post is a video clip from the
+ * clipper — graphics stopped getting traction there, so they are no longer sent.
+ * This is a *default*, not a restriction: an explicit platform list always wins,
+ * so any post can still be sent to TikTok by selecting it.
+ */
+export const GRAPHIC_DEFAULT_PLATFORMS: readonly SocialPlatform[] = ['instagram', 'facebook', 'threads'];
+export const VIDEO_DEFAULT_PLATFORMS: readonly SocialPlatform[] = ['instagram', 'facebook', 'threads', 'tiktok'];
+
+export function defaultPlatformsFor(kind: 'video' | 'graphic'): SocialPlatform[] {
+  return [...(kind === 'video' ? VIDEO_DEFAULT_PLATFORMS : GRAPHIC_DEFAULT_PLATFORMS)];
+}
+
 export function normalizePlatforms(value: unknown): SocialPlatform[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter(isSocialPlatform))];

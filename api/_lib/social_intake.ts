@@ -1,7 +1,10 @@
 import { supabase } from './supabase.js';
 import { attachGenresBatch } from './film_enrichment.js';
 
-const INTAKE_SOCIAL_PLATFORMS = ['instagram', 'facebook', 'threads', 'tiktok'] as const;
+const INTAKE_SOCIAL_PLATFORMS = ['instagram', 'facebook', 'threads'] as const;
+// TikTok only receives video, so an intake item earns a TikTok variant only
+// when a playable video came through with it.
+const INTAKE_VIDEO_ONLY_PLATFORMS = ['tiktok'] as const;
 
 export const INTAKE_KINDS = ['unclassified', 'social_post', 'film', 'critic_review', 'credits', 'news'] as const;
 export type SocialIntakeKind = (typeof INTAKE_KINDS)[number];
@@ -154,7 +157,12 @@ export async function createSocialDraftFromIntake(input: {
     threads: supplied.threads_post || supplied.x_post,
     tiktok: supplied.tiktok_caption || supplied.instagram_caption,
   };
-  const variants = INTAKE_SOCIAL_PLATFORMS.map(platform => ({
+  const hasPlayableVideo = Boolean(metadata.telegram_video_file_id);
+  const intakePlatforms = [
+    ...INTAKE_SOCIAL_PLATFORMS,
+    ...(hasPlayableVideo ? INTAKE_VIDEO_ONLY_PLATFORMS : []),
+  ];
+  const variants = intakePlatforms.map(platform => ({
     content_item_id: contentItem.id,
     platform,
     status: 'draft',

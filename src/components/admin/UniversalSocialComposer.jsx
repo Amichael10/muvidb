@@ -115,7 +115,8 @@ function normalizeInitialData(data) {
     }
   }
   if (!platforms.length) {
-    platforms = ['instagram', 'threads', 'tiktok', 'facebook', 'x'];
+    // TikTok is not a default destination; it only receives clipper video.
+    platforms = ['instagram', 'threads', 'facebook', 'x'];
   }
 
   // Captions
@@ -252,7 +253,7 @@ export default function UniversalSocialComposer({
 
   // State
   const [selectedPlatforms, setSelectedPlatforms] = useState(() => 
-    parsed?.selectedPlatforms || ['instagram', 'threads', 'tiktok', 'facebook', 'x']
+    parsed?.selectedPlatforms || ['instagram', 'threads', 'facebook', 'x']
   );
   const [postFormat, setPostFormat] = useState(() => parsed?.postFormat || 'post');
   const [aspectRatio, setAspectRatio] = useState(() => parsed?.aspectRatio || 'portrait_4_5');

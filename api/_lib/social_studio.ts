@@ -19,7 +19,7 @@ import { parseGenerateDraftRequest, createPublishJobIdempotencyKey } from './soc
 import { deleteFromR2 } from './r2.js';
 export { parseGenerateDraftRequest };
 import type { SocialContentType } from './social-studio/domain/content-types.js';
-import { preferredAssetFormat, type SocialPlatform } from './social-studio/domain/platform-types.js';
+import { defaultPlatformsFor, preferredAssetFormat, type SocialPlatform } from './social-studio/domain/platform-types.js';
 import { namesOnlyCaption } from './social-studio/content/names-only.js';
 import {
   PLATFORM_CAPTION_LIMITS,
@@ -3558,7 +3558,9 @@ export async function approveEditorialSlot(
 
   const contentType = input.contentType || defaultContentTypeForSeries('', input.candidateType);
   const templateSlug = input.templateSlug || defaultTemplateSlugForSeries('', input.candidateType);
-  const platforms = input.platforms && input.platforms.length ? input.platforms : (['instagram', 'threads', 'facebook', 'tiktok'] as SocialPlatform[]);
+  // Editorial slots are rendered graphics, so TikTok is not a default
+  // destination. An explicit `input.platforms` still wins.
+  const platforms = input.platforms && input.platforms.length ? input.platforms : defaultPlatformsFor('graphic');
 
   // Validate live theatre productions: reject archived / passed stage plays
   if (input.candidateType === 'play' || (contentType as string) === 'theatre_spotlight' || (contentType as string) === 'whats_on_stage') {

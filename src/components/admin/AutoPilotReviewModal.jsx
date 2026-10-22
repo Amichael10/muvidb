@@ -74,7 +74,10 @@ export default function AutoPilotReviewModal({
   const [candidatePool, setCandidatePool] = useState([]);
   const [poolIndex, setPoolIndex] = useState(0);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
-  const [selectedPlatforms, setSelectedPlatforms] = useState(['instagram', 'threads', 'facebook', 'tiktok']);
+  // Editorial posts are graphics, so TikTok is off by default — it only gets
+  // video from the clipper. Tick it here to send a graphic anyway.
+  // Mirrors GRAPHIC_DEFAULT_PLATFORMS in api/_lib/social-studio/domain/platform-types.ts.
+  const [selectedPlatforms, setSelectedPlatforms] = useState(['instagram', 'threads', 'facebook']);
   const [activePlatformTab, setActivePlatformTab] = useState('instagram');
   const [isEditingCaption, setIsEditingCaption] = useState(false);
   const [scheduledDate, setScheduledDate] = useState('');
