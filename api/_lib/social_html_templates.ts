@@ -48,14 +48,20 @@ export const HTML_SOCIAL_TEMPLATES: Record<string, HtmlTemplateSpec> = {
 function audiencePulseData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   const movie = snapshot.kind === 'upcoming_movie' ? (snapshot as UpcomingMovieSnapshot) : null;
   return {
-    label: 'Audience Pulse',
-    likeWord: 'LIKE',
+    lede: 'Like<br>This Film',
+    // These are YouTube comments, so say so rather than the broader
+    // "across social media" — it is just as persuasive and actually true.
+    source: 'Based on real viewer comments on YouTube',
     image: movie ? preferredArtwork(movie) : '',
     likedPercent: movie?.likedPercent ?? null,
     comments: (movie?.audienceComments || []).map(c => ({
       author: c.author,
       body: c.body,
       avatar: c.avatarUrl || '',
+      // A real like count. We cannot derive a believable per-comment
+      // percentage — sentiment is a whole number out of 10, so it would only
+      // ever read 70/80/90/100, and 54% of positive comments score exactly 8.
+      likes: c.likes,
     })),
   };
 }
