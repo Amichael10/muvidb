@@ -11,8 +11,10 @@ const ROTATION = [
   ['critics_say', 'by_the_numbers', 'behind_the_camera'],
   ['new_and_upcoming', 'filmography', 'one_film_two_takes'],
   ['critics_say', 'where_to_watch', 'weekend_watchlist'],
-  ['whats_on_stage', 'you_know_the_face', 'film_conversation'],
-  ['stage_to_screen', 'by_the_numbers', 'behind_the_camera'],
+  // Friday evening and Saturday morning are the slots the audience actually
+  // shows up for, so Audience Pulse takes both. Index 0 is Sunday.
+  ['whats_on_stage', 'you_know_the_face', 'audience_pulse'],
+  ['audience_pulse', 'by_the_numbers', 'behind_the_camera'],
 ] as const;
 
 type CalendarInsert = {

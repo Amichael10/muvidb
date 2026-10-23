@@ -1437,7 +1437,7 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
   if (error) throw error;
   if (!film) throw httpError(404, 'Film not found');
 
-  const [creditsResult, channelVideoResult] = await Promise.all([
+  const [creditsResult, channelVideoResult, commentsResult] = await Promise.all([
     supabase
       .from('credits')
       .select('role,character_name,billing_order,people!inner(id,name,instagram_url,tiktok_url)')
@@ -1451,10 +1451,24 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
       .order('published_at', { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle(),
+    // Clearly-positive mined comments for the Audience Pulse card. Pulled wide
+    // and most-liked first, because the snapshot then drops any that are too
+    // long to show whole.
+    supabase
+      .from('reviews')
+      .select('author_name,author_avatar_url,body,likes,sentiment_score')
+      .eq('film_id', filmId)
+      .eq('source', 'youtube')
+      .gte('sentiment_score', 7)
+      .order('likes', { ascending: false })
+      .limit(60),
   ]);
 
   if (creditsResult.error) throw creditsResult.error;
   if (channelVideoResult.error) throw channelVideoResult.error;
+  // A film with no mined comments still makes a perfectly good post for every
+  // other series, so this must never be fatal.
+  if (commentsResult.error) console.warn(`[social] audience comments unavailable for ${filmId}: ${commentsResult.error.message}`);
 
   const linkedChannel = (channelVideoResult.data as any)?.channels;
   const filmWithChannel = {
@@ -1463,7 +1477,13 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
     youtube_channel_handle: linkedChannel?.channel_handle || null,
   };
 
-  return buildUpcomingMovieSnapshot({ film: filmWithChannel, credits: creditsResult.data || [], capturedAt, castLimit: 8 });
+  return buildUpcomingMovieSnapshot({
+    film: filmWithChannel,
+    credits: creditsResult.data || [],
+    audienceComments: commentsResult.data || [],
+    capturedAt,
+    castLimit: 8,
+  });
 }
 
 async function loadSelectedCriticReview(filmId: string, criticReviewId: string) {
@@ -1897,6 +1917,7 @@ export async function refreshStreamingPoster(contentItemId: string, refresh: boo
 
 export function defaultContentTypeForSeries(seriesSlug: string, candidateType: string): SocialContentType {
   if (candidateType === 'play' || seriesSlug === 'whats_on_stage') return 'whats_on_stage';
+  if (seriesSlug === 'audience_pulse') return 'audience_pulse';
   if (candidateType === 'person') return 'actor_spotlight';
   if (seriesSlug === 'critics_say' || seriesSlug === 'the_critic') return 'critics_say';
   if (seriesSlug === 'where_to_watch') return 'where_to_watch';
@@ -1920,6 +1941,7 @@ export function defaultTemplateSlugForSeries(seriesSlug: string, candidateType: 
     whats_on_stage: 'on-stage-simple-v1',
     where_to_watch: 'where-to-watch-simple-v1',
     you_know_the_face: 'you-know-the-face-simple-v1',
+    audience_pulse: 'audience-pulse-v1',
   };
   return aliases[seriesSlug] || (candidateType === 'person' ? 'you-know-the-face-simple-v1' : 'new-upcoming-simple-v1');
 }

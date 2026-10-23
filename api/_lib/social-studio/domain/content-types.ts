@@ -7,6 +7,7 @@ export const SOCIAL_CONTENT_TYPES = [
   'weekend_watchlist',
   'whats_on_stage',
   'film_conversation',
+  'audience_pulse',
 ] as const;
 
 export type SocialContentType = (typeof SOCIAL_CONTENT_TYPES)[number];
@@ -20,6 +21,7 @@ export const SOCIAL_CONTENT_TYPE_LABELS: Record<SocialContentType, string> = {
   weekend_watchlist: 'Weekend Watchlist',
   whats_on_stage: "What's On Stage",
   film_conversation: 'Nollywood Debate',
+  audience_pulse: 'Audience Pulse',
 };
 
 export function isSocialContentType(value: unknown): value is SocialContentType {

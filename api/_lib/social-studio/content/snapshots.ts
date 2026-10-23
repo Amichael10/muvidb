@@ -51,6 +51,14 @@ export type ActorSpotlightSnapshot = {
   creditCount: number;
 };
 
+/** One mined viewer comment, as the Audience Pulse card shows it. */
+export type SnapshotAudienceComment = {
+  author: string;
+  body: string;
+  avatarUrl: string | null;
+  likes: number;
+};
+
 export type UpcomingMovieSnapshot = {
   kind: 'upcoming_movie';
   capturedAt: string;
@@ -74,6 +82,8 @@ export type UpcomingMovieSnapshot = {
   creditedPeople: SnapshotCreditedPerson[];
   youtubeChannelName: string | null;
   youtubeChannelHandle: string | null;
+  /** Mined viewer comments for the Audience Pulse card, positive first. */
+  audienceComments?: SnapshotAudienceComment[];
   /** The reviewer explicitly chosen for a "What the Critics Say" post. */
   criticReview?: SnapshotCriticReview | null;
   /** The three films explicitly chosen for a Weekend Watchlist thread. */
@@ -160,6 +170,7 @@ export const SOURCE_ENTITY_TYPES: Record<SocialContentType, 'person' | 'film' | 
   weekend_watchlist: 'film',
   whats_on_stage: 'play',
   film_conversation: 'film',
+  audience_pulse: 'film',
 };
 
 function text(value: unknown): string | null {
@@ -432,9 +443,76 @@ export function buildBirthdaySpotlightSnapshot(input: {
   };
 }
 
+/**
+ * Pick the quotes the Audience Pulse card will show.
+ *
+ * Nothing is truncated — a quote cut mid-sentence reads as broken — so a long
+ * comment is dropped rather than clipped and the card simply shows fewer. The
+ * card lays itself out for whatever count it receives.
+ */
+/**
+ * Trim a reply-farming tail off a quote.
+ *
+ * A comment like "Such an unpredictable movie, I rate it 100% ..who is with
+ * me?" is a real opinion, so it belongs in the rating — but the card should
+ * print the opinion, not the call for replies. Only a trailing clause is
+ * removed, and only when a real sentence remains in front of it.
+ */
+export function stripBaitTail(body: string): string {
+  // The trailing run must allow emoji: these clauses are almost always followed
+  // by a string of them ("…who is with me?🤚🤚🤚"), which defeated a plain
+  // punctuation-and-end anchor.
+  const TAIL_END = '[\\s?!.,…\\p{Extended_Pictographic}\\u{1F3FB}-\\u{1F3FF}\\u{200D}\\uFE0F]*$';
+  const BAIT_TAIL = new RegExp(
+    '[\\s.,!…-]*\\b(?:' +
+      "who(?:'s| is| else is)?\\s+with\\s+me" +
+      '|who\\s+agrees?' +
+      '|if\\s+you\\s+agree[^.?!]*' +
+      '|gather\\s+(?:here|up)[^.?!]*' +
+      '|like\\s+my\\s+comment[^.?!]*' +
+      '|drop\\s+a\\s+(?:like|comment)[^.?!]*' +
+      '|mark\\s+your\\s+presence[^.?!]*' +
+    ')' + TAIL_END,
+    'iu',
+  );
+  const trimmed = (body || '').replace(/\s+/g, ' ').trim();
+  const withoutTail = trimmed.replace(BAIT_TAIL, '');
+  // Only tidy trailing punctuation when a tail was actually removed, or an
+  // ordinary comment loses the full stop it legitimately ended with.
+  if (withoutTail === trimmed) return trimmed;
+  const stripped = withoutTail.replace(/[\s.,;:-]+$/, '').trim();
+  // Never strip so hard that nothing meaningful is left; keep the original.
+  return stripped.length >= 12 ? stripped : trimmed;
+}
+
+export function selectAudienceComments(
+  rows: Record<string, any>[],
+  limit = 5,
+  maxLength = 96,
+): SnapshotAudienceComment[] {
+  const seen = new Set<string>();
+  return (rows || [])
+    .map(row => ({
+      author: String(text(row?.author_name) || ''),
+      body: stripBaitTail(String(text(row?.body) || '')),
+      avatarUrl: text(row?.author_avatar_url),
+      likes: Number(row?.likes) || 0,
+    }))
+    .filter(c => {
+      if (!c.author || c.body.length < 12 || c.body.length > maxLength) return false;
+      const key = c.body.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => b.likes - a.likes)
+    .slice(0, limit);
+}
+
 export function buildUpcomingMovieSnapshot(input: {
   film: Record<string, any>;
   credits?: Record<string, any>[];
+  audienceComments?: Record<string, any>[];
   capturedAt: string;
   castLimit?: number;
 }): UpcomingMovieSnapshot {
@@ -465,9 +543,11 @@ export function buildUpcomingMovieSnapshot(input: {
 
   const liked = input.film.liked_percent;
   const likedPercent = liked === null || liked === undefined ? null : integer(liked);
+  const audienceComments = selectAudienceComments(input.audienceComments || []);
 
   return {
     kind: 'upcoming_movie',
+    audienceComments,
     capturedAt: input.capturedAt,
     filmId: String(input.film.id),
     title: String(text(input.film.title) || 'Untitled'),

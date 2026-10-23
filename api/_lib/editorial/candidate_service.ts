@@ -486,6 +486,62 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     }
   }
 
+  // ── AUDIENCE PULSE (films with real mined comments to quote) ───────────────
+  // This card is nothing without quotes, so the pool is built from the reviews
+  // table rather than filtered afterwards: a film with no comments can never be
+  // scheduled for it. The series guard columns on social_content_series
+  // (requires_reviews / min_reviews) are not read by anything, so the
+  // constraint has to live here.
+  if (norm.includes('audience_pulse') || norm.includes('pulse')) {
+    const MIN_QUOTES = 3;
+    const pulseSelect = 'id, title, slug, poster_url, backdrop_url, release_date, year, release_type, liked_percent, view_count, synopsis, genres, updated_at';
+
+    const { data: films, error: pulseError } = await supabase
+      .from('films')
+      .select(pulseSelect)
+      .eq('is_published', true)
+      .not('poster_url', 'is', null)
+      .gte('liked_percent', 60)
+      .order('liked_percent', { ascending: false })
+      .limit(Math.max(limit * 8, 150));
+    if (pulseError) throw pulseError;
+
+    const ids = (films || []).map(f => f.id);
+    if (!ids.length) return [];
+
+    // Count quotable comments per film. Short enough to print whole, since the
+    // card never truncates.
+    const quotable = new Map<string, number>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data: rows, error: rowsError } = await supabase
+        .from('reviews')
+        .select('film_id,body,author_name')
+        .in('film_id', ids.slice(i, i + 200))
+        .eq('source', 'youtube')
+        .gte('sentiment_score', 7);
+      if (rowsError) throw rowsError;
+      for (const row of rows || []) {
+        const body = (row.body || '').replace(/\s+/g, ' ').trim();
+        if (!row.author_name || body.length < 12 || body.length > 96) continue;
+        quotable.set(row.film_id!, (quotable.get(row.film_id!) || 0) + 1);
+      }
+    }
+
+    return (films || [])
+      .filter(f => (quotable.get(f.id) || 0) >= MIN_QUOTES)
+      .slice(0, limit)
+      .map(f => ({
+        id: f.id,
+        type: 'movie' as const,
+        name: f.title,
+        subtext: `${f.liked_percent}% liked • ${quotable.get(f.id)} viewer comments`,
+        imageUrl: f.poster_url,
+        category: 'Audience Pulse',
+        completenessScore: 0.9,
+        data: { ...f, quotableComments: quotable.get(f.id) || 0 },
+      }));
+  }
+
   // Person, theatre and critic series must never fall through to a film pool.
   if (intent === 'people' || intent === 'crew' || intent === 'theatre' || intent === 'critics') return [];
 

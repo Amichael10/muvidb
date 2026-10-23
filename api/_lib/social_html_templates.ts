@@ -31,7 +31,49 @@ export const HTML_SOCIAL_TEMPLATES: Record<string, HtmlTemplateSpec> = {
   'on-stage-simple-v1': simpleSpec('on_stage'),
   'where-to-watch-simple-v1': simpleSpec('where_to_watch'),
   'you-know-the-face-simple-v1': simpleSpec('you_know_the_face'),
+  // Its own file rather than a simple-editorial variant: the layout is comment
+  // cards scattered over the artwork, which shares nothing with that template.
+  'audience-pulse-v1': {
+    file: 'audience-verdict-v1.html',
+    formats: ['portrait_4_5'],
+    data: snapshot => audiencePulseData(snapshot),
+  },
 };
+
+/**
+ * The Audience Pulse card: real mined comments over the film's artwork, with
+ * MuviDB's own "% liked". Never an IMDb score — most of the catalogue was never
+ * on IMDb, so that badge would be inventing a number.
+ */
+function audiencePulseData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
+  const movie = snapshot.kind === 'upcoming_movie' ? (snapshot as UpcomingMovieSnapshot) : null;
+  return {
+    label: 'Audience Pulse',
+    likeWord: 'LIKE',
+    image: movie ? preferredArtwork(movie) : '',
+    likedPercent: movie?.likedPercent ?? null,
+    comments: (movie?.audienceComments || []).map(c => ({
+      author: c.author,
+      body: c.body,
+      avatar: c.avatarUrl || '',
+    })),
+  };
+}
+
+/**
+ * Prefer the uploaded portrait. Only fall back to YouTube, and then to its
+ * highest-resolution thumbnail — films store the 480x360 `hqdefault`, while
+ * `maxresdefault` is 1280x720 and looks far sharper behind the cards.
+ */
+function preferredArtwork(movie: UpcomingMovieSnapshot): string {
+  // Some stored URLs carry stray whitespace, which breaks the <img> outright.
+  const clean = (url: string | null) => (url || '').replace(/\s+/g, '').trim();
+  const poster = clean(movie.posterUrl);
+  if (poster && !poster.includes('ytimg.com')) return poster;
+  const candidate = poster || clean(movie.backdropUrl);
+  if (!candidate.includes('ytimg.com')) return candidate;
+  return candidate.replace(/\/(hq|sd|mq|maxres)default\.jpg/, '/maxresdefault.jpg');
+}
 
 type SimpleEditorialVariant =
   | 'behind_camera'

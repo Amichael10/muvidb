@@ -23,6 +23,7 @@ const DEFAULT_TEMPLATE_SLUGS: Record<SocialContentType, string> = {
   weekend_watchlist: 'weekend-watchlist-simple-v1',
   whats_on_stage: 'on-stage-simple-v1',
   film_conversation: 'film-conversation-simple-v1',
+  audience_pulse: 'audience-pulse-v1',
 };
 
 export function parseGenerateDraftRequest(body: unknown): {
