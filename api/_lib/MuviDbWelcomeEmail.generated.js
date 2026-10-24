@@ -145,37 +145,137 @@ function MuviDbWelcomeEmail({
   ];
   const featuresEyebrow = personaConfig?.featuresEyebrow || "EVERYTHING YOU CAN DO ON MUVIDB";
   return /* @__PURE__ */ jsxs(Html, { lang: "en", children: [
-    /* @__PURE__ */ jsx(Head, {}),
+    /* @__PURE__ */ jsx(Head, { children: /* @__PURE__ */ jsx("style", { children: `
+          @media only screen and (max-width: 600px) {
+            .mobile-container {
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 !important;
+              border-radius: 0 !important;
+            }
+            .mobile-header {
+              padding: 20px 18px 12px !important;
+            }
+            .mobile-hero {
+              padding: 16px 18px 24px !important;
+            }
+            .mobile-hero-copy {
+              display: block !important;
+              width: 100% !important;
+              padding-right: 0 !important;
+              margin-bottom: 24px !important;
+            }
+            .mobile-hero-art {
+              display: block !important;
+              width: 100% !important;
+              max-width: 320px !important;
+              margin: 0 auto !important;
+            }
+            .mobile-heading {
+              font-size: 26px !important;
+              line-height: 32px !important;
+            }
+            .mobile-intro {
+              font-size: 15px !important;
+              line-height: 23px !important;
+              margin: 14px 0 16px !important;
+            }
+            .mobile-btn {
+              display: block !important;
+              width: 100% !important;
+              text-align: center !important;
+              padding: 14px 20px !important;
+              box-sizing: border-box !important;
+            }
+            .mobile-features-section {
+              padding: 24px 16px 28px !important;
+            }
+            .mobile-feature-col {
+              display: block !important;
+              width: 100% !important;
+              padding: 0 0 10px 0 !important;
+              box-sizing: border-box !important;
+            }
+            .mobile-feature-card {
+              background-color: #FFFFFF !important;
+              border-radius: 12px !important;
+              padding: 14px 16px !important;
+              border: 1px solid #EFEAE5 !important;
+              text-align: left !important;
+            }
+            .mobile-feature-title {
+              font-size: 15px !important;
+              line-height: 20px !important;
+              font-weight: 700 !important;
+              text-align: left !important;
+              margin: 0 !important;
+            }
+            .mobile-feature-text {
+              font-size: 13px !important;
+              line-height: 19px !important;
+              text-align: left !important;
+              margin: 4px 0 0 !important;
+            }
+            .mobile-mission-wrapper {
+              padding: 16px !important;
+            }
+            .mobile-mission-copy {
+              display: block !important;
+              width: 100% !important;
+              padding: 22px 18px 14px !important;
+              box-sizing: border-box !important;
+            }
+            .mobile-mission-statement-col {
+              display: block !important;
+              width: 100% !important;
+              border-left: 0 !important;
+              border-top: 1px solid #35383C !important;
+              padding: 16px 18px 22px !important;
+              text-align: center !important;
+              box-sizing: border-box !important;
+            }
+            .mobile-mission-statement {
+              font-size: 20px !important;
+              line-height: 28px !important;
+            }
+            .mobile-signoff {
+              padding: 20px 18px 24px !important;
+            }
+            .mobile-footer {
+              padding: 20px 18px 28px !important;
+            }
+          }
+        ` }) }),
     /* @__PURE__ */ jsx(Preview, { children: resolvedPreview }),
-    /* @__PURE__ */ jsx(Body, { style: styles.body, children: /* @__PURE__ */ jsxs(Container, { style: styles.container, children: [
-      /* @__PURE__ */ jsx(Section, { style: styles.header, children: /* @__PURE__ */ jsxs(Row, { children: [
+    /* @__PURE__ */ jsx(Body, { style: styles.body, children: /* @__PURE__ */ jsxs(Container, { style: styles.container, className: "mobile-container", children: [
+      /* @__PURE__ */ jsx(Section, { style: styles.header, className: "mobile-header", children: /* @__PURE__ */ jsxs(Row, { children: [
         /* @__PURE__ */ jsx(Column, { children: /* @__PURE__ */ jsx(Img, { src: logoUrl, width: "160", alt: "MuviDB", style: styles.logo }) }),
         /* @__PURE__ */ jsx(Column, { align: "right", children: /* @__PURE__ */ jsx(Link, { href: exploreUrl, style: styles.viewInBrowser, children: "View in browser" }) })
       ] }) }),
-      /* @__PURE__ */ jsx(Section, { style: styles.hero, children: /* @__PURE__ */ jsxs(Row, { children: [
-        /* @__PURE__ */ jsxs(Column, { style: styles.heroCopy, children: [
+      /* @__PURE__ */ jsx(Section, { style: styles.hero, className: "mobile-hero", children: /* @__PURE__ */ jsxs(Row, { children: [
+        /* @__PURE__ */ jsxs(Column, { style: styles.heroCopy, className: "mobile-hero-copy", children: [
           resolvedRoleBadge && /* @__PURE__ */ jsx(Section, { style: { margin: "0 0 10px" }, children: /* @__PURE__ */ jsx(Text, { style: styles.roleBadge, children: resolvedRoleBadge }) }),
           /* @__PURE__ */ jsx(Text, { style: styles.eyebrow, children: eyebrow }),
-          headline ? /* @__PURE__ */ jsx(Heading, { style: styles.heading, children: headline }) : personaConfig ? /* @__PURE__ */ jsx(Heading, { style: styles.heading, children: personaConfig.headline }) : /* @__PURE__ */ jsxs(Heading, { style: styles.heading, children: [
+          headline ? /* @__PURE__ */ jsx(Heading, { style: styles.heading, className: "mobile-heading", children: headline }) : personaConfig ? /* @__PURE__ */ jsx(Heading, { style: styles.heading, className: "mobile-heading", children: personaConfig.headline }) : /* @__PURE__ */ jsxs(Heading, { style: styles.heading, className: "mobile-heading", children: [
             "Muvi",
             /* @__PURE__ */ jsx("span", { style: { color: ORANGE }, children: "DB" }),
             /* @__PURE__ */ jsx("br", {}),
             "You're in",
             /* @__PURE__ */ jsx("span", { style: { color: ORANGE }, children: "!" })
           ] }),
-          /* @__PURE__ */ jsx(Text, { style: styles.intro, children: resolvedIntro }),
+          /* @__PURE__ */ jsx(Text, { style: styles.intro, className: "mobile-intro", children: resolvedIntro }),
           !compact && /* @__PURE__ */ jsx(Text, { style: styles.boldText, children: "We're excited to have you with us." }),
-          /* @__PURE__ */ jsx(Button, { href: resolvedCtaUrl, style: styles.button, children: resolvedCtaLabel })
+          /* @__PURE__ */ jsx(Button, { href: resolvedCtaUrl, style: styles.button, className: "mobile-btn", children: resolvedCtaLabel })
         ] }),
-        /* @__PURE__ */ jsx(Column, { style: styles.heroArt, children: /* @__PURE__ */ jsx(CinemaCollage, { images: collage }) })
+        /* @__PURE__ */ jsx(Column, { style: styles.heroArt, className: "mobile-hero-art", children: /* @__PURE__ */ jsx(CinemaCollage, { images: collage }) })
       ] }) }),
-      !compact && /* @__PURE__ */ jsxs(Section, { style: styles.featuresSection, children: [
+      !compact && /* @__PURE__ */ jsxs(Section, { style: styles.featuresSection, className: "mobile-features-section", children: [
         /* @__PURE__ */ jsx(Text, { style: styles.sectionEyebrow, children: featuresEyebrow }),
         /* @__PURE__ */ jsx(Hr, { style: styles.sectionRule }),
         /* @__PURE__ */ jsx(Row, { children: resolvedFeatures.map((f, i) => /* @__PURE__ */ jsx(Feature, { title: f.title, text: f.text }, i)) })
       ] }),
-      !compact && /* @__PURE__ */ jsx(Section, { style: styles.missionWrapper, children: /* @__PURE__ */ jsxs(Row, { style: styles.mission, children: [
-        /* @__PURE__ */ jsxs(Column, { style: styles.missionCopy, children: [
+      !compact && /* @__PURE__ */ jsx(Section, { style: styles.missionWrapper, className: "mobile-mission-wrapper", children: /* @__PURE__ */ jsxs(Row, { style: styles.mission, children: [
+        /* @__PURE__ */ jsxs(Column, { style: styles.missionCopy, className: "mobile-mission-copy", children: [
           /* @__PURE__ */ jsx(Heading, { as: "h2", style: styles.missionTitle, children: "Our Mission" }),
           /* @__PURE__ */ jsxs(Text, { style: styles.missionText, children: [
             "MuviDB exists to document, connect, and amplify African stories and the people behind them. We believe",
@@ -183,7 +283,7 @@ function MuviDbWelcomeEmail({
             /* @__PURE__ */ jsx("span", { style: { color: ORANGE, fontWeight: 700 }, children: "every credit counts." })
           ] })
         ] }),
-        /* @__PURE__ */ jsx(Column, { style: styles.missionStatementColumn, children: /* @__PURE__ */ jsxs(Text, { style: styles.missionStatement, children: [
+        /* @__PURE__ */ jsx(Column, { style: styles.missionStatementColumn, className: "mobile-mission-statement-col", children: /* @__PURE__ */ jsxs(Text, { style: styles.missionStatement, className: "mobile-mission-statement", children: [
           "Discover.",
           /* @__PURE__ */ jsx("br", {}),
           "Connect.",
@@ -191,7 +291,7 @@ function MuviDbWelcomeEmail({
           "Celebrate."
         ] }) })
       ] }) }),
-      /* @__PURE__ */ jsxs(Section, { style: styles.signoff, children: [
+      /* @__PURE__ */ jsxs(Section, { style: styles.signoff, className: "mobile-signoff", children: [
         /* @__PURE__ */ jsx(Text, { style: styles.signoffTitle, children: "Thanks for being part of this journey." }),
         /* @__PURE__ */ jsx(Text, { style: styles.signoffText, children: "The best of African cinema starts with you." }),
         /* @__PURE__ */ jsxs(Text, { style: styles.signoffText, children: [
@@ -202,7 +302,7 @@ function MuviDbWelcomeEmail({
         ] })
       ] }),
       /* @__PURE__ */ jsx(Hr, { style: styles.divider }),
-      /* @__PURE__ */ jsxs(Section, { style: styles.footer, children: [
+      /* @__PURE__ */ jsxs(Section, { style: styles.footer, className: "mobile-footer", children: [
         /* @__PURE__ */ jsx(Text, { style: styles.footerLabel, children: "Follow us for more updates" }),
         /* @__PURE__ */ jsxs(Text, { style: styles.socialLinks, children: [
           social.instagram && /* @__PURE__ */ jsxs(Fragment, { children: [
@@ -298,10 +398,10 @@ function CinemaCollage({
   ] }) });
 }
 function Feature({ title, text }) {
-  return /* @__PURE__ */ jsxs(Column, { style: styles.feature, children: [
-    /* @__PURE__ */ jsx(Text, { style: styles.featureTitle, children: title }),
-    /* @__PURE__ */ jsx(Text, { style: styles.featureText, children: text })
-  ] });
+  return /* @__PURE__ */ jsx(Column, { style: styles.feature, className: "mobile-feature-col", children: /* @__PURE__ */ jsxs("div", { className: "mobile-feature-card", children: [
+    /* @__PURE__ */ jsx(Text, { style: styles.featureTitle, className: "mobile-feature-title", children: title }),
+    /* @__PURE__ */ jsx(Text, { style: styles.featureText, className: "mobile-feature-text", children: text })
+  ] }) });
 }
 var styles = {
   body: {

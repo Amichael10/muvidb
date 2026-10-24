@@ -209,11 +209,113 @@ export default function MuviDbWelcomeEmail({
 
   return (
     <Html lang="en">
-      <Head />
+      <Head>
+        <style>{`
+          @media only screen and (max-width: 600px) {
+            .mobile-container {
+              width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 !important;
+              border-radius: 0 !important;
+            }
+            .mobile-header {
+              padding: 20px 18px 12px !important;
+            }
+            .mobile-hero {
+              padding: 16px 18px 24px !important;
+            }
+            .mobile-hero-copy {
+              display: block !important;
+              width: 100% !important;
+              padding-right: 0 !important;
+              margin-bottom: 24px !important;
+            }
+            .mobile-hero-art {
+              display: block !important;
+              width: 100% !important;
+              max-width: 320px !important;
+              margin: 0 auto !important;
+            }
+            .mobile-heading {
+              font-size: 26px !important;
+              line-height: 32px !important;
+            }
+            .mobile-intro {
+              font-size: 15px !important;
+              line-height: 23px !important;
+              margin: 14px 0 16px !important;
+            }
+            .mobile-btn {
+              display: block !important;
+              width: 100% !important;
+              text-align: center !important;
+              padding: 14px 20px !important;
+              box-sizing: border-box !important;
+            }
+            .mobile-features-section {
+              padding: 24px 16px 28px !important;
+            }
+            .mobile-feature-col {
+              display: block !important;
+              width: 100% !important;
+              padding: 0 0 10px 0 !important;
+              box-sizing: border-box !important;
+            }
+            .mobile-feature-card {
+              background-color: #FFFFFF !important;
+              border-radius: 12px !important;
+              padding: 14px 16px !important;
+              border: 1px solid #EFEAE5 !important;
+              text-align: left !important;
+            }
+            .mobile-feature-title {
+              font-size: 15px !important;
+              line-height: 20px !important;
+              font-weight: 700 !important;
+              text-align: left !important;
+              margin: 0 !important;
+            }
+            .mobile-feature-text {
+              font-size: 13px !important;
+              line-height: 19px !important;
+              text-align: left !important;
+              margin: 4px 0 0 !important;
+            }
+            .mobile-mission-wrapper {
+              padding: 16px !important;
+            }
+            .mobile-mission-copy {
+              display: block !important;
+              width: 100% !important;
+              padding: 22px 18px 14px !important;
+              box-sizing: border-box !important;
+            }
+            .mobile-mission-statement-col {
+              display: block !important;
+              width: 100% !important;
+              border-left: 0 !important;
+              border-top: 1px solid #35383C !important;
+              padding: 16px 18px 22px !important;
+              text-align: center !important;
+              box-sizing: border-box !important;
+            }
+            .mobile-mission-statement {
+              font-size: 20px !important;
+              line-height: 28px !important;
+            }
+            .mobile-signoff {
+              padding: 20px 18px 24px !important;
+            }
+            .mobile-footer {
+              padding: 20px 18px 28px !important;
+            }
+          }
+        `}</style>
+      </Head>
       <Preview>{resolvedPreview}</Preview>
       <Body style={styles.body}>
-        <Container style={styles.container}>
-          <Section style={styles.header}>
+        <Container style={styles.container} className="mobile-container">
+          <Section style={styles.header} className="mobile-header">
             <Row>
               <Column>
                 <Img src={logoUrl} width="160" alt="MuviDB" style={styles.logo} />
@@ -226,9 +328,9 @@ export default function MuviDbWelcomeEmail({
             </Row>
           </Section>
 
-          <Section style={styles.hero}>
+          <Section style={styles.hero} className="mobile-hero">
             <Row>
-              <Column style={styles.heroCopy}>
+              <Column style={styles.heroCopy} className="mobile-hero-copy">
                 {resolvedRoleBadge && (
                   <Section style={{ margin: '0 0 10px' }}>
                     <Text style={styles.roleBadge}>{resolvedRoleBadge}</Text>
@@ -236,33 +338,33 @@ export default function MuviDbWelcomeEmail({
                 )}
                 <Text style={styles.eyebrow}>{eyebrow}</Text>
                 {headline ? (
-                  <Heading style={styles.heading}>{headline}</Heading>
+                  <Heading style={styles.heading} className="mobile-heading">{headline}</Heading>
                 ) : personaConfig ? (
-                  <Heading style={styles.heading}>{personaConfig.headline}</Heading>
+                  <Heading style={styles.heading} className="mobile-heading">{personaConfig.headline}</Heading>
                 ) : (
-                  <Heading style={styles.heading}>
+                  <Heading style={styles.heading} className="mobile-heading">
                     Muvi<span style={{ color: ORANGE }}>DB</span>
                     <br />
                     You&apos;re in
                     <span style={{ color: ORANGE }}>!</span>
                   </Heading>
                 )}
-                <Text style={styles.intro}>{resolvedIntro}</Text>
+                <Text style={styles.intro} className="mobile-intro">{resolvedIntro}</Text>
                 {!compact && (
                   <Text style={styles.boldText}>We&apos;re excited to have you with us.</Text>
                 )}
-                <Button href={resolvedCtaUrl} style={styles.button}>
+                <Button href={resolvedCtaUrl} style={styles.button} className="mobile-btn">
                   {resolvedCtaLabel}
                 </Button>
               </Column>
-              <Column style={styles.heroArt}>
+              <Column style={styles.heroArt} className="mobile-hero-art">
                 <CinemaCollage images={collage} />
               </Column>
             </Row>
           </Section>
 
           {!compact && (
-          <Section style={styles.featuresSection}>
+          <Section style={styles.featuresSection} className="mobile-features-section">
             <Text style={styles.sectionEyebrow}>{featuresEyebrow}</Text>
             <Hr style={styles.sectionRule} />
             <Row>
@@ -274,9 +376,9 @@ export default function MuviDbWelcomeEmail({
           )}
 
           {!compact && (
-          <Section style={styles.missionWrapper}>
+          <Section style={styles.missionWrapper} className="mobile-mission-wrapper">
             <Row style={styles.mission}>
-              <Column style={styles.missionCopy}>
+              <Column style={styles.missionCopy} className="mobile-mission-copy">
                 <Heading as="h2" style={styles.missionTitle}>
                   Our Mission
                 </Heading>
@@ -288,8 +390,8 @@ export default function MuviDbWelcomeEmail({
                   </span>
                 </Text>
               </Column>
-              <Column style={styles.missionStatementColumn}>
-                <Text style={styles.missionStatement}>
+              <Column style={styles.missionStatementColumn} className="mobile-mission-statement-col">
+                <Text style={styles.missionStatement} className="mobile-mission-statement">
                   Discover.
                   <br />
                   Connect.
@@ -301,7 +403,7 @@ export default function MuviDbWelcomeEmail({
           </Section>
           )}
 
-          <Section style={styles.signoff}>
+          <Section style={styles.signoff} className="mobile-signoff">
             <Text style={styles.signoffTitle}>
               Thanks for being part of this journey.
             </Text>
@@ -316,7 +418,7 @@ export default function MuviDbWelcomeEmail({
 
           <Hr style={styles.divider} />
 
-          <Section style={styles.footer}>
+          <Section style={styles.footer} className="mobile-footer">
             <Text style={styles.footerLabel}>Follow us for more updates</Text>
             <Text style={styles.socialLinks}>
               {social.instagram && (
@@ -428,9 +530,11 @@ function CinemaCollage({
 
 function Feature({ title, text }: { title: string; text: string }) {
   return (
-    <Column style={styles.feature}>
-      <Text style={styles.featureTitle}>{title}</Text>
-      <Text style={styles.featureText}>{text}</Text>
+    <Column style={styles.feature} className="mobile-feature-col">
+      <div className="mobile-feature-card">
+        <Text style={styles.featureTitle} className="mobile-feature-title">{title}</Text>
+        <Text style={styles.featureText} className="mobile-feature-text">{text}</Text>
+      </div>
     </Column>
   );
 }
