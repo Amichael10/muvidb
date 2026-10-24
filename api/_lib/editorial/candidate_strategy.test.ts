@@ -38,10 +38,21 @@ describe('editorial candidate strategy', () => {
   it('prioritizes a newly uploaded YouTube film using the channel upload date', () => {
     const october = new Date('2026-10-20T12:00:00.000Z');
     const films = [
-      { id: 'old-upload', release_date: '2026-10-19', release_type: 'youtube', youtube_published_at: '2026-01-01', poster_url: 'old.jpg' },
-      { id: 'new-upload-old-film', release_date: '2014-01-01', release_type: 'youtube', youtube_published_at: '2026-10-19', poster_url: 'new.jpg' },
+      { id: 'older-upload', release_date: '2026-08-01', release_type: 'youtube', youtube_published_at: '2026-08-01', poster_url: 'older.jpg' },
+      { id: 'recent-upload', release_date: '2026-10-19', release_type: 'youtube', youtube_published_at: '2026-10-19', poster_url: 'recent.jpg' },
     ];
-    expect(rankAndDedupeFilms(films, 'streaming', 10, october).map(f => f.id)[0]).toBe('new-upload-old-film');
+    expect(rankAndDedupeFilms(films, 'streaming', 10, october).map(f => f.id)[0]).toBe('recent-upload');
+  });
+
+  it('strictly rejects old movies from previous years or stale releases from streaming', () => {
+    const october = new Date('2026-10-20T12:00:00.000Z');
+    const films = [
+      { id: 'koleoso-3', title: 'Koleoso Part 3', year: 2025, release_date: '2025-06-13', release_type: 'youtube', youtube_published_at: '2025-06-13', poster_url: 'koleoso.jpg' },
+      { id: 'old-catalog-reupload', title: 'Classic 2014', year: 2014, release_date: '2014-01-01', release_type: 'youtube', youtube_published_at: '2026-10-19', poster_url: 'old.jpg' },
+      { id: 'new-release', title: 'New Movie 2026', year: 2026, release_date: '2026-10-15', release_type: 'youtube', youtube_published_at: '2026-10-15', poster_url: 'new.jpg' },
+    ];
+    const results = rankAndDedupeFilms(films, 'streaming', 10, october);
+    expect(results.map(f => f.id)).toEqual(['new-release']);
   });
 
   it('only selects dated future titles for upcoming posts', () => {

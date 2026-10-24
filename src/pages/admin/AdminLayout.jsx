@@ -63,6 +63,7 @@ export default function AdminLayout() {
     { path: '/admin/deduplicator', label: 'Deduplicator', icon: 'solar:radar-2-linear' },
     { path: '/admin/ai', label: 'AI Agent', icon: 'solar:cpu-linear' },
     { path: '/admin/editorial', label: 'Editorial', icon: 'solar:pen-new-square-linear' },
+    { path: '/admin/social', label: 'Social Studio', icon: 'solar:magic-stick-3-linear' },
     { path: '/admin/spotlight', label: 'Spotlight', icon: 'solar:star-fall-linear' },
     { path: '/admin/jobs', label: 'Careers', icon: 'solar:case-round-linear' },
     { path: '/admin/top10', label: 'Top 10', icon: 'solar:medal-star-linear' },

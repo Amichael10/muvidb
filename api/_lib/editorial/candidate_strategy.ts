@@ -91,7 +91,40 @@ export function isFilmEligibleForIntent(film: any, intent: EditorialSeriesIntent
   if (film?.poster_url && isLikelyLandscapeOrThumbnailUrl(film.poster_url)) return false;
 
   const lifecycle = classifyFilmLifecycle(film, referenceDate);
-  if (intent === 'streaming') return lifecycle === 'now_streaming';
+  if (intent === 'streaming') {
+    if (lifecycle !== 'now_streaming') return false;
+
+    // Strict editorial rule: Never post old movies - only new releases.
+    const nowMs = referenceDate.getTime();
+    const currentYear = referenceDate.getFullYear();
+    const release = dateValue(film?.release_date);
+    const filmYear = film?.year ? Number(film.year) : null;
+    const maxAgeDays = 90;
+    const maxAgeMs = maxAgeDays * 86_400_000;
+
+    // 1. If release_date is known, must not be older than 90 days (never from previous years)
+    if (release !== null) {
+      if (release < nowMs - maxAgeMs) return false;
+    } else if (filmYear !== null && filmYear < currentYear) {
+      // No release_date, but year is from a previous calendar year
+      return false;
+    }
+
+    // 2. If it is a YouTube upload, the upload date itself must not be older than 90 days
+    const uploadDate = dateValue(film?.youtubePublishedAt || film?.youtube_published_at);
+    if (uploadDate !== null && uploadDate < nowMs - maxAgeMs) {
+      return false;
+    }
+
+    // 3. If neither release_date nor uploadDate is known, reject if created long ago or old year
+    if (release === null && uploadDate === null) {
+      if (filmYear !== null && filmYear < currentYear) return false;
+      const created = dateValue(film?.created_at);
+      if (created !== null && created < nowMs - maxAgeMs) return false;
+    }
+
+    return true;
+  }
   if (intent === 'upcoming') {
     const release = dateValue(film?.release_date);
     const withinOneYear = release !== null && release > referenceDate.getTime() && release <= referenceDate.getTime() + 366 * 86_400_000;

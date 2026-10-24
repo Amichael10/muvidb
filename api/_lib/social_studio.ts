@@ -1004,6 +1004,7 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       adapter = new InstagramPlatformAdapter({
         accessToken,
         instagramAccountId: connection.external_account_id,
+        accountUsername: connection.username,
         apiVersion: process.env.META_GRAPH_API_VERSION,
       });
     } else if (publishMode === 'live' && variant.platform === 'facebook') {
@@ -1306,6 +1307,15 @@ export async function runSocialPublisher(input: {
     for (const itemId of orphanedItemIds) {
       await recalculateContentStatus(itemId).catch(() => {});
     }
+  }
+
+  // 1c. Zero-Approval Auto-Schedule: Inspect un-drafted / unapproved calendar slots for today,
+  // validate portrait posters and credits, and auto-schedule them into variants.
+  try {
+    const { autoScheduleDueCalendarSlots } = await import('./editorial/auto_scheduler.js');
+    await autoScheduleDueCalendarSlots(now);
+  } catch (autoSchedErr: any) {
+    console.warn('[social_studio] Auto-schedule due calendar slots warning:', autoSchedErr?.message || autoSchedErr);
   }
 
   // 2. Auto-heal: ensure any scheduled variants with scheduled_for <= now have a queued publish job
@@ -3580,8 +3590,18 @@ export async function approveEditorialSlot(
 ) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
 
-  const contentType = input.contentType || defaultContentTypeForSeries('', input.candidateType);
-  const templateSlug = input.templateSlug || defaultTemplateSlugForSeries('', input.candidateType);
+  let seriesSlug = '';
+  if (input.slotId) {
+    const { data: slotRow } = await supabase
+      .from('social_calendar')
+      .select('social_content_series(slug)')
+      .eq('id', input.slotId)
+      .maybeSingle();
+    seriesSlug = (slotRow as any)?.social_content_series?.slug || '';
+  }
+
+  const contentType = input.contentType || defaultContentTypeForSeries(seriesSlug, input.candidateType);
+  const templateSlug = input.templateSlug || defaultTemplateSlugForSeries(seriesSlug, input.candidateType);
   // Editorial slots are rendered graphics, so TikTok is not a default
   // destination. An explicit `input.platforms` still wins.
   const platforms = input.platforms && input.platforms.length ? input.platforms : defaultPlatformsFor('graphic');
@@ -3603,13 +3623,14 @@ export async function approveEditorialSlot(
     }
   }
 
-  // 1. Generate the draft
+  // 1. Generate the draft (isAdHoc: true automatically marks content and variants approved)
   const draft = await generateSocialDraft(
     {
       contentType,
       sourceEntityId: input.candidateId,
       templateSlug,
       platforms,
+      isAdHoc: true,
     },
     actor,
   );
@@ -3621,9 +3642,12 @@ export async function approveEditorialSlot(
     );
   }
 
-  // 2. Compute scheduled time ISO string
+  // 2. Compute scheduled time ISO string (WAT is UTC+1; if time passed today, queue for immediate release)
   const time = input.scheduledTime || '11:00:00';
-  const scheduledFor = new Date(`${input.scheduledDate}T${time}`).toISOString();
+  const targetMs = new Date(`${input.scheduledDate}T${time}+01:00`).getTime();
+  const scheduledFor = targetMs <= Date.now()
+    ? new Date(Date.now() + 10_000).toISOString()
+    : new Date(targetMs).toISOString();
 
   // 3. Update platform variants with custom captions if provided
   if (input.customCaptions) {

@@ -26,13 +26,9 @@ beforeEach(() => {
     ],
   };
 });
-it('never sends a Streaming Alert to main Instagram if the second account is missing', async () => {
-  await expect(resolveDestinationConnection('streaming', 'instagram', 'where_to_watch')).rejects.toThrow('Connect @muvi_database');
-  expect(getPlatformPublishingCredentials).not.toHaveBeenCalled();
-});
-it('selects the requested second Instagram account', async () => {
-  state.tables.social_connections.push({ id: 'second-instagram', platform: 'instagram', status: 'connected', username: 'muvi_database' });
-  await expect(resolveDestinationConnection('streaming', 'instagram', 'where_to_watch')).resolves.toBe('second-instagram');
+it('routes a Streaming Alert on Instagram to primary @muvidb_', async () => {
+  await expect(resolveDestinationConnection('streaming', 'instagram', 'where_to_watch')).resolves.toBe('main-instagram');
+  expect(getPlatformPublishingCredentials).toHaveBeenCalledWith('instagram', 'main-instagram');
 });
 it('preserves existing Facebook and TikTok mappings for Streaming Alerts', async () => {
   await expect(resolveDestinationConnection('streaming', 'facebook', 'where_to_watch')).resolves.toBe('existing-facebook');

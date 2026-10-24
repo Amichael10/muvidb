@@ -25,6 +25,7 @@ export const AWARD_LOGOS = {
   VENICE: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-venice.jpg',
   CFIF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/97c4c683-7aa2-4eb6-8ced-ab37f838e2b1.jpg',
   REFFA: 'https://reffaawards.com/wp-content/uploads/2020/01/cropped-REFFA-1-192x192.png',
+  FILM_AFRICA: 'https://www.filmafrica.org/wp-content/uploads/2022/02/cropped-favicon_FA-192x192.png',
 };
 
 /**
@@ -32,6 +33,33 @@ export const AWARD_LOGOS = {
  * Enriched with location, categories, entry plans, submission timelines, and official portals.
  */
 export const AWARD_ORGS = [
+  {
+    id: 'FILM_AFRICA',
+    label: 'Film Africa',
+    full: 'Film Africa (Royal African Society)',
+    tagline: 'The UK’s Largest Annual Festival of African Cinema',
+    category: 'festival',
+    location: 'London, United Kingdom',
+    frequency: 'Annual (October/November)',
+    founded: 2011,
+    accent: '#E8AB3E',
+    about:
+      'Film Africa is the UK’s largest annual festival celebrating African cinema, presented by the Royal African Society in partnership with leading British cultural hubs including BFI Southbank, Rio Cinema, Cine Lumière, and Riverside Studios.',
+    when:
+      'Held annually in late October to early November across premier cinema venues in London and the UK.',
+    submissions:
+      'Accepts fiction features, documentaries, and short films from African filmmakers and the diaspora.',
+    entryPlan: {
+      fees: 'Standard / Student festival submissions',
+      eligibility: 'Features, documentaries, and shorts by African filmmakers or about African heritage.',
+      formats: 'DCP / ProRes / secure screener with English subtitles.',
+      categoriesCount: '2 Competitive Awards + Curated Showcase',
+      platform: 'FilmFreeway & Film Africa Official Portal',
+    },
+    submitUrl: 'https://www.filmafrica.org/',
+    submitLabel: 'Film Africa Official Portal',
+    tags: ['London', 'United Kingdom', 'Pan-African', 'Festival', 'Awards', 'Baobab Award', 'Audience Award'],
+  },
   {
     id: 'REFFA',
     label: 'REFFA',
@@ -1548,6 +1576,7 @@ export function normOrg(raw) {
   if (upper.includes('FESPACO')) return 'FESPACO';
   if (upper.includes('DIFF') || upper.includes('DURBAN INTERNATIONAL')) return 'DIFF';
   if (upper.includes('SUNDANCE')) return 'SUNDANCE';
+  if (upper.includes('FILM AFRICA') || upper.includes('FILM_AFRICA') || upper.includes('ROYAL AFRICAN SOCIETY')) return 'FILM_AFRICA';
   if (upper === 'TIFF' || upper.includes('TORONTO INTERNATIONAL')) return 'TIFF';
   if (upper.includes('ZAFAA') || upper.includes('ZULU AFRICAN')) return 'ZAFAA';
   if (upper.includes('GMAA') || upper.includes('GOLDEN MOVIE AWARDS')) return 'GMAA';

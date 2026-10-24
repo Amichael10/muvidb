@@ -4,6 +4,8 @@ import { SocialPlatformError } from './platform-errors.js';
 export type InstagramAdapterOptions = {
   accessToken: string;
   instagramAccountId: string;
+  accountUsername?: string;
+  collaborators?: string[];
   apiVersion?: string;
   fetchImpl?: typeof fetch;
   pollIntervalMs?: number;
@@ -48,6 +50,8 @@ function errorFromResponse(status: number, payload: MetaApiError, fallback: stri
 export class InstagramPlatformAdapter implements SocialPlatformAdapter {
   private readonly accessToken: string;
   private readonly instagramAccountId: string;
+  private readonly accountUsername?: string;
+  private readonly defaultCollaborators: string[];
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly pollIntervalMs: number;
@@ -56,6 +60,8 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
   constructor(options: InstagramAdapterOptions) {
     this.accessToken = options.accessToken;
     this.instagramAccountId = options.instagramAccountId;
+    this.accountUsername = options.accountUsername;
+    this.defaultCollaborators = options.collaborators ?? ['muvi_database'];
     const isDirectInstagramToken = options.accessToken.startsWith('IGAG') || options.accessToken.startsWith('IGAA');
     const domain = isDirectInstagramToken ? 'graph.instagram.com' : 'graph.facebook.com';
     this.baseUrl = `https://${domain}/${cleanVersion(options.apiVersion)}`;
@@ -175,6 +181,14 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
       });
     }
 
+    const requestedCollaborators: string[] = Array.isArray(request.options?.collaborators)
+      ? (request.options.collaborators as string[])
+      : this.defaultCollaborators;
+
+    const activeCollaborators = requestedCollaborators
+      .map((u) => String(u || '').trim().replace(/^@/, ''))
+      .filter((u) => Boolean(u) && u.toLowerCase() !== (this.accountUsername || '').toLowerCase());
+
     if (mediaUrls.length > 1) {
       const childIds: string[] = [];
       const carouselAssets = Array.isArray(request.options?.carousel_assets)
@@ -203,14 +217,28 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
         childIds.push(String(child.id));
       }
 
-      const carousel = await this.post(
-        `/${encodeURIComponent(this.instagramAccountId)}/media`,
-        new URLSearchParams({
-          media_type: 'CAROUSEL',
-          children: childIds.join(','),
-          caption: request.caption,
-        }),
-      );
+      const carouselParams = new URLSearchParams({
+        media_type: 'CAROUSEL',
+        children: childIds.join(','),
+        caption: request.caption,
+      });
+      if (activeCollaborators.length > 0) {
+        carouselParams.set('collaborators', JSON.stringify(activeCollaborators));
+      }
+
+      let carousel: { id?: string };
+      try {
+        carousel = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, carouselParams);
+      } catch (carouselErr: any) {
+        if (carouselParams.has('collaborators')) {
+          console.warn(`[instagram-adapter] Failed to create carousel container with collaborators (${carouselErr?.message}). Retrying without collaborators...`);
+          const fallbackParams = new URLSearchParams(carouselParams);
+          fallbackParams.delete('collaborators');
+          carousel = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, fallbackParams);
+        } else {
+          throw carouselErr;
+        }
+      }
       if (!carousel.id) {
         throw new SocialPlatformError({
           platform: 'instagram',
@@ -255,6 +283,9 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
     const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(assetUrl);
     const containerParams = new URLSearchParams();
     containerParams.set('caption', request.caption);
+    if (activeCollaborators.length > 0) {
+      containerParams.set('collaborators', JSON.stringify(activeCollaborators));
+    }
 
     if (isVideo) {
       containerParams.set('media_type', 'REELS');
@@ -267,12 +298,28 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
       containerParams.set('image_url', assetUrl);
     }
 
-    // 1. Create Media Container (with graceful fallback if cover_url is rejected)
+    // 1. Create Media Container (with graceful fallback if collaborators or cover_url is rejected)
     let containerRes: { id?: string };
     try {
       containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, containerParams);
     } catch (createErr: any) {
-      if (containerParams.has('cover_url')) {
+      if (containerParams.has('collaborators')) {
+        console.warn(`[instagram-adapter] Failed to create media container with collaborators (${createErr?.message}). Retrying without collaborators...`);
+        const fallbackParams = new URLSearchParams(containerParams);
+        fallbackParams.delete('collaborators');
+        try {
+          containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, fallbackParams);
+        } catch (secondErr: any) {
+          if (fallbackParams.has('cover_url')) {
+            console.warn(`[instagram-adapter] Retrying without cover_url...`);
+            const thirdParams = new URLSearchParams(fallbackParams);
+            thirdParams.delete('cover_url');
+            containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, thirdParams);
+          } else {
+            throw secondErr;
+          }
+        }
+      } else if (containerParams.has('cover_url')) {
         console.warn(`[instagram-adapter] Failed to create media container with cover_url (${createErr?.message}). Retrying without cover_url...`);
         const fallbackParams = new URLSearchParams(containerParams);
         fallbackParams.delete('cover_url');

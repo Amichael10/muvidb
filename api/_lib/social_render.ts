@@ -1459,6 +1459,35 @@ export type RenderedAsset = {
   slide?: number;
 };
 
+function defaultTemplateSlugForSnapshot(snapshot: SocialSourceSnapshot): string {
+  if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
+    const s = snapshot as any;
+    const dept = String(s.knownForDepartment || (Array.isArray(s.roles) ? s.roles.join(' ') : s.roles) || '').toLowerCase();
+    if (
+      dept.includes('edit') ||
+      dept.includes('direct') ||
+      dept.includes('camera') ||
+      dept.includes('sound') ||
+      dept.includes('vfx') ||
+      dept.includes('cinemat') ||
+      dept.includes('produc')
+    ) {
+      return 'behind-camera-simple-v1';
+    }
+    return 'you-know-the-face-simple-v1';
+  }
+  if (snapshot.kind === 'whats_on_stage') {
+    return 'on-stage-simple-v1';
+  }
+  if (snapshot.kind === 'upcoming_movie') {
+    const s = snapshot as UpcomingMovieSnapshot;
+    if (s.watchlistPicks && s.watchlistPicks.length > 0) return 'weekend-watchlist-simple-v1';
+    if (s.criticReview) return 'critics-say-simple-v1';
+    return 'new-upcoming-simple-v1';
+  }
+  return 'new-upcoming-simple-v1';
+}
+
 export async function renderSnapshotAsset(input: {
   snapshot: SocialSourceSnapshot;
   format: SocialAssetFormat;
@@ -1466,81 +1495,17 @@ export async function renderSnapshotAsset(input: {
   templateSlug?: string | null;
   slide?: number;
 }): Promise<RenderedAsset> {
-  if (input.templateSlug) {
-    const { isHtmlSocialTemplate, renderHtmlSocialTemplateAsset } = await import('./social_html_templates.js');
-    if (isHtmlSocialTemplate(input.templateSlug)) {
-      return renderHtmlSocialTemplateAsset({
-        templateSlug: input.templateSlug,
-        snapshot: input.snapshot,
-        format: input.format,
-        slide: input.slide,
-      });
-    }
+  const templateSlug = input.templateSlug || defaultTemplateSlugForSnapshot(input.snapshot);
+  const { isHtmlSocialTemplate, renderHtmlSocialTemplateAsset } = await import('./social_html_templates.js');
+  if (isHtmlSocialTemplate(templateSlug)) {
+    return await renderHtmlSocialTemplateAsset({
+      templateSlug,
+      snapshot: input.snapshot,
+      format: input.format,
+      slide: input.slide,
+    });
   }
-
-  const copy = cardCopy(input.snapshot);
-  const artwork = input.artwork !== undefined ? input.artwork : await loadArtwork(copy.imageUrl);
-  const brandLogo = await getBrandLockup();
-  const decor = await getCardDecor();
-
-  const isLandscape = Boolean(
-    input.snapshot.kind !== 'actor_spotlight' &&
-    input.snapshot.kind !== 'birthday_spotlight' &&
-    ((artwork && (artwork.width / artwork.height) >= 1.05) ||
-     (!artwork && isLandscapeArtworkUrl(copy.imageUrl)))
-  );
-
-  const { width, height } = isLandscape
-    ? { width: 1254, height: 1254 }
-    : ASSET_FORMAT_DIMENSIONS[input.format];
-
-  let element: SatoriNode;
-
-  if (input.snapshot.kind === 'actor_spotlight' || input.snapshot.kind === 'birthday_spotlight') {
-    element = buildPersonSpotlightCard(
-      input.snapshot,
-      personCardSpec(input.snapshot),
-      input.format,
-      artwork,
-      brandLogo,
-      decor,
-    );
-  } else if (isLandscape) {
-    element = buildMovieLandscapeCard(
-      input.snapshot as UpcomingMovieSnapshot,
-      input.format,
-      artwork,
-      brandLogo,
-      decor,
-    );
-  } else {
-    element = buildMovieSpotlightCard(
-      input.snapshot as UpcomingMovieSnapshot,
-      input.format,
-      artwork,
-      brandLogo,
-      decor,
-    );
-  }
-
-  const { default: satori } = await import('satori');
-  const { Resvg } = await import('@resvg/resvg-js');
-
-  const svg = await satori(element as never, {
-    width,
-    height,
-    fonts: await getFonts(),
-  });
-
-  if (process.env.SOCIAL_RENDER_DEBUG_SVG) {
-    for (const match of svg.matchAll(/<image[^>]*>/g)) {
-      console.log(`[render:${input.format}]`, match[0].replace(/(xlink:)?href="[^"]*"/, 'href="..."'));
-    }
-  }
-
-  const png = new Resvg(svg, { fitTo: { mode: 'width', value: width } }).render().asPng();
-
-  return { format: input.format, png, width, height, usedArtwork: Boolean(artwork) };
+  throw new Error(`[renderSnapshotAsset] No valid HTML editorial template for slug "${templateSlug}". Legacy Satori fallback is disabled.`);
 }
 
 /** Renders every format from one artwork fetch instead of re-downloading per size. */
@@ -1549,25 +1514,17 @@ export async function renderSnapshotAssets(input: {
   formats: SocialAssetFormat[];
   templateSlug?: string | null;
 }): Promise<RenderedAsset[]> {
-  if (input.templateSlug) {
-    const { isHtmlSocialTemplate, htmlTemplateSlides } = await import('./social_html_templates.js');
-    if (isHtmlSocialTemplate(input.templateSlug)) {
-      const rendered: RenderedAsset[] = [];
-      for (const format of input.formats) {
-        const slides = htmlTemplateSlides(input.templateSlug);
-        for (let slide = 1; slide <= slides; slide += 1) {
-          rendered.push(await renderSnapshotAsset({ snapshot: input.snapshot, format, templateSlug: input.templateSlug, slide }));
-        }
+  const templateSlug = input.templateSlug || defaultTemplateSlugForSnapshot(input.snapshot);
+  const { isHtmlSocialTemplate, htmlTemplateSlides } = await import('./social_html_templates.js');
+  if (isHtmlSocialTemplate(templateSlug)) {
+    const rendered: RenderedAsset[] = [];
+    for (const format of input.formats) {
+      const slides = htmlTemplateSlides(templateSlug);
+      for (let slide = 1; slide <= slides; slide += 1) {
+        rendered.push(await renderSnapshotAsset({ snapshot: input.snapshot, format, templateSlug, slide }));
       }
-      return rendered;
     }
+    return rendered;
   }
-
-  const artwork = await loadArtwork(cardCopy(input.snapshot).imageUrl);
-
-  const rendered: RenderedAsset[] = [];
-  for (const format of input.formats) {
-    rendered.push(await renderSnapshotAsset({ snapshot: input.snapshot, format, artwork }));
-  }
-  return rendered;
+  throw new Error(`[renderSnapshotAssets] No valid HTML editorial template for slug "${templateSlug}". Legacy Satori fallback is disabled.`);
 }

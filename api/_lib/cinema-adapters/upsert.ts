@@ -309,7 +309,26 @@ export async function upsertShowtimes(
   scraped: ScrapedShowtime[],
   source: string,
 ): Promise<{ matched_showtimes: number; unmatched_titles: number; marked_unavailable: number }> {
-  if (!scraped.length) return { matched_showtimes: 0, unmatched_titles: 0, marked_unavailable: 0 };
+  if (!scraped.length) {
+    // A successful scrape with no sessions means the branch currently has no
+    // programme. Expire its previous look-ahead rows instead of leaving stale
+    // schedules visible forever (especially after a branch-ID correction).
+    const lagosNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+    const from = lagosNow.toISOString().slice(0, 10);
+    const untilDate = new Date(lagosNow);
+    untilDate.setDate(untilDate.getDate() + 7);
+    const until = untilDate.toISOString().slice(0, 10);
+    const { data: expired, error } = await supabase
+      .from('showtimes')
+      .update({ is_available: false })
+      .eq('cinema_id', cinemaId)
+      .gte('show_date', from)
+      .lte('show_date', until)
+      .eq('is_available', true)
+      .select('id');
+    if (error) throw new Error(`Empty-schedule expiry failed for cinema ${cinemaId}: ${error.message}`);
+    return { matched_showtimes: 0, unmatched_titles: 0, marked_unavailable: expired?.length ?? 0 };
+  }
 
   const cache: MatchCache = new Map();
   const rows: Record<string, unknown>[] = [];
@@ -452,7 +471,16 @@ export async function upsertShowtimes(
   }
 
   if (!rows.length) {
-    return { matched_showtimes: 0, unmatched_titles: unmatchedSeen.size, marked_unavailable: 0 };
+    const { data: expired, error } = await supabase
+      .from('showtimes')
+      .update({ is_available: false })
+      .eq('cinema_id', cinemaId)
+      .gte('show_date', minDate)
+      .lte('show_date', maxDate)
+      .eq('is_available', true)
+      .select('id');
+    if (error) throw new Error(`Unmatched-schedule expiry failed for cinema ${cinemaId}: ${error.message}`);
+    return { matched_showtimes: 0, unmatched_titles: unmatchedSeen.size, marked_unavailable: expired?.length ?? 0 };
   }
 
   const uniqueRows = Array.from(new Map(rows.map((row) => [

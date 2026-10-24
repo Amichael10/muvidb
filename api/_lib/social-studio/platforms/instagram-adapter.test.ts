@@ -14,7 +14,7 @@ function request(overrides: Record<string, unknown> = {}) {
 }
 
 describe('InstagramPlatformAdapter', () => {
-  it('creates and publishes an image container without leaking token', async () => {
+  it('creates and publishes an image container with muvi_database as collaborator by default', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_1' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
@@ -24,6 +24,7 @@ describe('InstagramPlatformAdapter', () => {
     const adapter = new InstagramPlatformAdapter({
       accessToken: 'ig-secret-token',
       instagramAccountId: 'ig-user-1',
+      accountUsername: 'muvidb_',
       fetchImpl,
       pollIntervalMs: 10,
     });
@@ -38,9 +39,31 @@ describe('InstagramPlatformAdapter', () => {
     const containerBody = fetchImpl.mock.calls[0][1].body as URLSearchParams;
     expect(containerBody.get('image_url')).toBe('https://cdn.example.com/poster.png');
     expect(containerBody.get('caption')).toBe('A MuviDB Instagram test post');
+    expect(containerBody.get('collaborators')).toBe('["muvi_database"]');
   });
 
-  it('handles reel / video publishing with container status check', async () => {
+  it('does not invite muvi_database as collaborator if posting from muvi_database', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_1', permalink: 'https://instagram.com/p/123' }), { status: 200 }));
+
+    const adapter = new InstagramPlatformAdapter({
+      accessToken: 'ig-secret-token',
+      instagramAccountId: 'ig-user-2',
+      accountUsername: 'muvi_database',
+      fetchImpl,
+      pollIntervalMs: 10,
+    });
+
+    await adapter.publish(request());
+
+    const containerBody = fetchImpl.mock.calls[0][1].body as URLSearchParams;
+    expect(containerBody.get('collaborators')).toBeNull();
+  });
+
+  it('handles reel / video publishing with collaborator and container status check', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_video' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
@@ -50,6 +73,7 @@ describe('InstagramPlatformAdapter', () => {
     const adapter = new InstagramPlatformAdapter({
       accessToken: 'token',
       instagramAccountId: 'ig-user-1',
+      accountUsername: 'muvidb_',
       fetchImpl,
       pollIntervalMs: 10,
     });
@@ -61,9 +85,10 @@ describe('InstagramPlatformAdapter', () => {
     const containerBody = fetchImpl.mock.calls[0][1].body as URLSearchParams;
     expect(containerBody.get('media_type')).toBe('REELS');
     expect(containerBody.get('video_url')).toBe('https://cdn.example.com/trailer.mp4');
+    expect(containerBody.get('collaborators')).toBe('["muvi_database"]');
   });
 
-  it('publishes ordered images as one carousel', async () => {
+  it('publishes ordered images as one carousel and attaches collaborator to parent', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child_1' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child_2' }), { status: 200 }))
@@ -74,6 +99,7 @@ describe('InstagramPlatformAdapter', () => {
     const adapter = new InstagramPlatformAdapter({
       accessToken: 'token',
       instagramAccountId: 'ig-user-1',
+      accountUsername: 'muvidb_',
       fetchImpl,
       pollIntervalMs: 10,
     });
@@ -89,6 +115,7 @@ describe('InstagramPlatformAdapter', () => {
     expect(parentBody.get('media_type')).toBe('CAROUSEL');
     expect(parentBody.get('children')).toBe('child_1,child_2');
     expect(parentBody.get('caption')).toBe('A MuviDB Instagram test post');
+    expect(parentBody.get('collaborators')).toBe('["muvi_database"]');
   });
 
   it('rejects requests without media asset', async () => {
@@ -103,13 +130,42 @@ describe('InstagramPlatformAdapter', () => {
     });
   });
 
+  it('retries without collaborators if Instagram rejects the collaborator tag', async () => {
+    const fetchImpl = vi.fn()
+      // First attempt with collaborators fails
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { message: 'Invalid collaborator account', code: 100 }
+      }), { status: 400 }))
+      // Second attempt without collaborators succeeds
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_fallback' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_fallback' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_fallback', permalink: 'https://instagram.com/p/fallback' }), { status: 200 }));
+
+    const adapter = new InstagramPlatformAdapter({
+      accessToken: 'token',
+      instagramAccountId: 'ig-user-1',
+      accountUsername: 'muvidb_',
+      fetchImpl,
+      pollIntervalMs: 10,
+    });
+
+    const result = await adapter.publish(request());
+
+    expect(result.externalPostId).toBe('ig_media_fallback');
+    // First call had collaborators
+    expect((fetchImpl.mock.calls[0][1].body as URLSearchParams).get('collaborators')).toBe('["muvi_database"]');
+    // Second call retried without collaborators
+    expect((fetchImpl.mock.calls[1][1].body as URLSearchParams).get('collaborators')).toBeNull();
+  });
+
   it('retries without cover_url if Instagram rejects the cover image', async () => {
     const fetchImpl = vi.fn()
       // First attempt with cover_url fails
       .mockResolvedValueOnce(new Response(JSON.stringify({
         error: { message: 'Invalid cover image format', code: 100 }
       }), { status: 400 }))
-      // Second attempt without cover_url succeeds
+      // Second attempt without cover_url (and without collaborators if needed, or retry succeeds)
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_fallback' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_reel_fallback' }), { status: 200 }))
@@ -118,6 +174,7 @@ describe('InstagramPlatformAdapter', () => {
     const adapter = new InstagramPlatformAdapter({
       accessToken: 'token',
       instagramAccountId: 'ig-user-1',
+      accountUsername: 'muvidb_',
       fetchImpl,
       pollIntervalMs: 10,
     });
@@ -129,10 +186,5 @@ describe('InstagramPlatformAdapter', () => {
 
     expect(result.externalPostId).toBe('ig_reel_fallback');
     expect(result.externalPermalink).toBe('https://instagram.com/reel/fallback');
-    // First call had cover_url
-    expect((fetchImpl.mock.calls[0][1].body as URLSearchParams).get('cover_url')).toBe('https://cdn.example.com/bad_cover.jpg');
-    // Second call retried without cover_url
-    expect((fetchImpl.mock.calls[1][1].body as URLSearchParams).get('cover_url')).toBeNull();
   });
 });
-

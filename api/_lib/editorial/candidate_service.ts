@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../supabase.js';
 import { extractInstagramHandle, extractSocialHandle } from '../social-studio/content/snapshots.js';
 import {
   classifyFilmLifecycle,
@@ -7,11 +7,6 @@ import {
   rankAndDedupeFilms,
   resolveFilmPlatform,
 } from './candidate_strategy.js';
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 export interface CandidateEntity {
   id: string;
@@ -299,22 +294,51 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       .not('photo_url', 'is', null)
       .not('known_for_department', 'is', null)
       .order('film_count', { ascending: false, nullsFirst: false })
-      .limit(limit * 3);
+      .limit(Math.max(limit * 8, 120));
     if (crewError) throw crewError;
 
     const craftCrew = (crew || []).filter((p) => {
       const dept = (p.known_for_department || '').toLowerCase();
+      // Exclude pure actors who have no behind-the-camera department
+      if (dept === 'actor' || dept === 'acting') return false;
       return (
         dept.includes('camera') ||
         dept.includes('writing') ||
         dept.includes('directing') ||
+        dept.includes('director') ||
         dept.includes('editing') ||
         dept.includes('sound') ||
-        dept.includes('costume')
+        dept.includes('costume') ||
+        dept.includes('producer') ||
+        dept.includes('production') ||
+        dept.includes('post')
       );
     });
 
-    const targetList = craftCrew.length > 0 ? craftCrew : (crew || []);
+    // Partition into grassroots / YouTube up-and-coming craft (film_count <= 100) vs established (> 100)
+    const grassroots = craftCrew.filter((p) => (p.film_count || 0) <= 100 && (p.film_count || 0) >= 3);
+    const established = craftCrew.filter((p) => (p.film_count || 0) > 100);
+
+    // Prioritize Lateef Olofin (esteemed post-production editor & first customer of MuviDB)
+    const lateefIndex = grassroots.findIndex(
+      (p) => p.slug === 'lateef-olofin' || (p.name && p.name.toLowerCase().includes('lateef olofin'))
+    );
+    if (lateefIndex > -1) {
+      const [lateef] = grassroots.splice(lateefIndex, 1);
+      grassroots.unshift(lateef);
+    }
+
+    // Interleave: 2 up-and-coming / grassroots to 1 established
+    const targetList: typeof craftCrew = [];
+    let gIdx = 0;
+    let eIdx = 0;
+    while (targetList.length < limit && (gIdx < grassroots.length || eIdx < established.length)) {
+      if (gIdx < grassroots.length) targetList.push(grassroots[gIdx++]);
+      if (targetList.length < limit && gIdx < grassroots.length) targetList.push(grassroots[gIdx++]);
+      if (targetList.length < limit && eIdx < established.length) targetList.push(established[eIdx++]);
+    }
+    if (targetList.length === 0) targetList.push(...(craftCrew.length > 0 ? craftCrew : crew || []).slice(0, limit));
+
     const enriched = await enrichPeopleCandidates(targetList.slice(0, limit));
 
     return enriched.map((p) => {
@@ -367,20 +391,46 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       .order('popularity_score', { ascending: false, nullsFirst: false })
       .order('profile_views', { ascending: false, nullsFirst: false })
       .order('film_count', { ascending: false, nullsFirst: false })
-      .limit(limit * 4);
+      .limit(Math.max(limit * 3, 50));
     if (peopleError) throw peopleError;
 
-    if (!people || people.length === 0) {
-      const { data: fallbackPeople, error: fallbackError } = await supabase
-        .from('people')
-        .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
-        .order('film_count', { ascending: false, nullsFirst: false })
-        .limit(limit);
-      if (fallbackError) throw fallbackError;
-      people = fallbackPeople || [];
+    // Also fetch up-and-coming grassroots & YouTube Nollywood talent (3 to 75 film credits)
+    const { data: upAndComing } = await supabase
+      .from('people')
+      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
+      .not('photo_url', 'is', null)
+      .gte('film_count', 3)
+      .lte('film_count', 75)
+      .not('bio', 'is', null)
+      .order('film_count', { ascending: false, nullsFirst: false })
+      .limit(Math.max(limit * 3, 50));
+
+    // Interleave up-and-coming talent with established icons
+    const mixedPeople: any[] = [];
+    const seenIds = new Set<string>();
+    const uList = upAndComing || [];
+    const pList = people || [];
+    let uI = 0;
+    let pI = 0;
+    while (mixedPeople.length < limit && (uI < uList.length || pI < pList.length)) {
+      if (uI < uList.length) {
+        const item = uList[uI++];
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          mixedPeople.push(item);
+        }
+      }
+      if (mixedPeople.length < limit && pI < pList.length) {
+        const item = pList[pI++];
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          mixedPeople.push(item);
+        }
+      }
     }
 
-    const enriched = await enrichPeopleCandidates(people.slice(0, limit));
+    const targetPeople = mixedPeople.length > 0 ? mixedPeople : (people || []);
+    const enriched = await enrichPeopleCandidates(targetPeople.slice(0, limit));
 
     return enriched.map((p) => ({
       id: p.id,
@@ -496,12 +546,16 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     const MIN_QUOTES = 3;
     const pulseSelect = 'id, title, slug, poster_url, backdrop_url, release_date, year, release_type, liked_percent, view_count, synopsis, genres, updated_at';
 
+    const currentYear = new Date().getFullYear();
+    const recentPulseCutoff = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
+
     const { data: films, error: pulseError } = await supabase
       .from('films')
       .select(pulseSelect)
       .eq('is_published', true)
       .not('poster_url', 'is', null)
       .gte('liked_percent', 60)
+      .or(`release_date.gte.${recentPulseCutoff},year.gte.${currentYear}`)
       .order('liked_percent', { ascending: false })
       .limit(Math.max(limit * 8, 150));
     if (pulseError) throw pulseError;
@@ -555,7 +609,10 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   if (intent === 'streaming') {
     // Query active destinations directly so NolliStream/Docuth titles cannot be
     // pushed out of the pool by unrelated rows with newer update timestamps.
-    const recentUploadCutoff = new Date(Date.now() - 120 * 86_400_000).toISOString();
+    const recentUploadCutoff = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    const recentReleaseCutoff = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    const currentYear = new Date().getFullYear();
+
     const { data: recentChannelVideos, error: recentChannelVideosError } = await supabase
       .from('channel_videos')
       .select(`film_id,published_at,channels(name,channel_handle),films!inner(${filmSelect})`)
@@ -570,16 +627,24 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     }
     const platformQueries = ['nollistream', 'docuth', 'ebonylife', 'kava', 'circuits', 'netflix', 'prime_video'].map(platform =>
       supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
-        .eq('release_type', platform).order('updated_at', { ascending: false }).limit(Math.max(limit * 2, 20))
+        .eq('release_type', platform)
+        .or(`release_date.gte.${recentReleaseCutoff},year.gte.${currentYear}`)
+        .order('updated_at', { ascending: false }).limit(Math.max(limit * 2, 20))
     );
     const [platformResults, youtubeRows, youtubeRecentRows, linkedRows] = await Promise.all([
       Promise.all(platformQueries),
       supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
-        .not('youtube_watch_url', 'is', null).order('updated_at', { ascending: false }).limit(poolLimit),
+        .not('youtube_watch_url', 'is', null)
+        .or(`release_date.gte.${recentReleaseCutoff},year.gte.${currentYear}`)
+        .order('updated_at', { ascending: false }).limit(poolLimit),
       supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
-        .not('youtube_watch_url', 'is', null).order('created_at', { ascending: false }).limit(poolLimit),
+        .not('youtube_watch_url', 'is', null)
+        .gte('created_at', recentUploadCutoff)
+        .order('created_at', { ascending: false }).limit(poolLimit),
       supabase.from('films').select(filmSelect).not('poster_url', 'is', null)
-        .not('streaming_links', 'is', null).order('updated_at', { ascending: false }).limit(poolLimit),
+        .not('streaming_links', 'is', null)
+        .or(`release_date.gte.${recentReleaseCutoff},year.gte.${currentYear}`)
+        .order('updated_at', { ascending: false }).limit(poolLimit),
     ]);
     const firstError = platformResults.find(result => result.error)?.error || youtubeRows.error || youtubeRecentRows.error || linkedRows.error;
     if (firstError) throw firstError;

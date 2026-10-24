@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -100,7 +101,7 @@ function simpleSpec(variant: SimpleEditorialVariant): HtmlTemplateSpec {
   return {
     file: 'simple-editorial-v1.html',
     formats: ['portrait_4_5'],
-    slides: variant === 'weekend_watchlist' ? 3 : undefined,
+    slides: variant === 'weekend_watchlist' ? 5 : undefined,
     data: (snapshot, slide) => simpleEditorialData(snapshot, variant, slide),
   };
 }
@@ -273,6 +274,19 @@ function actorData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   };
 }
 
+function summarizePersonBio(bio: string | null | undefined, maxChars = 210): string {
+  if (!bio) return 'Discover the people and stories shaping African screen culture.';
+  const clean = bio.replace(/\s+/g, ' ').trim();
+  if (clean.length <= maxChars) return clean;
+  const slice = clean.slice(0, maxChars);
+  const lastDot = slice.lastIndexOf('.');
+  if (lastDot > 90) {
+    return clean.slice(0, lastDot + 1).trim();
+  }
+  const lastSpace = slice.lastIndexOf(' ');
+  return (lastSpace > 0 ? clean.slice(0, lastSpace) : slice).trim() + '...';
+}
+
 function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEditorialVariant, slide = 1): Record<string, unknown> {
   const isPerson = snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight';
   const isFilm = snapshot.kind === 'upcoming_movie';
@@ -295,6 +309,7 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
     ? (person as any).roles.filter(Boolean).join(' · ')
     : '';
   const personRole = suppliedRoles || person?.knownForDepartment || 'Screen professional';
+  const personSummary = (person as any)?.summary || (person as any)?.shortBio || summarizePersonBio(person?.bio, 210);
 
   const base = {
     title,
@@ -303,7 +318,7 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
     badge: 'DISCOVER',
     status: isFilm ? filmStatus : isPlay ? 'Live on stage' : 'Profile',
     detail: isFilm ? filmDetail : isPlay ? ([stage?.venue, stage?.city].filter(Boolean).join(' · ') || 'Theatre') : personRole,
-    support: film?.synopsis || stage?.synopsis || person?.bio || 'Discover the people and stories shaping African screen culture.',
+    support: film?.synopsis || stage?.synopsis || personSummary || 'Discover the people and stories shaping African screen culture.',
     variant: 'default',
     metric: '',
     metricLabel: '',
@@ -312,7 +327,7 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
 
   switch (variant) {
     case 'behind_camera':
-      return { ...base, series: 'Behind The Camera', badge: 'THE MAKERS', status: `${person?.creditCount || 0} credits`, detail: personRole };
+      return { ...base, series: 'Behind The Camera', badge: 'THE MAKERS', status: `${person?.creditCount || 0} credits`, detail: personRole, support: personSummary };
     case 'film_conversation':
       return { ...base, image: film?.posterUrl || image, imagePosition: 'center top', series: 'Film Conversation', badge: 'JOIN IN', title: `What did you think of ${title}?`, status: 'Tell us', detail: 'In the comments' };
     case 'by_the_numbers':
@@ -340,11 +355,13 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
       };
     case 'weekend_watchlist':
       {
-        const pick = film?.watchlistPicks?.[Math.max(0, slide - 1)] || film;
+        const pickIndex = Math.max(0, (slide || 2) - 2);
+        const pick = film?.watchlistPicks?.[pickIndex] || film;
+        const totalPicks = film?.watchlistPicks?.length || 3;
         return {
           ...base,
           series: 'Weekend Watchlist',
-          badge: `${slide}/3 · FRI — SUN`,
+          badge: `${pickIndex + 1}/${totalPicks} · FRI — SUN`,
           title: pick?.title || title,
           image: pick?.posterUrl || pick?.backdropUrl || image,
           imagePosition: 'center top',
@@ -378,7 +395,7 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
     case 'where_to_watch':
       return { ...base, series: 'Now Streaming', badge: 'NEW TO STREAMING', variant: 'now-streaming', status: film?.youtubeChannelName || filmStatus, detail: film?.youtubeChannelName ? 'YouTube' : filmDetail };
     case 'you_know_the_face':
-      return { ...base, series: 'You Know The Face', badge: 'PEOPLE', status: `${person?.creditCount || 0} credits`, detail: personRole };
+      return { ...base, series: 'You Know The Face', badge: 'PEOPLE', status: `${person?.creditCount || 0} credits`, detail: personRole, support: personSummary };
     default:
       return base;
   }
@@ -399,7 +416,7 @@ async function renderHtmlTemplate(input: {
   await readFile(templatePath);
 
   const defaultDimensions = {
-    square_1_1: { width: 1080, height: 1080 },
+    square_1_1: { width: 1254, height: 1254 },
     portrait_4_5: { width: 1080, height: 1350 },
     vertical_9_16: { width: 1080, height: 1920 },
   }[input.format];
@@ -432,8 +449,21 @@ async function renderHtmlTemplate(input: {
     await page.addInitScript(data => {
       (window as any).MUVIDB_DATA = data;
     }, { ...spec.data(input.snapshot, input.slide), ...(input.dataOverride || {}) });
-    await page.goto(url.toString(), { waitUntil: 'load', timeout: 30_000 });
-    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+    await page.goto(url.toString(), { waitUntil: 'commit', timeout: 15_000 });
+    await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => {});
+    await page.evaluate(async () => {
+      const images = Array.from(document.querySelectorAll('img'));
+      await Promise.all(
+        images.map((img: HTMLImageElement) => {
+          if (!img.src || img.complete) return;
+          return new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve;
+            setTimeout(resolve, 5000);
+          });
+        })
+      );
+    }).catch(() => {});
     await page.evaluate(() => {
       document.documentElement.style.margin = '0';
       document.body.style.margin = '0';
@@ -458,11 +488,33 @@ export async function renderHtmlSocialTemplateAsset(input: {
 }): Promise<RenderedAsset> {
   const spec = HTML_SOCIAL_TEMPLATES[input.templateSlug];
   const defaultDimensions = {
-    square_1_1: { width: 1080, height: 1080 },
+    square_1_1: { width: 1254, height: 1254 },
     portrait_4_5: { width: 1080, height: 1350 },
     vertical_9_16: { width: 1080, height: 1920 },
   }[input.format];
   const { width, height } = spec?.dimensions?.[input.format] || defaultDimensions;
+
+  // Slide 1 of weekend_watchlist is always the official default cover poster
+  if (input.templateSlug === 'weekend-watchlist-simple-v1' && (!input.slide || input.slide === 1)) {
+    const coverPath = path.join(process.cwd(), 'public', 'images', 'social', 'weekend-watchlist-cover-v1.png');
+    if (existsSync(coverPath)) {
+      const sharp = (await import('sharp')).default;
+      const png = await sharp(coverPath).resize(width, height, { fit: 'cover' }).png().toBuffer();
+      return { format: input.format, png, width, height, usedArtwork: true, slide: input.slide || 1 };
+    }
+  }
+
+  // Final slide of ANY carousel is the official default back cover poster unless custom override requested
+  const totalSlides = spec?.slides || 1;
+  const wantsCustomBackCover = Boolean(input.dataOverride && (input.dataOverride.variant || input.dataOverride.title || input.dataOverride.skipDefaultBackCover));
+  if (totalSlides > 1 && input.slide === totalSlides && !wantsCustomBackCover) {
+    const backCoverPath = path.join(process.cwd(), 'public', 'images', 'social', 'carousel-back-cover-v1.png');
+    if (existsSync(backCoverPath)) {
+      const sharp = (await import('sharp')).default;
+      const png = await sharp(backCoverPath).resize(width, height, { fit: 'cover' }).png().toBuffer();
+      return { format: input.format, png, width, height, usedArtwork: true, slide: input.slide };
+    }
+  }
 
   const png = await renderHtmlTemplate(input);
   return { format: input.format, png, width, height, usedArtwork: true, slide: input.slide };

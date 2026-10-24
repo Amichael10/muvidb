@@ -196,6 +196,16 @@ export function assessEditorialCandidate(
       whyNow = 'Verified audience activity makes it suitable for conversation';
     }
 
+    const filmYear = data.year ? Number(data.year) : null;
+    const currentYear = referenceDate.getFullYear();
+    const isOldMovie = (release !== null && release < referenceDate.getTime() - 90 * DAY_MS) ||
+      (filmYear !== null && filmYear < currentYear && (release === null || release < referenceDate.getTime() - 90 * DAY_MS));
+
+    if (isOldMovie && intent === 'streaming') {
+      warnings.push('Old release is not eligible for new streaming spotlight');
+      penalties -= 100;
+    }
+
     if (!synopsisReady && intent === 'catalogue') {
       warnings.push('Not enough story context for a conversation post');
       penalties -= 30;

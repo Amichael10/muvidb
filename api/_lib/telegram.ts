@@ -55,14 +55,14 @@ export async function sendTelegramMessage(
 }
 
 export type TelegramPhotoOpts = {
-  photo: string;
+  photo: string | Buffer | Uint8Array;
   caption?: string;
   chatId?: string;
   replyMarkup?: { inline_keyboard: TelegramInlineButton[][] };
 };
 
 export async function sendTelegramPhoto(
-  photoOrOpts: string | TelegramPhotoOpts,
+  photoOrOpts: string | Buffer | Uint8Array | TelegramPhotoOpts,
   caption?: string,
   replyMarkup?: { inline_keyboard: TelegramInlineButton[][] },
   chatId?: string,
@@ -74,7 +74,7 @@ export async function sendTelegramPhoto(
   }
 
   const opts: TelegramPhotoOpts =
-    typeof photoOrOpts === 'string'
+    typeof photoOrOpts === 'string' || Buffer.isBuffer(photoOrOpts) || photoOrOpts instanceof Uint8Array
       ? { photo: photoOrOpts, caption, replyMarkup, chatId }
       : photoOrOpts;
 
@@ -82,18 +82,33 @@ export async function sendTelegramPhoto(
   if (!targetChatId) return { ok: false, error: 'chat id missing' };
 
   try {
-    const body: Record<string, unknown> = {
-      chat_id: targetChatId,
-      photo: opts.photo,
-    };
-    if (opts.caption) body.caption = opts.caption.slice(0, 1024);
-    if (opts.replyMarkup) body.reply_markup = opts.replyMarkup;
+    let res: Response;
+    if (Buffer.isBuffer(opts.photo) || opts.photo instanceof Uint8Array) {
+      const formData = new FormData();
+      formData.append('chat_id', targetChatId);
+      formData.append('photo', new Blob([opts.photo], { type: 'image/png' }), 'photo.png');
+      if (opts.caption) formData.append('caption', opts.caption.slice(0, 1024));
+      if (opts.replyMarkup) formData.append('reply_markup', JSON.stringify(opts.replyMarkup));
 
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+      res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: 'POST',
+        body: formData,
+      });
+    } else {
+      const body: Record<string, unknown> = {
+        chat_id: targetChatId,
+        photo: opts.photo,
+      };
+      if (opts.caption) body.caption = opts.caption.slice(0, 1024);
+      if (opts.replyMarkup) body.reply_markup = opts.replyMarkup;
+
+      res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.ok) {
       // If photo failed (e.g. invalid URL), fallback to message

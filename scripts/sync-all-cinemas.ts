@@ -137,25 +137,26 @@ const DEFAULT_CINEMAS: Partial<CinemaRow>[] = [
     name: 'Viva Cinemas Abuja',
     chain: 'Viva',
     scrape_adapter: 'reach_cinema',
-    scrape_config: { externalCinemaId: 'viv-27fd41dc', bookingBaseUrl: 'https://web.vivacinemas.com' },
+    // Viva's live circuit has no Abuja branch. Do not map Abuja to Ikeja.
+    scrape_config: {},
   },
   {
     name: 'Viva Cinemas Ibadan',
     chain: 'Viva',
     scrape_adapter: 'reach_cinema',
-    scrape_config: { externalCinemaId: 'viv-27fd41dc', bookingBaseUrl: 'https://web.vivacinemas.com' },
+    scrape_config: { externalCinemaId: 'viv-353d0dd9', bookingBaseUrl: 'https://web.vivacinemas.com' },
   },
   {
     name: 'Viva Cinemas Ilorin',
     chain: 'Viva',
     scrape_adapter: 'reach_cinema',
-    scrape_config: { externalCinemaId: 'viv-27fd41dc', bookingBaseUrl: 'https://web.vivacinemas.com' },
+    scrape_config: { externalCinemaId: 'viv-8a416f84', bookingBaseUrl: 'https://web.vivacinemas.com' },
   },
   {
     name: 'Viva Cinemas Ota',
     chain: 'Viva',
     scrape_adapter: 'reach_cinema',
-    scrape_config: { externalCinemaId: 'viv-27fd41dc', bookingBaseUrl: 'https://web.vivacinemas.com' },
+    scrape_config: { externalCinemaId: 'viv-f55b99bf', bookingBaseUrl: 'https://web.vivacinemas.com' },
   },
 
   // ── KADA CINEMAS ──
@@ -163,19 +164,20 @@ const DEFAULT_CINEMAS: Partial<CinemaRow>[] = [
     name: 'KADA Cinema Kaduna',
     chain: 'Kada',
     scrape_adapter: 'reach_cinema',
-    scrape_config: { externalCinemaId: 'kad-65087c1a', bookingBaseUrl: 'https://kadacinemas.com' },
+    // The provider circuit currently exposes Benin only.
+    scrape_config: {},
   },
   {
     name: 'Kada Cinemas Benin',
     chain: 'Kada',
     scrape_adapter: 'reach_cinema',
-    scrape_config: { externalCinemaId: 'kad-65087c1a', bookingBaseUrl: 'https://kadacinemas.com' },
+    scrape_config: { externalCinemaId: 'kad-65087c1a', bookingBaseUrl: 'https://kadacinemas.fusionintel.io' },
   },
   {
     name: 'Kada Calabar',
     chain: 'Kada',
     scrape_adapter: 'reach_cinema',
-    scrape_config: { externalCinemaId: 'kad-65087c1a', bookingBaseUrl: 'https://kadacinemas.com' },
+    scrape_config: {},
   },
 
   // ── BOX OFFICE CINEMAS ──

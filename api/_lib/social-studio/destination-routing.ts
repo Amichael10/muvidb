@@ -3,14 +3,17 @@ import { getPlatformPublishingCredentials } from '../threads_oauth.js';
 function httpError(status: number, message: string) { return Object.assign(new Error(message), { status }); }
 
 export async function resolveDestinationConnection(destinationId: string | null, platform: string, contentType?: string) {
-  // Streaming alerts must never fall back to the main Instagram account.
-  if (platform === 'instagram' && contentType === 'where_to_watch') {
-    const { data, error } = await supabase.from('social_connections').select('id')
-      .eq('platform', 'instagram').eq('status', 'connected').eq('username', 'muvi_database').maybeSingle();
-    if (error) throw error;
-    if (!data) throw httpError(409, 'Connect @muvi_database before publishing Streaming Alerts to Instagram.');
-    await getPlatformPublishingCredentials(platform, data.id);
-    return data.id;
+  // Route Instagram posts to primary @muvidb_ account
+  if (platform === 'instagram') {
+    if (!destinationId || contentType === 'where_to_watch') {
+      const { data, error } = await supabase.from('social_connections').select('id')
+        .eq('platform', 'instagram').eq('status', 'connected').eq('username', 'muvidb_').maybeSingle();
+      if (error) throw error;
+      if (data) {
+        await getPlatformPublishingCredentials(platform, data.id);
+        return data.id;
+      }
+    }
   }
   if ((contentType === 'where_to_watch' || contentType === 'whats_on_stage') && platform !== 'instagram') {
     const { data: main, error } = await supabase.from('content_destinations').select('id').eq('slug', 'main-muvidb').single();

@@ -37,6 +37,11 @@ export const GENERAL_AWARD_CATEGORIES = [
  * Curated list of known categories per award organization.
  */
 export const KNOWN_CATEGORIES_BY_ORG = {
+  FILM_AFRICA: [
+    'Baobab Award for Best Short Film',
+    'Audience Award for Best Feature',
+    'Special Mention'
+  ],
   AMVCA: [
     'Best Overall Movie',
     'Best Director',

@@ -295,9 +295,87 @@ const scorePeoplePair = (left, right) => {
   return { score, reasons: unique(reasons), conflicts };
 };
 
-const filmKind = (film) => film.content_type || (film.season_number || film.episode_number ? 'series' : 'film');
+const PROTECTED_SERIES_NAMES = [
+  'abattoir', 'saamu alajo', "jenifa's diary", 'jenifas diary', 'aiyetoro town',
+  'my siblings and i', 'she must be obeyed', 'abejoye', 'eniyan egun', 'gbemi',
+  'the train', 'papa ajasco', 'professor johnbull', 'skinny girl in transit',
+  'the johnsons', 'flatmates', 'officer titus', "the men's club", 'the mens club',
+  'dear queen', 'onyeka the local hustler', 'once upon a village', 'bakayoko',
+  'family game', "adaobi's trial", 'adaobis trial', 'the voice', 'industreet',
+  'prayerquake', 'prayer quake', 'drama ministers', 'vision carriers', 'ile ariwo',
+  'shackles', 'jailer', 'legion',
+];
+
+export const isProtectedSeries = (film) => {
+  if (!film) return false;
+  if (film.content_type === 'series' || film.season_number != null || film.episode_number != null || film.series_id != null) {
+    return true;
+  }
+  const title = String(film.title || '').toLowerCase().trim();
+  return PROTECTED_SERIES_NAMES.some((s) => title === s || title.startsWith(`${s} `) || title.startsWith(`${s}:`) || title.startsWith(`${s} -`) || title.startsWith(`${s} (`));
+};
+
+export const isPortraitPoster = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  const lower = url.toLowerCase();
+  if (
+    lower.includes('ytimg.com')
+    || lower.includes('youtube.com')
+    || lower.includes('maxresdefault')
+    || lower.includes('hqdefault')
+    || lower.includes('sddefault')
+    || lower.includes('mqdefault')
+    || lower.includes('/vi/')
+  ) {
+    return false;
+  }
+  return true;
+};
+
+export const filmPosterScore = (film) => {
+  if (!film?.poster_url) return 0;
+  if (isPortraitPoster(film.poster_url)) return 100;
+  return 10;
+};
+
+export const filmEnsembleScore = (film) => {
+  if (typeof film?.credits_count === 'number') return film.credits_count;
+  if (Array.isArray(film?.credits)) return film.credits.length;
+  return 0;
+};
+
+export const filmSelectionScore = (film) => {
+  let score = 0;
+  score += filmPosterScore(film) * 10;
+  score += filmEnsembleScore(film) * 50;
+  if (film?.tmdb_id) score += 200;
+  if (film?.mubi_id) score += 100;
+  if (film?.synopsis && film.synopsis.length > 40) score += 50;
+  if (film?.backdrop_url && !film.backdrop_url.includes('ytimg')) score += 40;
+  if (film?.runtime_minutes && film.runtime_minutes > 0) score += 30;
+  if (film?.year) score += 20;
+  if (film?.release_date) score += 10;
+  if (film?.is_published) score += 10;
+  if (film?.is_verified) score += 10;
+  return score;
+};
+
+const filmKind = (film) => (isProtectedSeries(film) ? 'series' : film.content_type || 'film');
 
 const scoreFilmPair = (left, right) => {
+  // Never merge series from FAAN, SAAMU ALAJO, DAMILOLA BAMIGBOYE, or other episodic series
+  // unless they are the exact same video or explicitly the exact same season + episode.
+  if (isProtectedSeries(left) || isProtectedSeries(right)) {
+    const sameVid = Boolean(left.source_video_id && right.source_video_id && left.source_video_id === right.source_video_id);
+    const sameEp = Boolean(
+      left.season_number != null && right.season_number != null && left.season_number === right.season_number
+      && left.episode_number != null && right.episode_number != null && left.episode_number === right.episode_number
+    );
+    if (!sameVid && !sameEp) {
+      return null;
+    }
+  }
+
   const form = bestFormScore(left._forms, right._forms);
   const reasons = [];
   const conflicts = [];
@@ -406,6 +484,13 @@ const connectedGroups = (records, scoredPairs, entity) => {
           ? 'medium'
           : 'review';
     const recommended = [...groupRecords].sort((left, right) => {
+      if (entity === 'films') {
+        const scoreDiff = filmSelectionScore(right) - filmSelectionScore(left);
+        if (scoreDiff !== 0) return scoreDiff;
+        const usageLeft = Number(left.view_count || 0);
+        const usageRight = Number(right.view_count || 0);
+        return usageRight - usageLeft;
+      }
       const verifiedDelta = Number(right.is_verified || right.is_published) - Number(left.is_verified || left.is_published);
       if (verifiedDelta) return verifiedDelta;
       const claimedDelta = Number(Boolean(right.claimed_by)) - Number(Boolean(left.claimed_by));

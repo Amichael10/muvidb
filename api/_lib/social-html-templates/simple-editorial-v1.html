@@ -21,7 +21,44 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ink);
 .content{position:absolute;left:7.6%;right:6.7%;bottom:5.6%}.metric{display:none;font-size:15.7vw;line-height:.74;font-weight:800;letter-spacing:-.06em;margin-bottom:2.2%}.metric.show{display:block}.metric small{font-size:3.1vw;letter-spacing:0;color:var(--brand)}
 .title{font-size:8.45vw;line-height:.9;letter-spacing:-.045em;font-weight:800;margin:0;max-width:94%;text-wrap:balance}.title.long{font-size:6.5vw;line-height:.94;letter-spacing:-.035em}.status-row{display:flex;align-items:center;gap:2.4vw;margin-top:2.3%;font-size:3.35vw;line-height:1;font-weight:700;text-transform:uppercase}.status{display:inline-flex;background:var(--brand);border-radius:999px;padding:1.1vw 2.25vw 1.2vw;font-size:2.45vw;letter-spacing:.045em;white-space:nowrap}.support{margin:2% 0 0;max-width:82%;font-size:2.2vw;line-height:1.3;font-weight:500;color:#eee}.quote{display:none;font-size:5vw;line-height:1.04;font-weight:700;max-width:92%;margin:0 0 2.2%}.quote.show{display:block}.quote:before{content:'“';display:block;font-size:9vw;line-height:.35;color:var(--brand)}
 .card.filmography .content{display:flex;flex-direction:column}.card.filmography .metric{order:4;font-size:1.25vw;line-height:1;letter-spacing:.08em;margin:1.7% 0 0;font-weight:700;text-transform:uppercase;color:#ccc}.card.filmography .metric small{font-size:1.25vw;color:#ccc}.card.filmography .title{order:1;font-size:8vw;text-transform:uppercase}.card.filmography .support{order:2;font-size:2.8vw;line-height:1.14;font-weight:600;max-width:74%;margin-top:1.7%}.card.filmography .status-row{order:3;margin-top:2%}.card.filmography .status{background:var(--brand);font-size:1.9vw}.card.filmography .status-row>span:last-child:empty{display:none}
-.card.editorial-story .content{display:flex;flex-direction:column}.card.editorial-story .title{order:1;font-size:7.4vw;line-height:.94;max-width:92%}.card.editorial-story .support{order:2;font-size:3vw;line-height:1.15;font-weight:650;max-width:78%;margin-top:1.7%}.card.editorial-story .status-row{order:3;align-items:flex-start;flex-direction:column;gap:1.15vw;margin-top:2%}.card.editorial-story .status{max-width:82%;white-space:normal;border-radius:0;padding:.65vw 1.05vw;font-size:1.75vw;line-height:1.12}.card.editorial-story .status-row>span:last-child{font-size:1.35vw;line-height:1.15;letter-spacing:.06em;color:#ddd}
+.card.has-mosaic .mosaic{display:grid}.card.has-mosaic .art,.card.has-mosaic .pair{display:none}.card.has-mosaic .shade{background:linear-gradient(to bottom,rgba(0,0,0,.25) 0%,rgba(0,0,0,.5) 40%,rgba(0,0,0,.95) 100%)}
+.card.editorial-story .art,.card.editorial-story .pair,.card.editorial-story .mosaic{display:none}
+.card.editorial-story .shade{background:#0b0d10}
+.card.editorial-story .content{top:20%;bottom:auto;left:8%;right:8%;display:flex;flex-direction:column}
+.card.editorial-story .title{order:1;font-size:7.4vw;line-height:.95;max-width:92%;text-transform:uppercase;letter-spacing:-.03em}
+.card.editorial-story .status-row{order:2;margin-top:2.5%;align-items:center;gap:1.5vw}
+.card.editorial-story .status{background:var(--brand);font-size:2vw;padding:.8vw 1.6vw;border-radius:999px;letter-spacing:.05em}
+.card.editorial-story .status-row>span:last-child{font-size:1.8vw;color:#ccc;letter-spacing:.04em}
+.card.editorial-story .support{order:3;margin-top:4%;font-size:3.2vw;line-height:1.45;color:#e8e8e8;font-weight:500;max-width:95%}
+.card.split-top .art{position:absolute;top:0;left:0;width:100%;height:44%;object-fit:cover;object-position:center;z-index:0}
+.card.split-top .pair,.card.split-top .mosaic,.card.split-top .poster-grid{display:none}
+.card.split-top .shade{position:absolute;inset:0;z-index:1;background:linear-gradient(to bottom,rgba(0,0,0,.15) 0%,rgba(0,0,0,.05) 25%,rgba(11,13,16,.85) 42%,#0b0d10 47%,#0b0d10 100%)}
+.card.split-top .logo{z-index:3;filter:drop-shadow(0 2px 6px rgba(0,0,0,.9))}
+.card.split-top .series{z-index:3;filter:drop-shadow(0 2px 6px rgba(0,0,0,.9))}
+.card.split-top .content{top:48%;bottom:auto;left:8%;right:8%;display:flex;flex-direction:column;z-index:3}
+.card.split-top .title{order:1;font-size:7vw;line-height:.95;max-width:92%;text-transform:uppercase;letter-spacing:-.03em}
+.card.split-top .status-row{order:2;margin-top:2.2%;align-items:center;gap:1.5vw}
+.card.split-top .status{background:var(--brand);font-size:1.9vw;padding:.7vw 1.5vw;border-radius:999px;letter-spacing:.05em}
+.card.split-top .status-row>span:last-child{font-size:1.7vw;color:#ccc;letter-spacing:.04em}
+.card.split-top .support{order:3;margin-top:3%;font-size:2.8vw;line-height:1.45;color:#e8e8e8;font-weight:500;max-width:95%}
+.poster-grid{display:none;position:absolute;top:18%;left:7%;right:7%;bottom:12%;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2.2vw;z-index:3}
+.card.poster-grid-slide .poster-grid{display:grid}
+.card.poster-grid-slide .art,.card.poster-grid-slide .pair,.card.poster-grid-slide .mosaic{display:none}
+.card.poster-grid-slide .shade{background:#0b0d10}
+.poster-card{position:relative;width:100%;height:100%;overflow:hidden;border-radius:1.2vw;border:1px solid rgba(255,255,255,.18);box-shadow:0 1vw 2.5vw rgba(0,0,0,.6);background:#16191f;display:flex;flex-direction:column}
+.poster-card img{width:100%;height:100%;object-fit:cover;flex:1}
+.poster-title{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.7) 65%,transparent 100%);padding:1.8vw 1vw .8vw;font-size:1.7vw;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center;color:#fff}
+.card.poster-grid-slide .content{display:none}
+.card.celebration-closing .art,.card.celebration-closing .pair,.card.celebration-closing .mosaic{display:none}
+.card.celebration-closing .shade{background:radial-gradient(circle at 50% 42%,rgba(255,90,31,.28) 0%,rgba(11,13,16,.96) 68%,#080a0d 100%)}
+.card.celebration-closing .series,.card.celebration-closing .badge,.card.celebration-closing .footer{display:none}
+.card.celebration-closing .content{left:8%;right:8%;top:26%;bottom:auto;display:flex;flex-direction:column;align-items:center;text-align:center}
+.card.celebration-closing .title{order:1;font-size:7.4vw;line-height:1.02;max-width:92%;text-transform:uppercase;letter-spacing:-.03em;color:#fff}
+.card.celebration-closing .support{order:2;margin-top:4%;font-size:3.4vw;line-height:1.35;color:#ff8a57;font-weight:600;max-width:90%}
+.card.celebration-closing .status-row{display:flex;order:3;margin-top:5%;justify-content:center}
+.card.celebration-closing .status-row>span:last-child{display:none}
+.card.celebration-closing .status{background:var(--brand);font-size:2vw;padding:.8vw 2vw;border-radius:999px;letter-spacing:.06em}
+.card.celebration-closing .actions{display:grid}
 .card.critic-quote .shade{background:linear-gradient(to bottom,rgba(0,0,0,.08) 0%,rgba(0,0,0,.08) 31%,rgba(0,0,0,.5) 57%,rgba(0,0,0,.98) 100%)}.card.critic-quote .series{width:29%;font-size:2.35vw}.card.critic-quote .content{display:flex;flex-direction:column}.card.critic-quote .title{order:1;font-size:2.15vw;line-height:1.1;letter-spacing:.08em;text-transform:uppercase;color:#ddd;margin-bottom:2.4%}.card.critic-quote .quote{order:2;font-size:4.8vw;line-height:1.03;letter-spacing:-.022em;font-weight:750;max-width:94%;margin:0}.card.critic-quote .quote:before{font-size:7vw;line-height:.35}.card.critic-quote .status-row{order:3;align-items:flex-start;flex-direction:column;gap:.7vw;margin-top:2.7%}.card.critic-quote .status{background:none;border-radius:0;padding:0;font-size:2.25vw;letter-spacing:.02em}.card.critic-quote .status-row>span:last-child{font-size:1.65vw;color:#d8d8d8;text-transform:none}.card.critic-quote .support{order:4;color:var(--brand);font-size:1.7vw;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-top:2.2%}
 .critic-avatar{display:none;width:6.2vw;height:6.2vw;border-radius:50%;object-fit:cover;object-position:center top;border:.28vw solid var(--brand);box-shadow:0 .5vw 1.5vw rgba(0,0,0,.45);flex:0 0 auto}.card.critic-quote .status-row,.card.critic_spotlight .status-row{display:grid;grid-template-columns:auto 1fr;column-gap:1.35vw;align-items:center}.card.critic-quote .critic-avatar.show,.card.critic_spotlight .critic-avatar.show{display:block;grid-row:1 / span 2}.card.critic-quote .status,.card.critic_spotlight .status{grid-column:2}.card.critic-quote .status-row>span:last-child,.card.critic_spotlight .status-row>span:last-child{grid-column:2}
 .footer{position:absolute;right:7.2%;bottom:5.8%;font-size:1.25vw;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#ddd}
@@ -33,6 +70,12 @@ body.render-mode *{animation:none!important;transition:none!important}
   <img class="art" id="art" alt="">
   <div class="pair"><img id="imageA" alt=""><img id="imageB" alt=""></div>
   <div class="mosaic"><img id="mosaic1" alt=""><img id="mosaic2" alt=""><img id="mosaic3" alt=""><img id="mosaic4" alt=""></div>
+  <div class="poster-grid" id="posterGrid">
+    <div class="poster-card"><img id="grid1" alt=""><div class="poster-title" id="gridTitle1"></div></div>
+    <div class="poster-card"><img id="grid2" alt=""><div class="poster-title" id="gridTitle2"></div></div>
+    <div class="poster-card"><img id="grid3" alt=""><div class="poster-title" id="gridTitle3"></div></div>
+    <div class="poster-card"><img id="grid4" alt=""><div class="poster-title" id="gridTitle4"></div></div>
+  </div>
   <div class="shade"></div>
   <img class="logo" src="../../../public/images/MuviDB%20Brand/White%20Wordmark.svg" alt="MuviDB">
   <div class="series"><span id="series"></span><span class="badge" id="badge"></span></div>
@@ -51,11 +94,12 @@ body.render-mode *{animation:none!important;transition:none!important}
   <div class="footer" id="footer">MUVIDB.COM</div>
 </main>
 <script>
-const DEFAULTS={series:'MuviDB Editorial',badge:'DISCOVER',title:'African cinema, beautifully indexed.',status:'Explore',detail:'MuviDB',support:'Every film. Every credit.',image:'',image2:'',image3:'',image4:'',criticAvatar:'',metric:'',metricLabel:'',quote:'',variant:'default',imagePosition:'center'};
-function render(input={}){const d={...DEFAULTS,...(window.MUVIDB_DATA||{}),...input};const card=document.getElementById('card');card.className='card';if(d.variant)card.classList.add(String(d.variant).replace(/[^a-z0-9_-]/gi,''));if(d.image2)card.classList.add('has-pair');
-document.getElementById('series').textContent=d.series||'';const badge=document.getElementById('badge');badge.textContent=d.badge||'';badge.style.display=String(d.badge||'').trim().toLowerCase()===String(d.series||'').trim().toLowerCase()?'none':'';document.getElementById('title').textContent=d.title||'';document.getElementById('status').textContent=d.status||'';document.getElementById('detail').textContent=d.detail||'';document.getElementById('support').textContent=d.support||'';document.getElementById('footer').textContent=d.footer||'MUVIDB.COM';
+const DEFAULTS={series:'MuviDB Editorial',badge:'DISCOVER',title:'African cinema, beautifully indexed.',status:'Explore',detail:'MuviDB',support:'Every film. Every credit.',image:'',image2:'',image3:'',image4:'',grid1:'',grid2:'',grid3:'',grid4:'',gridTitle1:'',gridTitle2:'',gridTitle3:'',gridTitle4:'',criticAvatar:'',metric:'',metricLabel:'',quote:'',variant:'default',imagePosition:'center'};
+function render(input={}){const d={...DEFAULTS,...(window.MUVIDB_DATA||{}),...input};const card=document.getElementById('card');card.className='card';if(d.variant)card.classList.add(String(d.variant).replace(/[^a-z0-9_-]/gi,''));if(d.image2&&!d.image3)card.classList.add('has-pair');if(d.image3||d.variant==='mosaic'||d.variant==='has-mosaic')card.classList.add('has-mosaic');
+document.getElementById('series').textContent=d.series||'';const badge=document.getElementById('badge');badge.textContent=d.badge||'';badge.style.display=String(d.badge||'').trim().toLowerCase()===String(d.series||'').trim().toLowerCase()?'none':'';document.getElementById('title').textContent=d.title||'';document.getElementById('status').textContent=d.status||'';document.getElementById('detail').textContent=d.detail||'';document.getElementById('support').innerHTML=(d.supportHtml||(d.support||'').replace(/\n/g, '<br>'));document.getElementById('footer').textContent=d.footer||'MUVIDB.COM';
 const title=document.getElementById('title');title.classList.toggle('long',String(d.title||'').length>24);const art=document.getElementById('art');art.src=d.image||'';art.style.objectPosition=d.imagePosition||'center';document.getElementById('imageA').src=d.image||'';document.getElementById('imageB').src=d.image2||'';
 document.getElementById('mosaic1').src=d.image||'';document.getElementById('mosaic2').src=d.image2||d.image||'';document.getElementById('mosaic3').src=d.image3||d.image||'';document.getElementById('mosaic4').src=d.image4||d.image2||d.image||'';
+if(document.getElementById('grid1')){document.getElementById('grid1').src=d.grid1||'';document.getElementById('grid2').src=d.grid2||'';document.getElementById('grid3').src=d.grid3||'';document.getElementById('grid4').src=d.grid4||'';document.getElementById('gridTitle1').textContent=d.gridTitle1||'';document.getElementById('gridTitle2').textContent=d.gridTitle2||'';document.getElementById('gridTitle3').textContent=d.gridTitle3||'';document.getElementById('gridTitle4').textContent=d.gridTitle4||'';}
 const criticAvatar=document.getElementById('criticAvatar');criticAvatar.src=d.criticAvatar||'';criticAvatar.classList.toggle('show',Boolean(d.criticAvatar));
 const metric=document.getElementById('metric');metric.classList.toggle('show',Boolean(d.metric));metric.innerHTML=d.metric?`${d.metric}${d.metricLabel?` <small>${d.metricLabel}</small>`:''}`:'';const quote=document.getElementById('quote');quote.classList.toggle('show',Boolean(d.quote));quote.textContent=d.quote||'';
 }

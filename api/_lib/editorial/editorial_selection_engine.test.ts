@@ -127,4 +127,21 @@ describe('editorial selection engine', () => {
       seriesAlreadyUsedToday: false,
     })).toContain('Weekly');
   });
+
+  it('rejects old movies from previous years from streaming series', () => {
+    const result = assessEditorialCandidate(candidate({
+      type: 'movie',
+      name: 'Koleoso Part 3',
+      data: {
+        lifecycle: 'now_streaming',
+        platformDisplayName: 'YouTube',
+        release_date: '2025-06-13',
+        year: 2025,
+        synopsis: 'A story about a father and his children from 2025.',
+      },
+    }), 'weekend_watchlist', { referenceDate });
+
+    expect(result.eligible).toBe(false);
+    expect(result.warnings).toContain('Old release is not eligible for new streaming spotlight');
+  });
 });

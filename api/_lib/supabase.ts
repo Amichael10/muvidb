@@ -1,14 +1,21 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import dns from 'dns';
-try { dns.setDefaultResultOrder('ipv4first'); dns.setServers(['1.1.1.1', '8.8.8.8']); } catch {}
+try {
+  dns.setDefaultResultOrder('ipv4first');
+  if (process.env.VERCEL) {
+    dns.setServers(['1.1.1.1', '8.8.8.8']);
+  }
+} catch {}
 
 import { Agent, setGlobalDispatcher } from 'undici';
 try {
   setGlobalDispatcher(
     new Agent({
       connect: { timeout: 60_000 },
-      headersTimeout: 300_000,
-      bodyTimeout: 300_000,
+      headersTimeout: 180_000,
+      bodyTimeout: 180_000,
+      keepAliveTimeout: 10_000,
+      keepAliveMaxTimeout: 30_000,
     })
   );
 } catch {}

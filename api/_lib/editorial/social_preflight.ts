@@ -36,8 +36,23 @@ export async function preflightFilm(filmId: string) {
     .from('films')
     .select('id,title,poster_url,backdrop_url,synopsis,updated_at,credits(role,people(id,name))')
     .eq('id', filmId)
-    .single();
+    .maybeSingle();
   if (error) throw error;
+  if (!film) {
+    return {
+      ready: false,
+      checkedAt: new Date().toISOString(),
+      filmId,
+      filmUpdatedAt: null,
+      title: 'Unknown / Merged Film',
+      synopsisLength: 0,
+      artwork: { url: null, width: null, height: null, orientation: 'unknown' as const },
+      castCount: 0,
+      crewCount: 0,
+      directorCount: 0,
+      reasons: ['film_not_found_or_merged'],
+    };
+  }
 
   const artwork = await inspectArtwork(film.poster_url);
   const credits = (film.credits || []) as any[];
