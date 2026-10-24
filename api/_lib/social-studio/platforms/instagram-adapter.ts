@@ -61,7 +61,7 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
     this.accessToken = options.accessToken;
     this.instagramAccountId = options.instagramAccountId;
     this.accountUsername = options.accountUsername;
-    this.defaultCollaborators = options.collaborators ?? [];
+    this.defaultCollaborators = options.collaborators ?? ['muvi_database'];
     const isDirectInstagramToken = options.accessToken.startsWith('IGAG') || options.accessToken.startsWith('IGAA');
     const domain = isDirectInstagramToken ? 'graph.instagram.com' : 'graph.facebook.com';
     this.baseUrl = `https://${domain}/${cleanVersion(options.apiVersion)}`;

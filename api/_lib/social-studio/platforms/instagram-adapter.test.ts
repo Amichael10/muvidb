@@ -43,7 +43,7 @@ describe('InstagramPlatformAdapter', () => {
     expect(containerBody.get('collaborators')).toBe('["muvi_database"]');
   });
 
-  it('does not attach any collaborators by default', async () => {
+  it('attaches muvi_database as collaborator by default when posting from muvidb_', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_1' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
@@ -54,6 +54,28 @@ describe('InstagramPlatformAdapter', () => {
       accessToken: 'ig-secret-token',
       instagramAccountId: 'ig-user-1',
       accountUsername: 'muvidb_',
+      fetchImpl,
+      pollIntervalMs: 10,
+    });
+
+    await adapter.publish(request());
+
+    const containerBody = fetchImpl.mock.calls[0][1].body as URLSearchParams;
+    expect(containerBody.get('collaborators')).toBe('["muvi_database"]');
+  });
+
+  it('allows overriding collaborators with empty array', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_1', permalink: 'https://instagram.com/p/123' }), { status: 200 }));
+
+    const adapter = new InstagramPlatformAdapter({
+      accessToken: 'ig-secret-token',
+      instagramAccountId: 'ig-user-1',
+      accountUsername: 'muvidb_',
+      collaborators: [],
       fetchImpl,
       pollIntervalMs: 10,
     });
