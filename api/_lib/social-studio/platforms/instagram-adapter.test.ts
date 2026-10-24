@@ -25,6 +25,7 @@ describe('InstagramPlatformAdapter', () => {
       accessToken: 'ig-secret-token',
       instagramAccountId: 'ig-user-1',
       accountUsername: 'muvidb_',
+      collaborators: ['muvi_database'],
       fetchImpl,
       pollIntervalMs: 10,
     });
@@ -40,6 +41,27 @@ describe('InstagramPlatformAdapter', () => {
     expect(containerBody.get('image_url')).toBe('https://cdn.example.com/poster.png');
     expect(containerBody.get('caption')).toBe('A MuviDB Instagram test post');
     expect(containerBody.get('collaborators')).toBe('["muvi_database"]');
+  });
+
+  it('does not attach any collaborators by default', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_media_1', permalink: 'https://instagram.com/p/123' }), { status: 200 }));
+
+    const adapter = new InstagramPlatformAdapter({
+      accessToken: 'ig-secret-token',
+      instagramAccountId: 'ig-user-1',
+      accountUsername: 'muvidb_',
+      fetchImpl,
+      pollIntervalMs: 10,
+    });
+
+    await adapter.publish(request());
+
+    const containerBody = fetchImpl.mock.calls[0][1].body as URLSearchParams;
+    expect(containerBody.get('collaborators')).toBeNull();
   });
 
   it('does not invite muvi_database as collaborator if posting from muvi_database', async () => {
@@ -74,6 +96,7 @@ describe('InstagramPlatformAdapter', () => {
       accessToken: 'token',
       instagramAccountId: 'ig-user-1',
       accountUsername: 'muvidb_',
+      collaborators: ['muvi_database'],
       fetchImpl,
       pollIntervalMs: 10,
     });
@@ -100,6 +123,7 @@ describe('InstagramPlatformAdapter', () => {
       accessToken: 'token',
       instagramAccountId: 'ig-user-1',
       accountUsername: 'muvidb_',
+      collaborators: ['muvi_database'],
       fetchImpl,
       pollIntervalMs: 10,
     });
@@ -146,6 +170,7 @@ describe('InstagramPlatformAdapter', () => {
       accessToken: 'token',
       instagramAccountId: 'ig-user-1',
       accountUsername: 'muvidb_',
+      collaborators: ['muvi_database'],
       fetchImpl,
       pollIntervalMs: 10,
     });
