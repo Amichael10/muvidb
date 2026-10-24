@@ -16,9 +16,13 @@ import {
   Text,
 } from '@react-email/components';
 
+export type PersonaType = 'fan' | 'professional' | 'company';
+
 export interface MuviDbWelcomeEmailProps {
   firstName?: string;
   logoUrl: string;
+  persona?: PersonaType;
+  roleBadge?: string;
   exploreUrl?: string;
   helpUrl?: string;
   unsubscribeUrl?: string;
@@ -35,6 +39,7 @@ export interface MuviDbWelcomeEmailProps {
   ctaUrl?: string;
   /** Hide feature grid + mission on shorter auth emails */
   compact?: boolean;
+  features?: Array<{ title: string; text: string }>;
   collage: {
     featuredPerson: string;
     actor: string;
@@ -57,31 +62,155 @@ const TEXT = '#15171A';
 const MUTED = '#5F6368';
 const CREAM = '#FFF9F5';
 
+const PERSONA_CONFIG: Record<
+  PersonaType,
+  {
+    badge: string;
+    headline: React.ReactNode;
+    intro: (name: string) => string;
+    ctaLabel: string;
+    ctaUrl: string;
+    preview: string;
+    featuresEyebrow: string;
+    features: Array<{ title: string; text: string }>;
+  }
+> = {
+  fan: {
+    badge: 'Account Type: Film Fan',
+    headline: (
+      <>
+        Welcome to the home of African cinema<span style={{ color: ORANGE }}>!</span>
+      </>
+    ),
+    intro: (name) =>
+      `Hi ${name}, thanks for joining MuviDB! Whether you’re looking for what to watch tonight or exploring the creators behind your favorite African stories, you’re in the right place.`,
+    ctaLabel: 'Explore African Cinema →',
+    ctaUrl: 'https://muvidb.com',
+    preview: 'Welcome to MuviDB — Your front row seat to African cinema',
+    featuresEyebrow: 'EVERYTHING YOU CAN DO ON MUVIDB',
+    features: [
+      {
+        title: 'Where to watch',
+        text: 'Instantly find where films are streaming or currently showing in cinemas.',
+      },
+      {
+        title: 'Rate & watchlist',
+        text: 'Keep track of films you’ve watched and build your personalized watchlist.',
+      },
+      {
+        title: 'Follow talent',
+        text: 'Follow your favorite actors, directors, and get notified on new releases.',
+      },
+      {
+        title: 'Community pulse',
+        text: 'Read real viewer reactions, critical reviews, and join the debate.',
+      },
+    ],
+  },
+  professional: {
+    badge: 'Account Type: Industry Professional',
+    headline: (
+      <>
+        Welcome to your professional screen hub<span style={{ color: ORANGE }}>!</span>
+      </>
+    ),
+    intro: (name) =>
+      `Hi ${name}, welcome to MuviDB Pro! As a creator shaping African screen culture, your craft deserves accurate, dispute-free documentation and worldwide visibility.`,
+    ctaLabel: 'Claim & Verify Your Profile →',
+    ctaUrl: 'https://muvidb.com/pro-dashboard',
+    preview: 'Welcome to MuviDB — Claim and verify your official industry profile',
+    featuresEyebrow: 'HOW TO ELEVATE YOUR SCREEN CAREER ON MUVIDB',
+    features: [
+      {
+        title: 'Claim your profile',
+        text: 'Take ownership of your verified public filmography, biography, and photos.',
+      },
+      {
+        title: 'Verified credits',
+        text: 'Document every film, series, and department credit with zero duplicate entries.',
+      },
+      {
+        title: 'Global showcase',
+        text: 'Showcase your portfolio, reel, and achievements to producers worldwide.',
+      },
+      {
+        title: 'Industry network',
+        text: 'Connect with fellow filmmakers, crew, and discover collaborative opportunities.',
+      },
+    ],
+  },
+  company: {
+    badge: 'Account Type: Studio & Production Company',
+    headline: (
+      <>
+        Welcome to the African cinema directory<span style={{ color: ORANGE }}>!</span>
+      </>
+    ),
+    intro: (name) =>
+      `Hi ${name}, welcome to MuviDB! We help production companies, distributors, and studios document their film catalogs, reach engaged audiences, and discover top-tier talent.`,
+    ctaLabel: 'Access Studio Portal →',
+    ctaUrl: 'https://muvidb.com/dashboard',
+    preview: 'Welcome to MuviDB — Your film catalog and industry talent network',
+    featuresEyebrow: 'WHAT YOUR STUDIO CAN ACHIEVE ON MUVIDB',
+    features: [
+      {
+        title: 'Catalog management',
+        text: 'Submit and manage official movie listings, festival selections, and trailers.',
+      },
+      {
+        title: 'Cast & crew credits',
+        text: 'Officially credit cast, HODs, and crew teams to build verified, dispute-free credits.',
+      },
+      {
+        title: 'Audience reach',
+        text: 'Track viewer sentiment, ratings, and market presence across your releases.',
+      },
+      {
+        title: 'Talent discovery',
+        text: 'Find vetted actors, directors, cinematographers, and crew across Africa.',
+      },
+    ],
+  },
+};
+
 export default function MuviDbWelcomeEmail({
   firstName = 'there',
   logoUrl,
+  persona,
+  roleBadge,
   exploreUrl = 'https://muvidb.com',
   helpUrl = 'https://muvidb.com/about',
   unsubscribeUrl = 'https://muvidb.com',
-  preview = 'Welcome to MuviDB, the home of African cinema.',
+  preview,
   eyebrow = 'WELCOME TO',
   headline,
   intro,
-  ctaLabel = 'Explore MuviDB →',
+  ctaLabel,
   ctaUrl,
   compact = false,
+  features,
   collage,
   social = {},
 }: MuviDbWelcomeEmailProps) {
-  const actionUrl = ctaUrl || exploreUrl;
-  const heroIntro =
-    intro
-    ?? `Hi ${firstName}, thanks for joining MuviDB — the home of African films, television, and the people who bring those stories to life.`;
+  const personaConfig = persona ? PERSONA_CONFIG[persona] : null;
+
+  const resolvedPreview = preview || personaConfig?.preview || 'Welcome to MuviDB, the home of African cinema.';
+  const resolvedRoleBadge = roleBadge || personaConfig?.badge;
+  const resolvedIntro = intro || (personaConfig ? personaConfig.intro(firstName) : `Hi ${firstName}, thanks for joining MuviDB — the home of African films, television, and the people who bring those stories to life.`);
+  const resolvedCtaLabel = ctaLabel || personaConfig?.ctaLabel || 'Explore MuviDB →';
+  const resolvedCtaUrl = ctaUrl || personaConfig?.ctaUrl || exploreUrl;
+  const resolvedFeatures = features || personaConfig?.features || [
+    { title: 'Explore', text: 'Browse films, television, short films, and more from across Africa.' },
+    { title: 'Discover people', text: 'Explore actors, directors, producers, writers, crew, and their credits.' },
+    { title: 'Where to watch', text: 'See where films are streaming or currently showing in cinemas.' },
+    { title: 'Stay updated', text: 'Follow releases, reviews, trailers, and highlights from African cinema.' },
+  ];
+  const featuresEyebrow = personaConfig?.featuresEyebrow || 'EVERYTHING YOU CAN DO ON MUVIDB';
 
   return (
     <Html lang="en">
       <Head />
-      <Preview>{preview}</Preview>
+      <Preview>{resolvedPreview}</Preview>
       <Body style={styles.body}>
         <Container style={styles.container}>
           <Section style={styles.header}>
@@ -100,9 +229,16 @@ export default function MuviDbWelcomeEmail({
           <Section style={styles.hero}>
             <Row>
               <Column style={styles.heroCopy}>
+                {resolvedRoleBadge && (
+                  <Section style={{ margin: '0 0 10px' }}>
+                    <Text style={styles.roleBadge}>{resolvedRoleBadge}</Text>
+                  </Section>
+                )}
                 <Text style={styles.eyebrow}>{eyebrow}</Text>
                 {headline ? (
                   <Heading style={styles.heading}>{headline}</Heading>
+                ) : personaConfig ? (
+                  <Heading style={styles.heading}>{personaConfig.headline}</Heading>
                 ) : (
                   <Heading style={styles.heading}>
                     Muvi<span style={{ color: ORANGE }}>DB</span>
@@ -111,12 +247,12 @@ export default function MuviDbWelcomeEmail({
                     <span style={{ color: ORANGE }}>!</span>
                   </Heading>
                 )}
-                <Text style={styles.intro}>{heroIntro}</Text>
+                <Text style={styles.intro}>{resolvedIntro}</Text>
                 {!compact && (
                   <Text style={styles.boldText}>We&apos;re excited to have you with us.</Text>
                 )}
-                <Button href={actionUrl} style={styles.button}>
-                  {ctaLabel}
+                <Button href={resolvedCtaUrl} style={styles.button}>
+                  {resolvedCtaLabel}
                 </Button>
               </Column>
               <Column style={styles.heroArt}>
@@ -127,25 +263,12 @@ export default function MuviDbWelcomeEmail({
 
           {!compact && (
           <Section style={styles.featuresSection}>
-            <Text style={styles.sectionEyebrow}>EVERYTHING YOU CAN DO ON MUVIDB</Text>
+            <Text style={styles.sectionEyebrow}>{featuresEyebrow}</Text>
             <Hr style={styles.sectionRule} />
             <Row>
-              <Feature
-                title="Explore"
-                text="Browse films, television, short films, and more from across Africa."
-              />
-              <Feature
-                title="Discover people"
-                text="Explore actors, directors, producers, writers, crew, and their credits."
-              />
-              <Feature
-                title="Where to watch"
-                text="See where films are streaming or currently showing in cinemas."
-              />
-              <Feature
-                title="Stay updated"
-                text="Follow releases, reviews, trailers, and highlights from African cinema."
-              />
+              {resolvedFeatures.map((f, i) => (
+                <Feature key={i} title={f.title} text={f.text} />
+              ))}
             </Row>
           </Section>
           )}
@@ -349,6 +472,20 @@ const styles = {
   heroArt: {
     width: '49%',
     verticalAlign: 'middle',
+  },
+  roleBadge: {
+    display: 'inline-block',
+    margin: 0,
+    backgroundColor: '#FFF0EA',
+    border: `1px solid ${ORANGE}`,
+    color: ORANGE,
+    fontSize: '10px',
+    lineHeight: '14px',
+    fontWeight: 800,
+    letterSpacing: '1.2px',
+    padding: '4px 10px',
+    borderRadius: '999px',
+    textTransform: 'uppercase' as const,
   },
   eyebrow: {
     margin: '0 0 10px',

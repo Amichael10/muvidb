@@ -29,17 +29,23 @@ const templates = [
 ];
 
 async function main() {
-  // esbuild is a transitive dep; if it cannot be loaded we must NOT fail the
-  // build — the committed .generated.js is the source of truth at runtime.
   let build;
   try {
     ({ build } = await import('esbuild'));
-  } catch (err) {
-    console.warn(
-      `[email-templates] esbuild unavailable (${err?.message || err}); ` +
-        'using committed .generated.js files.',
-    );
-    return;
+  } catch {
+    try {
+      ({ build } = await import('../node_modules/vite/node_modules/esbuild/lib/main.js'));
+    } catch {
+      try {
+        ({ build } = await import('../node_modules/tsx/node_modules/esbuild/lib/main.js'));
+      } catch (err) {
+        console.warn(
+          `[email-templates] esbuild unavailable (${err?.message || err}); ` +
+            'using committed .generated.js files.',
+        );
+        return;
+      }
+    }
   }
 
   for (const t of templates) {

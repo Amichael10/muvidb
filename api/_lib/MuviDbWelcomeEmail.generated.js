@@ -20,27 +20,133 @@ var ORANGE = "#FF5A1F";
 var TEXT = "#15171A";
 var MUTED = "#5F6368";
 var CREAM = "#FFF9F5";
+var PERSONA_CONFIG = {
+  fan: {
+    badge: "Account Type: Film Fan",
+    headline: /* @__PURE__ */ jsxs(Fragment, { children: [
+      "Welcome to the home of African cinema",
+      /* @__PURE__ */ jsx("span", { style: { color: ORANGE }, children: "!" })
+    ] }),
+    intro: (name) => `Hi ${name}, thanks for joining MuviDB! Whether you\u2019re looking for what to watch tonight or exploring the creators behind your favorite African stories, you\u2019re in the right place.`,
+    ctaLabel: "Explore African Cinema \u2192",
+    ctaUrl: "https://muvidb.com",
+    preview: "Welcome to MuviDB \u2014 Your front row seat to African cinema",
+    featuresEyebrow: "EVERYTHING YOU CAN DO ON MUVIDB",
+    features: [
+      {
+        title: "Where to watch",
+        text: "Instantly find where films are streaming or currently showing in cinemas."
+      },
+      {
+        title: "Rate & watchlist",
+        text: "Keep track of films you\u2019ve watched and build your personalized watchlist."
+      },
+      {
+        title: "Follow talent",
+        text: "Follow your favorite actors, directors, and get notified on new releases."
+      },
+      {
+        title: "Community pulse",
+        text: "Read real viewer reactions, critical reviews, and join the debate."
+      }
+    ]
+  },
+  professional: {
+    badge: "Account Type: Industry Professional",
+    headline: /* @__PURE__ */ jsxs(Fragment, { children: [
+      "Welcome to your professional screen hub",
+      /* @__PURE__ */ jsx("span", { style: { color: ORANGE }, children: "!" })
+    ] }),
+    intro: (name) => `Hi ${name}, welcome to MuviDB Pro! As a creator shaping African screen culture, your craft deserves accurate, dispute-free documentation and worldwide visibility.`,
+    ctaLabel: "Claim & Verify Your Profile \u2192",
+    ctaUrl: "https://muvidb.com/pro-dashboard",
+    preview: "Welcome to MuviDB \u2014 Claim and verify your official industry profile",
+    featuresEyebrow: "HOW TO ELEVATE YOUR SCREEN CAREER ON MUVIDB",
+    features: [
+      {
+        title: "Claim your profile",
+        text: "Take ownership of your verified public filmography, biography, and photos."
+      },
+      {
+        title: "Verified credits",
+        text: "Document every film, series, and department credit with zero duplicate entries."
+      },
+      {
+        title: "Global showcase",
+        text: "Showcase your portfolio, reel, and achievements to producers worldwide."
+      },
+      {
+        title: "Industry network",
+        text: "Connect with fellow filmmakers, crew, and discover collaborative opportunities."
+      }
+    ]
+  },
+  company: {
+    badge: "Account Type: Studio & Production Company",
+    headline: /* @__PURE__ */ jsxs(Fragment, { children: [
+      "Welcome to the African cinema directory",
+      /* @__PURE__ */ jsx("span", { style: { color: ORANGE }, children: "!" })
+    ] }),
+    intro: (name) => `Hi ${name}, welcome to MuviDB! We help production companies, distributors, and studios document their film catalogs, reach engaged audiences, and discover top-tier talent.`,
+    ctaLabel: "Access Studio Portal \u2192",
+    ctaUrl: "https://muvidb.com/dashboard",
+    preview: "Welcome to MuviDB \u2014 Your film catalog and industry talent network",
+    featuresEyebrow: "WHAT YOUR STUDIO CAN ACHIEVE ON MUVIDB",
+    features: [
+      {
+        title: "Catalog management",
+        text: "Submit and manage official movie listings, festival selections, and trailers."
+      },
+      {
+        title: "Cast & crew credits",
+        text: "Officially credit cast, HODs, and crew teams to build verified, dispute-free credits."
+      },
+      {
+        title: "Audience reach",
+        text: "Track viewer sentiment, ratings, and market presence across your releases."
+      },
+      {
+        title: "Talent discovery",
+        text: "Find vetted actors, directors, cinematographers, and crew across Africa."
+      }
+    ]
+  }
+};
 function MuviDbWelcomeEmail({
   firstName = "there",
   logoUrl,
+  persona,
+  roleBadge,
   exploreUrl = "https://muvidb.com",
   helpUrl = "https://muvidb.com/about",
   unsubscribeUrl = "https://muvidb.com",
-  preview = "Welcome to MuviDB, the home of African cinema.",
+  preview,
   eyebrow = "WELCOME TO",
   headline,
   intro,
-  ctaLabel = "Explore MuviDB \u2192",
+  ctaLabel,
   ctaUrl,
   compact = false,
+  features,
   collage,
   social = {}
 }) {
-  const actionUrl = ctaUrl || exploreUrl;
-  const heroIntro = intro ?? `Hi ${firstName}, thanks for joining MuviDB \u2014 the home of African films, television, and the people who bring those stories to life.`;
+  const personaConfig = persona ? PERSONA_CONFIG[persona] : null;
+  const resolvedPreview = preview || personaConfig?.preview || "Welcome to MuviDB, the home of African cinema.";
+  const resolvedRoleBadge = roleBadge || personaConfig?.badge;
+  const resolvedIntro = intro || (personaConfig ? personaConfig.intro(firstName) : `Hi ${firstName}, thanks for joining MuviDB \u2014 the home of African films, television, and the people who bring those stories to life.`);
+  const resolvedCtaLabel = ctaLabel || personaConfig?.ctaLabel || "Explore MuviDB \u2192";
+  const resolvedCtaUrl = ctaUrl || personaConfig?.ctaUrl || exploreUrl;
+  const resolvedFeatures = features || personaConfig?.features || [
+    { title: "Explore", text: "Browse films, television, short films, and more from across Africa." },
+    { title: "Discover people", text: "Explore actors, directors, producers, writers, crew, and their credits." },
+    { title: "Where to watch", text: "See where films are streaming or currently showing in cinemas." },
+    { title: "Stay updated", text: "Follow releases, reviews, trailers, and highlights from African cinema." }
+  ];
+  const featuresEyebrow = personaConfig?.featuresEyebrow || "EVERYTHING YOU CAN DO ON MUVIDB";
   return /* @__PURE__ */ jsxs(Html, { lang: "en", children: [
     /* @__PURE__ */ jsx(Head, {}),
-    /* @__PURE__ */ jsx(Preview, { children: preview }),
+    /* @__PURE__ */ jsx(Preview, { children: resolvedPreview }),
     /* @__PURE__ */ jsx(Body, { style: styles.body, children: /* @__PURE__ */ jsxs(Container, { style: styles.container, children: [
       /* @__PURE__ */ jsx(Section, { style: styles.header, children: /* @__PURE__ */ jsxs(Row, { children: [
         /* @__PURE__ */ jsx(Column, { children: /* @__PURE__ */ jsx(Img, { src: logoUrl, width: "160", alt: "MuviDB", style: styles.logo }) }),
@@ -48,53 +154,25 @@ function MuviDbWelcomeEmail({
       ] }) }),
       /* @__PURE__ */ jsx(Section, { style: styles.hero, children: /* @__PURE__ */ jsxs(Row, { children: [
         /* @__PURE__ */ jsxs(Column, { style: styles.heroCopy, children: [
+          resolvedRoleBadge && /* @__PURE__ */ jsx(Section, { style: { margin: "0 0 10px" }, children: /* @__PURE__ */ jsx(Text, { style: styles.roleBadge, children: resolvedRoleBadge }) }),
           /* @__PURE__ */ jsx(Text, { style: styles.eyebrow, children: eyebrow }),
-          headline ? /* @__PURE__ */ jsx(Heading, { style: styles.heading, children: headline }) : /* @__PURE__ */ jsxs(Heading, { style: styles.heading, children: [
+          headline ? /* @__PURE__ */ jsx(Heading, { style: styles.heading, children: headline }) : personaConfig ? /* @__PURE__ */ jsx(Heading, { style: styles.heading, children: personaConfig.headline }) : /* @__PURE__ */ jsxs(Heading, { style: styles.heading, children: [
             "Muvi",
             /* @__PURE__ */ jsx("span", { style: { color: ORANGE }, children: "DB" }),
             /* @__PURE__ */ jsx("br", {}),
             "You're in",
             /* @__PURE__ */ jsx("span", { style: { color: ORANGE }, children: "!" })
           ] }),
-          /* @__PURE__ */ jsx(Text, { style: styles.intro, children: heroIntro }),
+          /* @__PURE__ */ jsx(Text, { style: styles.intro, children: resolvedIntro }),
           !compact && /* @__PURE__ */ jsx(Text, { style: styles.boldText, children: "We're excited to have you with us." }),
-          /* @__PURE__ */ jsx(Button, { href: actionUrl, style: styles.button, children: ctaLabel })
+          /* @__PURE__ */ jsx(Button, { href: resolvedCtaUrl, style: styles.button, children: resolvedCtaLabel })
         ] }),
         /* @__PURE__ */ jsx(Column, { style: styles.heroArt, children: /* @__PURE__ */ jsx(CinemaCollage, { images: collage }) })
       ] }) }),
       !compact && /* @__PURE__ */ jsxs(Section, { style: styles.featuresSection, children: [
-        /* @__PURE__ */ jsx(Text, { style: styles.sectionEyebrow, children: "EVERYTHING YOU CAN DO ON MUVIDB" }),
+        /* @__PURE__ */ jsx(Text, { style: styles.sectionEyebrow, children: featuresEyebrow }),
         /* @__PURE__ */ jsx(Hr, { style: styles.sectionRule }),
-        /* @__PURE__ */ jsxs(Row, { children: [
-          /* @__PURE__ */ jsx(
-            Feature,
-            {
-              title: "Explore",
-              text: "Browse films, television, short films, and more from across Africa."
-            }
-          ),
-          /* @__PURE__ */ jsx(
-            Feature,
-            {
-              title: "Discover people",
-              text: "Explore actors, directors, producers, writers, crew, and their credits."
-            }
-          ),
-          /* @__PURE__ */ jsx(
-            Feature,
-            {
-              title: "Where to watch",
-              text: "See where films are streaming or currently showing in cinemas."
-            }
-          ),
-          /* @__PURE__ */ jsx(
-            Feature,
-            {
-              title: "Stay updated",
-              text: "Follow releases, reviews, trailers, and highlights from African cinema."
-            }
-          )
-        ] })
+        /* @__PURE__ */ jsx(Row, { children: resolvedFeatures.map((f, i) => /* @__PURE__ */ jsx(Feature, { title: f.title, text: f.text }, i)) })
       ] }),
       !compact && /* @__PURE__ */ jsx(Section, { style: styles.missionWrapper, children: /* @__PURE__ */ jsxs(Row, { style: styles.mission, children: [
         /* @__PURE__ */ jsxs(Column, { style: styles.missionCopy, children: [
@@ -262,6 +340,20 @@ var styles = {
   heroArt: {
     width: "49%",
     verticalAlign: "middle"
+  },
+  roleBadge: {
+    display: "inline-block",
+    margin: 0,
+    backgroundColor: "#FFF0EA",
+    border: `1px solid ${ORANGE}`,
+    color: ORANGE,
+    fontSize: "10px",
+    lineHeight: "14px",
+    fontWeight: 800,
+    letterSpacing: "1.2px",
+    padding: "4px 10px",
+    borderRadius: "999px",
+    textTransform: "uppercase"
   },
   eyebrow: {
     margin: "0 0 10px",

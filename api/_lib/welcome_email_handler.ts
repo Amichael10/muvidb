@@ -66,10 +66,14 @@ export async function handleWelcomeEmail(req: VercelRequest, res: VercelResponse
     }))
     .catch((err) => console.warn('[welcome-email] signup notify skipped:', err?.message || err));
 
+  const rawRole = String(user.user_metadata?.role || user.user_metadata?.account_intent || '').toLowerCase();
+  const persona = rawRole === 'professional' ? 'professional' : (rawRole === 'company' || rawRole === 'studio' || rawRole === 'distributor') ? 'company' : 'fan';
+
   const result = await sendWelcomeEmail({
     userId: user.id,
     email: user.email,
     firstName,
+    persona,
   });
 
   if (result.ok === false) {

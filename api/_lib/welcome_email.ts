@@ -127,15 +127,27 @@ export type SendWelcomeEmailResult =
   | { ok: true; emailId?: string; skipped?: 'already_sent' | 'no_email' }
   | { ok: false; error: string };
 
+export type PersonaType = 'fan' | 'professional' | 'company';
+
+export type SendWelcomeEmailOpts = {
+  userId: string;
+  email: string;
+  firstName?: string | null;
+  persona?: PersonaType | null;
+  force?: boolean;
+};
+
+const PERSONA_SUBJECTS: Record<PersonaType, string> = {
+  fan: 'Welcome to MuviDB — Your front row seat to African cinema',
+  professional: 'Welcome to MuviDB — Claim & verify your official industry profile',
+  company: 'Welcome to MuviDB — Your film catalog & industry talent network',
+};
+
 /**
  * Send the branded welcome email. Idempotent via auth app_metadata.welcome_email_sent.
  * Call only from server code — never from the browser with the Resend key.
  */
-export async function sendWelcomeEmail(opts: {
-  userId: string;
-  email: string;
-  firstName?: string | null;
-}): Promise<SendWelcomeEmailResult> {
+export async function sendWelcomeEmail(opts: SendWelcomeEmailOpts): Promise<SendWelcomeEmailResult> {
   const email = (opts.email || '').trim().toLowerCase();
   if (!email) return { ok: true, skipped: 'no_email' };
 
@@ -148,17 +160,27 @@ export async function sendWelcomeEmail(opts: {
   // Idempotency via auth app_metadata (needs service role). If admin API is
   // unavailable we still send — the JWT already authenticated this user.
   let existingMeta: Record<string, unknown> = {};
-  try {
-    const { data: authUser, error: getErr } = await supabase.auth.admin.getUserById(opts.userId);
-    if (getErr) {
-      console.warn('[welcome-email] admin getUserById failed (continuing):', getErr.message);
-    } else if (authUser?.user?.app_metadata?.welcome_email_sent) {
-      return { ok: true, skipped: 'already_sent' };
-    } else {
-      existingMeta = (authUser?.user?.app_metadata || {}) as Record<string, unknown>;
+  let resolvedPersona: PersonaType = opts.persona || 'fan';
+
+  if (!opts.force) {
+    try {
+      const { data: authUser, error: getErr } = await supabase.auth.admin.getUserById(opts.userId);
+      if (getErr) {
+        console.warn('[welcome-email] admin getUserById failed (continuing):', getErr.message);
+      } else if (authUser?.user?.app_metadata?.welcome_email_sent) {
+        return { ok: true, skipped: 'already_sent' };
+      } else {
+        existingMeta = (authUser?.user?.app_metadata || {}) as Record<string, unknown>;
+        if (!opts.persona) {
+          const userMetaRole = String(authUser?.user?.user_metadata?.role || authUser?.user?.user_metadata?.account_intent || '').toLowerCase();
+          if (userMetaRole === 'professional') resolvedPersona = 'professional';
+          else if (userMetaRole === 'company' || userMetaRole === 'studio' || userMetaRole === 'distributor') resolvedPersona = 'company';
+          else resolvedPersona = 'fan';
+        }
+      }
+    } catch (err: any) {
+      console.warn('[welcome-email] admin lookup threw (continuing):', err?.message || err);
     }
-  } catch (err: any) {
-    console.warn('[welcome-email] admin lookup threw (continuing):', err?.message || err);
   }
 
   const firstName =
@@ -187,6 +209,7 @@ export async function sendWelcomeEmail(opts: {
     html = await render(
       React.createElement(MuviDbWelcomeEmail, {
         firstName,
+        persona: resolvedPersona,
         logoUrl: WELCOME_EMAIL_ASSETS.logoUrl,
         exploreUrl: SITE,
         helpUrl: `${SITE}/about`,
@@ -200,10 +223,12 @@ export async function sendWelcomeEmail(opts: {
     return { ok: false, error: `Email render failed: ${err?.message || err}` };
   }
 
+  const subject = PERSONA_SUBJECTS[resolvedPersona] || 'Welcome to MuviDB';
+
   const { data, error } = await resend.emails.send({
     from,
     to: email,
-    subject: 'Welcome to MuviDB',
+    subject,
     replyTo,
     html,
   });
