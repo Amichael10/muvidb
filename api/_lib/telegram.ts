@@ -134,6 +134,62 @@ export async function sendTelegramPhoto(
   }
 }
 
+export type TelegramMediaItem = {
+  photo: Buffer | Uint8Array | string;
+  caption?: string;
+};
+
+export async function sendTelegramMediaGroup(
+  mediaItems: TelegramMediaItem[],
+  chatId?: string,
+): Promise<{ ok: boolean; error?: string; messageIds?: number[] }> {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const defaultChatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
+  if (!token || !defaultChatId) {
+    return { ok: false, error: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set' };
+  }
+  const targetChatId = (chatId || defaultChatId).trim();
+  if (!targetChatId) return { ok: false, error: 'chat id missing' };
+
+  try {
+    const formData = new FormData();
+    formData.append('chat_id', targetChatId);
+
+    const mediaList = mediaItems.map((item, idx) => {
+      const attachName = `attach://photo_${idx}`;
+      if (Buffer.isBuffer(item.photo) || item.photo instanceof Uint8Array) {
+        formData.append(`photo_${idx}`, new Blob([item.photo], { type: 'image/png' }), `photo_${idx}.png`);
+        return {
+          type: 'photo',
+          media: attachName,
+          ...(item.caption ? { caption: item.caption.slice(0, 1024) } : {}),
+        };
+      } else {
+        return {
+          type: 'photo',
+          media: item.photo,
+          ...(item.caption ? { caption: item.caption.slice(0, 1024) } : {}),
+        };
+      }
+    });
+
+    formData.append('media', JSON.stringify(mediaList));
+
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {
+      method: 'POST',
+      body: formData,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) {
+      return { ok: false, error: json?.description || `HTTP ${res.status}` };
+    }
+    const messageIds = (json.result || []).map((m: any) => m.message_id);
+    return { ok: true, messageIds };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'sendMediaGroup failed' };
+  }
+}
+
 export type TelegramVideoOpts = {
   video: string;
   caption?: string;
