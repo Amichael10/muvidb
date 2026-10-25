@@ -288,54 +288,54 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
 
   // ── 2. CREW & BEHIND THE CAMERA (DP, Writer, Director, Editor, Sound, Costume) ─
   if (norm.includes('camera') || norm.includes('crew') || norm.includes('craft') || norm.includes('director')) {
-    const { data: crew, error: crewError } = await supabase
-      .from('people')
-      .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url')
-      .not('photo_url', 'is', null)
-      .not('known_for_department', 'is', null)
-      .order('film_count', { ascending: false, nullsFirst: false })
-      .limit(Math.max(limit * 8, 120));
-    if (crewError) throw crewError;
+    const [btlRes, atlRes] = await Promise.all([
+      // Dedicated query for below-the-line crew (editors, camera, sound, costume, art)
+      supabase
+        .from('people')
+        .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url')
+        .not('photo_url', 'is', null)
+        .gte('film_count', 3)
+        .or('known_for_department.ilike.%edit%,known_for_department.ilike.%camera%,known_for_department.ilike.%sound%,known_for_department.ilike.%costume%,known_for_department.ilike.%art%,known_for_department.ilike.%post%')
+        .order('film_count', { ascending: false, nullsFirst: false })
+        .limit(Math.max(limit * 4, 60)),
+      // Query for directors, writers, and producers
+      supabase
+        .from('people')
+        .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url')
+        .not('photo_url', 'is', null)
+        .gte('film_count', 3)
+        .or('known_for_department.ilike.%direct%,known_for_department.ilike.%writ%,known_for_department.ilike.%produc%')
+        .order('film_count', { ascending: false, nullsFirst: false })
+        .limit(Math.max(limit * 4, 60)),
+    ]);
+    if (btlRes.error) throw btlRes.error;
+    if (atlRes.error) throw atlRes.error;
 
-    const craftCrew = (crew || []).filter((p) => {
+    const isActorOnly = (p: any) => {
       const dept = (p.known_for_department || '').toLowerCase();
-      // Exclude pure actors who have no behind-the-camera department
-      if (dept === 'actor' || dept === 'acting') return false;
-      return (
-        dept.includes('camera') ||
-        dept.includes('writing') ||
-        dept.includes('directing') ||
-        dept.includes('director') ||
-        dept.includes('editing') ||
-        dept.includes('sound') ||
-        dept.includes('costume') ||
-        dept.includes('producer') ||
-        dept.includes('production') ||
-        dept.includes('post')
-      );
-    });
+      return dept === 'actor' || dept === 'acting';
+    };
 
-    // Partition into grassroots / YouTube up-and-coming craft (film_count <= 100) vs established (> 100)
-    const grassroots = craftCrew.filter((p) => (p.film_count || 0) <= 100 && (p.film_count || 0) >= 3);
-    const established = craftCrew.filter((p) => (p.film_count || 0) > 100);
+    const belowTheLine = (btlRes.data || []).filter(p => !isActorOnly(p));
+    const aboveTheLine = (atlRes.data || []).filter(p => !isActorOnly(p));
 
     // Prioritize Lateef Olofin (esteemed post-production editor & first customer of MuviDB)
-    const lateefIndex = grassroots.findIndex(
+    const lateefIndex = belowTheLine.findIndex(
       (p) => p.slug === 'lateef-olofin' || (p.name && p.name.toLowerCase().includes('lateef olofin'))
     );
     if (lateefIndex > -1) {
-      const [lateef] = grassroots.splice(lateefIndex, 1);
-      grassroots.unshift(lateef);
+      const [lateef] = belowTheLine.splice(lateefIndex, 1);
+      belowTheLine.unshift(lateef);
     }
 
-    // Interleave: 2 up-and-coming / grassroots to 1 established
+    // Interleave: 2 below-the-line craftspeople to 1 director/producer
     const targetList: typeof craftCrew = [];
-    let gIdx = 0;
-    let eIdx = 0;
-    while (targetList.length < limit && (gIdx < grassroots.length || eIdx < established.length)) {
-      if (gIdx < grassroots.length) targetList.push(grassroots[gIdx++]);
-      if (targetList.length < limit && gIdx < grassroots.length) targetList.push(grassroots[gIdx++]);
-      if (targetList.length < limit && eIdx < established.length) targetList.push(established[eIdx++]);
+    let bIdx = 0;
+    let aIdx = 0;
+    while (targetList.length < limit && (bIdx < belowTheLine.length || aIdx < aboveTheLine.length)) {
+      if (bIdx < belowTheLine.length) targetList.push(belowTheLine[bIdx++]);
+      if (targetList.length < limit && bIdx < belowTheLine.length) targetList.push(belowTheLine[bIdx++]);
+      if (targetList.length < limit && aIdx < aboveTheLine.length) targetList.push(aboveTheLine[aIdx++]);
     }
     if (targetList.length === 0) targetList.push(...(craftCrew.length > 0 ? craftCrew : crew || []).slice(0, limit));
 
