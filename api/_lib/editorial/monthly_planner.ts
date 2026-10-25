@@ -2,19 +2,24 @@ import { supabase } from '../supabase.js';
 
 const DAY_MS = 86_400_000;
 const DEFAULT_DAYS = 30;
-const BASE_TIMES = ['09:00:00', '14:00:00', '19:00:00'];
+const BASE_TIMES = ['09:00:00', '12:00:00', '15:00:00', '18:00:00', '20:30:00'];
 const RELEASE_TIMES = ['08:00:00', '11:00:00', '16:30:00', '21:00:00'];
 
 const ROTATION = [
-  ['new_and_upcoming', 'behind_the_camera', 'filmography'],
-  ['whats_on_stage', 'where_to_watch', 'you_know_the_face'],
-  ['critics_say', 'by_the_numbers', 'audience_pulse'],
-  ['new_and_upcoming', 'filmography', 'one_film_two_takes'],
-  ['audience_pulse', 'where_to_watch', 'weekend_watchlist'],
-  // Audience Pulse is featured across key days (Tue, Thu, Fri, Sat) to capture
-  // fresh releases within 24-48 hours of drop. Index 0 is Sunday.
-  ['whats_on_stage', 'you_know_the_face', 'audience_pulse'],
-  ['audience_pulse', 'by_the_numbers', 'behind_the_camera'],
+  // 0: Sunday (Audience Pulse morning & evening; 3 planned cycles midday)
+  ['audience_pulse', 'new_and_upcoming', 'behind_the_camera', 'filmography', 'audience_pulse'],
+  // 1: Monday
+  ['audience_pulse', 'whats_on_stage', 'where_to_watch', 'you_know_the_face', 'audience_pulse'],
+  // 2: Tuesday
+  ['audience_pulse', 'critics_say', 'by_the_numbers', 'behind_the_camera', 'audience_pulse'],
+  // 3: Wednesday
+  ['audience_pulse', 'new_and_upcoming', 'filmography', 'one_film_two_takes', 'audience_pulse'],
+  // 4: Thursday
+  ['audience_pulse', 'critics_say', 'where_to_watch', 'weekend_watchlist', 'audience_pulse'],
+  // 5: Friday
+  ['audience_pulse', 'whats_on_stage', 'you_know_the_face', 'one_film_two_takes', 'audience_pulse'],
+  // 6: Saturday
+  ['audience_pulse', 'filmography', 'by_the_numbers', 'behind_the_camera', 'audience_pulse'],
 ] as const;
 
 type CalendarInsert = {
@@ -77,6 +82,7 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
     { data: series, error: seriesError },
     { data: films, error: filmsError },
     { data: existingReleaseRows, error: existingReleaseError },
+    { data: existingBaseRows, error: existingBaseError },
   ] = await Promise.all([
     supabase.from('social_content_series').select('id,slug').eq('active', true),
     supabase.from('films')
@@ -86,10 +92,16 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
       .lte('release_date', endDate)
       .order('release_date', { ascending: true }),
     supabase.from('social_calendar').select('planner_key').like('planner_key', 'release:%'),
+    supabase.from('social_calendar').select('planner_key,status,selection_locked')
+      .like('planner_key', 'base:%')
+      .in('status', ['published', 'approved', 'draft_ready', 'subject_selected']),
   ]);
   if (seriesError) throw seriesError;
   if (filmsError) throw filmsError;
   if (existingReleaseError) throw existingReleaseError;
+  if (existingBaseError) throw existingBaseError;
+
+  const lockedBaseKeys = new Set((existingBaseRows || []).map(row => row.planner_key));
 
   const seriesIds = new Map((series || []).map(row => [row.slug, row.id]));
   const upcomingSeriesId = seriesIds.get('new_and_upcoming');
@@ -103,8 +115,10 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
     slugs.forEach((slug, index) => {
       const seriesId = seriesIds.get(slug);
       if (!seriesId) return;
+      const plannerKey = `base:${scheduledDate}:${index + 1}`;
+      if (lockedBaseKeys.has(plannerKey)) return;
       rows.push({
-        planner_key: `base:${scheduledDate}:${index + 1}`,
+        planner_key: plannerKey,
         scheduled_date: scheduledDate,
         scheduled_time: BASE_TIMES[index],
         series_id: seriesId,
@@ -114,7 +128,7 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
         selection_locked: false,
         priority: 'normal',
         source: 'planned',
-        notes: `Daily editorial slot ${index + 1}/3. Candidate selection remains subject to recency and cooldown rules.`,
+        notes: `Daily editorial slot ${index + 1}/5. Candidate selection remains subject to recency and cooldown rules.`,
       });
     });
   }
@@ -143,7 +157,7 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
       priority: 'urgent',
       source: 'database_event',
       notes: film.poster_url || film.backdrop_url
-        ? 'Mandatory new-release post. Added on top of the daily three; never displaced by the base schedule.'
+        ? 'Mandatory new-release post. Added on top of the daily base slots; never displaced by the base schedule.'
         : 'Mandatory new-release post. Artwork enrichment is required before rendering; the slot must not be dropped.',
     }));
   }
@@ -152,7 +166,7 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
     startDate,
     endDate,
     days,
-    baseSlots: days * 3,
+    baseSlots: days * 5,
     releaseSlots: rows.filter(row => row.planner_key.startsWith('release:')).length,
     totalSlots: rows.length,
     releasesWithoutArtwork: releases.filter(film => !film.poster_url && !film.backdrop_url).map(film => ({ id: film.id, title: film.title })),

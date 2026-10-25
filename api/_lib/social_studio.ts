@@ -3351,7 +3351,7 @@ export async function getEditorialCalendar(days = 30, shuffleOffset = 0, startDa
     .lte('scheduled_date', endDateString)
     .order('scheduled_date', { ascending: true })
     .order('scheduled_time', { ascending: true })
-    .limit(200);
+    .limit(350);
 
   if (error) throw error;
   const rawSlots = data || [];

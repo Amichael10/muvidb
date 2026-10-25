@@ -49,6 +49,21 @@ export async function autoScheduleDueCalendarSlots(now = new Date()): Promise<{
   const scheduledSlots: string[] = [];
   const skippedSlots: Array<{ slotId: string; reason: string }> = [];
 
+  // Track claimed candidate IDs across recent days and within this batch
+  // to ensure 2 daily pulse slots (or other slots) never choose the same entity twice.
+  const claimedCandidateIds = new Set<string>();
+  const recentCutoff = new Date(now.getTime() - 14 * 86_400_000).toISOString().slice(0, 10);
+  const { data: recentSlots } = await supabase
+    .from('social_calendar')
+    .select('subject_entity_id')
+    .gte('scheduled_date', recentCutoff)
+    .not('subject_entity_id', 'is', null)
+    .in('status', ['published', 'approved', 'draft_ready', 'subject_selected']);
+
+  for (const row of recentSlots || []) {
+    if (row.subject_entity_id) claimedCandidateIds.add(row.subject_entity_id);
+  }
+
   for (const slot of slots || []) {
     try {
       const series = (slot as any).social_content_series;
@@ -58,9 +73,10 @@ export async function autoScheduleDueCalendarSlots(now = new Date()): Promise<{
 
       // If subject is not yet selected, pick top verified candidate from series
       if (!candidateId) {
-        const candidates = await fetchSeriesCandidates(seriesSlug, 15).catch(() => []);
+        const candidates = await fetchSeriesCandidates(seriesSlug, 20).catch(() => []);
         const eligible = candidates.find((c) => {
           if (!c.imageUrl) return false;
+          if (claimedCandidateIds.has(c.id)) return false;
           // Filter out obvious landscape banners or low completeness
           if (c.imageUrl.includes('i.ytimg.com') && !c.imageUrl.includes('maxresdefault')) return false;
           return (c.completenessScore || 0) >= 0.5;
@@ -128,6 +144,7 @@ export async function autoScheduleDueCalendarSlots(now = new Date()): Promise<{
       );
 
       scheduledSlots.push(slot.id);
+      claimedCandidateIds.add(candidateId);
     } catch (err: any) {
       console.error(`[auto_scheduler] Failed to auto-schedule slot ${slot.id}:`, err?.message || err);
       skippedSlots.push({ slotId: slot.id, reason: err?.message || 'unknown_error' });
