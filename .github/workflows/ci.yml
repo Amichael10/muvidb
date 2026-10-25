@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
       # The check that would have caught the 2026-10-21 deploy failure. Runs
       # against the committed tree only, so a missing-but-locally-present file
       # shows up here instead of in a failed production build.
