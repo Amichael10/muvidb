@@ -290,20 +290,23 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   if (norm.includes('camera') || norm.includes('crew') || norm.includes('craft') || norm.includes('director')) {
     const [btlRes, atlRes] = await Promise.all([
       // Dedicated query for below-the-line crew (editors, camera, sound, costume, art)
+      // Capped at <= 60 credits (preserving Lateef Olofin) so unappreciative moguls are excluded.
       supabase
         .from('people')
         .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url')
         .not('photo_url', 'is', null)
         .gte('film_count', 3)
+        .lte('film_count', 80)
         .or('known_for_department.ilike.%edit%,known_for_department.ilike.%camera%,known_for_department.ilike.%sound%,known_for_department.ilike.%costume%,known_for_department.ilike.%art%,known_for_department.ilike.%post%')
         .order('film_count', { ascending: false, nullsFirst: false })
         .limit(Math.max(limit * 4, 60)),
-      // Query for directors, writers, and producers
+      // Query for emerging directors, writers, and grassroots producers (capped at <= 50 credits)
       supabase
         .from('people')
         .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url')
         .not('photo_url', 'is', null)
         .gte('film_count', 3)
+        .lte('film_count', 50)
         .or('known_for_department.ilike.%direct%,known_for_department.ilike.%writ%,known_for_department.ilike.%produc%')
         .order('film_count', { ascending: false, nullsFirst: false })
         .limit(Math.max(limit * 4, 60)),
@@ -316,8 +319,13 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       return dept === 'actor' || dept === 'acting';
     };
 
-    const belowTheLine = (btlRes.data || []).filter(p => !isActorOnly(p));
-    const aboveTheLine = (atlRes.data || []).filter(p => !isActorOnly(p));
+    // Filter out industry moguls with > 60 credits (unless Lateef Olofin)
+    const belowTheLine = (btlRes.data || []).filter(p => {
+      if (isActorOnly(p)) return false;
+      const isLateef = p.slug === 'lateef-olofin' || (p.name && p.name.toLowerCase().includes('lateef olofin'));
+      return isLateef || (p.film_count || 0) <= 60;
+    });
+    const aboveTheLine = (atlRes.data || []).filter(p => !isActorOnly(p) && (p.film_count || 0) <= 50);
 
     // Prioritize Lateef Olofin (esteemed post-production editor & first customer of MuviDB)
     const lateefIndex = belowTheLine.findIndex(
@@ -337,7 +345,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       if (targetList.length < limit && bIdx < belowTheLine.length) targetList.push(belowTheLine[bIdx++]);
       if (targetList.length < limit && aIdx < aboveTheLine.length) targetList.push(aboveTheLine[aIdx++]);
     }
-    if (targetList.length === 0) targetList.push(...(craftCrew.length > 0 ? craftCrew : crew || []).slice(0, limit));
+    if (targetList.length === 0) targetList.push(...(belowTheLine.length > 0 ? belowTheLine : aboveTheLine).slice(0, limit));
 
     const enriched = await enrichPeopleCandidates(targetList.slice(0, limit));
 
@@ -384,28 +392,31 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     norm.includes('talent') ||
     norm.includes('people')
   ) {
-    let { data: people, error: peopleError } = await supabase
+    // Focus on appreciative up-and-coming & rising Nollywood actors (5 to 50 film credits)
+    // rather than established industry veterans with hundreds of credits.
+    const { data: people, error: peopleError } = await supabase
       .from('people')
       .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
       .not('photo_url', 'is', null)
-      .order('popularity_score', { ascending: false, nullsFirst: false })
+      .gte('film_count', 5)
+      .lte('film_count', 50)
       .order('profile_views', { ascending: false, nullsFirst: false })
       .order('film_count', { ascending: false, nullsFirst: false })
       .limit(Math.max(limit * 3, 50));
     if (peopleError) throw peopleError;
 
-    // Also fetch up-and-coming grassroots & YouTube Nollywood talent (3 to 75 film credits)
+    // Also fetch up-and-coming grassroots & YouTube Nollywood talent (3 to 25 film credits)
     const { data: upAndComing } = await supabase
       .from('people')
       .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url, date_of_birth')
       .not('photo_url', 'is', null)
       .gte('film_count', 3)
-      .lte('film_count', 75)
+      .lte('film_count', 25)
       .not('bio', 'is', null)
       .order('film_count', { ascending: false, nullsFirst: false })
       .limit(Math.max(limit * 3, 50));
 
-    // Interleave up-and-coming talent with established icons
+    // Interleave up-and-coming talent with rising actors
     const mixedPeople: any[] = [];
     const seenIds = new Set<string>();
     const uList = upAndComing || [];
@@ -429,7 +440,12 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       }
     }
 
-    const targetPeople = mixedPeople.length > 0 ? mixedPeople : (people || []);
+    const isTestPerson = (p: any) => {
+      const name = (p.name || '').toLowerCase();
+      return name.includes('test') || name.includes('sample') || name.includes('placeholder');
+    };
+
+    const targetPeople = (mixedPeople.length > 0 ? mixedPeople : (people || [])).filter(p => !isTestPerson(p));
     const enriched = await enrichPeopleCandidates(targetPeople.slice(0, limit));
 
     return enriched.map((p) => ({
