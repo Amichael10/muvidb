@@ -15,7 +15,7 @@
     "start:node": "node server/node-server.mjs",
     "smoke:ssr": "node scripts/ssr_smoke.mjs",
     "clean": "rm -rf dist build",
-    "lint": "tsc --noEmit",
+    "lint": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "ig:login": "tsx scripts/lib/ig_session_manager.ts",

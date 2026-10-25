@@ -458,7 +458,11 @@ async function renderHtmlTemplate(input: {
     ? await (async () => {
         const serverlessChromium = await getServerlessChromium();
         return chromium.launch({
-          args: serverlessChromium.args,
+          args: [
+            ...serverlessChromium.args,
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+          ],
           executablePath: serverlessChromium.executablePath,
           headless: true,
         });

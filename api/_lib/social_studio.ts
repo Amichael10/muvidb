@@ -3693,7 +3693,8 @@ export async function approveEditorialSlot(
     await supabase
       .from('social_calendar')
       .update({
-        status: 'scheduled',
+        status: 'approved',
+        draft_id: draft.contentItem.id,
         notes: `Scheduled ${draft.contentItem.title} for ${input.scheduledDate}`,
       })
       .eq('id', input.slotId);

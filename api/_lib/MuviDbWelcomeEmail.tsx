@@ -528,7 +528,7 @@ function CinemaCollage({
   );
 }
 
-function Feature({ title, text }: { title: string; text: string }) {
+function Feature({ title, text }: { key?: React.Key; title: string; text: string }) {
   return (
     <Column style={styles.feature} className="mobile-feature-col">
       <div className="mobile-feature-card">
