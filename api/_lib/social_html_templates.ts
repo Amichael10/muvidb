@@ -18,6 +18,29 @@ type HtmlTemplateSpec = {
 const TEMPLATE_DIR = path.join(getLibDir(), 'social-html-templates');
 const DEFAULT_HANDLE = '@muvidb_';
 
+// @sparticuz/chromium expands its remote pack into /tmp. A single editorial
+// asset can render several formats/slides concurrently, so calling
+// executablePath() in every render races multiple writers against the same
+// archive. Share the extraction promise for the lifetime of the warm function.
+let serverlessExecutablePathPromise: Promise<string> | null = null;
+
+async function getServerlessChromium() {
+  const { default: serverlessChromium } = await import('@sparticuz/chromium');
+  if (!serverlessExecutablePathPromise) {
+    const remotePackUrl =
+      process.env.CHROMIUM_REMOTE_PACK_URL ||
+      'https://pub-8c78c05976804a2da51ca287d5c3b229.r2.dev/bin/chromium-v149-pack.tar';
+    serverlessExecutablePathPromise = serverlessChromium.executablePath(remotePackUrl).catch(error => {
+      serverlessExecutablePathPromise = null;
+      throw error;
+    });
+  }
+  return {
+    args: serverlessChromium.args,
+    executablePath: await serverlessExecutablePathPromise,
+  };
+}
+
 export const HTML_SOCIAL_TEMPLATES: Record<string, HtmlTemplateSpec> = {
   'behind-camera-simple-v1': simpleSpec('behind_camera'),
   'film-conversation-simple-v1': simpleSpec('film_conversation'),
@@ -433,13 +456,10 @@ async function renderHtmlTemplate(input: {
   const isServerless = Boolean(process.env.VERCEL || process.env.AWS_EXECUTION_ENV);
   const browser = isServerless
     ? await (async () => {
-        const { default: serverlessChromium } = await import('@sparticuz/chromium');
-        const remotePackUrl =
-          process.env.CHROMIUM_REMOTE_PACK_URL ||
-          'https://pub-8c78c05976804a2da51ca287d5c3b229.r2.dev/bin/chromium-v149-pack.tar';
+        const serverlessChromium = await getServerlessChromium();
         return chromium.launch({
           args: serverlessChromium.args,
-          executablePath: await serverlessChromium.executablePath(remotePackUrl),
+          executablePath: serverlessChromium.executablePath,
           headless: true,
         });
       })()
