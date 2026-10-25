@@ -27,10 +27,10 @@ let serverlessExecutablePathPromise: Promise<string> | null = null;
 async function getServerlessChromium() {
   const { default: serverlessChromium } = await import('@sparticuz/chromium');
   if (!serverlessExecutablePathPromise) {
-    const remotePackUrl =
-      process.env.CHROMIUM_REMOTE_PACK_URL ||
-      'https://pub-8c78c05976804a2da51ca287d5c3b229.r2.dev/bin/chromium-v149-pack.tar';
-    serverlessExecutablePathPromise = serverlessChromium.executablePath(remotePackUrl).catch(error => {
+    // Use the Brotli payload shipped with this exact package version. The
+    // former remote tar was created with permissions that Vercel preserved as
+    // unreadable (`EACCES` on al2023.tar.br).
+    serverlessExecutablePathPromise = serverlessChromium.executablePath().catch(error => {
       serverlessExecutablePathPromise = null;
       throw error;
     });
