@@ -1256,6 +1256,7 @@ export async function runSocialPublisher(input: {
   const now = input.now || new Date();
   const nowIso = now.toISOString();
   const limit = Math.min(Math.max(input.limit || 10, 1), 25);
+  let autoScheduleResult: Awaited<ReturnType<typeof import('./editorial/auto_scheduler.js')['autoScheduleDueCalendarSlots']>> | null = null;
 
   // 1. Recover stale processing locks (e.g. jobs stuck in processing for > 2 mins from crashed runs)
   const staleThreshold = new Date(now.getTime() - 2 * 60 * 1000).toISOString();
@@ -1313,7 +1314,7 @@ export async function runSocialPublisher(input: {
   // validate portrait posters and credits, and auto-schedule them into variants.
   try {
     const { autoScheduleDueCalendarSlots } = await import('./editorial/auto_scheduler.js');
-    await autoScheduleDueCalendarSlots(now);
+    autoScheduleResult = await autoScheduleDueCalendarSlots(now);
   } catch (autoSchedErr: any) {
     console.warn('[social_studio] Auto-schedule due calendar slots warning:', autoSchedErr?.message || autoSchedErr);
   }
@@ -1385,6 +1386,7 @@ export async function runSocialPublisher(input: {
     skipped: false,
     processed: results.filter(result => result.status !== 'skipped').length,
     results,
+    autoSchedule: autoScheduleResult,
   };
 }
 
@@ -3634,6 +3636,26 @@ export async function approveEditorialSlot(
     },
     actor,
   );
+
+  // Automated editorial posts are media posts. If rendering failed, do not
+  // leave a caption-only item in the approved state: the next cron run would
+  // generate another approved copy for the same slot while neither could ever
+  // be scheduled. Keep the failure visible and retry the calendar slot after
+  // the underlying renderer/deployment issue is fixed.
+  if (!draft.assets.length) {
+    const renderFailure = draft.warnings.find(warning => warning.startsWith('Asset rendering failed:'))
+      || 'Asset rendering produced no publishable files.';
+    await Promise.all([
+      supabase.from('social_content_items').update({ status: 'failed' }).eq('id', draft.contentItem.id),
+      supabase.from('social_platform_variants').update({ status: 'failed', last_error_code: 'asset_render_failed', last_error_message: renderFailure }).eq('content_item_id', draft.contentItem.id),
+    ]);
+    await insertSocialEvent({
+      contentItemId: draft.contentItem.id,
+      eventType: 'draft_generation_failed',
+      eventData: { error: renderFailure, template_slug: templateSlug, slot_id: input.slotId },
+    });
+    throw httpError(500, renderFailure);
+  }
 
   if (input.customImageUrl) {
     await attachCustomAsset(
