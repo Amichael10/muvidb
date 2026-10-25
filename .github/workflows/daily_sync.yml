@@ -203,8 +203,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-      - name: Mine YouTube Comment Reviews (Every 8 Hours)
-        if: github.event.schedule == '0 */8 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'comments'))
+      - name: Mine YouTube Comment Reviews (Every 8 Hours & Daily Morning)
+        if: github.event.schedule == '0 */8 * * *' || github.event.schedule == '0 5 * * *' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'comments'))
         run: |
           echo "Mining YouTube comments into audience reviews + ratings…"
           npx tsx scripts/sync-comments.ts

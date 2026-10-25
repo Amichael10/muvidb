@@ -82,6 +82,7 @@ export type UpcomingMovieSnapshot = {
   creditedPeople: SnapshotCreditedPerson[];
   youtubeChannelName: string | null;
   youtubeChannelHandle: string | null;
+  viewCount?: number | null;
   /** Mined viewer comments for the Audience Pulse card, positive first. */
   audienceComments?: SnapshotAudienceComment[];
   /** The reviewer explicitly chosen for a "What the Critics Say" post. */
@@ -488,7 +489,7 @@ export function stripBaitTail(body: string): string {
 export function selectAudienceComments(
   rows: Record<string, any>[],
   limit = 5,
-  maxLength = 96,
+  maxLength = 140,
 ): SnapshotAudienceComment[] {
   const seen = new Set<string>();
   return (rows || [])
@@ -569,6 +570,7 @@ export function buildUpcomingMovieSnapshot(input: {
     creditedPeople,
     youtubeChannelName: text(input.film.youtube_channel_name),
     youtubeChannelHandle: text(input.film.youtube_channel_handle),
+    viewCount: typeof input.film.view_count === 'number' ? input.film.view_count : (input.film.view_count ? Number(input.film.view_count) : null),
   };
 }
 

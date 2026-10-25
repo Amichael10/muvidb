@@ -8,11 +8,11 @@ const RELEASE_TIMES = ['08:00:00', '11:00:00', '16:30:00', '21:00:00'];
 const ROTATION = [
   ['new_and_upcoming', 'behind_the_camera', 'filmography'],
   ['whats_on_stage', 'where_to_watch', 'you_know_the_face'],
-  ['critics_say', 'by_the_numbers', 'behind_the_camera'],
+  ['critics_say', 'by_the_numbers', 'audience_pulse'],
   ['new_and_upcoming', 'filmography', 'one_film_two_takes'],
-  ['critics_say', 'where_to_watch', 'weekend_watchlist'],
-  // Friday evening and Saturday morning are the slots the audience actually
-  // shows up for, so Audience Pulse takes both. Index 0 is Sunday.
+  ['audience_pulse', 'where_to_watch', 'weekend_watchlist'],
+  // Audience Pulse is featured across key days (Tue, Thu, Fri, Sat) to capture
+  // fresh releases within 24-48 hours of drop. Index 0 is Sunday.
   ['whats_on_stage', 'you_know_the_face', 'audience_pulse'],
   ['audience_pulse', 'by_the_numbers', 'behind_the_camera'],
 ] as const;

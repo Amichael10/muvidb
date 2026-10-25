@@ -549,22 +549,48 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     const currentYear = new Date().getFullYear();
     const recentPulseCutoff = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
 
-    const { data: films, error: pulseError } = await supabase
-      .from('films')
-      .select(pulseSelect)
-      .eq('is_published', true)
-      .not('poster_url', 'is', null)
-      .gte('liked_percent', 60)
-      .or(`release_date.gte.${recentPulseCutoff},year.gte.${currentYear}`)
-      .order('liked_percent', { ascending: false })
-      .limit(Math.max(limit * 8, 150));
-    if (pulseError) throw pulseError;
+    // In our de-inflated Bayesian logistic curve, 40-50% liked corresponds to an
+    // audience_rating of 6.8-7.1/10 (solid positive reception).
+    // To ensure fresh releases from the last 1-3 days aren't squeezed out by old catalogue
+    // titles with legacy ratings, query a dedicated fresh pool alongside the catalogue pool.
+    const freshCutoff = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
+    const [freshResult, catalogueResult] = await Promise.all([
+      supabase
+        .from('films')
+        .select(pulseSelect)
+        .eq('is_published', true)
+        .not('poster_url', 'is', null)
+        .gte('liked_percent', 40)
+        .gte('release_date', freshCutoff)
+        .order('release_date', { ascending: false })
+        .limit(50),
+      supabase
+        .from('films')
+        .select(pulseSelect)
+        .eq('is_published', true)
+        .not('poster_url', 'is', null)
+        .gte('liked_percent', 45)
+        .or(`release_date.gte.${recentPulseCutoff},year.gte.${currentYear}`)
+        .order('liked_percent', { ascending: false })
+        .limit(100),
+    ]);
+    if (freshResult.error) throw freshResult.error;
+    if (catalogueResult.error) throw catalogueResult.error;
+
+    // Deduplicate by film ID preserving order
+    const filmMap = new Map<string, any>();
+    for (const f of [...(freshResult.data || []), ...(catalogueResult.data || [])]) {
+      if (!filmMap.has(f.id)) {
+        filmMap.set(f.id, f);
+      }
+    }
+    const films = Array.from(filmMap.values());
 
     const ids = (films || []).map(f => f.id);
     if (!ids.length) return [];
 
     // Count quotable comments per film. Short enough to print whole, since the
-    // card never truncates.
+    // card never truncates (quotes up to 140 characters).
     const quotable = new Map<string, number>();
     for (let i = 0; i < ids.length; i += 200) {
       const { data: rows, error: rowsError } = await supabase
@@ -576,24 +602,68 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       if (rowsError) throw rowsError;
       for (const row of rows || []) {
         const body = (row.body || '').replace(/\s+/g, ' ').trim();
-        if (!row.author_name || body.length < 12 || body.length > 96) continue;
+        if (!row.author_name || body.length < 12 || body.length > 140) continue;
         quotable.set(row.film_id!, (quotable.get(row.film_id!) || 0) + 1);
       }
     }
 
+    const formatViews = (n: number | null | undefined): string => {
+      const v = Number(n) || 0;
+      if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+      if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+      return String(v);
+    };
+
+    const now = Date.now();
+    const daysSince = (d: string | null) => {
+      if (!d) return 999;
+      const t = new Date(d).getTime();
+      return Number.isNaN(t) ? 999 : Math.max(0, (now - t) / 86_400_000);
+    };
+
     return (films || [])
       .filter(f => (quotable.get(f.id) || 0) >= MIN_QUOTES)
+      .map(f => {
+        const ageDays = daysSince(f.release_date);
+        let freshnessBonus = 0;
+        let ageLabel = '';
+        if (ageDays <= 2.2) {
+          freshnessBonus = 1200;
+          ageLabel = ageDays <= 1.2 ? 'Released 24h ago' : 'Released 48h ago';
+        } else if (ageDays <= 4.2) {
+          freshnessBonus = 800;
+          ageLabel = `Released ${Math.round(ageDays)}d ago`;
+        } else if (ageDays <= 7.2) {
+          freshnessBonus = 400;
+          ageLabel = `Released ${Math.round(ageDays)}d ago`;
+        } else if (ageDays <= 30) {
+          freshnessBonus = 150;
+        }
+
+        const viewBonus = Math.min(250, (Number(f.view_count) || 0) / 20_000);
+        const quoteBonus = Math.min(200, (quotable.get(f.id) || 0) * 10);
+        const likedBonus = (Number(f.liked_percent) || 0) * 2;
+        const totalScore = freshnessBonus + viewBonus + quoteBonus + likedBonus;
+
+        const viewsPart = f.view_count && f.view_count > 1000 ? `${formatViews(f.view_count)} views • ` : '';
+        const agePart = ageLabel ? `${ageLabel} • ` : '';
+        const subtext = `${f.liked_percent}% liked • ${viewsPart}${agePart}${quotable.get(f.id)} viewer comments`;
+
+        return {
+          id: f.id,
+          type: 'movie' as const,
+          name: f.title,
+          subtext,
+          imageUrl: f.poster_url,
+          category: 'Audience Pulse',
+          completenessScore: freshnessBonus > 0 ? 0.98 : 0.9,
+          data: { ...f, quotableComments: quotable.get(f.id) || 0, totalScore },
+          totalScore,
+        };
+      })
+      .sort((a, b) => b.totalScore - a.totalScore)
       .slice(0, limit)
-      .map(f => ({
-        id: f.id,
-        type: 'movie' as const,
-        name: f.title,
-        subtext: `${f.liked_percent}% liked • ${quotable.get(f.id)} viewer comments`,
-        imageUrl: f.poster_url,
-        category: 'Audience Pulse',
-        completenessScore: 0.9,
-        data: { ...f, quotableComments: quotable.get(f.id) || 0 },
-      }));
+      .map(({ totalScore, ...item }) => item);
   }
 
   // Person, theatre and critic series must never fall through to a film pool.

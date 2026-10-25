@@ -350,6 +350,54 @@ function movieBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlatform): s
   return lines;
 }
 
+function formatShortNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return String(n);
+}
+
+function audiencePulseBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlatform): string[] {
+  const lines: string[] = [];
+  const yearSuffix = snapshot.year ? ` (${snapshot.year})` : '';
+  const liked = snapshot.likedPercent ? `${Math.round(snapshot.likedPercent)}%` : null;
+  const comments = (snapshot.audienceComments || []).slice(0, 3);
+
+  // 1. Viral Verdict Header
+  lines.push(`🔥 Real Viewer Verdict: ${snapshot.title}${yearSuffix} 🎬`);
+
+  // 2. Verified Pulse Metric with views
+  const viewStr = snapshot.viewCount && snapshot.viewCount > 1000
+    ? formatShortNumber(snapshot.viewCount) + ' views'
+    : null;
+  if (liked && viewStr) {
+    lines.push(`📊 ${liked} of audience members loved this film with over ${viewStr} on YouTube.`);
+  } else if (liked) {
+    lines.push(`📊 ${liked} of audience members loved this film, based on real comments from viewers.`);
+  }
+
+  // 3. Featured Real Audience Quotes
+  if (comments.length > 0) {
+    const quotes = comments
+      .filter(c => c.body && c.body.length >= 10)
+      .slice(0, 2)
+      .map(c => `🗣️ “${c.body.trim()}” — ${c.author}`)
+      .join('\n\n');
+    if (quotes) {
+      lines.push(`Here is what viewers are saying:\n\n${quotes}`);
+    }
+  }
+
+  // 4. Where to stream
+  if (snapshot.watchAvailability) {
+    lines.push(snapshot.watchAvailability.startsWith('Where to Watch') ? snapshot.watchAvailability : `🍿 ${snapshot.watchAvailability}`);
+  }
+
+  // 5. Provocative Debate CTA
+  lines.push(`Have you watched ${snapshot.title} yet? Does this verdict match your take, or did the audience get it completely wrong? Sound off below! 👇`);
+
+  return lines;
+}
+
 function criticsBody(snapshot: UpcomingMovieSnapshot): string[] {
   const review = snapshot.criticReview;
   const critic = review?.criticName || 'our critics';
@@ -423,7 +471,7 @@ function theatreBody(snapshot: TheatrePlaySnapshot, platform: SocialPlatform = '
   return lines;
 }
 
-function baseHashtags(snapshot: SocialSourceSnapshot): (string | null)[] {
+function baseHashtags(snapshot: SocialSourceSnapshot, contentType?: string | null): (string | null)[] {
   if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
     return [
       'MuviDB',
@@ -442,6 +490,18 @@ function baseHashtags(snapshot: SocialSourceSnapshot): (string | null)[] {
       'Theatre',
       'NigerianTheatre',
       snapshot.city ? toHashtag(snapshot.city) : null,
+      'Nollywood',
+    ];
+  }
+
+  if (contentType === 'audience_pulse') {
+    return [
+      'MuviDB',
+      toHashtag(snapshot.title),
+      'AudiencePulse',
+      'RealViewerVerdict',
+      ...snapshot.genres.map(genre => toHashtag(genre)),
+      ...snapshot.topCast.map(member => toHashtag(member.name)),
       'Nollywood',
     ];
   }
@@ -466,9 +526,10 @@ function baseHashtags(snapshot: SocialSourceSnapshot): (string | null)[] {
 export function buildVariantContent(input: {
   snapshot: SocialSourceSnapshot;
   platform: SocialPlatform;
+  contentType?: string | null;
 }): VariantContent {
   const limits = PLATFORM_CAPTION_LIMITS[input.platform];
-  const hashtags = dedupeHashtags(baseHashtags(input.snapshot), limits.hashtagLimit);
+  const hashtags = dedupeHashtags(baseHashtags(input.snapshot, input.contentType), limits.hashtagLimit);
 
   const lines =
     input.snapshot.kind === 'birthday_spotlight'
@@ -477,9 +538,11 @@ export function buildVariantContent(input: {
         ? actorBody(input.snapshot)
         : input.snapshot.kind === 'whats_on_stage'
           ? theatreBody(input.snapshot, input.platform)
-          : input.snapshot.kind === 'upcoming_movie' && input.snapshot.criticReview
-            ? criticsBody(input.snapshot)
-            : movieBody(input.snapshot, input.platform);
+          : input.snapshot.kind === 'upcoming_movie' && input.contentType === 'audience_pulse'
+            ? audiencePulseBody(input.snapshot, input.platform)
+            : input.snapshot.kind === 'upcoming_movie' && input.snapshot.criticReview
+              ? criticsBody(input.snapshot)
+              : movieBody(input.snapshot, input.platform);
   const body = lines.filter(Boolean).join('\n\n');
 
   const hashtagBlock = hashtags.map(tag => `#${tag}`).join(' ');

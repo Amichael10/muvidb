@@ -1441,7 +1441,7 @@ async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
   const { data: film, error } = await supabase
     .from('films')
     .select(
-      'id,title,slug,poster_url,backdrop_url,backdrop,release_date,year,release_type,source,synopsis,tagline,genres,countries,languages,liked_percent,coming_soon,is_published,is_in_cinemas,streaming_links,youtube_watch_url',
+      'id,title,slug,poster_url,backdrop_url,backdrop,release_date,year,release_type,source,synopsis,tagline,genres,countries,languages,liked_percent,coming_soon,is_published,is_in_cinemas,streaming_links,youtube_watch_url,view_count',
     )
     .eq('id', filmId)
     .maybeSingle();
@@ -1802,6 +1802,7 @@ export async function syncContentItemWithSource(
     const freshContent = buildVariantContent({
       snapshot: freshSnapshot,
       platform: variant.platform as SocialPlatform,
+      contentType: item.content_type,
     });
 
     const variantUpdates: Record<string, any> = variant.platform_options?.caption_locked ? {} : {
@@ -2181,7 +2182,7 @@ export async function generateSocialDraft(
   const availableFormats: string[] = assets.rows.map(row => row.format);
 
   const variantRows = input.platforms.map(platform => {
-    const content = buildVariantContent({ snapshot, platform });
+    const content = buildVariantContent({ snapshot, platform, contentType: input.contentType });
     const format = preferredAssetFormat(platform, availableFormats);
     const slideAssets = format ? (assets.carouselAssets?.[format] || []) : [];
     const useCarousel = (input.contentType === 'critics_say' || input.contentType === 'weekend_watchlist') && platform !== 'tiktok' && slideAssets.length >= 2;

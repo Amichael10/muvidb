@@ -314,7 +314,8 @@ export async function runCommentMining(opts: {
   /** Re-mine films last mined before this ISO timestamp. Used to sweep the
    *  catalogue after the filter changes, so ratings built on comments an
    *  earlier pass should have rejected get rebuilt. */
-  remineBefore?: string;
+  /** Only mine fresh releases (released in the last 1-3 days). */
+  freshOnly?: boolean;
 } = {}) {
   const scan = opts.scan ?? Number(process.env.COMMENT_MINE_SCAN || 300);
   const aiCap = opts.aiCap ?? Number(process.env.COMMENT_MINE_AICAP || 150);
@@ -344,7 +345,7 @@ export async function runCommentMining(opts: {
     }
   };
 
-  const COLS = 'id, source_video_id, comments_synced_at';
+  const COLS = 'id, source_video_id, comments_synced_at, release_date';
   // Needs a (re)check: never mined, or mined > 5 days ago.
   const needsMining = (q: any) =>
     q.not('source_video_id', 'is', null)
@@ -395,65 +396,90 @@ export async function runCommentMining(opts: {
     return { checked: targeted.length, mined: remined, skipped: failed, aiUsed: remined, viewsBackfilled: 0 };
   }
 
-  // 1. Mine the films the site actually surfaces FIRST (Top 10 / trending /
-  //    featured). Newest-first alone buries ratings on obscure fresh uploads
-  //    that have no comments yet and that nobody browses.
-  const priorityFilms: any[] = [];
-  const top10 = await withRetry<any[]>(
-    () => supabase.from('top_10_films').select('film_id'),
-    'top-10 lookup',
-  );
-  const top10Ids = [...new Set((top10 || []).map((t: any) => t.film_id).filter(Boolean))];
-  if (top10Ids.length) {
-    const rows = await withRetry<any[]>(
-      () => needsMining(supabase.from('films').select(COLS)).in('id', top10Ids).limit(50),
-      'top-10 films',
-    );
-    if (rows) priorityFilms.push(...rows);
-  }
-  const flagged = await withRetry<any[]>(
+  // 0. FRESH RELEASES (1-3 days old): Nollywood YouTube audience reactions and views
+  //    peak in the first 24-48 hours (often gaining 100k-1M+ views and hundreds of
+  //    comments in 1-2 days). These must be checked DAILY with a 12-hour staleness
+  //    window rather than the default 5-day cycle, so Audience Pulse can post
+  //    while conversation is viral.
+  const freshCutoff = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
+  const freshStaleBefore = new Date(Date.now() - 12 * 3600_000).toISOString();
+  const freshReleases = await withRetry<any[]>(
     () =>
-      needsMining(supabase.from('films').select(COLS))
-        .or('is_trending.eq.true,is_featured.eq.true')
-        .limit(Math.min(scan, 200)),
-    'trending/featured films',
-  );
-  if (flagged) priorityFilms.push(...flagged);
-
-  // 2. Then the most-watched unmined films (view_count is backfilled below as
-  //    we go, so this gets better every run). These are what users browse.
-  const popular = await withRetry<any[]>(
-    () =>
-      needsMining(supabase.from('films').select(COLS))
-        .gt('view_count', 0)
-        .order('view_count', { ascending: false })
-        .limit(scan),
-    'popular films',
+      supabase.from('films')
+        .select(COLS)
+        .not('source_video_id', 'is', null)
+        .gte('release_date', freshCutoff)
+        .or(`comments_synced_at.is.null,comments_synced_at.lt.${freshStaleBefore}`)
+        .order('release_date', { ascending: false })
+        .limit(100),
+    'fresh releases (1-3 days)',
   );
 
-  // 3. Unviewed / zero-view films needing mining + view backfill
-  const unviewed = await withRetry<any[]>(
-    () =>
-      needsMining(supabase.from('films').select(COLS))
-        .or('view_count.is.null,view_count.eq.0')
-        .order('created_at', { ascending: false })
-        .limit(scan),
-    'unviewed films',
-  );
-
-  // 4. Fill the remaining budget with the most recently added films.
-  const recent = await withRetry<any[]>(
-    () =>
-      needsMining(supabase.from('films').select(COLS))
-        .order('created_at', { ascending: false })
-        .limit(scan),
-    'recent films',
-  );
-
-  // Priority, then popular, then unviewed, then recent; dedupe and cap at the scan budget.
   const byId = new Map<string, any>();
-  for (const f of [...priorityFilms, ...(popular || []), ...(unviewed || []), ...(recent || [])]) {
-    if (f?.id && !byId.has(f.id)) byId.set(f.id, f);
+  if (opts.freshOnly) {
+    for (const f of freshReleases || []) {
+      if (f?.id && !byId.has(f.id)) byId.set(f.id, f);
+    }
+  } else {
+    // 1. Mine the films the site actually surfaces FIRST (Top 10 / trending /
+    //    featured). Newest-first alone buries ratings on obscure fresh uploads
+    //    that have no comments yet and that nobody browses.
+    const priorityFilms: any[] = [];
+    const top10 = await withRetry<any[]>(
+      () => supabase.from('top_10_films').select('film_id'),
+      'top-10 lookup',
+    );
+    const top10Ids = [...new Set((top10 || []).map((t: any) => t.film_id).filter(Boolean))];
+    if (top10Ids.length) {
+      const rows = await withRetry<any[]>(
+        () => needsMining(supabase.from('films').select(COLS)).in('id', top10Ids).limit(50),
+        'top-10 films',
+      );
+      if (rows) priorityFilms.push(...rows);
+    }
+    const flagged = await withRetry<any[]>(
+      () =>
+        needsMining(supabase.from('films').select(COLS))
+          .or('is_trending.eq.true,is_featured.eq.true')
+          .limit(Math.min(scan, 200)),
+      'trending/featured films',
+    );
+    if (flagged) priorityFilms.push(...flagged);
+
+    // 2. Then the most-watched unmined films (view_count is backfilled below as
+    //    we go, so this gets better every run). These are what users browse.
+    const popular = await withRetry<any[]>(
+      () =>
+        needsMining(supabase.from('films').select(COLS))
+          .gt('view_count', 0)
+          .order('view_count', { ascending: false })
+          .limit(scan),
+      'popular films',
+    );
+
+    // 3. Unviewed / zero-view films needing mining + view backfill
+    const unviewed = await withRetry<any[]>(
+      () =>
+        needsMining(supabase.from('films').select(COLS))
+          .or('view_count.is.null,view_count.eq.0')
+          .order('created_at', { ascending: false })
+          .limit(scan),
+      'unviewed films',
+    );
+
+    // 4. Fill the remaining budget with the most recently added films.
+    const recent = await withRetry<any[]>(
+      () =>
+        needsMining(supabase.from('films').select(COLS))
+          .order('created_at', { ascending: false })
+          .limit(scan),
+      'recent films',
+    );
+
+    // Fresh releases first, then priority, popular, unviewed, recent; dedupe and cap at scan.
+    for (const f of [...(freshReleases || []), ...priorityFilms, ...(popular || []), ...(unviewed || []), ...(recent || [])]) {
+      if (f?.id && !byId.has(f.id)) byId.set(f.id, f);
+    }
   }
   const films = [...byId.values()].slice(0, scan);
   if (!films.length) return { checked: 0, mined: 0, skipped: 0, message: 'nothing to mine' };
@@ -495,7 +521,8 @@ export async function runCommentMining(opts: {
 
       if (c >= minComments && aiUsed < aiCap) {
         aiUsed++;
-        const res = await mineFilmComments(f.id, f.source_video_id, { replace: opts.replace });
+        const isFresh = Boolean(f.release_date && f.release_date >= freshCutoff);
+        const res = await mineFilmComments(f.id, f.source_video_id, { replace: opts.replace || isFresh });
         if (res.status === 'ok') {
           mined++;
           // mineFilmComments already stamped comments_synced_at + rating; just

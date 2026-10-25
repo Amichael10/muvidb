@@ -7,13 +7,14 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 async function main() {
-  console.log('Starting YouTube comment-review mining…');
+  const freshOnly = process.argv.includes('--fresh') || process.env.FRESH_ONLY === 'true';
+  console.log(freshOnly ? 'Starting fresh-releases YouTube comment mining (1-3 days post-release)…' : 'Starting YouTube comment-review mining…');
   try {
     // Dynamic import so env (.env.local) is loaded BEFORE api/_lib/supabase.ts
     // initialises — static imports are hoisted and would run first, leaving the
     // client uninitialised when running locally via dotenv.
     const { runCommentMining } = await import('../api/_lib/comment_reviews.js');
-    const result = await runCommentMining();
+    const result = await runCommentMining({ freshOnly });
     console.log('Done:', JSON.stringify(result, null, 2));
   } catch (err: any) {
     console.error('Comment mining failed:', err.message);
