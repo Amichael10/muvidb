@@ -14,6 +14,7 @@ import LikedScore from '../components/film/LikedScore';
 import RottenTomatoesScorecard from '../components/film/RottenTomatoesScorecard';
 import FilmSpecsTable from '../components/film/FilmSpecsTable';
 import AdminBoxOfficeModal from '../components/film/AdminBoxOfficeModal';
+import BoxOfficeBreakdownModal from '../components/film/BoxOfficeBreakdownModal';
 import RateMoviePrompt from '../components/film/RateMoviePrompt';
 import WatchOptions from '../components/film/WatchOptions';
 import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
@@ -286,6 +287,7 @@ export default function FilmDetail() {
   const [criticSummary, setCriticSummary] = useState({ score: null, count: 0, featuredQuote: null });
   const [showFilmEdit, setShowFilmEdit] = useState(false);
   const [showBoxOfficeModal, setShowBoxOfficeModal] = useState(false);
+  const [showBoxOfficeBreakdown, setShowBoxOfficeBreakdown] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
   const [awardsOpen, setAwardsOpen] = useState(false);
@@ -803,8 +805,16 @@ export default function FilmDetail() {
                    flows full-width under the scorecard on small screens and
                    keeps its right-hand slot from lg up. */
                 <div className="flex w-full lg:w-auto flex-col z-10">
-                  <div className="h-full flex flex-col justify-center p-4 sm:p-5 rounded-2xl bg-black/70 border border-amber-500/40 backdrop-blur-xl shadow-2xl shadow-amber-500/20 w-full lg:w-64 text-left lg:text-right space-y-2">
+                  <div 
+                    onClick={() => setShowBoxOfficeBreakdown(true)}
+                    className="h-full flex flex-col justify-center p-4 sm:p-5 rounded-2xl bg-black/70 border border-amber-500/40 backdrop-blur-xl shadow-2xl shadow-amber-500/20 w-full lg:w-64 text-left lg:text-right space-y-2 cursor-pointer hover:border-amber-400 hover:shadow-amber-500/30 hover:scale-[1.02] transition-all duration-200 group"
+                    title="Click for Box Office breakdown"
+                  >
                     <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                      <span className="text-[9px] text-amber-400/80 group-hover:text-amber-300 font-normal flex items-center gap-0.5">
+                        <span>Details</span>
+                        <Icon icon="solar:arrow-right-up-linear" className="text-xs group-hover:translate-x-0.5 transition-transform" />
+                      </span>
                       <div className="flex items-center gap-1.5 ml-auto">
                         <Icon icon="solar:ticket-bold" className="text-amber-400 text-sm" />
                         <span>Box Office Revenue</span>
@@ -914,6 +924,7 @@ export default function FilmDetail() {
               synopsis={film.synopsis}
               isAdmin={isAdmin}
               onEditBoxOffice={() => setShowBoxOfficeModal(true)}
+              onOpenBoxOfficeBreakdown={() => setShowBoxOfficeBreakdown(true)}
               onSuggestEdit={() => setShowFilmEdit(true)}
               onReport={() => setShowReport(true)}
             />
@@ -927,6 +938,12 @@ export default function FilmDetail() {
                     ...updatedFilm,
                   }));
                 }}
+              />
+            )}
+            {showBoxOfficeBreakdown && (
+              <BoxOfficeBreakdownModal
+                film={film}
+                onClose={() => setShowBoxOfficeBreakdown(false)}
               />
             )}
             {showFilmEdit && (

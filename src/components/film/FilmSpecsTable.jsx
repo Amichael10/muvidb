@@ -17,6 +17,7 @@ export default function FilmSpecsTable({
   onSuggestEdit = null,
   onReport = null,
   onEditBoxOffice = null,
+  onOpenBoxOfficeBreakdown = null,
   isAdmin = false,
   className = '',
 }) {
@@ -161,10 +162,18 @@ export default function FilmSpecsTable({
       label: 'Box Office (Domestic Gross)',
       value: formattedBoxOffice ? (
         <span className="inline-flex items-center gap-2 flex-wrap font-bold text-amber-400">
-          <span className="inline-flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onOpenBoxOfficeBreakdown}
+            className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors cursor-pointer group"
+            title="Click to view full box office breakdown"
+          >
             <Icon icon="solar:ticket-bold" className="text-sm" />
-            <span>{formattedBoxOffice}</span>
-          </span>
+            <span className="underline decoration-dotted decoration-amber-500/50 underline-offset-4 group-hover:decoration-amber-300">
+              {formattedBoxOffice}
+            </span>
+            <Icon icon="solar:arrow-right-up-linear" className="text-xs opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+          </button>
           {/* Where a figure came from is an internal reconciliation detail,
               so it stays on the admin's view of the page only. */}
           {isAdmin && (
