@@ -486,6 +486,38 @@ export function stripBaitTail(body: string): string {
   return stripped.length >= 12 ? stripped : trimmed;
 }
 
+const NOISE_PATTERNS = [
+  /\b(?:coming\s+from\s+tiktok|from\s+tiktok|via\s+tiktok|on\s+tiktok|tiktok\s+brought|tiktok\s+made\s+me)\b/i,
+  /\b(?:mark\s+(?:your\s+)?attendance|let\s+mart\s+attendant|let\s+mark\s+attendance|present\s+sir|first\s+(?:to\s+)?(?:comment|view|watch)|early\s+gang|early\s+bird)\b/i,
+  /\b(?:who\s+(?:is\s+)?watching\s+from|watching\s+from\s+[a-z]+)\b/i,
+  /\b(?:gather\s+here|fans?\s+gather|lovers?\s+gather|drop\s+(?:a\s+)?like|like\s+(?:if|this|my|and\s+subscribe)|hit\s+like|smash\s+like|subscribe\s+to)\b/i,
+  /\b(?:dey\s+give\s+us\s+b2b|give\s+us\s+b2b|back\s+to\s+back)\b/i,
+  /\b(?:action\s+po\s+bi)\b/i,
+];
+
+const SUBSTANCE_PATTERNS = [
+  /\b(?:movie|film|story|storyline|plot|script|screenplay|writer|screenwriter|ending|twist|direct(?:or|ing)?|cinematography|picture|scene|scenes|acting|actor|actress|cast|character|role|performance|talent|dialogue|soundtrack|sound|music|lesson|message|producer?|production)\b/i,
+  /\b(?:watch(?:ed|ing)?|cried|tears?|laugh(?:ed)?|hilarious|emotional|moving|touching|therapeutic|inspiring|boring|predictable|unpredictable|masterpiece|10\/10|100%|recommend(?:ed)?|worth)\b/i,
+];
+
+export function isQualityReviewComment(body: string): boolean {
+  const clean = (body || '').replace(/\s+/g, ' ').trim();
+  if (clean.length < 15 || clean.length > 150) return false;
+
+  // 1. Reject known noise, referrals, attendance, and cheerleading spam
+  for (const p of NOISE_PATTERNS) {
+    if (p.test(clean)) return false;
+  }
+
+  // 2. Reject excessive emoji spam
+  const emojiMatches = clean.match(/[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}]/gu);
+  if (emojiMatches && emojiMatches.length > 6) return false;
+  if (emojiMatches && emojiMatches.length / clean.length > 0.3) return false;
+
+  // 3. Must have substantive review / evaluative keywords
+  return SUBSTANCE_PATTERNS.some(p => p.test(clean));
+}
+
 export function selectAudienceComments(
   rows: Record<string, any>[],
   limit = 5,
@@ -500,7 +532,8 @@ export function selectAudienceComments(
       likes: Number(row?.likes) || 0,
     }))
     .filter(c => {
-      if (!c.author || c.body.length < 12 || c.body.length > maxLength) return false;
+      if (!c.author || c.body.length < 15 || c.body.length > maxLength) return false;
+      if (!isQualityReviewComment(c.body)) return false;
       const key = c.body.toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
