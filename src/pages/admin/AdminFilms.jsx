@@ -444,6 +444,8 @@ export default function AdminFilms() {
       if (typeFilter !== 'all') {
         if (typeFilter === 'feature_film') {
           countQuery = countQuery.in('content_type', ['feature_film', 'feature film']);
+        } else if (typeFilter === 'short_film') {
+          countQuery = countQuery.in('content_type', ['short_film', 'short film', 'short']);
         } else if (typeFilter === 'mini_series') {
           countQuery = countQuery.in('content_type', ['mini_series', 'mini series']);
         } else if (typeFilter === 'series') {
@@ -484,6 +486,8 @@ export default function AdminFilms() {
       if (typeFilter !== 'all') {
         if (typeFilter === 'feature_film') {
           query = query.in('content_type', ['feature_film', 'feature film']);
+        } else if (typeFilter === 'short_film') {
+          query = query.in('content_type', ['short_film', 'short film', 'short']);
         } else if (typeFilter === 'mini_series') {
           query = query.in('content_type', ['mini_series', 'mini series']);
         } else if (typeFilter === 'series') {
@@ -829,7 +833,7 @@ export default function AdminFilms() {
       const baseForm = {
         ...initialFormState,
         ...film,
-        content_type: (film.content_type === 'feature film' ? 'feature_film' : film.content_type === 'mini series' ? 'mini_series' : film.content_type === 'serie' ? 'series' : film.content_type) || 'movie',
+        content_type: (film.content_type === 'feature film' ? 'feature_film' : film.content_type === 'mini series' ? 'mini_series' : film.content_type === 'serie' ? 'series' : (film.content_type === 'short film' || film.content_type === 'short') ? 'short_film' : film.content_type) || 'movie',
         genres: film.genres || [],
         runtime_minutes: film.runtime_minutes || '',
         is_featured: film.is_featured || false,
@@ -2166,6 +2170,7 @@ export default function AdminFilms() {
           >
             <option value="all">All Types</option>
             <option value="feature_film">Feature Films</option>
+            <option value="short_film">Short Films</option>
             <option value="movie">Movies</option>
             <option value="series">Series</option>
             <option value="mini_series">Mini-series</option>
@@ -2338,6 +2343,8 @@ export default function AdminFilms() {
                                 ? 'bg-purple-500/10 text-purple-600 border-purple-500/20'
                                 : film.content_type === 'feature_film' || film.content_type === 'feature film'
                                 ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                : film.content_type === 'short_film' || film.content_type === 'short film' || film.content_type === 'short'
+                                ? 'bg-teal-500/10 text-teal-600 border-teal-500/20'
                                 : film.content_type === 'mini_series' || film.content_type === 'mini series'
                                 ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
                                 : film.content_type === 'documentary'
@@ -2857,6 +2864,7 @@ export default function AdminFilms() {
                         formData.content_type === 'feature film' ? 'feature_film' :
                         formData.content_type === 'mini series' ? 'mini_series' :
                         formData.content_type === 'serie' ? 'series' :
+                        (formData.content_type === 'short film' || formData.content_type === 'short') ? 'short_film' :
                         formData.content_type || 'movie'
                       } 
                       onChange={handleChange} 
@@ -2864,6 +2872,7 @@ export default function AdminFilms() {
                     >
                       <option value="movie">Movie</option>
                       <option value="feature_film">Feature Film</option>
+                      <option value="short_film">Short Film</option>
                       <option value="series">Series</option>
                       <option value="mini_series">Mini-series</option>
                       <option value="documentary">Documentary</option>

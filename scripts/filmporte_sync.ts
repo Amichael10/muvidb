@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { cleanTitle } from '../api/_lib/yt_service.js';
 import { supabase } from './lib/db';
 import { startSyncLog, type SyncCounters } from './lib/sync';
@@ -51,32 +52,101 @@ type FilmporteContentDetail = {
   mediaAttachments?: FilmporteMediaAttachment[];
 };
 
-function normalizeRole(role: string): string {
-  const r = role.toUpperCase().trim();
-  if (r === 'CAST' || r === 'ACTOR') return 'actor';
-  if (r === 'DIRECTED_BY' || r === 'DIRECTOR') return 'director';
-  if (r === 'PRODUCED_BY' || r === 'PRODUCER') return 'producer';
-  if (r === 'WRITTEN_BY' || r === 'WRITER' || r === 'SCREENPLAY') return 'writer';
-  if (r === 'EXECUTIVE_PRODUCER') return 'executive_producer';
-  if (r === 'CINEMATOGRAPHER' || r === 'DOP') return 'cinematographer';
-  return r.toLowerCase().replace(/_/g, ' ');
-}
+type FilmporteCatalogItem = {
+  id: string;
+  title: string;
+  slug: string;
+  type: string;
+};
 
 function normalizeGenres(primary?: string[], secondary?: string[]): string[] {
   const all = [...(primary || []), ...(secondary || [])];
   const set = new Set<string>();
   for (const g of all) {
     if (!g) continue;
-    const trimmed = g.trim();
-    if (trimmed.length >= 2) {
-      set.add(trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase());
-    }
+    const clean = g.trim();
+    if (clean) set.add(clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase());
   }
   return Array.from(set);
 }
 
-function mergeGenres(existing: string[] | null | undefined, incoming: string[]): string[] {
-  return [...new Set([...(existing || []), ...incoming])];
+function mergeGenres(existing?: string[] | null, incoming?: string[] | null): string[] {
+  const set = new Set<string>([...(existing || []), ...(incoming || [])]);
+  return Array.from(set);
+}
+
+function normalizeRole(role: string): string {
+  const r = (role || '').toUpperCase();
+  if (r.includes('ACTOR') || r.includes('CAST')) return 'actor';
+  if (r.includes('DIRECTOR')) return 'director';
+  if (r.includes('PRODUCER')) return 'producer';
+  if (r.includes('WRITER')) return 'writer';
+  return 'actor';
+}
+
+function sniffImageType(buf: Buffer): string | null {
+  if (buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'image/gif';
+  if (
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  ) return 'image/webp';
+  return null;
+}
+
+// Fetch a remote image with the source-site Referer and upload to Supabase Storage.
+// Returns the public Supabase URL, or original if failed.
+async function mirrorImage(
+  srcUrl: string | null,
+  bucket: 'posters' | 'backdrops' | 'people'
+): Promise<string | null> {
+  if (!srcUrl) return null;
+  if (srcUrl.includes('supabase.co/storage/v1/object/public/')) return srcUrl;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    const res = await fetch(srcUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        'Referer': 'https://films.filmporte.com/',
+      },
+    }).finally(() => clearTimeout(timeout));
+
+    if (!res.ok) {
+      console.warn(`[mirrorImage] Failed to download ${srcUrl}: ${res.status}`);
+      return null;
+    }
+
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.byteLength < 500) return null;
+
+    const ct = sniffImageType(buf) || 'image/jpeg';
+    const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg';
+    const filename = `${crypto.randomUUID()}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage.from(bucket).upload(filename, buf, {
+      contentType: ct,
+      upsert: true,
+      cacheControl: '31536000',
+    });
+
+    if (uploadErr) {
+      console.warn(`[mirrorImage] Upload to ${bucket} failed:`, uploadErr.message);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filename);
+    return publicUrl;
+  } catch (err: any) {
+    console.warn(`[mirrorImage] Error mirroring ${srcUrl}:`, err.message);
+    return null;
+  }
 }
 
 async function findFilm(title: string, slug?: string) {
@@ -116,11 +186,18 @@ async function findFilm(title: string, slug?: string) {
 
 const peopleCache = new Map<string, string>();
 
-async function upsertPerson(name: string, photoUrl: string | null): Promise<string | null> {
+async function upsertPerson(name: string, rawPhotoUrl: string | null): Promise<string | null> {
   const normName = name.trim();
   if (!normName) return null;
   const cacheKey = normName.toLowerCase();
   if (peopleCache.has(cacheKey)) return peopleCache.get(cacheKey)!;
+
+  // Mirror photo to people bucket if from external host
+  let photoUrl = rawPhotoUrl;
+  if (rawPhotoUrl && !rawPhotoUrl.includes('supabase.co/storage/')) {
+    const mirrored = await mirrorImage(rawPhotoUrl, 'people');
+    if (mirrored) photoUrl = mirrored;
+  }
 
   // 1. Look up existing person
   const { data: existing, error: findError } = await supabase
@@ -133,9 +210,12 @@ async function upsertPerson(name: string, photoUrl: string | null): Promise<stri
   if (findError) throw findError;
 
   if (existing) {
-    // If existing person does not have a profile picture, and Filmporte provides one:
-    if ((!existing.photo_url || existing.photo_url.includes('placeholder')) && photoUrl) {
-      console.log(`[filmporte_sync] Updating missing photo for actor "${existing.name}": ${photoUrl}`);
+    const needsNewPhoto = (!existing.photo_url || 
+      existing.photo_url.includes('placeholder') || 
+      existing.photo_url.includes('assets.filmporte.com')) && photoUrl;
+
+    if (needsNewPhoto) {
+      console.log(`[filmporte_sync] Updating photo for actor "${existing.name}": ${photoUrl}`);
       if (!DRY_RUN) {
         await supabase
           .from('people')
@@ -195,8 +275,8 @@ async function syncCredits(filmId: string, credits: FilmporteCredit[]) {
   if (!credits || !credits.length) return;
 
   for (const c of credits) {
-    const photoUrl = c.image?.url ? `${ASSETS_BASE}/${c.image.url}` : null;
-    const personId = await upsertPerson(c.name, photoUrl);
+    const rawPhotoUrl = c.image?.url ? `${ASSETS_BASE}/${c.image.url}` : null;
+    const personId = await upsertPerson(c.name, rawPhotoUrl);
     if (!personId) continue;
 
     const role = normalizeRole(c.role);
@@ -213,7 +293,6 @@ async function syncCredits(filmId: string, credits: FilmporteCredit[]) {
         .maybeSingle();
 
       if (existingCredit) {
-        // Update in place with any richer character name or billing order
         const updates: Record<string, unknown> = {};
         if (!existingCredit.character_name && characterName) {
           updates.character_name = characterName;
@@ -249,24 +328,23 @@ export async function runFilmporteSync(options: { dryRun?: boolean } = {}) {
     // 1. Fetch catalog
     const res = await fetch(`${API_BASE}/contents`, {
       headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
     });
 
     if (!res.ok) {
-      throw new Error(`Failed to fetch Filmporte catalog: ${res.status} ${res.statusText}`);
+      throw new Error(`Failed to fetch Filmporte catalog: HTTP ${res.status}`);
     }
 
-    const items: Array<{ id: string; slug: string; title: string; type: string }> = await res.json();
+    const items: FilmporteCatalogItem[] = await res.json();
     console.log(`[filmporte_sync] Retrieved ${items.length} titles from Filmporte API.`);
 
-    for (const item of items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
       counters.processed += 1;
-      try {
-        console.log(`\n[filmporte_sync] Processing (${counters.processed}/${items.length}): "${item.title}" (${item.slug})`);
+      console.log(`\n[filmporte_sync] Processing (${i + 1}/${items.length}): "${item.title}" (${item.slug})`);
 
-        // Fetch single content details
+      try {
         const detailRes = await fetch(`${API_BASE}/contents/slug/${item.slug}`);
         if (!detailRes.ok) {
           console.warn(`[filmporte_sync] Failed to fetch details for ${item.slug}: ${detailRes.status}`);
@@ -277,7 +355,7 @@ export async function runFilmporteSync(options: { dryRun?: boolean } = {}) {
         const data: FilmporteContentDetail = await detailRes.json();
 
         const isShort = data.type === 'SHORT' || data.type === 'SHORT_FILM';
-        const contentType: 'movie' = 'movie';
+        const contentType: 'movie' | 'short_film' = isShort ? 'short_film' : 'movie';
         const watchUrl = isShort
           ? `${WEB_BASE}/short-films/${data.slug}`
           : `${WEB_BASE}/movies/${data.slug}`;
@@ -290,12 +368,14 @@ export async function runFilmporteSync(options: { dryRun?: boolean } = {}) {
         const releaseDateIso = data.movie?.releaseDate || data.createdAt;
         const year = releaseDateIso ? new Date(releaseDateIso).getUTCFullYear() : null;
 
-        // Poster & Backdrop extraction
+        // Poster & Backdrop extraction + mirroring to Supabase Storage
         const posterAttachment = data.mediaAttachments?.find(m => m.role === 'THUMBNAIL' || m.role === 'POSTER');
-        const posterUrl = posterAttachment?.image?.url ? `${ASSETS_BASE}/${posterAttachment.image.url}` : null;
+        const rawPosterUrl = posterAttachment?.image?.url ? `${ASSETS_BASE}/${posterAttachment.image.url}` : null;
+        const posterUrl = await mirrorImage(rawPosterUrl, 'posters');
 
         const galleryAttachment = data.mediaAttachments?.find(m => m.role === 'GALLERY');
-        const backdropUrl = galleryAttachment?.image?.url ? `${ASSETS_BASE}/${galleryAttachment.image.url}` : posterUrl;
+        const rawBackdropUrl = galleryAttachment?.image?.url ? `${ASSETS_BASE}/${galleryAttachment.image.url}` : rawPosterUrl;
+        const backdropUrl = await mirrorImage(rawBackdropUrl, 'backdrops') || posterUrl;
 
         // Trailer extraction
         const trailerAttachment = data.mediaAttachments?.find(m => m.role === 'TRAILER' || m.role === 'TEASER');
@@ -319,19 +399,29 @@ export async function runFilmporteSync(options: { dryRun?: boolean } = {}) {
             const updatePayload: Record<string, unknown> = {
               streaming_links: links,
               genres: mergeGenres(existingFilm.genres, genres),
-              content_type: existingFilm.content_type || contentType,
-              release_type: existingFilm.release_type || null,
+              content_type: contentType,
+              release_type: existingFilm.release_type || 'filmporte',
               updated_at: new Date().toISOString(),
             };
 
-            if ((!existingFilm.synopsis || existingFilm.synopsis.length < 20) && synopsis) {
-              updatePayload.synopsis = synopsis;
-            }
-            if ((!existingFilm.poster_url || existingFilm.poster_url.includes('placeholder')) && posterUrl) {
+            const needsNewPoster = !existingFilm.poster_url ||
+              existingFilm.poster_url.includes('placeholder') ||
+              existingFilm.poster_url.includes('assets.filmporte.com');
+
+            if (needsNewPoster && posterUrl) {
               updatePayload.poster_url = posterUrl;
             }
-            if (!existingFilm.backdrop_url && backdropUrl) {
+
+            const needsNewBackdrop = !existingFilm.backdrop_url ||
+              existingFilm.backdrop_url.includes('placeholder') ||
+              existingFilm.backdrop_url.includes('assets.filmporte.com');
+
+            if (needsNewBackdrop && backdropUrl) {
               updatePayload.backdrop_url = backdropUrl;
+            }
+
+            if ((!existingFilm.synopsis || existingFilm.synopsis.length < 20) && synopsis) {
+              updatePayload.synopsis = synopsis;
             }
             if (!existingFilm.release_date && releaseDateIso) {
               updatePayload.release_date = releaseDateIso.slice(0, 10);
@@ -353,7 +443,7 @@ export async function runFilmporteSync(options: { dryRun?: boolean } = {}) {
           }
           counters.updated += 1;
         } else {
-          console.log(`[filmporte_sync] Inserting new ${isShort ? 'short film' : 'movie'}: "${data.title}"`);
+          console.log(`[filmporte_sync] Inserting new ${contentType}: "${data.title}"`);
           if (!isDryRun) {
             const { data: inserted, error: insertErr } = await supabase
               .from('films')
@@ -365,7 +455,7 @@ export async function runFilmporteSync(options: { dryRun?: boolean } = {}) {
                 backdrop_url: backdropUrl,
                 genres,
                 content_type: contentType,
-                release_type: null,
+                release_type: 'filmporte',
                 source: 'filmporte_sync',
                 release_date: releaseDateIso ? releaseDateIso.slice(0, 10) : null,
                 year,
@@ -409,23 +499,18 @@ export async function runFilmporteSync(options: { dryRun?: boolean } = {}) {
       }
     }
 
-    const summary = `Filmporte Sync completed. Processed: ${counters.processed}, Created: ${counters.created}, Updated: ${counters.updated}, Failed: ${counters.failed}`;
-    console.log(`\n[filmporte_sync] ${summary}`);
-    await syncLog.finish(summary);
-    return { ok: true, counters };
+    await syncLog.finish(
+      `Filmporte Sync completed. Processed: ${counters.processed}, Created: ${counters.created}, Updated: ${counters.updated}, Failed: ${counters.failed}`
+    );
+    console.log(`\n[filmporte_sync] Filmporte Sync completed. Processed: ${counters.processed}, Created: ${counters.created}, Updated: ${counters.updated}, Failed: ${counters.failed}`);
   } catch (err: any) {
-    console.error('[filmporte_sync] Sync failed:', err);
+    console.error('[filmporte_sync] Fatal error during sync:', err);
     await syncLog.fail(err);
-    throw err;
+    process.exit(1);
   }
 }
 
-// Direct CLI invocation
-if (import.meta.url.endsWith(process.argv[1]) || process.argv[1]?.includes('filmporte_sync')) {
-  runFilmporteSync()
-    .then(() => process.exit(0))
-    .catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
+// Auto-run if executed directly
+if (process.argv[1]?.endsWith('filmporte_sync.ts') || process.argv[1]?.endsWith('filmporte_sync.js')) {
+  runFilmporteSync().catch(console.error);
 }

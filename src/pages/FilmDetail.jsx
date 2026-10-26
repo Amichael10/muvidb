@@ -688,6 +688,8 @@ export default function FilmDetail() {
                 <span>
                   {film.content_type === 'series'
                     ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
+                    : (film.content_type === 'short_film' || film.content_type === 'short film' || film.content_type === 'short')
+                    ? (film.runtime_minutes ? `Short Film • ${film.runtime_minutes} min` : 'Short Film')
                     : `${film.runtime_minutes || film.runtime || 0} min`}
                 </span>
                 {film.nfvcb_rating && (
