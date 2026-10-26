@@ -24,6 +24,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose }) {
   const source = film.box_office_source || boxOfficeData.source || 'Nigerian Film Intelligence / CEAN';
   const sourceIssue = boxOfficeData.source_issue;
   const weeklyHistory = boxOfficeData.history || [];
+  const reachMetrics = boxOfficeData.reach_metrics;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
@@ -104,6 +105,59 @@ export default function BoxOfficeBreakdownModal({ film, onClose }) {
             </div>
           ) : null}
         </div>
+
+        {/* Reach Cinema Daily Live Intelligence */}
+        {reachMetrics && reachMetrics.cumulative_reach_tickets > 0 && (
+          <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Icon icon="solar:chart-square-bold" className="text-sm" />
+                <span>Live Reach POS Circuit Tracking</span>
+              </span>
+              <span className="text-[10px] text-text-muted bg-surface px-2 py-0.5 rounded border border-border">
+                25 Nationwide Branches
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center pt-1">
+              <div className="p-2 rounded-lg bg-surface/80 border border-border/50">
+                <span className="text-[10px] text-text-muted block">Circuit Tickets</span>
+                <span className="text-base font-bold text-text-primary">
+                  {Number(reachMetrics.cumulative_reach_tickets).toLocaleString()}
+                </span>
+              </div>
+              <div className="p-2 rounded-lg bg-surface/80 border border-border/50">
+                <span className="text-[10px] text-text-muted block">Circuit Revenue</span>
+                <span className="text-base font-bold text-amber-400">
+                  {formatNaira(reachMetrics.cumulative_reach_revenue)}
+                </span>
+              </div>
+              <div className="p-2 rounded-lg bg-surface/80 border border-border/50">
+                <span className="text-[10px] text-text-muted block">Hall Occupancy</span>
+                <span className="text-base font-bold text-emerald-400">
+                  {reachMetrics.latest_occupancy ? `${reachMetrics.latest_occupancy}%` : '—'}
+                </span>
+              </div>
+            </div>
+
+            {reachMetrics.daily_history && reachMetrics.daily_history.length > 0 && (
+              <div className="pt-2 border-t border-amber-500/10">
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">
+                  Recent Daily Admissions (Reach Branches)
+                </span>
+                <div className="space-y-1">
+                  {reachMetrics.daily_history.slice(-3).reverse().map((dh, i) => (
+                    <div key={i} className="flex items-center justify-between text-[11px] text-text-secondary py-0.5">
+                      <span className="font-mono text-text-muted">{dh.date}</span>
+                      <span className="font-semibold text-text-primary">{dh.ticketsSold} tickets ({formatNaira(dh.estimatedRevenue)})</span>
+                      <span className="text-emerald-400 text-[10px]">{dh.occupancyRate}% full</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Weekly Progression History if available */}
         {weeklyHistory && weeklyHistory.length > 0 && (
