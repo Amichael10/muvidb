@@ -45,27 +45,40 @@ export interface CriticChannelRow {
 interface CriticCandidateRow {
   id: string;
   video_id: string;
+  video_url: string | null;
+  source_platform: CriticSourcePlatform;
+  critic_id: string | null;
+  critic_channel_id: string | null;
   film_id: string | null;
   quote: string | null;
   excerpt_context: string | null;
   rating: number | null;
   quote_start_seconds: number | null;
   critic_review_id: string | null;
-  critic_channel_id: string | null;
 }
 
-interface CriticChannelAttribution {
+/** The canonical critic record an approved review is attributed to. */
+interface CriticAttribution {
+  id: string;
   name?: string | null;
-  social_handle?: string | null;
+  title?: string | null;
   publication?: string | null;
   avatar_url?: string | null;
+  handle?: string | null;
 }
+
+export type CriticSourcePlatform = 'youtube' | 'instagram' | 'tiktok' | 'other';
 
 export interface CriticVideoCandidateInput {
   videoId: string;
   criticChannelId?: string | null;
+  /** Attribution for a hand-submitted review with no channel behind it. */
+  criticId?: string | null;
   title: string;
   publishedAt?: string | null;
+  sourcePlatform?: CriticSourcePlatform;
+  /** Overrides the derived URL, for a platform that is not YouTube. */
+  videoUrl?: string | null;
 }
 
 /** Boilerplate that surrounds the film title in a review video's title. */
@@ -159,13 +172,17 @@ export async function enqueueCriticVideoCandidate(input: CriticVideoCandidateInp
   // assigned it by hand, and that beats a title guess.
   const filmId = existing?.film_id || (await matchFilmForVideoTitle(input.title));
 
+  const platform: CriticSourcePlatform = input.sourcePlatform || 'youtube';
   const payload = {
     video_id: input.videoId,
     critic_channel_id: input.criticChannelId || null,
+    critic_id: input.criticId || null,
+    source_platform: platform,
     film_id: filmId,
     video_title: input.title,
     video_published_at: input.publishedAt || null,
-    video_url: `https://www.youtube.com/watch?v=${input.videoId}`,
+    video_url: input.videoUrl
+      || (platform === 'youtube' ? `https://www.youtube.com/watch?v=${input.videoId}` : null),
     updated_at: new Date().toISOString(),
   };
 
@@ -370,10 +387,54 @@ export async function applyCriticVideoTranscript(
   return { status: 'pending_review' as const, quote: extracted.excerpt, rating, quoteStartSeconds };
 }
 
-/** Deep link to the moment the quote is spoken, so a reader can verify it. */
-export function criticVideoReviewUrl(videoId: string, startSeconds: number | null): string {
+/**
+ * Deep link to the moment the quote is spoken, so a reader can verify it.
+ *
+ * Only YouTube takes a start offset. An Instagram or TikTok review links to
+ * the post, which means its quote cannot be click-verified — the admin queue
+ * says so rather than implying a precision that is not there.
+ */
+export function criticVideoReviewUrl(
+  videoId: string,
+  startSeconds: number | null,
+  platform: CriticSourcePlatform = 'youtube',
+  videoUrl?: string | null,
+): string {
+  if (platform !== 'youtube') return videoUrl || '';
   const base = `https://www.youtube.com/watch?v=${videoId}`;
   return startSeconds && startSeconds > 0 ? `${base}&t=${Math.floor(startSeconds)}` : base;
+}
+
+export function supportsQuoteDeepLink(platform: CriticSourcePlatform): boolean {
+  return platform === 'youtube';
+}
+
+/**
+ * Identify a pasted review URL. The id is what the candidate is keyed on, so
+ * it has to be stable per post: a YouTube video id, or an Instagram shortcode.
+ */
+export function identifyCriticVideoUrl(
+  rawUrl: string,
+): { platform: CriticSourcePlatform; videoId: string; url: string } | null {
+  const url = String(rawUrl || '').trim();
+  if (!url) return null;
+
+  const youtube = url.match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/,
+  );
+  if (youtube) {
+    return { platform: 'youtube', videoId: youtube[1], url: `https://www.youtube.com/watch?v=${youtube[1]}` };
+  }
+
+  const instagram = url.match(/instagram\.com\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);
+  if (instagram) {
+    return { platform: 'instagram', videoId: `ig_${instagram[1]}`, url: `https://www.instagram.com/reel/${instagram[1]}/` };
+  }
+
+  const tiktok = url.match(/tiktok\.com\/[^/]+\/video\/(\d+)/);
+  if (tiktok) return { platform: 'tiktok', videoId: `tt_${tiktok[1]}`, url };
+
+  return null;
 }
 
 /**
@@ -383,42 +444,67 @@ export function criticVideoReviewUrl(videoId: string, startSeconds: number | nul
  * updates one row rather than adding a second review for the same video.
  */
 export async function approveCriticVideoCandidate(candidateId: string) {
-  // Read the channel separately rather than as an embedded select: these
-  // tables are not in the generated Supabase types yet, and a join widens the
-  // inferred row type to an error shape.
+  // Read the channel and critic separately rather than as embedded selects:
+  // these tables are not in the generated Supabase types yet, and a join
+  // widens the inferred row type to an error shape.
   const { data: row, error: readError } = await supabase
     .from('critic_review_candidates')
-    .select('id,video_id,film_id,quote,excerpt_context,rating,quote_start_seconds,critic_review_id,critic_channel_id')
+    .select('id,video_id,video_url,source_platform,film_id,quote,excerpt_context,rating,'
+      + 'quote_start_seconds,critic_review_id,critic_id,critic_channel_id')
     .eq('id', candidateId)
     .maybeSingle();
   if (readError) throw new Error(`Cannot read critic video candidate: ${readError.message}`);
   if (!row) throw new Error(`No critic video candidate ${candidateId}`);
-  const candidate = row as CriticCandidateRow;
+  const candidate = row as unknown as CriticCandidateRow;
   if (!candidate.film_id) throw new Error('Assign a film before approving this review');
   if (!candidate.quote) throw new Error('This candidate has no extracted quote to publish');
 
-  let channel: CriticChannelAttribution = {};
-  if (candidate.critic_channel_id) {
-    const { data: channelRow, error: channelError } = await supabase
+  // A hand-set critic wins over the channel's, so a guest review on someone
+  // else's channel is attributed to whoever actually said it.
+  let criticId = candidate.critic_id;
+  if (!criticId && candidate.critic_channel_id) {
+    const { data: channel, error: channelError } = await supabase
       .from('critic_channels')
-      .select('name,social_handle,publication,avatar_url')
+      .select('critic_id')
       .eq('id', candidate.critic_channel_id)
       .maybeSingle();
     if (channelError) throw new Error(`Cannot read critic channel: ${channelError.message}`);
-    if (channelRow) channel = channelRow as CriticChannelAttribution;
+    criticId = (channel as unknown as { critic_id?: string | null } | null)?.critic_id || null;
   }
+  if (!criticId) throw new Error('Attribute this review to a critic before approving it');
+
+  const { data: criticRow, error: criticError } = await supabase
+    .from('critics')
+    .select('id,name,title,publication,avatar_url,handle')
+    .eq('id', criticId)
+    .maybeSingle();
+  if (criticError) throw new Error(`Cannot read critic: ${criticError.message}`);
+  if (!criticRow) throw new Error(`Critic ${criticId} no longer exists`);
+  const critic = criticRow as unknown as CriticAttribution;
+
+  const platform = candidate.source_platform || 'youtube';
+  const reviewUrl = criticVideoReviewUrl(
+    candidate.video_id,
+    candidate.quote_start_seconds,
+    platform,
+    candidate.video_url,
+  );
+
   const review = {
     film_id: candidate.film_id,
-    critic_name: channel.name || 'Film critic',
-    critic_title: channel.publication || null,
-    publication: channel.publication || null,
-    social_handle: channel.social_handle || null,
-    avatar_url: channel.avatar_url || null,
+    // Attribution comes from the canonical critics row, so an approved video
+    // review also appears on that critic's own /critics/:slug page.
+    critic_id: critic.id,
+    critic_name: critic.name || 'Film critic',
+    critic_title: critic.title || null,
+    publication: critic.publication || null,
+    social_handle: critic.handle || null,
+    avatar_url: critic.avatar_url || null,
     quote: candidate.quote,
     excerpt_context: candidate.excerpt_context,
     rating: candidate.rating,
     review_type: 'video',
-    review_url: criticVideoReviewUrl(candidate.video_id, candidate.quote_start_seconds),
+    review_url: reviewUrl,
     updated_at: new Date().toISOString(),
   };
 
@@ -447,7 +533,7 @@ export async function approveCriticVideoCandidate(candidateId: string) {
     .eq('id', candidateId);
   if (markError) throw new Error(`Cannot mark candidate approved: ${markError.message}`);
 
-  return { criticReviewId: reviewId, reviewUrl: review.review_url };
+  return { criticReviewId: reviewId, reviewUrl };
 }
 
 export async function rejectCriticVideoCandidate(candidateId: string, reason?: string) {

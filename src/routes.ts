@@ -114,6 +114,7 @@ export default [
       route('countries', 'pages/admin/AdminCountries.jsx'),
       route('critics', 'pages/admin/AdminCritics.jsx'),
       route('film-critics', 'pages/admin/AdminCritics.jsx', { id: 'admin-critics-alias' }),
+      route('critic-videos', 'pages/admin/AdminCriticVideos.jsx'),
       route('plays', 'pages/admin/AdminPlays.jsx'),
       route('theatre-plays', 'pages/admin/AdminPlays.jsx', { id: 'admin-plays-alias' }),
 

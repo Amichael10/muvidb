@@ -4,6 +4,8 @@ import { supabase } from './supabase.js';
 import {
   applyCriticVideoTranscript,
   approveCriticVideoCandidate,
+  enqueueCriticVideoCandidate,
+  identifyCriticVideoUrl,
   listCriticVideosAwaitingTranscript,
   pollCriticChannels,
   rejectCriticVideoCandidate,
@@ -73,7 +75,8 @@ export async function handleCriticVideos(req: VercelRequest, res: VercelResponse
       const { data, error } = await supabase
         .from('critic_review_candidates')
         .select('id,video_id,video_url,video_title,film_id,status,quote,excerpt_context,rating,'
-          + 'quote_start_seconds,transcript_source,last_error,video_published_at,created_at')
+          + 'quote_start_seconds,transcript_source,last_error,video_published_at,created_at,'
+          + 'source_platform,critic_id,critic_channel_id')
         .eq('status', status)
         .order('video_published_at', { ascending: false, nullsFirst: false })
         .limit(limit);
@@ -93,6 +96,41 @@ export async function handleCriticVideos(req: VercelRequest, res: VercelResponse
       const id = String(payload.id || payload.candidate_id || '').trim();
       if (!id) return res.status(400).json({ error: 'id is required' });
       return res.status(200).json(await rejectCriticVideoCandidate(id, String(payload.reason || '') || undefined));
+    }
+
+    if (action === 'submit') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST to submit a review' });
+      const identified = identifyCriticVideoUrl(String(payload.url || ''));
+      if (!identified) {
+        return res.status(400).json({
+          error: 'Paste a YouTube, Instagram or TikTok video URL',
+        });
+      }
+      const title = String(payload.title || '').trim();
+      const outcome = await enqueueCriticVideoCandidate({
+        videoId: identified.videoId,
+        sourcePlatform: identified.platform,
+        videoUrl: identified.url,
+        criticId: String(payload.critic_id || '').trim() || null,
+        // Without a title there is nothing to match a film on; the operator
+        // assigns it from the queue instead.
+        title: title || identified.url,
+        publishedAt: null,
+      });
+      return res.status(200).json({ ...identified, outcome });
+    }
+
+    if (action === 'attribute') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST to attribute' });
+      const id = String(payload.id || payload.candidate_id || '').trim();
+      const criticId = String(payload.critic_id || '').trim();
+      if (!id || !criticId) return res.status(400).json({ error: 'id and critic_id are required' });
+      const { error } = await supabase
+        .from('critic_review_candidates')
+        .update({ critic_id: criticId, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+      return res.status(200).json({ ok: true, id, critic_id: criticId });
     }
 
     // Assigning the film by hand, for a review whose title did not match.
@@ -118,7 +156,8 @@ export async function handleCriticVideos(req: VercelRequest, res: VercelResponse
 
     return res.status(400).json({
       error: 'Unknown action',
-      actions: ['pending', 'transcript', 'review-queue', 'approve', 'reject', 'assign-film', 'poll'],
+      actions: ['pending', 'transcript', 'review-queue', 'submit', 'attribute', 'approve', 'reject',
+        'assign-film', 'poll'],
     });
   } catch (error: any) {
     console.error('[critic-videos]', action, error?.message || error);

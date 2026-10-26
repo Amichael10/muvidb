@@ -20,7 +20,9 @@ import {
   criticVideoReviewUrl,
   criticVideoTitleCandidates,
   enqueueCriticVideoCandidate,
+  identifyCriticVideoUrl,
   normalizeSpokenRatings,
+  supportsQuoteDeepLink,
 } from './critic_video_candidates';
 
 /** A chainable Supabase query stub that resolves to {data, error}. */
@@ -99,6 +101,40 @@ describe('the deep link back to the quote', () => {
     expect(criticVideoReviewUrl('abc123', null)).toBe('https://www.youtube.com/watch?v=abc123');
     expect(criticVideoReviewUrl('abc123', 0)).toBe('https://www.youtube.com/watch?v=abc123');
   });
+
+  it('does not fake a timestamp on a platform that has none', () => {
+    // Only YouTube takes a start offset. Appending one to an Instagram URL
+    // would imply a precision the link does not have.
+    const igUrl = 'https://www.instagram.com/reel/Cabc123/';
+    expect(criticVideoReviewUrl('ig_Cabc123', 252, 'instagram', igUrl)).toBe(igUrl);
+    expect(supportsQuoteDeepLink('instagram')).toBe(false);
+    expect(supportsQuoteDeepLink('youtube')).toBe(true);
+  });
+});
+
+describe('identifying a pasted review URL', () => {
+  // Not every critic is on YouTube, so a review has to be submittable by hand.
+  it.each([
+    ['https://www.youtube.com/watch?v=Lkfdroqco28', 'youtube', 'Lkfdroqco28'],
+    ['https://youtu.be/Lkfdroqco28?t=90', 'youtube', 'Lkfdroqco28'],
+    ['https://www.youtube.com/shorts/Lkfdroqco28', 'youtube', 'Lkfdroqco28'],
+    ['https://www.instagram.com/reel/Cabc123XY/', 'instagram', 'ig_Cabc123XY'],
+    ['https://instagram.com/p/Cabc123XY', 'instagram', 'ig_Cabc123XY'],
+    ['https://www.tiktok.com/@critic/video/7312345678901234567', 'tiktok', 'tt_7312345678901234567'],
+  ])('reads %s', (url, platform, videoId) => {
+    expect(identifyCriticVideoUrl(url)).toMatchObject({ platform, videoId });
+  });
+
+  it('keys a YouTube video on its id however the link was written', () => {
+    // The same review pasted twice must not queue two candidates.
+    expect(identifyCriticVideoUrl('https://youtu.be/Lkfdroqco28')?.videoId)
+      .toBe(identifyCriticVideoUrl('https://www.youtube.com/watch?v=Lkfdroqco28&list=PL1')?.videoId);
+  });
+
+  it('rejects anything that is not a recognised video post', () => {
+    expect(identifyCriticVideoUrl('https://example.com/a-written-review')).toBeNull();
+    expect(identifyCriticVideoUrl('')).toBeNull();
+  });
 });
 
 describe('queuing a discovered review', () => {
@@ -121,6 +157,23 @@ describe('queuing a discovered review', () => {
       film_id: 'film-1',
       status: 'pending_transcript',
       video_url: 'https://www.youtube.com/watch?v=vid-1',
+    }));
+  });
+
+  it('records the platform and URL of a hand-submitted Instagram review', async () => {
+    const candidates = query(null);
+    tables({ critic_review_candidates: candidates, films: query([]) });
+    await enqueueCriticVideoCandidate({
+      videoId: 'ig_Cabc123XY',
+      sourcePlatform: 'instagram',
+      videoUrl: 'https://www.instagram.com/reel/Cabc123XY/',
+      criticId: 'critic-1',
+      title: 'GINGERRR review',
+    });
+    expect(candidates.insert).toHaveBeenCalledWith(expect.objectContaining({
+      source_platform: 'instagram',
+      video_url: 'https://www.instagram.com/reel/Cabc123XY/',
+      critic_id: 'critic-1',
     }));
   });
 
