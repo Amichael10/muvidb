@@ -233,12 +233,13 @@ async function syncKava() {
 
         if (m.genres && m.genres.length > 0) {
            for (const gName of m.genres) {
-              if (!gName) continue;
+              const cleanG = (gName || '').trim();
+              if (!cleanG || cleanG.length < 3 || cleanG.length > 25 || cleanG.includes('\n') || cleanG.toLowerCase().includes('cast')) continue;
               let genreId;
-              const { data: g } = await supabase.from('genres').select('id').ilike('name', gName).maybeSingle();
+              const { data: g } = await supabase.from('genres').select('id').ilike('name', cleanG).maybeSingle();
               if (g) genreId = g.id;
               else {
-                 const { data: newG } = await supabase.from('genres').insert({ name: gName }).select('id').single();
+                 const { data: newG } = await supabase.from('genres').insert({ name: cleanG }).select('id').single();
                  genreId = newG?.id;
               }
               if (genreId) {
