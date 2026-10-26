@@ -356,27 +356,43 @@ function formatShortNumber(n: number): string {
   return String(n);
 }
 
-function audiencePulseBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlatform): string[] {
+function audiencePulseBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlatform = 'instagram'): string[] {
   const lines: string[] = [];
   const yearSuffix = snapshot.year ? ` (${snapshot.year})` : '';
   const liked = snapshot.likedPercent ? `${Math.round(snapshot.likedPercent)}%` : null;
   const comments = (snapshot.audienceComments || []).slice(0, 3);
+  const cast = (snapshot.topCast || []).slice(0, 3);
 
-  // 1. Viral Verdict Header
-  lines.push(`🔥 Real Viewer Verdict: ${snapshot.title}${yearSuffix} 🎬`);
+  // 1. Header Hook
+  lines.push(`🍿 AUDIENCE PULSE | ${snapshot.title.toUpperCase()}${yearSuffix}`);
 
-  // 2. Verified Pulse Metric with views
-  const viewStr = snapshot.viewCount && snapshot.viewCount > 1000
-    ? formatShortNumber(snapshot.viewCount) + ' views'
-    : null;
-  if (liked && viewStr) {
-    lines.push(`📊 ${liked} of audience members loved this film with over ${viewStr} on YouTube.`);
-  } else if (liked) {
-    lines.push(`📊 ${liked} of audience members loved this film, based on real comments from viewers.`);
+  // 2. Views / Viral Momentum
+  if (snapshot.viewCount && snapshot.viewCount >= 1000) {
+    const viewCountFormatted = formatShortNumber(snapshot.viewCount).toUpperCase();
+    lines.push(`Over ${viewCountFormatted} views and counting! 🔥🎬`);
+  } else {
+    lines.push(`The audience verdict is in, and Nollywood fans are tuned in! 🔥🎬`);
   }
 
-  // 3. Featured Real Audience Quotes
-  if (comments.length > 0) {
+  // 3. Creator / Lead Actor anchor
+  const channelName = snapshot.youtubeChannelName?.replace(/\s*(?:tv|movies|channel)$/i, '').trim();
+  const leadActor = cast[0]?.name;
+  const anchorName = channelName || leadActor;
+  if (anchorName) {
+    lines.push(`${anchorName} is back with *${snapshot.title}*, and the love from viewers is pouring in! ❤️`);
+  }
+
+  // 4. Cast Performance Highlights
+  if (cast.length >= 2) {
+    const actor1 = cast[0].name;
+    const actor2 = cast[1].name;
+    const actor3 = cast[2]?.name;
+    if (actor3) {
+      lines.push(`From ${actor1}'s performance to ${actor2} and ${actor3}'s charm, the cast is giving audiences plenty to talk about.`);
+    } else {
+      lines.push(`From ${actor1}'s standout delivery to ${actor2}'s performance, the cast is giving audiences plenty to talk about.`);
+    }
+  } else if (comments.length > 0) {
     const quotes = comments
       .filter(c => c.body && c.body.length >= 10)
       .slice(0, 2)
@@ -387,13 +403,24 @@ function audiencePulseBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlat
     }
   }
 
-  // 4. Where to stream
-  if (snapshot.watchAvailability) {
-    lines.push(snapshot.watchAvailability.startsWith('Where to Watch') ? snapshot.watchAvailability : `🍿 ${snapshot.watchAvailability}`);
+  // 5. Verified Metric Callout
+  if (liked) {
+    lines.push(`📊 **${liked} liked the film**, according to MuviDB's analysis of YouTube viewer comments.`);
+    lines.push(`And judging by the reactions, the cast deserves their flowers! 💐👏`);
   }
 
-  // 5. Provocative Debate CTA
-  lines.push(`Have you watched ${snapshot.title} yet? Does this verdict match your take, or did the audience get it completely wrong? Sound off below! 👇`);
+  // 6. Availability Callout
+  if (snapshot.youtubeChannelName) {
+    lines.push(`📺 Now showing on ${snapshot.youtubeChannelName} on YouTube.`);
+  } else if (snapshot.watchAvailability) {
+    lines.push(snapshot.watchAvailability.startsWith('Where to Watch') ? snapshot.watchAvailability : `📺 ${snapshot.watchAvailability}`);
+  }
+
+  // 7. Interactive Conversation Trigger
+  lines.push(`🍿 Have you seen *${snapshot.title}* yet? Do you agree with what viewers are saying? Who stole the show for you?\n\n👇 Let's hear your thoughts!`);
+
+  // 8. Discovery Footer
+  lines.push(`🔗 Discover more African films on **muvidb.com**`);
 
   return lines;
 }

@@ -82,6 +82,37 @@ async function handleScheduledEvent(event: ScheduledEvent, env: Env) {
 
   // Routine check (every 10 minutes): check if any post is due in Supabase
   await checkAndDispatchPublishJobs(env, false);
+
+  // 30-minute Pre-Post Verification Rule:
+  // Check if any scheduled post is due for preflight (poster, cast, crew, synopsis, rating)
+  await checkAndDispatchPreflight(env);
+}
+
+/**
+ * Checks for upcoming slots that need 30-minute preflight verification.
+ */
+async function checkAndDispatchPreflight(env: Env) {
+  const now = new Date();
+  const todayLagos = new Date(now.getTime() + 60 * 60_000).toISOString().slice(0, 10);
+
+  const queryUrl = `${env.SUPABASE_URL}/rest/v1/social_calendar?select=id,scheduled_time&scheduled_date=eq.${todayLagos}&status=in.(planned,subject_selected,draft_ready,approved)&preflight_checked_at=is.null&limit=5`;
+
+  try {
+    const res = await fetch(queryUrl, {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    });
+    if (!res.ok) return;
+    const slots: any[] = await res.json();
+    if (slots.length > 0) {
+      console.log(`[cron-worker] Found ${slots.length} slot(s) needing preflight. Dispatching social_preflight...`);
+      await dispatchTask(env, 'social_preflight');
+    }
+  } catch (err: any) {
+    console.error('[cron-worker] Preflight check error:', err?.message || err);
+  }
 }
 
 /**
