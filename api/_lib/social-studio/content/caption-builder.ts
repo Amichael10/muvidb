@@ -378,6 +378,24 @@ function audiencePulseBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlat
   const channelName = snapshot.youtubeChannelName?.replace(/\s*(?:tv|movies|channel)$/i, '').trim();
   const leadActor = cast[0]?.name;
   const anchorName = channelName || leadActor;
+
+  if (platform === 'threads') {
+    const threadLines: string[] = [];
+    threadLines.push(`🍿 AUDIENCE PULSE | ${snapshot.title.toUpperCase()}${yearSuffix}`);
+    if (snapshot.viewCount && snapshot.viewCount >= 1000) {
+      const viewCountFormatted = formatShortNumber(snapshot.viewCount).toUpperCase();
+      threadLines.push(`Over ${viewCountFormatted} views and counting! 🔥🎬`);
+    }
+    if (anchorName) {
+      threadLines.push(`${anchorName} is back with *${snapshot.title}*, and the love from viewers is pouring in! ❤️`);
+    }
+    if (liked) {
+      threadLines.push(`📊 ${liked} liked the film, according to MuviDB's analysis of YouTube viewer comments.`);
+    }
+    threadLines.push(`🍿 Have you seen *${snapshot.title}* yet? Who stole the show for you? 👇`);
+    return threadLines;
+  }
+
   if (anchorName) {
     lines.push(`${anchorName} is back with *${snapshot.title}*, and the love from viewers is pouring in! ❤️`);
   }

@@ -128,9 +128,6 @@ export async function runSocialPreflight(options: { now?: Date; targetMinutes?: 
     if (updateError) throw updateError;
     results.push({ slotId: slot.id, ...result });
   }
-    if (updateError) throw updateError;
-    results.push({ slotId: slot.id, ...result });
-  }
 
   return { checked: results.length, ready: results.filter(result => result.ready).length, blocked: results.filter(result => !result.ready).length, results };
 }
