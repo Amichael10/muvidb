@@ -37,6 +37,7 @@ const PLATFORM_STYLES = {
   iroko:       { label: 'iROKO',    bg: 'bg-green-500/20',  text: 'text-green-400',  dot: 'bg-green-400'  },
   kava:        { label: 'Kava',     bg: 'bg-pink-500/20',   text: 'text-pink-400',   dot: 'bg-pink-500'   },
   docuth:      { label: 'Docuth',   bg: 'bg-zinc-800/40',   text: 'text-zinc-200',   dot: 'bg-zinc-400'   },
+  filmporte:   { label: 'Filmporte', bg: 'bg-zinc-800/40',  text: 'text-zinc-200',   dot: 'bg-zinc-400'   },
 }
 
 function PlatformBadge({ releaseType, film }) {

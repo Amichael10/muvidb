@@ -34,7 +34,7 @@ async function inspectArtwork(url: string | null): Promise<ArtworkInspection> {
 export async function preflightFilm(filmId: string) {
   const { data: film, error } = await supabase
     .from('films')
-    .select('id,title,poster_url,backdrop_url,synopsis,updated_at,credits(role,people(id,name))')
+    .select('id,title,poster_url,backdrop_url,synopsis,liked_percent,updated_at,credits(role,people(id,name))')
     .eq('id', filmId)
     .maybeSingle();
   if (error) throw error;
@@ -50,6 +50,7 @@ export async function preflightFilm(filmId: string) {
       castCount: 0,
       crewCount: 0,
       directorCount: 0,
+      rating: null,
       reasons: ['film_not_found_or_merged'],
     };
   }
@@ -65,7 +66,8 @@ export async function preflightFilm(filmId: string) {
   if (!film.poster_url) reasons.push('missing_poster');
   else if (artwork.orientation === 'unknown') reasons.push('unreadable_poster');
   if (castCount < 1) reasons.push('missing_cast');
-  if (crewCount < 1 || directorCount < 1) reasons.push('missing_director_or_crew');
+  if (crewCount < 1 && directorCount < 1) reasons.push('missing_director_or_crew');
+  if (film.liked_percent === null || film.liked_percent === undefined) reasons.push('missing_rating');
 
   return {
     ready: reasons.length === 0,
@@ -78,6 +80,7 @@ export async function preflightFilm(filmId: string) {
     castCount,
     crewCount,
     directorCount,
+    rating: film.liked_percent,
     reasons,
   };
 }
@@ -88,8 +91,8 @@ function scheduledInstant(date: string, time: string): number {
 
 export async function runSocialPreflight(options: { now?: Date; targetMinutes?: number; toleranceMinutes?: number } = {}) {
   const now = options.now || new Date();
-  const targetMinutes = options.targetMinutes ?? 20;
-  const toleranceMinutes = options.toleranceMinutes ?? 4;
+  const targetMinutes = options.targetMinutes ?? 30;
+  const toleranceMinutes = options.toleranceMinutes ?? 10;
   const minMs = (targetMinutes - toleranceMinutes) * 60_000;
   const maxMs = (targetMinutes + toleranceMinutes) * 60_000;
   const todayLagos = new Date(now.getTime() + 60 * 60_000).toISOString().slice(0, 10);
@@ -119,8 +122,8 @@ export async function runSocialPreflight(options: { now?: Date; targetMinutes?: 
       preflight_json: result,
       status: result.ready ? slot.status : 'skipped',
       notes: result.ready
-        ? `${result.artwork.orientation === 'landscape' ? '20-minute preflight passed with landscape artwork; published using the current crop.' : '20-minute preflight passed using current film metadata.'}`
-        : `20-minute preflight blocked publication: ${result.reasons.join(', ')}.`,
+        ? `${result.artwork.orientation === 'landscape' ? '30-minute preflight passed with landscape artwork; published using current crop.' : '30-minute preflight passed: poster, cast, crew, rating and synopsis verified.'}`
+        : `30-minute preflight blocked publication: ${result.reasons.join(', ')}.`,
     }).eq('id', slot.id);
     if (updateError) throw updateError;
     results.push({ slotId: slot.id, ...result });

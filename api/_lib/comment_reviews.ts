@@ -134,9 +134,18 @@ ALSO REJECT engagement bait — comments written to farm replies or likes rather
   "if you like X gather here", "X fans gather here", "like my comment", "drop a like", "first to comment", "who else is watching in 2026", "I came from TikTok", "mark your presence", "count me in", "I'm here for <actor>".
 But KEEP a comment that carries a real opinion even when it also carries bait: "I came from Facebook, this was a great touching movie" says something about the film and counts; "Arinja fan gather here 😂" says nothing and does not. Decide by whether anything is actually said about the film once the bait is ignored.
 
+CRITICAL PIDGIN & CULTURAL IDIOMS (Do NOT interpret Nigerian slang literally!):
+- Expressions like "no get sense / no get joy / crase / mad / scatter / finish work / kill role / fire / tear / e shock me / tear my brain" are expressions of humor, astonishment, and DEEP PRAISE, NOT insults!
+  - "X no just get sense 😂😂😂" = "X was so funny / crazy hilarious!" -> Score: 8-9 (NOT a 3!).
+  - "X killed/finished this role" = "Masterful performance!" -> Score: 8-10.
+  - "He scatter everywhere / fire" = "Brilliant acting / energetic" -> Score: 8-10.
+  - "This film wan wound me with laugh" = "Hilarious comedy" -> Score: 8-10.
+  - "Wahala / God abeg" with laugh emojis = "Hysterically funny or shocking drama" -> Score: 7-9.
+- Only score 1-4 if the viewer is expressing GENUINE negative criticism: "waste of my data", "boring story", "acting was stiff/dry", "poor audio", "I couldn't finish it", "terrible ending".
+
 For each kept comment, score 1-10 = how positively that viewer truly regards the film. Be strict and use the WHOLE range — most films are ordinary:
   9-10 = genuinely exceptional, specific, strong praise
-  7-8  = clearly liked it
+  7-8  = clearly liked it / laughed / enjoyed the acting
   5-6  = mixed / lukewarm / "it was okay" — THIS IS THE DEFAULT for generic positivity like "nice movie", "wow", "🔥"
   3-4  = disappointed / notable criticism
   1-2  = disliked / hated it

@@ -1,20 +1,12 @@
 name: Social Publisher & Daily Planning
 
 on:
-  schedule:
-    # Drain the publish queue every 15 minutes, offset from the heavily
-    # congested top/quarter-hour boundary used by many GitHub cron workflows.
-    #
-    # This deliberately replaces the old five fixed publish slots. The editorial
-    # rule is three posts a day PLUS one mandatory post per new release, added on
-    # top — so a day can legitimately need six or more posts. Fixed slots capped
-    # the day at five and silently dropped the rest. A frequent drainer publishes
-    # whatever `social_calendar` says is due, however many that is.
-    - cron: '7,22,37,52 * * * *'
-    # 00:00 WAT (23:00 UTC) — roll the 30-day plan forward.
-    - cron: '0 23 * * *'
-    # 07:00 WAT (06:00 UTC) — morning briefing to Telegram.
-    - cron: '0 6 * * *'
+  # Cron triggers moved to Cloudflare Worker (muvidb-cron-worker) to eliminate
+  # GitHub Actions queue delays and stop burning Vercel 4-hour compute limits.
+  # schedule:
+  #   - cron: '7,22,37,52 * * * *'
+  #   - cron: '0 23 * * *'
+  #   - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       task:

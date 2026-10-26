@@ -186,6 +186,7 @@ export default function FilmCard({
       ebonylife: { icon: 'solar:play-circle-bold', color: 'text-[#F8A008]', label: 'Watch on EbonyLife' },
       circuits: { icon: 'solar:clapperboard-play-bold', color: 'text-[#F0532B]', label: 'Watch on Circuits' },
       homitv: { icon: 'solar:tv-bold', color: 'text-[#6D1DDC]', label: 'Watch on HomiTV' },
+      filmporte: { icon: 'solar:play-circle-bold', color: 'text-zinc-200', label: 'Watch on Filmporte' },
     };
     
     Object.keys(platformMap).forEach(key => {
@@ -201,13 +202,16 @@ export default function FilmCard({
 
   const activePlatforms = getPlatforms();
   const runtimeLabel = formatRuntimeHours(film.runtime_minutes || film.runtime);
+  const isShortFilm = film.content_type === 'short_film' || film.content_type === 'short film' || film.content_type === 'short';
   const durationLabel = (film.content_type === 'series' || film.is_series_group)
     ? (film.episodes_count > 1
       ? `${film.episodes_count} videos`
       : (film.season_count
         ? (film.season_count === 1 ? '1 Season' : `${film.season_count} Seasons`)
         : 'TV Series'))
-    : (runtimeLabel || '2h 5m');
+    : isShortFilm
+      ? (runtimeLabel ? `Short • ${runtimeLabel}` : 'Short Film')
+      : (runtimeLabel || '2h 5m');
   const youtubeRuntimeLabel = (film.content_type === 'series' || film.is_series_group) ? durationLabel : runtimeLabel;
   const ratingStar = getLetterboxdRating(film);
   const primaryCountry = (Array.isArray(film.countries) ? film.countries[0] : null) || film.country || null;
@@ -319,11 +323,15 @@ export default function FilmCard({
               {/* Left pill (Series / Cinema / Country flag) */}
               <div className="flex items-center gap-1">
                 {flag && <span className="text-xs">{flag}</span>}
-                {(film.content_type === 'series' || film.is_series_group) && (
+                {(film.content_type === 'series' || film.is_series_group) ? (
                   <span className="bg-brand text-white text-[8px] font-black uppercase px-1 py-0.5 rounded-[2px]">
                     TV
                   </span>
-                )}
+                ) : isShortFilm ? (
+                  <span className="bg-teal-500 text-white text-[8px] font-black uppercase px-1 py-0.5 rounded-[2px]">
+                    SHORT
+                  </span>
+                ) : null}
               </div>
 
               {/* Right Watchlist action button */}

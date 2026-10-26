@@ -24,7 +24,7 @@ export async function downloadSocialImage(url: string): Promise<Buffer> {
   const response = await fetch(target, {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
     redirect: 'follow',
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(15000),
   });
   if (!response.ok || !response.body) throw new Error(`Could not fetch poster (${response.status})`);
   const chunks: Uint8Array[] = [];

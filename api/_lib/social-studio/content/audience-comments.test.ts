@@ -66,4 +66,17 @@ describe('selectAudienceComments', () => {
     const many = Array.from({ length: 12 }, (_, i) => row(`A genuinely fine film number ${i}`, i));
     expect(selectAudienceComments(many).length).toBeLessThanOrEqual(5);
   });
+
+  it('rejects TikTok referrals, attendance calls, and non-review cheerleader noise', () => {
+    const mixed = [
+      row('If you are coming from TikTok oya let mart attendant ✅ Me this movie is 10000000', 50),
+      row('Action po bi Ogogo 💯💯💯💯💯💯💯 Baami Femi Omo Adebayo 🙌🙌🙌🙌🙌🙌🙌🙌🙌🙌🙌', 40),
+      row('Itele and kemity just Dey give us b2b ❤...', 30),
+      row('Who is watching from London gather here 👍', 20),
+      row('Can we give Onome her flowers. She executed her role so perfectly.', 15),
+    ];
+    const picked = selectAudienceComments(mixed);
+    expect(picked).toHaveLength(1);
+    expect(picked[0].body).toBe('Can we give Onome her flowers. She executed her role so perfectly.');
+  });
 });

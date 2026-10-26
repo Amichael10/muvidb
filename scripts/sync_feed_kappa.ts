@@ -90,11 +90,20 @@ async function scrapeKavaVideoPage(url: string) {
     let cast: string[] = [];
     let directors: string[] = [];
 
-    // Genre extraction from on-page tags
+    // Genre extraction from on-page tags with strict whitelist
     const bodyText = $('body').text();
-    const genreMatch = bodyText.match(/•\s*([A-Za-z,\s]+)(?:\n|DRAMA|COMEDY|ACTION|ROMANCE)/);
+    const VALID_GENRE_NAMES = new Set([
+      'action', 'adventure', 'animation', 'biography', 'comedy', 'crime', 'documentary',
+      'drama', 'family', 'fantasy', 'history', 'horror', 'music', 'mystery', 'romance',
+      'sci-fi', 'thriller', 'war', 'western', 'faith', 'epic', 'epics', 'melodrama', 'legal drama'
+    ]);
+    const genreMatch = bodyText.match(/•\s*([A-Za-z,\s/]+?)(?:\s*•|\s*\n|DRAMA|COMEDY|ACTION|ROMANCE)/i);
     if (genreMatch) {
-      genres = genreMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+      genres = genreMatch[1]
+        .split(/[,/]/)
+        .map(s => s.trim().toLowerCase())
+        .filter(s => s.length >= 3 && s.length <= 25 && !s.includes('\n') && !s.includes('cast') && VALID_GENRE_NAMES.has(s))
+        .map(s => s.charAt(0).toUpperCase() + s.slice(1));
     }
 
     const yearMatch = ogDesc.match(/\b(19\d\d|20\d\d)\b/);
@@ -346,13 +355,14 @@ async function syncFeedKappa() {
         // 3. Sync genres
         if (item.genres && item.genres.length > 0) {
           for (const gName of item.genres) {
-            if (!gName) continue;
+            const cleanG = gName.trim();
+            if (!cleanG || cleanG.length < 3 || cleanG.length > 25 || cleanG.includes('\n') || cleanG.toLowerCase().includes('cast')) continue;
             let genreId: string | null = null;
-            const { data: g } = await supabase.from('genres').select('id').ilike('name', gName).maybeSingle();
+            const { data: g } = await supabase.from('genres').select('id').ilike('name', cleanG).maybeSingle();
             if (g) {
               genreId = g.id;
             } else {
-              const { data: newG } = await supabase.from('genres').insert({ name: gName }).select('id').single();
+              const { data: newG } = await supabase.from('genres').insert({ name: cleanG }).select('id').single();
               genreId = newG?.id || null;
             }
             if (genreId) {

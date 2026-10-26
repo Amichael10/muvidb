@@ -70,18 +70,25 @@ jobs:
           CIRCUITS_EMAIL: ${{ secrets.CIRCUITS_EMAIL }}
           CIRCUITS_PASSWORD: ${{ secrets.CIRCUITS_PASSWORD }}
 
-      # Each platform runs independently: a broken Netflix scraper must not stop
-      # Prime, Feed Zeta or Circuits from syncing, which is what would happen
-      # with the default fail-fast behaviour. This final step still turns the
-      # run red so a dead scraper cannot sit unnoticed for weeks.
+      - name: Run Filmporte Sync
+        id: filmporte
+        continue-on-error: true
+        run: npm run sync:filmporte
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      # Each platform runs independently: a broken scraper must not stop others.
       - name: Report sync outcomes
         if: always()
         run: |
           failed=""
-          [ "${{ steps.netflix.outcome }}"  = "failure" ] && failed="$failed netflix"
-          [ "${{ steps.prime.outcome }}"    = "failure" ] && failed="$failed prime"
-          [ "${{ steps.feedzeta.outcome }}" = "failure" ] && failed="$failed feed-zeta"
-          [ "${{ steps.circuits.outcome }}" = "failure" ] && failed="$failed circuits"
+          [ "${{ steps.netflix.outcome }}"   = "failure" ] && failed="$failed netflix"
+          [ "${{ steps.prime.outcome }}"     = "failure" ] && failed="$failed prime"
+          [ "${{ steps.feedzeta.outcome }}"  = "failure" ] && failed="$failed feed-zeta"
+          [ "${{ steps.circuits.outcome }}"  = "failure" ] && failed="$failed circuits"
+          [ "${{ steps.filmporte.outcome }}" = "failure" ] && failed="$failed filmporte"
           if [ -n "$failed" ]; then
             echo "::error::Streaming syncs failed:$failed"
             exit 1

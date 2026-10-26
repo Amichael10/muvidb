@@ -1070,16 +1070,29 @@ async function processJob(job: any, lockedBy: string, now: Date) {
             retryable: false,
           });
         }
-        try {
-          await validatePosterUrlIsHighResPortrait(testUrl);
-        } catch (verr: any) {
-          if (verr instanceof SocialPlatformError) throw verr;
-          throw new SocialPlatformError({
-            platform: variant.platform,
-            code: 'landscape_poster_rejected',
-            message: `Social Studio publication blocked: artwork failed portrait rule (${verr?.message}). Only high-resolution portrait posters are allowed.`,
-            retryable: false,
-          });
+        let knownPortrait = false;
+        if (variant.selected_asset_id) {
+          const { data: assetRow } = await supabase
+            .from('social_assets')
+            .select('width, height, format')
+            .eq('id', variant.selected_asset_id)
+            .maybeSingle();
+          if (assetRow && assetRow.width && assetRow.height && assetRow.height > assetRow.width) {
+            knownPortrait = true;
+          }
+        }
+        if (!knownPortrait) {
+          try {
+            await validatePosterUrlIsHighResPortrait(testUrl);
+          } catch (verr: any) {
+            if (verr instanceof SocialPlatformError) throw verr;
+            throw new SocialPlatformError({
+              platform: variant.platform,
+              code: 'landscape_poster_rejected',
+              message: `Social Studio publication blocked: artwork failed portrait rule (${verr?.message}). Only high-resolution portrait posters are allowed.`,
+              retryable: false,
+            });
+          }
         }
       }
     }

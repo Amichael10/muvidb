@@ -444,6 +444,8 @@ export default function AdminFilms() {
       if (typeFilter !== 'all') {
         if (typeFilter === 'feature_film') {
           countQuery = countQuery.in('content_type', ['feature_film', 'feature film']);
+        } else if (typeFilter === 'short_film') {
+          countQuery = countQuery.in('content_type', ['short_film', 'short film', 'short']);
         } else if (typeFilter === 'mini_series') {
           countQuery = countQuery.in('content_type', ['mini_series', 'mini series']);
         } else if (typeFilter === 'series') {
@@ -484,6 +486,8 @@ export default function AdminFilms() {
       if (typeFilter !== 'all') {
         if (typeFilter === 'feature_film') {
           query = query.in('content_type', ['feature_film', 'feature film']);
+        } else if (typeFilter === 'short_film') {
+          query = query.in('content_type', ['short_film', 'short film', 'short']);
         } else if (typeFilter === 'mini_series') {
           query = query.in('content_type', ['mini_series', 'mini series']);
         } else if (typeFilter === 'series') {
@@ -829,7 +833,7 @@ export default function AdminFilms() {
       const baseForm = {
         ...initialFormState,
         ...film,
-        content_type: (film.content_type === 'feature film' ? 'feature_film' : film.content_type === 'mini series' ? 'mini_series' : film.content_type === 'serie' ? 'series' : film.content_type) || 'movie',
+        content_type: (film.content_type === 'feature film' ? 'feature_film' : film.content_type === 'mini series' ? 'mini_series' : film.content_type === 'serie' ? 'series' : (film.content_type === 'short film' || film.content_type === 'short') ? 'short_film' : film.content_type) || 'movie',
         genres: film.genres || [],
         runtime_minutes: film.runtime_minutes || '',
         is_featured: film.is_featured || false,
@@ -2166,6 +2170,7 @@ export default function AdminFilms() {
           >
             <option value="all">All Types</option>
             <option value="feature_film">Feature Films</option>
+            <option value="short_film">Short Films</option>
             <option value="movie">Movies</option>
             <option value="series">Series</option>
             <option value="mini_series">Mini-series</option>
@@ -2199,6 +2204,7 @@ export default function AdminFilms() {
             <option value="circuits">Circuits</option>
             <option value="nollistream">NolliStream</option>
             <option value="homitv">HomiTV</option>
+            <option value="filmporte">Filmporte</option>
           </select>
 
           <select
@@ -2215,6 +2221,7 @@ export default function AdminFilms() {
             <option value="irokotv">IrokoTV Sync</option>
             <option value="youtube">YouTube Sync</option>
             <option value="docuth_sync">Docuth Sync</option>
+            <option value="filmporte_sync">Filmporte Sync</option>
           </select>
           
           <select
@@ -2336,6 +2343,8 @@ export default function AdminFilms() {
                                 ? 'bg-purple-500/10 text-purple-600 border-purple-500/20'
                                 : film.content_type === 'feature_film' || film.content_type === 'feature film'
                                 ? 'bg-blue-500/10 text-blue-500 border-blue-500/20'
+                                : film.content_type === 'short_film' || film.content_type === 'short film' || film.content_type === 'short'
+                                ? 'bg-teal-500/10 text-teal-600 border-teal-500/20'
                                 : film.content_type === 'mini_series' || film.content_type === 'mini series'
                                 ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
                                 : film.content_type === 'documentary'
@@ -2477,7 +2486,12 @@ export default function AdminFilms() {
                             <Icon icon="solar:tv-bold" className="w-4 h-4" />
                           </a>
                         )}
-                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && !film.streaming_links?.nollistream && !film.streaming_links?.homitv && (
+                        {film.streaming_links?.filmporte && (
+                          <a href={film.streaming_links.filmporte} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800 text-zinc-200 hover:bg-black hover:text-white transition-all shadow-sm" title="Filmporte Link">
+                            <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
+                          </a>
+                        )}
+                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && !film.streaming_links?.nollistream && !film.streaming_links?.homitv && !film.streaming_links?.filmporte && (
                           <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter opacity-40">Offline</span>
                         )}
                       </div>
@@ -2850,6 +2864,7 @@ export default function AdminFilms() {
                         formData.content_type === 'feature film' ? 'feature_film' :
                         formData.content_type === 'mini series' ? 'mini_series' :
                         formData.content_type === 'serie' ? 'series' :
+                        (formData.content_type === 'short film' || formData.content_type === 'short') ? 'short_film' :
                         formData.content_type || 'movie'
                       } 
                       onChange={handleChange} 
@@ -2857,6 +2872,7 @@ export default function AdminFilms() {
                     >
                       <option value="movie">Movie</option>
                       <option value="feature_film">Feature Film</option>
+                      <option value="short_film">Short Film</option>
                       <option value="series">Series</option>
                       <option value="mini_series">Mini-series</option>
                       <option value="documentary">Documentary</option>
@@ -3373,7 +3389,7 @@ export default function AdminFilms() {
                 <div>
                   <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Available On Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits', 'nollistream', 'homitv'].map((type) => {
+                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits', 'nollistream', 'homitv', 'filmporte'].map((type) => {
                       const isActive = type === 'cinema' 
                         ? formData.release_type === 'cinema'
                         : (formData.streaming_links && type in formData.streaming_links) || formData.release_type === type;
@@ -3593,6 +3609,7 @@ export default function AdminFilms() {
                       { id: 'circuits', label: 'Circuits', placeholder: 'https://www.circuits.tv/...' },
                       { id: 'nollistream', label: 'NolliStream', placeholder: 'https://nollistream.net/movie/...' },
                       { id: 'homitv', label: 'HomiTV', placeholder: 'https://homitv.com/watch/...' },
+                      { id: 'filmporte', label: 'Filmporte', placeholder: 'https://films.filmporte.com/movies/...' },
                     ].map(platform => {
                       const isActive = (formData.streaming_links && platform.id in formData.streaming_links) || formData.release_type === platform.id;
                       if (!isActive) return null;

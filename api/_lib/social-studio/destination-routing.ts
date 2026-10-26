@@ -5,7 +5,7 @@ function httpError(status: number, message: string) { return Object.assign(new E
 export async function resolveDestinationConnection(destinationId: string | null, platform: string, contentType?: string) {
   // Route Instagram posts to primary @muvidb_ account
   if (platform === 'instagram') {
-    if (!destinationId || contentType === 'where_to_watch') {
+    if (!destinationId || contentType === 'where_to_watch' || contentType === 'audience_pulse') {
       const { data, error } = await supabase.from('social_connections').select('id')
         .eq('platform', 'instagram').eq('status', 'connected').eq('username', 'muvidb_').maybeSingle();
       if (error) throw error;
@@ -15,7 +15,7 @@ export async function resolveDestinationConnection(destinationId: string | null,
       }
     }
   }
-  if ((contentType === 'where_to_watch' || contentType === 'whats_on_stage') && platform !== 'instagram') {
+  if ((contentType === 'where_to_watch' || contentType === 'whats_on_stage' || contentType === 'audience_pulse') && platform !== 'instagram') {
     const { data: main, error } = await supabase.from('content_destinations').select('id').eq('slug', 'main-muvidb').single();
     if (error) throw error;
     destinationId = main.id;

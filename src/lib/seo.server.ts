@@ -64,7 +64,7 @@ const isIndexablePerson = (person: any, creditCount: number) => {
 export const WATCH_NAMES: Record<string, string> = {
   netflix: 'Netflix', prime_video: 'Prime Video', youtube: 'YouTube',
   kava: 'Kava', docuth: 'Docuth', ebonylife: 'EbonyLife',
-  circuits: 'Circuits.tv', cinema: 'In Cinemas', nollistream: 'NolliStream', homitv: 'HomiTV',
+  circuits: 'Circuits.tv', cinema: 'In Cinemas', nollistream: 'NolliStream', homitv: 'HomiTV', filmporte: 'Filmporte',
 };
 
 /** Origin of the incoming request, replacing seo.ts's host/x-forwarded-proto read. */
