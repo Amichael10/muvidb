@@ -10,6 +10,7 @@ export const PUBLICATION_LOGOS: Record<string, string> = {
   'Nigerian Movies Review': 'https://nigerianmoviesreview.com/wp-content/uploads/2023/08/NMR-WITHOUT-BG-150x150.png',
   "It's A Wrap": 'https://static.wixstatic.com/media/f87a6d_4dd9e45b448549e1a4b6bfb6251af0d4~mv2.png',
   'Movie Evolution': 'https://intro2filmclass.blogspot.com/favicon.ico',
+  'VDK Film Club': 'https://yt3.googleusercontent.com/UB8tdamndTKRRQqOkDYOcEIVjMBQIBgfA17r-lEJ6cHkWoXaBTx82vUxFZm3XkfJE0kHg3M_7g=s900-c-k-c0x00ffffff-no-rj',
 };
 
 interface DiscoveredReview {
@@ -41,12 +42,16 @@ async function fetchReviewPage(url: string): Promise<string> {
 function cleanMovieTitle(raw: string): string {
   return raw
     .replace(/^['"“‘]|['"”’]$/g, '')
-    .replace(/review:?/i, '')
     .replace(/‘|’/g, "'")
     .replace(/\s*\|\s*.*$/, '')
+    .replace(/\s*[-–]\s*Nollywood Movie Review.*/i, '')
+    .replace(/\s*[-–]\s*Movie Review.*/i, '')
+    .replace(/\s*[-–]\s*Film Review.*/i, '')
     .replace(/\s*–\s*.*Review.*/i, '')
     .replace(/\s*-\s*.*Review.*/i, '')
+    .replace(/\s*\(.*?(?:film|movie|review).*?\)$/i, '')
     .replace(/Review\s*:\s*/i, '')
+    .replace(/review:?/i, '')
     .replace(/\s*Movie Review$/i, '')
     .replace(/\s*Film Review$/i, '')
     .trim();
@@ -57,7 +62,7 @@ async function fetchRss(url: string): Promise<string> {
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+        'Accept': 'application/rss+xml, application/xml, text/xml, application/atom+xml, */*'
       },
       signal: AbortSignal.timeout(15000)
     });
@@ -71,6 +76,41 @@ async function fetchRss(url: string): Promise<string> {
 
 function parseRssItems(xml: string, sourceName: string): DiscoveredReview[] {
   const items: DiscoveredReview[] = [];
+
+  // 1. Support Atom feed entries (e.g. YouTube channels)
+  if (xml.includes('<entry')) {
+    const entryRegex = /<entry[\s\S]*?<\/entry>/gi;
+    let match;
+    while ((match = entryRegex.exec(xml)) !== null) {
+      const entryXml = match[0];
+      const titleMatch = entryXml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      const linkMatch = entryXml.match(/<link[^>]*href="([^"]+)"/i);
+      const authorMatch = entryXml.match(/<author>[\s\S]*?<name>([\s\S]*?)<\/name>/i);
+      const pubDateMatch = entryXml.match(/<published>([\s\S]*?)<\/published>/i);
+      const descMatch = entryXml.match(/<media:description>([\s\S]*?)<\/media:description>/i);
+
+      if (titleMatch && linkMatch) {
+        const rawTitle = titleMatch[1].replace(/<[^>]+>/g, '').trim();
+        const link = linkMatch[1].trim();
+        const author = authorMatch ? authorMatch[1].trim() : '';
+        const rawDesc = descMatch ? descMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+
+        if (/review/i.test(rawTitle) || /review/i.test(link) || /movie|film|cinema/i.test(entryXml)) {
+          const firstDescLine = rawDesc.split('\n').map(l => l.trim()).find(l => l.length > 20 && !l.startsWith('#')) || '';
+          items.push({
+            film_title: cleanMovieTitle(rawTitle),
+            critic_name: author || sourceName,
+            source_publication: sourceName,
+            review_url: link,
+            quote: firstDescLine || rawTitle,
+            published_date: pubDateMatch ? pubDateMatch[1] : undefined
+          });
+        }
+      }
+    }
+  }
+
+  // 2. Standard RSS <item> elements
   const itemRegex = /<item[\s\S]*?<\/item>/gi;
   let match;
 
@@ -138,7 +178,8 @@ export async function runCriticsSync(): Promise<{
     { url: 'https://www.itsawrapng.com/blog-feed.xml', source: "It's A Wrap" },
     { url: 'https://intro2filmclass.blogspot.com/feeds/posts/default?alt=rss', source: 'Intro to Film Class' },
     { url: 'https://nollywoodlife.ng/topics/movie-reviews/feed/', source: 'Nollywood Life' },
-    { url: 'https://nollycritic.com/category/reviews/feed/', source: 'NollyCritic' }
+    { url: 'https://nollycritic.com/category/reviews/feed/', source: 'NollyCritic' },
+    { url: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCgNhtj5ldkwI2-P9jFExexg', source: 'VDK Film Club' }
   ];
 
   const candidateReviews: DiscoveredReview[] = [];
@@ -153,7 +194,18 @@ export async function runCriticsSync(): Promise<{
   processed = candidateReviews.length;
 
   for (const item of candidateReviews) {
-    const cleanUrl = item.review_url.split('?')[0];
+    let cleanUrl = item.review_url;
+    try {
+      const parsedUrl = new URL(item.review_url);
+      if (parsedUrl.hostname.includes('youtube.com') || parsedUrl.hostname.includes('youtu.be')) {
+        const v = parsedUrl.searchParams.get('v');
+        cleanUrl = v ? `https://www.youtube.com/watch?v=${v}` : item.review_url;
+      } else {
+        cleanUrl = item.review_url.split('?')[0];
+      }
+    } catch {
+      cleanUrl = item.review_url.split('?')[0];
+    }
     const existingReview = existingByUrl.get(cleanUrl) || existingByUrl.get(item.review_url);
     if (existingReview && Number(existingReview.extraction_version || 0) >= 1) {
       skipped++;
@@ -239,7 +291,8 @@ export async function runCriticsSync(): Promise<{
     let criticAvatar = matchedCritic?.avatar_url || null;
     let criticName = matchedCritic?.name || item.critic_name || item.source_publication;
 
-    const pageHtml = await fetchReviewPage(cleanUrl);
+    const isYouTubeUrl = /youtube\.com|youtu\.be/i.test(cleanUrl);
+    const pageHtml = isYouTubeUrl ? '' : await fetchReviewPage(cleanUrl);
     if (pageHtml) {
       const { authorName, avatarUrl } = extractAuthorAndAvatar(pageHtml, defaultLogo);
       if (authorName && (!matchedCritic || criticName === item.source_publication)) {
