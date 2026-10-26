@@ -562,22 +562,18 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     const MIN_QUOTES = 3;
     const pulseSelect = 'id, title, slug, poster_url, backdrop_url, release_date, year, release_type, liked_percent, view_count, synopsis, genres, updated_at';
 
-    const currentYear = new Date().getFullYear();
-    const recentPulseCutoff = new Date(Date.now() - 180 * 86_400_000).toISOString().slice(0, 10);
+    // Audience Pulse must strictly be chosen from movies released within the last
+    // few days or 1 week (maximum 7 to 10 days, fallback 14 days), never older catalogue titles.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
 
-    // In our de-inflated Bayesian logistic curve, 40-50% liked corresponds to an
-    // audience_rating of 6.8-7.1/10 (solid positive reception).
-    // To ensure fresh releases from the last 1-3 days aren't squeezed out by old catalogue
-    // titles with legacy ratings, query a dedicated fresh pool alongside the catalogue pool.
-    const freshCutoff = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
-    const [freshResult, catalogueResult] = await Promise.all([
+    const [freshResult, weekResult] = await Promise.all([
       supabase
         .from('films')
         .select(pulseSelect)
         .eq('is_published', true)
         .not('poster_url', 'is', null)
-        .gte('liked_percent', 40)
-        .gte('release_date', freshCutoff)
+        .gte('release_date', sevenDaysAgo)
         .order('release_date', { ascending: false })
         .limit(50),
       supabase
@@ -585,17 +581,16 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
         .select(pulseSelect)
         .eq('is_published', true)
         .not('poster_url', 'is', null)
-        .gte('liked_percent', 45)
-        .or(`release_date.gte.${recentPulseCutoff},year.gte.${currentYear}`)
-        .order('liked_percent', { ascending: false })
-        .limit(100),
+        .gte('release_date', fourteenDaysAgo)
+        .order('release_date', { ascending: false })
+        .limit(50),
     ]);
     if (freshResult.error) throw freshResult.error;
-    if (catalogueResult.error) throw catalogueResult.error;
+    if (weekResult.error) throw weekResult.error;
 
-    // Deduplicate by film ID preserving order
+    // Deduplicate by film ID preserving order (fresh 7-day releases first)
     const filmMap = new Map<string, any>();
-    for (const f of [...(freshResult.data || []), ...(catalogueResult.data || [])]) {
+    for (const f of [...(freshResult.data || []), ...(weekResult.data || [])]) {
       if (!filmMap.has(f.id)) {
         filmMap.set(f.id, f);
       }
