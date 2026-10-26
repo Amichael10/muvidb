@@ -10,7 +10,7 @@ import { dispatchMovieWhatsAppAlerts } from './whatsapp_movie_alerts';
 
 function query(data: unknown, error: unknown = null) {
   const q: any = { then: (resolve: any) => Promise.resolve({ data, error }).then(resolve) };
-  for (const method of ['select', 'eq', 'in', 'upsert']) q[method] = vi.fn(() => q);
+  for (const method of ['select', 'eq', 'in', 'neq', 'gte', 'upsert']) q[method] = vi.fn(() => q);
   return q;
 }
 
@@ -24,7 +24,7 @@ describe('WhatsApp cast and crew alerts', () => {
       query([{ person_id: 'actor', people: { name: 'Actor' } }, { person_id: 'editor', people: { name: 'Editor' } }]),
       query(follows || [{ user_id: 'user', person_id: 'actor' }, { user_id: 'user', person_id: 'editor' }]),
       query([{ id: 'user', whatsapp_phone: '2348000000000', whatsapp_enabled: true }]),
-      query(logs), query(null),
+      query(logs), query([]), query(null),
     ];
     for (const q of queries) mocks.from.mockReturnValueOnce(q);
     return queries;
@@ -53,7 +53,7 @@ describe('WhatsApp cast and crew alerts', () => {
     const queries = setup(); mocks.send.mockResolvedValue({ ok: false, error: 'Meta unavailable' });
     const result = await dispatchMovieWhatsAppAlerts(context);
     expect(result.failedCount).toBe(1);
-    expect(queries[4].upsert).toHaveBeenCalledWith(expect.objectContaining({
+    expect(queries[5].upsert).toHaveBeenCalledWith(expect.objectContaining({
       status: 'failed', error_message: 'Meta unavailable',
     }), { onConflict: 'user_id,film_id' });
   });
@@ -74,7 +74,19 @@ describe('WhatsApp cast and crew alerts', () => {
     const queries = setup([{ user_id: 'user', status: 'failed', attempts: 1, next_retry_at: '2020-01-01T00:00:00Z' }]);
     mocks.send.mockResolvedValue({ ok: true, messageId: 'retry-message' });
     await dispatchMovieWhatsAppAlerts(context);
-    expect(queries[4].upsert).toHaveBeenCalledWith(expect.objectContaining({ attempts: 2, status: 'sent', next_retry_at: null }), { onConflict: 'user_id,film_id' });
+    expect(queries[5].upsert).toHaveBeenCalledWith(expect.objectContaining({ attempts: 2, status: 'sent', next_retry_at: null }), { onConflict: 'user_id,film_id' });
+  });
+
+  it('defers a second film during the recipient marketing cooldown', async () => {
+    const queries = setup();
+    queries[4].then = (resolve: any) => Promise.resolve({
+      data: [{ user_id: 'user', status: 'delivered', error_code: null, last_attempt_at: new Date().toISOString() }],
+      error: null,
+    }).then(resolve);
+    const result = await dispatchMovieWhatsAppAlerts(context);
+    expect(result.deferredCount).toBe(1);
+    expect(result.nextDeferredAt).not.toBeNull();
+    expect(mocks.send).not.toHaveBeenCalled();
   });
 
   it('fails visibly when credentials or database queries are unavailable', async () => {
@@ -99,8 +111,9 @@ describe('a lost log write must not strand the other followers', () => {
       { id: 'u2', whatsapp_phone: '2348000000002', whatsapp_enabled: true },
     ]);
     const logs = query([]);
+    const recentLogs = query([]);
     mocks.from.mockReturnValueOnce(credits).mockReturnValueOnce(follows)
-      .mockReturnValueOnce(users).mockReturnValueOnce(logs);
+      .mockReturnValueOnce(users).mockReturnValueOnce(logs).mockReturnValueOnce(recentLogs);
     // Every later from() is a log write, which keeps failing.
     mocks.from.mockReturnValue(query(null, logUpsertError));
   }
@@ -133,8 +146,9 @@ describe('a lost log write must not strand the other followers', () => {
     const follows = query([{ user_id: 'u1', person_id: 'actor' }]);
     const users = query([{ id: 'u1', whatsapp_phone: '2348000000001', whatsapp_enabled: true }]);
     const logs = query([]);
+    const recentLogs = query([]);
     mocks.from.mockReturnValueOnce(credits).mockReturnValueOnce(follows)
-      .mockReturnValueOnce(users).mockReturnValueOnce(logs);
+      .mockReturnValueOnce(users).mockReturnValueOnce(logs).mockReturnValueOnce(recentLogs);
     // Fail once, then succeed.
     mocks.from.mockReturnValueOnce(query(null, { message: 'transient' }))
       .mockReturnValue(query(null));
@@ -173,7 +187,7 @@ describe('unreachable followers are counted', () => {
     mocks.from.mockReturnValueOnce(query([{ person_id: 'actor', people: { name: 'Actor' } }]))
       .mockReturnValueOnce(query([{ user_id: 'u1', person_id: 'actor' }]))
       .mockReturnValueOnce(query([{ id: 'u1', whatsapp_phone: '2348000000001', whatsapp_enabled: false }]))
-      .mockReturnValueOnce(query([]));
+      .mockReturnValueOnce(query([])).mockReturnValueOnce(query([]));
     const result = await dispatchMovieWhatsAppAlerts(context);
     expect(result.skippedNotReachable).toBe(1);
     expect(mocks.send).not.toHaveBeenCalled();
@@ -183,7 +197,7 @@ describe('unreachable followers are counted', () => {
     mocks.from.mockReturnValueOnce(query([{ person_id: 'actor', people: { name: 'Actor' } }]))
       .mockReturnValueOnce(query([{ user_id: 'u1', person_id: 'actor' }]))
       .mockReturnValueOnce(query([{ id: 'u1', whatsapp_phone: '123', whatsapp_enabled: true }]))
-      .mockReturnValueOnce(query([]));
+      .mockReturnValueOnce(query([])).mockReturnValueOnce(query([]));
     const result = await dispatchMovieWhatsAppAlerts(context);
     expect(result.skippedNotReachable).toBe(1);
     expect(mocks.send).not.toHaveBeenCalled();

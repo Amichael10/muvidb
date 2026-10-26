@@ -114,12 +114,12 @@ export async function backfillMovieWhatsAppAlertQueue(): Promise<AlertBackfillRe
   for (let i = 0; i < filmIds.length; i += 100) {
     const { data, error } = await supabase
       .from('films')
-      .select('id, is_published, is_in_cinemas, created_at')
+      .select('id, content_type, is_published, is_in_cinemas, created_at')
       .in('id', filmIds.slice(i, i + 100))
       .gte('created_at', since);
     if (error) throw new Error(`Cannot read films: ${error.message}`);
     for (const f of data || []) {
-      if (f.is_published || f.is_in_cinemas) live.push(f.id);
+      if (f.content_type !== 'series' && (f.is_published || f.is_in_cinemas)) live.push(f.id);
     }
   }
   result.candidateFilms = live.length;
@@ -185,10 +185,14 @@ export async function runWhatsAppAlertQueue() {
     let retryDelay = 5 * 60_000;
     try {
       const { data: film, error: filmError } = await supabase.from('films')
-        .select('id,title,slug,poster_url,release_type,is_published,is_in_cinemas')
+        .select('id,title,slug,poster_url,release_type,content_type,is_published,is_in_cinemas')
         .eq('id', job.film_id).single();
       if (filmError) throw new Error(filmError.message);
-      if (!film.is_published && !film.is_in_cinemas) {
+      // Episodic alerts quickly exhaust Meta's recipient-level marketing
+      // allowance and prevent actual movie releases from being delivered.
+      if (film.content_type === 'series') {
+        console.log('[WhatsApp Alert] Suppressing episodic alert:', film.id, film.title);
+      } else if (!film.is_published && !film.is_in_cinemas) {
         result.deferred++;
         retryDelay = 60 * 60_000;
         retryError = 'Waiting for film publication';
@@ -209,6 +213,12 @@ export async function runWhatsAppAlertQueue() {
           retryError = 'Waiting for credits to be harvested';
         } else if (dispatch.failedCount) {
           throw new Error(dispatch.errors.map(e => e.error).join('; '));
+        } else if (dispatch.deferredCount) {
+          result.deferred++;
+          retryDelay = dispatch.nextDeferredAt
+            ? Math.max(60_000, Date.parse(dispatch.nextDeferredAt) - Date.now())
+            : 60 * 60_000;
+          retryError = 'Waiting for recipient marketing cooldown';
         }
       }
     } catch (error) {

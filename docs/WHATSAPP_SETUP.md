@@ -102,6 +102,7 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=muvidb_whatsapp_verify_token
 # App secret for the Meta app that owns the WhatsApp webhook. If WhatsApp is
 # attached to the existing Meta app, META_APP_SECRET is also accepted.
 WHATSAPP_APP_SECRET=your_meta_app_secret
+WHATSAPP_MARKETING_COOLDOWN_HOURS=72
 ```
 
 ---

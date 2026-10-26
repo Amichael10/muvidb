@@ -18,7 +18,7 @@ describe('WhatsApp credit alert queue', () => {
   });
 
   function setup(published = true) {
-    const film = query({ id: 'film', title: 'Film', is_published: published, is_in_cinemas: false });
+    const film = query({ id: 'film', title: 'Film', content_type: 'movie', is_published: published, is_in_cinemas: false });
     const completion = query(null);
     const unlock = query(null);
     mocks.from.mockReturnValueOnce(film).mockReturnValueOnce(completion).mockReturnValueOnce(unlock);
@@ -42,12 +42,36 @@ describe('WhatsApp credit alert queue', () => {
     }));
   });
 
+  it('suppresses episodic alerts so they do not consume the movie marketing allowance', async () => {
+    const completion = query(null);
+    const unlock = query(null);
+    mocks.from.mockReturnValueOnce(query({
+      id: 'film', title: 'Episode 18', content_type: 'series', is_published: true, is_in_cinemas: false,
+    })).mockReturnValueOnce(completion).mockReturnValueOnce(unlock);
+    expect((await runWhatsAppAlertQueue()).deferred).toBe(0);
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+    expect(completion.delete).toHaveBeenCalled();
+  });
+
   it('releases failed jobs for retry with their error', async () => {
     const { completion } = setup();
     mocks.dispatch.mockResolvedValue({ sentCount: 0, failedCount: 1, errors: [{ error: 'Meta rejected' }] });
     expect((await runWhatsAppAlertQueue()).failed).toBe(1);
     expect(completion.update).toHaveBeenCalledWith(expect.objectContaining({
       last_error: 'Meta rejected', locked_until: null,
+    }));
+    expect(completion.delete).not.toHaveBeenCalled();
+  });
+
+  it('retains jobs while every recipient is in the marketing cooldown', async () => {
+    const { completion } = setup();
+    const next = new Date(Date.now() + 60 * 60_000).toISOString();
+    mocks.dispatch.mockResolvedValue({
+      sentCount: 0, failedCount: 0, deferredCount: 1, nextDeferredAt: next,
+    });
+    expect((await runWhatsAppAlertQueue()).deferred).toBe(1);
+    expect(completion.update).toHaveBeenCalledWith(expect.objectContaining({
+      last_error: 'Waiting for recipient marketing cooldown', locked_until: null,
     }));
     expect(completion.delete).not.toHaveBeenCalled();
   });
@@ -61,7 +85,7 @@ describe('credits that arrive after publication', () => {
   });
 
   function setupPublished() {
-    const film = query({ id: 'film', title: 'Film', is_published: true, is_in_cinemas: false });
+    const film = query({ id: 'film', title: 'Film', content_type: 'movie', is_published: true, is_in_cinemas: false });
     const completion = query(null);
     const unlock = query(null);
     mocks.from.mockReturnValueOnce(film).mockReturnValueOnce(completion).mockReturnValueOnce(unlock);
@@ -201,6 +225,19 @@ describe('queue backfill', () => {
       users: [{ id: 'u1', whatsapp_enabled: true, whatsapp_phone: '+2348012345678' }],
       credits: [{ film_id: 'f1', person_id: 'p1' }],
       films: [{ id: 'f1', is_published: false, is_in_cinemas: false, created_at: recent() }],
+      whatsapp_movie_alert_log: [],
+      whatsapp_movie_alert_queue: [],
+    });
+    expect((await backfillMovieWhatsAppAlertQueue()).candidateFilms).toBe(0);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not backfill series episodes into the marketing queue', async () => {
+    const { upsert } = tables({
+      follows: [{ user_id: 'u1', person_id: 'p1', notify_whatsapp: null }],
+      users: [{ id: 'u1', whatsapp_enabled: true, whatsapp_phone: '+2348012345678' }],
+      credits: [{ film_id: 'f1', person_id: 'p1' }],
+      films: [{ id: 'f1', content_type: 'series', is_published: true, is_in_cinemas: false, created_at: recent() }],
       whatsapp_movie_alert_log: [],
       whatsapp_movie_alert_queue: [],
     });
