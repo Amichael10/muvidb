@@ -314,6 +314,7 @@ export async function runCommentMining(opts: {
   /** Re-mine films last mined before this ISO timestamp. Used to sweep the
    *  catalogue after the filter changes, so ratings built on comments an
    *  earlier pass should have rejected get rebuilt. */
+  remineBefore?: string;
   /** Only mine fresh releases (released in the last 1-3 days). */
   freshOnly?: boolean;
 } = {}) {

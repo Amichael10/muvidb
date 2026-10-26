@@ -173,7 +173,11 @@ export async function backfillMovieWhatsAppAlertQueue(): Promise<AlertBackfillRe
 }
 
 export async function runWhatsAppAlertQueue() {
-  const result = { processed: 0, sent: 0, failed: 0, deferred: 0 };
+  // suppressedFilms is recorded, not just logged: the job is deleted without
+  // writing an alert-log row, so a movie mislabelled as a series would
+  // otherwise lose its alert with nothing to trace it by. The cron stores this
+  // result in sync_logs.details.
+  const result = { processed: 0, sent: 0, failed: 0, deferred: 0, suppressed: 0, suppressedFilms: [] as string[] };
   const deadline = Date.now() + 200_000;
   while (result.processed < 20 && Date.now() < deadline) {
     const { data, error } = await supabase.rpc('claim_whatsapp_movie_alert');
@@ -192,6 +196,8 @@ export async function runWhatsAppAlertQueue() {
       // allowance and prevent actual movie releases from being delivered.
       if (film.content_type === 'series') {
         console.log('[WhatsApp Alert] Suppressing episodic alert:', film.id, film.title);
+        result.suppressed++;
+        result.suppressedFilms.push(`${film.title || 'Untitled'} (${film.id})`);
       } else if (!film.is_published && !film.is_in_cinemas) {
         result.deferred++;
         retryDelay = 60 * 60_000;

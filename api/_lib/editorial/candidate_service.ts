@@ -337,7 +337,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     }
 
     // Interleave: 2 below-the-line craftspeople to 1 director/producer
-    const targetList: typeof craftCrew = [];
+    const targetList: typeof belowTheLine = [];
     let bIdx = 0;
     let aIdx = 0;
     while (targetList.length < limit && (bIdx < belowTheLine.length || aIdx < aboveTheLine.length)) {

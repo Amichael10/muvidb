@@ -28,7 +28,7 @@ describe('WhatsApp credit alert queue', () => {
   it('dispatches synced credits and deletes only the claimed queue version', async () => {
     const { completion } = setup();
     mocks.dispatch.mockResolvedValue({ sentCount: 1, failedCount: 0 });
-    expect(await runWhatsAppAlertQueue()).toEqual({ processed: 1, sent: 1, failed: 0, deferred: 0 });
+    expect(await runWhatsAppAlertQueue()).toEqual({ processed: 1, sent: 1, failed: 0, deferred: 0, suppressed: 0, suppressedFilms: [] });
     expect(completion.delete).toHaveBeenCalled();
     expect(completion.eq).toHaveBeenCalledWith('queued_at', 'version');
   });
@@ -48,9 +48,14 @@ describe('WhatsApp credit alert queue', () => {
     mocks.from.mockReturnValueOnce(query({
       id: 'film', title: 'Episode 18', content_type: 'series', is_published: true, is_in_cinemas: false,
     })).mockReturnValueOnce(completion).mockReturnValueOnce(unlock);
-    expect((await runWhatsAppAlertQueue()).deferred).toBe(0);
+    const result = await runWhatsAppAlertQueue();
+    expect(result.deferred).toBe(0);
     expect(mocks.dispatch).not.toHaveBeenCalled();
     expect(completion.delete).toHaveBeenCalled();
+    // The job is deleted with no alert-log row, so the suppression has to be
+    // traceable: a movie mislabelled as a series loses its alert silently.
+    expect(result.suppressed).toBe(1);
+    expect(result.suppressedFilms).toEqual(['Episode 18 (film)']);
   });
 
   it('releases failed jobs for retry with their error', async () => {
