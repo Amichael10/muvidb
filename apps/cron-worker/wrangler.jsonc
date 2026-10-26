@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "muvidb-cron-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-26",
+  "triggers": {
+    "crons": [
+      "*/10 * * * *",
+      "0 23 * * *",
+      "0 6 * * *"
+    ]
+  },
+  "vars": {
+    "SUPABASE_URL": "https://pkenrmorywmuvnzfoylp.supabase.co",
+    "SYNC_ENDPOINT": "https://muvidb.com/api/cron/sync"
+  }
+}
