@@ -49,9 +49,22 @@ export async function handleWhatsApp(req: VercelRequest, res: VercelResponse) {
   // ── META INBOUND WEBHOOK (POST) ─────────────────────────────────────────────
   // Handles incoming messages such as 'STOP' or button click to unsubscribe
   if (req.method === 'POST' && action === 'webhook') {
-    const secret = (process.env.WHATSAPP_APP_SECRET || '').trim();
-    if (!secret) return res.status(503).json({ error: 'Webhook signature verification is not configured' });
-    if (!verifyMetaWebhookSignature((req as RawBodyRequest).rawBody, req.headers['x-hub-signature-256'], secret)) {
+    // WhatsApp may be attached either to its dedicated Meta app or to the
+    // project's existing Meta app. Accept a valid signature from either
+    // configured app secret; never fall back to accepting an unsigned body.
+    const secrets = [...new Set([
+      process.env.WHATSAPP_APP_SECRET,
+      process.env.META_APP_SECRET,
+    ].map(value => (value || '').trim()).filter(Boolean))];
+    if (!secrets.length) return res.status(503).json({ error: 'Webhook signature verification is not configured' });
+    const rawBody = (req as RawBodyRequest).rawBody;
+    const signature = req.headers['x-hub-signature-256'];
+    if (!secrets.some(secret => verifyMetaWebhookSignature(rawBody, signature, secret))) {
+      console.warn('[WhatsApp Webhook] Signature rejected', {
+        hasRawBody: Buffer.isBuffer(rawBody),
+        hasSignature: typeof signature === 'string',
+        configuredSecretCount: secrets.length,
+      });
       return res.status(401).json({ error: 'Invalid webhook signature' });
     }
     const body = req.body;

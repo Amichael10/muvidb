@@ -57,10 +57,24 @@ it('rejects payload tampering even when a well-formed signature is supplied', as
 
 it('fails closed with no configured Meta app secret', async () => {
   vi.stubEnv('WHATSAPP_APP_SECRET', '');
+  vi.stubEnv('META_APP_SECRET', '');
   const req = request(Buffer.from(JSON.stringify(stop)));
   await prepareRequestBody(req);
   const res = response();
   await handleWhatsApp(req, res);
   expect(res.status).toHaveBeenCalledWith(503);
   expect(mocks.statuses).not.toHaveBeenCalled();
+});
+
+it('accepts the existing Meta app secret when WhatsApp uses that app', async () => {
+  vi.stubEnv('WHATSAPP_APP_SECRET', 'different-whatsapp-app');
+  vi.stubEnv('META_APP_SECRET', secret);
+  const raw = Buffer.from(JSON.stringify(stop));
+  const signature = 'sha256=' + createHmac('sha256', secret).update(raw).digest('hex');
+  const req = request(raw, signature);
+  await prepareRequestBody(req);
+  const res = response();
+  await handleWhatsApp(req, res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(mocks.statuses).toHaveBeenCalledOnce();
 });

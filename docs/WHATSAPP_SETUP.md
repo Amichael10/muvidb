@@ -99,6 +99,9 @@ WHATSAPP_ACCESS_TOKEN=your_meta_system_user_token
 WHATSAPP_BUSINESS_ACCOUNT_ID=your_meta_waba_id
 WHATSAPP_MOVIE_ALERT_TEMPLATE=movie_release_alert
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=muvidb_whatsapp_verify_token
+# App secret for the Meta app that owns the WhatsApp webhook. If WhatsApp is
+# attached to the existing Meta app, META_APP_SECRET is also accepted.
+WHATSAPP_APP_SECRET=your_meta_app_secret
 ```
 
 ---

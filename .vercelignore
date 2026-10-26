@@ -16,6 +16,7 @@ scripts/
 !scripts/build_email_templates.mjs
 .git/
 node_modules/
+.npm-cache/
 dist/
 
 # Ignore big media assets at root level only (NOT inside public/)

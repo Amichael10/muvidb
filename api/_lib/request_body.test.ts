@@ -14,6 +14,14 @@ it('retains the exact JSON bytes while exposing the parsed body to existing hand
   expect(req.rawBody).toEqual(raw);
 });
 
+it('reconstructs compact signed JSON when Vercel already parsed the body', async () => {
+  const body = { object: 'whatsapp_business_account', entry: [{ id: '1' }] };
+  const req: any = { method: 'POST', headers: { 'content-type': 'application/json' }, body };
+  await prepareRequestBody(req);
+  expect(req.body).toBe(body);
+  expect(req.rawBody).toEqual(Buffer.from(JSON.stringify(body)));
+});
+
 it('keeps non-JSON WebSub XML intact for its existing signature verifier', async () => {
   const raw = Buffer.from('<feed>test</feed>\n');
   const req = request([raw], 'application/atom+xml');

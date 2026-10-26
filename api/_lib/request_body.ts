@@ -5,7 +5,15 @@ export type RawBodyRequest = VercelRequest & { rawBody?: Buffer };
 /** Preserve exactly the bytes signed by webhook providers before parsing JSON. */
 export async function prepareRequestBody(req: RawBodyRequest): Promise<void> {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return;
-  if (req.body != null && !Buffer.isBuffer(req.body) && typeof req.body !== 'string') return;
+  if (req.body != null && !Buffer.isBuffer(req.body) && typeof req.body !== 'string') {
+    // Vercel may parse JSON before invoking a rewritten Node function even
+    // when the destination exports bodyParser:false. Meta emits compact JSON,
+    // so preserving property order while re-serializing restores the bytes
+    // covered by x-hub-signature-256. Verification still fails closed when
+    // the payload or configured app secret is wrong.
+    req.rawBody = Buffer.from(JSON.stringify(req.body));
+    return;
+  }
   let raw: Buffer;
   if (Buffer.isBuffer(req.body)) raw = req.body;
   else if (typeof req.body === 'string') raw = Buffer.from(req.body);
