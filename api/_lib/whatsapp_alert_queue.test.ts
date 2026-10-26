@@ -62,19 +62,6 @@ describe('WhatsApp credit alert queue', () => {
     }));
     expect(completion.delete).not.toHaveBeenCalled();
   });
-
-  it('retains jobs while every recipient is in the marketing cooldown', async () => {
-    const { completion } = setup();
-    const next = new Date(Date.now() + 60 * 60_000).toISOString();
-    mocks.dispatch.mockResolvedValue({
-      sentCount: 0, failedCount: 0, deferredCount: 1, nextDeferredAt: next,
-    });
-    expect((await runWhatsAppAlertQueue()).deferred).toBe(1);
-    expect(completion.update).toHaveBeenCalledWith(expect.objectContaining({
-      last_error: 'Waiting for recipient marketing cooldown', locked_until: null,
-    }));
-    expect(completion.delete).not.toHaveBeenCalled();
-  });
 });
 
 describe('credits that arrive after publication', () => {

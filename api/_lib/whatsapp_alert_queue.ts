@@ -213,12 +213,6 @@ export async function runWhatsAppAlertQueue() {
           retryError = 'Waiting for credits to be harvested';
         } else if (dispatch.failedCount) {
           throw new Error(dispatch.errors.map(e => e.error).join('; '));
-        } else if (dispatch.deferredCount) {
-          result.deferred++;
-          retryDelay = dispatch.nextDeferredAt
-            ? Math.max(60_000, Date.parse(dispatch.nextDeferredAt) - Date.now())
-            : 60 * 60_000;
-          retryError = 'Waiting for recipient marketing cooldown';
         }
       }
     } catch (error) {

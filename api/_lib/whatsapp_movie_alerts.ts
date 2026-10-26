@@ -7,7 +7,7 @@
  * 3. Idempotent tracking via whatsapp_movie_alert_log.
  */
 
-import { whatsappRetryAt, MAX_WHATSAPP_ATTEMPTS, MARKETING_COOLDOWN_MS } from './whatsapp_retry_policy.js';
+import { whatsappRetryAt, MAX_WHATSAPP_ATTEMPTS } from './whatsapp_retry_policy.js';
 import { supabase } from './supabase.js';
 import { sendMetaWhatsAppTemplate, isWhatsAppConfigured, normalizeWhatsAppNumber } from './meta_whatsapp.js';
 
@@ -47,10 +47,6 @@ export interface AlertDispatchResult {
   creditsMissing: boolean;
   /** Users skipped because WhatsApp is off, or the number is absent/too short. */
   skippedNotReachable: number;
-  /** Users held back so Meta does not reject a burst of marketing alerts. */
-  deferredCount: number;
-  /** Earliest time any deferred recipient becomes eligible. */
-  nextDeferredAt: string | null;
   /**
    * Messages that went out but whose log row could not be written. These are
    * the only cases that can produce a duplicate on a later pass, so they are
@@ -85,8 +81,6 @@ export async function dispatchMovieWhatsAppAlerts(
     failedCount: 0,
     creditsMissing: false,
     skippedNotReachable: 0,
-    deferredCount: 0,
-    nextDeferredAt: null,
     unloggedSends: 0,
     errors: [],
   };
@@ -165,7 +159,7 @@ export async function dispatchMovieWhatsAppAlerts(
   let alreadyNotifiedUserIds = new Set<string>();
   const { data: existingLogs, error: logReadError } = await supabase
     .from('whatsapp_movie_alert_log')
-    .select('user_id,status,attempts,next_retry_at')
+    .select('user_id,status,attempts,next_retry_at,created_at')
     .eq('film_id', filmId)
     .in('user_id', userIds);
 
@@ -177,28 +171,6 @@ export async function dispatchMovieWhatsAppAlerts(
       return log.status === 'failed' && (!log.next_retry_at
         || Date.parse(log.next_retry_at) > Date.now() || log.attempts >= MAX_WHATSAPP_ATTEMPTS);
     }).map(log => log.user_id));
-  }
-
-  // Meta applies recipient-level marketing frequency limits (error 131049).
-  // Enforce our own wider window across films so a user following a prolific
-  // actor does not receive several release templates in a burst.
-  const cooldownCutoff = new Date(Date.now() - MARKETING_COOLDOWN_MS).toISOString();
-  const { data: recentLogs, error: recentLogError } = await supabase
-    .from('whatsapp_movie_alert_log')
-    .select('user_id,status,error_code,last_attempt_at')
-    .in('user_id', userIds)
-    .neq('film_id', filmId)
-    .gte('last_attempt_at', cooldownCutoff);
-  if (recentLogError) throw new Error(`Cannot read WhatsApp cooldown history: ${recentLogError.message}`);
-  const cooldownUntilByUser = new Map<string, number>();
-  for (const log of recentLogs || []) {
-    const countsForCooldown = ['sent', 'delivered', 'read'].includes(log.status)
-      || (log.status === 'failed' && Number(log.error_code) === 131049);
-    if (!countsForCooldown) continue;
-    const until = Date.parse(log.last_attempt_at) + MARKETING_COOLDOWN_MS;
-    if (until > Date.now() && until > (cooldownUntilByUser.get(log.user_id) || 0)) {
-      cooldownUntilByUser.set(log.user_id, until);
-    }
   }
 
   // Determine watch platform label
@@ -219,14 +191,6 @@ export async function dispatchMovieWhatsAppAlerts(
     // Check if already notified for this movie
     if (alreadyNotifiedUserIds.has(uId)) {
       result.skippedAlreadyNotified++;
-      continue;
-    }
-
-    const cooldownUntil = cooldownUntilByUser.get(uId);
-    if (cooldownUntil) {
-      result.deferredCount++;
-      const currentNext = result.nextDeferredAt ? Date.parse(result.nextDeferredAt) : Infinity;
-      if (cooldownUntil < currentNext) result.nextDeferredAt = new Date(cooldownUntil).toISOString();
       continue;
     }
 
@@ -263,7 +227,8 @@ export async function dispatchMovieWhatsAppAlerts(
     // {{2}} = Movie Title (e.g., "Jagun Jagun")
     // {{3}} = Where to watch (e.g., "In Cinemas")
     // {{4}} = Film Page Link (e.g., "https://muvidb.com/film/jagun-jagun")
-    const attempts = (existingLogs?.find(l => l.user_id === uId)?.attempts || 0) + 1;
+    const existingLog = existingLogs?.find(l => l.user_id === uId);
+    const attempts = (existingLog?.attempts || 0) + 1;
     const attemptedAt = new Date().toISOString();
     const sendRes = await sendMetaWhatsAppTemplate({
       to: phone,
@@ -300,7 +265,8 @@ export async function dispatchMovieWhatsAppAlerts(
         user_id: uId, film_id: filmId, phone, followed_people_names: actorNames,
         status: 'failed', message_id: null, error_message: sendRes.error || 'Failed to send',
         attempts, last_attempt_at: attemptedAt, error_code: sendRes.details?.code || null,
-        next_retry_at: whatsappRetryAt(sendRes.details?.code, attempts), issue_notified_at: null,
+        next_retry_at: whatsappRetryAt(sendRes.details?.code, attempts, Date.now(), existingLog?.created_at),
+        issue_notified_at: null,
       });
       if (logError) {
         result.errors.push({ userId: uId, error: `Cannot save alert failure: ${logError}` });
