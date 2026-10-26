@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Icon } from '@iconify/react';
 
 function formatNaira(amount) {
@@ -14,6 +14,8 @@ function formatNaira(amount) {
 
 export default function BoxOfficeBreakdownModal({ film, onClose }) {
   if (!film) return null;
+
+  const [expandedDate, setExpandedDate] = useState(null);
 
   const boxOfficeData = film.streaming_links?.box_office || {};
   const domestic = film.box_office_domestic || boxOfficeData.domestic;
@@ -115,7 +117,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose }) {
                 <span>Live Reach POS Circuit Tracking</span>
               </span>
               <span className="text-[10px] text-text-muted bg-surface px-2 py-0.5 rounded border border-border">
-                25 Nationwide Branches
+                26 Tracked Branches
               </span>
             </div>
 
@@ -143,16 +145,57 @@ export default function BoxOfficeBreakdownModal({ film, onClose }) {
             {reachMetrics.daily_history && reachMetrics.daily_history.length > 0 && (
               <div className="pt-2 border-t border-amber-500/10">
                 <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">
-                  Recent Daily Admissions (Reach Branches)
+                  Daily Admissions & Price Tracking
                 </span>
-                <div className="space-y-1">
-                  {reachMetrics.daily_history.slice(-3).reverse().map((dh, i) => (
-                    <div key={i} className="flex items-center justify-between text-[11px] text-text-secondary py-0.5">
-                      <span className="font-mono text-text-muted">{dh.date}</span>
-                      <span className="font-semibold text-text-primary">{dh.ticketsSold} tickets ({formatNaira(dh.estimatedRevenue)})</span>
-                      <span className="text-emerald-400 text-[10px]">{dh.occupancyRate}% full</span>
-                    </div>
-                  ))}
+                <div className="space-y-1.5">
+                  {reachMetrics.daily_history.slice(-5).reverse().map((dh, i) => {
+                    const isExpanded = expandedDate === dh.date;
+                    const locationEntries = dh.locations ? Object.entries(dh.locations) : [];
+
+                    return (
+                      <div key={i} className="rounded-lg bg-surface/60 border border-border/40 p-2 text-[11px] space-y-1.5">
+                        <div 
+                          className="flex items-center justify-between cursor-pointer select-none"
+                          onClick={() => setExpandedDate(isExpanded ? null : dh.date)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-text-muted">{dh.date}</span>
+                            <span className="font-semibold text-text-primary">
+                              {dh.ticketsSold} ticket{dh.ticketsSold !== 1 ? 's' : ''} ({formatNaira(dh.estimatedRevenue)})
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px]">
+                            {dh.avgTicketPrice ? (
+                              <span className="text-amber-400 font-mono">~₦{dh.avgTicketPrice.toLocaleString()}/tkt</span>
+                            ) : null}
+                            <span className="text-emerald-400">{dh.occupancyRate}% full</span>
+                            {locationEntries.length > 0 && (
+                              <Icon 
+                                icon={isExpanded ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"} 
+                                className="text-text-muted text-xs" 
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        {isExpanded && locationEntries.length > 0 && (
+                          <div className="pt-1.5 border-t border-border/30 pl-2 space-y-1">
+                            <span className="text-[9px] font-semibold text-text-muted uppercase tracking-wider block">
+                              Circuit Branch Breakdown:
+                            </span>
+                            {locationEntries.map(([locName, locStat]) => (
+                              <div key={locName} className="flex items-center justify-between text-[10px] text-text-secondary pr-1">
+                                <span className="truncate max-w-[200px]">{locName}</span>
+                                <span className="font-mono text-text-primary">
+                                  {locStat.ticketsSold} tkt{locStat.ticketsSold !== 1 ? 's' : ''} • {formatNaira(locStat.estimatedRevenue)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

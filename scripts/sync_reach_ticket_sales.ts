@@ -65,18 +65,24 @@ export async function syncReachTicketSales() {
   }
 
   const cat = JSON.parse(fs.readFileSync(catPath, 'utf8'));
-  const branches: Array<{ id: string; name: string }> = [];
+  const branches: Array<{ id: string; name: string; jwt: string }> = [];
   for (const [_, v] of Object.entries<any>(cat)) {
     if (v.branches) {
       for (const b of v.branches) {
         if (b.id && b.isActive !== false) {
-          branches.push({ id: b.id, name: b.name });
+          branches.push({ id: b.id, name: b.name, jwt: b.jwt || v.jwt || JWT });
         }
       }
     }
   }
 
   console.log(`Loaded ${branches.length} active Reach branches.`);
+
+  interface LocationStats {
+    ticketsSold: number;
+    estimatedRevenue: number;
+    screeningsCount: number;
+  }
 
   interface FilmDailyAggregate {
     filmTitle: string;
@@ -85,6 +91,7 @@ export async function syncReachTicketSales() {
     estimatedRevenue: number;
     screeningsCount: number;
     activeBranches: Set<string>;
+    locationBreakdown: Record<string, LocationStats>;
     avgTicketPrice: number;
   }
 
@@ -100,7 +107,7 @@ export async function syncReachTicketSales() {
     try {
       const res = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${JWT}`,
+          Authorization: `Bearer ${branch.jwt || JWT}`,
           Accept: 'application/json',
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -134,6 +141,7 @@ export async function syncReachTicketSales() {
               estimatedRevenue: 0,
               screeningsCount: 0,
               activeBranches: new Set(),
+              locationBreakdown: {},
               avgTicketPrice: basePrice,
             });
           }
@@ -145,6 +153,16 @@ export async function syncReachTicketSales() {
           entry.estimatedRevenue += sold * basePrice;
           if (sold > 0) {
             entry.activeBranches.add(branch.name);
+            if (!entry.locationBreakdown[branch.name]) {
+              entry.locationBreakdown[branch.name] = {
+                ticketsSold: 0,
+                estimatedRevenue: 0,
+                screeningsCount: 0,
+              };
+            }
+            entry.locationBreakdown[branch.name].ticketsSold += sold;
+            entry.locationBreakdown[branch.name].estimatedRevenue += sold * basePrice;
+            entry.locationBreakdown[branch.name].screeningsCount += 1;
           }
         }
         successfulBranches++;
@@ -198,6 +216,8 @@ export async function syncReachTicketSales() {
       screeningsCount: stats.screeningsCount,
       activeLocations: stats.activeBranches.size,
       occupancyRate,
+      avgTicketPrice: Math.round(stats.estimatedRevenue / (stats.ticketsSold || 1)),
+      locations: stats.locationBreakdown,
     };
 
     // Deduplicate daily history by date
