@@ -204,6 +204,10 @@
       "destination": "/api/data?_r=whatsapp"
     },
     {
+      "source": "/api/critic-videos",
+      "destination": "/api/data?_r=critic-videos"
+    },
+    {
       "source": "/api/person-media",
       "destination": "/api/data?_r=person-media"
     },

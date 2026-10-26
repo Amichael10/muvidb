@@ -97,6 +97,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { youtubeWebSubHandler } = await import('./_lib/youtube_websub.js');
       return youtubeWebSubHandler(req, res);
     }
+    if (key === 'critic-videos') {
+      const { handleCriticVideos } = await import('./_lib/critic_videos_handler.js');
+      return handleCriticVideos(req, res);
+    }
     if (key === 'automation') {
       const { default: handleAutomation } = await import('./automation.js');
       return handleAutomation(req, res);

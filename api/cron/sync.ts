@@ -206,6 +206,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         break;
       }
       case 'critics':              result = await runCriticsSync(); break;
+      // Video critics. Discovery only: the transcript fetch needs a residential
+      // IP, so services/local-clipper drains the queue this fills.
+      case 'critic_videos': {
+        const { pollCriticChannels } = await import('../_lib/critic_video_candidates.js');
+        result = await pollCriticChannels({ limit: 20 });
+        break;
+      }
       case 'kava':      
         return res.status(200).json({ 
           task: 'kava', 
