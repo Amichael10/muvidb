@@ -376,6 +376,7 @@ export function formatWatchAvailability(film: {
     ebonylifeonplus: 'EbonyLife ON Plus',
     homitv: 'HomiTV',
     circuits: 'Circuits.tv',
+    filmporte: 'Filmporte',
     kava: 'Kava',
     netflix: 'Netflix',
     prime_video: 'Prime Video',

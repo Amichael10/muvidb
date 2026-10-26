@@ -652,7 +652,7 @@ export async function executeCopilotTool(
       if (platformFilter === 'youtube') {
         query = query.not('youtube_watch_url', 'is', null);
       } else if (platformFilter === 'streaming') {
-        query = query.or('release_type.in.(nollistream,docuth,ebonylife,kava,circuits,netflix,prime_video),source.in.(nollistream,docuth,ebonylife,kava,circuits),streaming_links.neq.{}');
+        query = query.or('release_type.in.(nollistream,docuth,ebonylife,kava,circuits,homitv,filmporte,netflix,prime_video),source.in.(nollistream,docuth,ebonylife,kava,circuits,homitv,filmporte),streaming_links.neq.{}');
       } else if (platformFilter === 'cinema') {
         query = query.or('is_in_cinemas.eq.true,release_type.eq.cinema');
       } else {

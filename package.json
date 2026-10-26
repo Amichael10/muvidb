@@ -46,6 +46,7 @@
     "sync:nollistream": "tsx scripts/nollistream_sync.ts",
     "sync:nollistream:dom": "tsx scripts/nollistream_dom_sync.ts",
     "sync:homitv": "tsx scripts/homitv_sync.ts",
+    "sync:filmporte": "tsx scripts/filmporte_sync.ts",
     "harvest:homitv": "tsx scripts/harvest_homitv_trailers.ts",
     "sync:ugandan": "tsx scripts/ugandan_sync.ts",
     "sync:nollymeter": "tsx scripts/nollymeter_sync.ts",

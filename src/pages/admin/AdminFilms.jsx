@@ -2199,6 +2199,7 @@ export default function AdminFilms() {
             <option value="circuits">Circuits</option>
             <option value="nollistream">NolliStream</option>
             <option value="homitv">HomiTV</option>
+            <option value="filmporte">Filmporte</option>
           </select>
 
           <select
@@ -2215,6 +2216,7 @@ export default function AdminFilms() {
             <option value="irokotv">IrokoTV Sync</option>
             <option value="youtube">YouTube Sync</option>
             <option value="docuth_sync">Docuth Sync</option>
+            <option value="filmporte_sync">Filmporte Sync</option>
           </select>
           
           <select
@@ -2477,7 +2479,12 @@ export default function AdminFilms() {
                             <Icon icon="solar:tv-bold" className="w-4 h-4" />
                           </a>
                         )}
-                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && !film.streaming_links?.nollistream && !film.streaming_links?.homitv && (
+                        {film.streaming_links?.filmporte && (
+                          <a href={film.streaming_links.filmporte} target="_blank" rel="noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800 text-zinc-200 hover:bg-black hover:text-white transition-all shadow-sm" title="Filmporte Link">
+                            <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
+                          </a>
+                        )}
+                        {!film.youtube_watch_url && !film.streaming_links?.netflix && !film.streaming_links?.prime_video && !film.streaming_links?.kava && !film.streaming_links?.iroko_tv && !film.streaming_links?.docuth && !film.streaming_links?.ebonylife && !film.streaming_links?.circuits && !film.streaming_links?.nollistream && !film.streaming_links?.homitv && !film.streaming_links?.filmporte && (
                           <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter opacity-40">Offline</span>
                         )}
                       </div>
@@ -3373,7 +3380,7 @@ export default function AdminFilms() {
                 <div>
                   <label className="block text-[10px] font-bold text-text-muted uppercase mb-2">Available On Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits', 'nollistream', 'homitv'].map((type) => {
+                    {['cinema', 'youtube', 'netflix', 'prime_video', 'kava', 'showmax', 'docuth', 'ebonylife', 'circuits', 'nollistream', 'homitv', 'filmporte'].map((type) => {
                       const isActive = type === 'cinema' 
                         ? formData.release_type === 'cinema'
                         : (formData.streaming_links && type in formData.streaming_links) || formData.release_type === type;
@@ -3593,6 +3600,7 @@ export default function AdminFilms() {
                       { id: 'circuits', label: 'Circuits', placeholder: 'https://www.circuits.tv/...' },
                       { id: 'nollistream', label: 'NolliStream', placeholder: 'https://nollistream.net/movie/...' },
                       { id: 'homitv', label: 'HomiTV', placeholder: 'https://homitv.com/watch/...' },
+                      { id: 'filmporte', label: 'Filmporte', placeholder: 'https://films.filmporte.com/movies/...' },
                     ].map(platform => {
                       const isActive = (formData.streaming_links && platform.id in formData.streaming_links) || formData.release_type === platform.id;
                       if (!isActive) return null;

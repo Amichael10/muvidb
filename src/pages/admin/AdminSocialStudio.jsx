@@ -1069,6 +1069,8 @@ export default function AdminSocialStudio() {
       ? 'Docuth'
       : film.streaming_links?.ebonylife
       ? 'EbonyLife ON Plus'
+      : film.streaming_links?.filmporte
+      ? 'Filmporte'
       : (film.release_type === 'cinema' || film.is_in_cinemas)
       ? 'Cinemas'
       : 'YouTube';
