@@ -11,15 +11,17 @@ import { bluepicturesAdapter } from './bluepictures.js';
 import { firecrawlAdapter } from './firecrawl.js';
 import { genesisAdapter } from './genesis.js';
 import { filmhouseAdapter } from './filmhouse.js';
+import { kapCinemaAdapter } from './kap-cinema.js';
 
 export const ADAPTERS: Record<string, CinemaAdapter> = {
-  reach_cinema: reachCinemaAdapter,   // Viva / Ozone / KADA (Reach Cinema / Fusion Intel)
+  reach_cinema: reachCinemaAdapter,   // Viva / Ozone / KADA / EbonyLife / OOPL (Reach Cinema / Fusion Intel)
   veezi:        veeziAdapter,         // Silverbird
   cinesync:     cinesyncAdapter,      // Filmhouse (needs DevTools recon — see cinesync.ts)
   bluepictures: bluepicturesAdapter,  // Blue Pictures
   firecrawl:    firecrawlAdapter,
-  genesis:      genesisAdapter,    // Genesis Cinemas (Jacro WP plugin — deterministic HTML, no AI)     // Genesis + any geo-blocked sites
-  filmhouse:    filmhouseAdapter,  // Filmhouse (Next.js server-rendered — run from a Nigerian IP)
+  genesis:      genesisAdapter,       // Genesis Cinemas (Jacro WP plugin — deterministic HTML, no AI)
+  filmhouse:    filmhouseAdapter,     // Filmhouse (Next.js server-rendered — run from a Nigerian IP)
+  kap_cinema:   kapCinemaAdapter,     // KAP Cinema (Kunle Afolayan Production Cinema REST API)
 };
 
 export * from './types.js';
