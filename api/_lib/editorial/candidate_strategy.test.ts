@@ -27,10 +27,10 @@ describe('editorial candidate strategy', () => {
 
   it('prioritizes NolliStream, then Docuth, and excludes cinema from now-streaming', () => {
     const films = [
-      { id: 'cinema', release_date: '2026-08-01', is_in_cinemas: true, poster_url: 'x', updated_at: '2026-08-23' },
-      { id: 'docuth', release_date: '2026-07-01', release_type: 'docuth', poster_url: 'x', updated_at: '2026-08-23' },
-      { id: 'nolli', release_date: '2026-06-01', release_type: 'nollistream', poster_url: 'x', updated_at: '2026-08-01' },
-      { id: 'netflix', release_date: '2026-08-01', release_type: 'netflix', poster_url: 'x', updated_at: '2026-08-23' },
+      { id: 'cinema', release_date: '2026-08-22', is_in_cinemas: true, poster_url: 'x', updated_at: '2026-08-23' },
+      { id: 'docuth', release_date: '2026-08-21', release_type: 'docuth', poster_url: 'x', updated_at: '2026-08-23' },
+      { id: 'nolli', release_date: '2026-08-20', release_type: 'nollistream', poster_url: 'x', updated_at: '2026-08-21' },
+      { id: 'netflix', release_date: '2026-08-22', release_type: 'netflix', poster_url: 'x', updated_at: '2026-08-23' },
     ];
     expect(rankAndDedupeFilms(films, 'streaming', 10, now).map(f => f.id)).toEqual(['nolli', 'docuth', 'netflix']);
   });
@@ -38,7 +38,7 @@ describe('editorial candidate strategy', () => {
   it('prioritizes a newly uploaded YouTube film using the channel upload date', () => {
     const october = new Date('2026-10-20T12:00:00.000Z');
     const films = [
-      { id: 'older-upload', release_date: '2026-08-01', release_type: 'youtube', youtube_published_at: '2026-08-01', poster_url: 'older.jpg' },
+      { id: 'older-upload', release_date: '2026-10-14', release_type: 'youtube', youtube_published_at: '2026-10-14', poster_url: 'older.jpg' },
       { id: 'recent-upload', release_date: '2026-10-19', release_type: 'youtube', youtube_published_at: '2026-10-19', poster_url: 'recent.jpg' },
     ];
     expect(rankAndDedupeFilms(films, 'streaming', 10, october).map(f => f.id)[0]).toBe('recent-upload');
@@ -59,14 +59,14 @@ describe('editorial candidate strategy', () => {
     const films = [
       { id: 'future', release_date: '2026-10-01', poster_url: 'x' },
       { id: 'stale-flag', release_date: '2025-01-01', coming_soon: true, poster_url: 'x' },
-      { id: 'streaming', release_date: '2026-08-01', release_type: 'docuth', poster_url: 'x' },
+      { id: 'streaming', release_date: '2026-08-20', release_type: 'docuth', poster_url: 'x' },
     ];
     expect(rankAndDedupeFilms(films, 'upcoming', 10, now).map(f => f.id)).toEqual(['future']);
   });
 
   it('routes a released YouTube film to streaming instead of upcoming', () => {
     const releasedYoutube = {
-      id: 'class-character', release_date: '2026-08-28', release_type: 'youtube',
+      id: 'class-character', release_date: '2026-10-18', release_type: 'youtube',
       youtube_watch_url: 'https://youtube.com/watch?v=example', poster_url: 'poster.jpg',
     };
     const october = new Date('2026-10-20T12:00:00.000Z');
@@ -77,8 +77,8 @@ describe('editorial candidate strategy', () => {
 
   it('excludes films whose poster URL is a landscape YouTube thumbnail or banner', () => {
     const films = [
-      { id: 'landscape-yt', release_date: '2026-08-01', release_type: 'docuth', poster_url: 'https://i.ytimg.com/vi/xyz/hqdefault.jpg', updated_at: '2026-08-23' },
-      { id: 'valid-portrait', release_date: '2026-08-01', release_type: 'docuth', poster_url: 'https://cloud.bakkaz.name.ng/poster1.jpg', updated_at: '2026-08-23' },
+      { id: 'landscape-yt', release_date: '2026-08-20', release_type: 'docuth', poster_url: 'https://i.ytimg.com/vi/xyz/hqdefault.jpg', updated_at: '2026-08-23' },
+      { id: 'valid-portrait', release_date: '2026-08-20', release_type: 'docuth', poster_url: 'https://cloud.bakkaz.name.ng/poster1.jpg', updated_at: '2026-08-23' },
     ];
     expect(rankAndDedupeFilms(films, 'streaming', 10, now).map(f => f.id)).toEqual(['valid-portrait']);
   });

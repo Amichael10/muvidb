@@ -25,6 +25,7 @@ import WhatsAppOptInModal from '../components/person/WhatsAppOptInModal'
 import AddPersonMediaModal from '../components/person/AddPersonMediaModal'
 import PersonPhotoLightboxModal from '../components/person/PersonPhotoLightboxModal'
 import BookingModal from '../components/person/BookingModal'
+import TalentAccessModal from '../components/person/TalentAccessModal'
 import AwardLogo from '../components/awards/AwardLogo'
 import { normOrg } from '../lib/awards'
 
@@ -191,6 +192,12 @@ export default function PersonDetailV2() {
   // Header Dropdown Menu State
   const [moreActionsOpen, setMoreActionsOpen] = useState(false)
   const moreActionsRef = useRef(null)
+  const [talentAccessModalOpen, setTalentAccessModalOpen] = useState(false)
+  const [pendingUserClaim, setPendingUserClaim] = useState(null)
+
+  const isClaimed = Boolean(person?.claimed_by)
+  const isDeceased = Boolean(person?.is_deceased || person?.date_of_death)
+  const isUnclaimed = Boolean(person && !isClaimed && !isDeceased)
 
   // Awards Section States
   const [selectedAwardOrg, setSelectedAwardOrg] = useState('all')
@@ -212,6 +219,25 @@ export default function PersonDetailV2() {
       user.user_metadata?.role === 'admin'
     )
   )
+
+  useEffect(() => {
+    if (!user?.id || !personId || isClaimed) {
+      setPendingUserClaim(null)
+      return
+    }
+    supabase
+      .from('profile_claims')
+      .select('id, status')
+      .eq('user_id', user.id)
+      .eq('person_id', personId)
+      .eq('status', 'pending')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPendingUserClaim(data || null)
+      })
+      .catch(() => {})
+  }, [user?.id, personId, isClaimed])
 
   const {
     isFollowing,
@@ -995,6 +1021,16 @@ export default function PersonDetailV2() {
                   </button>
                 )}
 
+                {/* 4. Talent & Rep Access (Uniform on ALL profiles - IMDbPro style) */}
+                <button
+                  onClick={() => setTalentAccessModalOpen(true)}
+                  className="flex-1 sm:flex-none inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-surface hover:bg-surface-2 hover:border-brand/60 px-4 py-2 text-xs font-bold text-text-secondary hover:text-text-primary transition whitespace-nowrap shadow-sm group/talent active:scale-95"
+                  title={`Talent management & representation portal for ${person.name}`}
+                >
+                  <Icon icon="solar:shield-user-bold" width="16" className="text-brand group-hover/talent:scale-110 transition-transform" />
+                  <span>Talent & Rep Access</span>
+                </button>
+
                 {/* Compact Utilities Bar (Share · Socials · More) */}
                 <div className="flex items-center gap-2 shrink-0">
                   {/* 3. Quick Share (Icon button with dropdown) */}
@@ -1049,16 +1085,13 @@ export default function PersonDetailV2() {
 
                     {moreActionsOpen && (
                       <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-xl shadow-2xl z-50 py-1 text-xs backdrop-blur-xl animate-in fade-in">
-                        {!person.claimed_by && !person.is_deceased && !person.date_of_death && (
-                          <Link
-                            to={`/claim?person=${encodeURIComponent(person.slug || person.id)}`}
-                            onClick={() => setMoreActionsOpen(false)}
-                            className="flex items-center gap-2.5 px-4 py-2.5 text-text-primary hover:bg-surface-2 hover:text-brand transition font-medium"
-                          >
-                            <Icon icon="solar:shield-check-linear" width="16" className="text-brand" />
-                            <span>Claim this profile</span>
-                          </Link>
-                        )}
+                        <button
+                          onClick={() => { setTalentAccessModalOpen(true); setMoreActionsOpen(false); }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-text-primary hover:bg-surface-2 hover:text-brand transition font-medium text-left"
+                        >
+                          <Icon icon="solar:shield-user-linear" width="16" className="text-brand" />
+                          <span>Talent & Rep Access</span>
+                        </button>
                         <button
                           onClick={() => { setBookingModalOpen(true); setMoreActionsOpen(false); }}
                           className="w-full flex items-center gap-2.5 px-4 py-2.5 text-text-primary hover:bg-surface-2 hover:text-amber-400 transition font-medium text-left"
@@ -2098,6 +2131,15 @@ export default function PersonDetailV2() {
         onClose={() => setBookingModalOpen(false)}
         person={person}
         representations={representations}
+      />
+
+      <TalentAccessModal
+        isOpen={talentAccessModalOpen}
+        onClose={() => setTalentAccessModalOpen(false)}
+        person={person}
+        user={user}
+        representations={representations}
+        pendingClaim={pendingUserClaim}
       />
 
     </div>

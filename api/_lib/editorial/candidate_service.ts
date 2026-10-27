@@ -230,11 +230,44 @@ async function enrichPeopleCandidates(people: any[]): Promise<any[]> {
 }
 
 /**
+ * Fetch all entity IDs that have already been published in social_content_items or social_calendar
+ */
+export async function getPublishedEntityIds(): Promise<Set<string>> {
+  try {
+    const [contentRes, calRes] = await Promise.all([
+      supabase
+        .from('social_content_items')
+        .select('source_entity_id')
+        .eq('status', 'published')
+        .not('source_entity_id', 'is', null),
+      supabase
+        .from('social_calendar')
+        .select('subject_entity_id')
+        .eq('status', 'published')
+        .not('subject_entity_id', 'is', null),
+    ]);
+
+    const publishedIds = new Set<string>();
+    for (const row of contentRes.data || []) {
+      if (row.source_entity_id) publishedIds.add(row.source_entity_id);
+    }
+    for (const row of calRes.data || []) {
+      if (row.subject_entity_id) publishedIds.add(row.subject_entity_id);
+    }
+    return publishedIds;
+  } catch (err) {
+    console.warn('Failed to fetch published entity IDs:', err);
+    return new Set<string>();
+  }
+}
+
+/**
  * Fetch candidate entities for a given content series from MuviDB Postgres tables.
  */
 export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Promise<CandidateEntity[]> {
   const norm = normalizeSeriesSlug(seriesSlug);
   const intent = getSeriesIntent(seriesSlug);
+  const publishedIds = await getPublishedEntityIds();
 
   // ── 1. RISING STARS & SUPPORTING ACTORS (you_know_the_face / rising_stars) ─
   if (norm.includes('face') || norm.includes('rising') || norm.includes('supporting')) {
@@ -260,7 +293,8 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       people = fallbackPeople || [];
     }
 
-    const enriched = await enrichPeopleCandidates(people.slice(0, limit));
+    const filteredPeople = (people || []).filter(p => !publishedIds.has(p.id));
+    const enriched = await enrichPeopleCandidates(filteredPeople.slice(0, limit));
 
     return enriched.map((p) => ({
       id: p.id,
@@ -319,22 +353,13 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       return dept === 'actor' || dept === 'acting';
     };
 
-    // Filter out industry moguls with > 60 credits (unless Lateef Olofin)
+    // Filter out industry moguls with > 60 credits and already-published people
     const belowTheLine = (btlRes.data || []).filter(p => {
+      if (publishedIds.has(p.id)) return false;
       if (isActorOnly(p)) return false;
-      const isLateef = p.slug === 'lateef-olofin' || (p.name && p.name.toLowerCase().includes('lateef olofin'));
-      return isLateef || (p.film_count || 0) <= 60;
+      return (p.film_count || 0) <= 60;
     });
-    const aboveTheLine = (atlRes.data || []).filter(p => !isActorOnly(p) && (p.film_count || 0) <= 50);
-
-    // Prioritize Lateef Olofin (esteemed post-production editor & first customer of MuviDB)
-    const lateefIndex = belowTheLine.findIndex(
-      (p) => p.slug === 'lateef-olofin' || (p.name && p.name.toLowerCase().includes('lateef olofin'))
-    );
-    if (lateefIndex > -1) {
-      const [lateef] = belowTheLine.splice(lateefIndex, 1);
-      belowTheLine.unshift(lateef);
-    }
+    const aboveTheLine = (atlRes.data || []).filter(p => !publishedIds.has(p.id) && !isActorOnly(p) && (p.film_count || 0) <= 50);
 
     // Interleave: 2 below-the-line craftspeople to 1 director/producer
     const targetList: typeof belowTheLine = [];
@@ -445,7 +470,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       return name.includes('test') || name.includes('sample') || name.includes('placeholder');
     };
 
-    const targetPeople = (mixedPeople.length > 0 ? mixedPeople : (people || [])).filter(p => !isTestPerson(p));
+    const targetPeople = (mixedPeople.length > 0 ? mixedPeople : (people || [])).filter(p => !isTestPerson(p) && !publishedIds.has(p.id));
     const enriched = await enrichPeopleCandidates(targetPeople.slice(0, limit));
 
     return enriched.map((p) => ({
@@ -477,8 +502,9 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       .limit(limit * 3);
 
     const now = new Date();
-    // Filter out all archived or ended plays — only active/upcoming productions are eligible for social posts
+    // Filter out all archived or ended plays and already-published productions
     const activePlays = (plays || []).filter((p) => {
+      if (publishedIds.has(p.id)) return false;
       const derived = derivePlayStatus(p, now);
       return derived !== 'archived' && p.status !== 'archived';
     });
@@ -498,7 +524,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   // ── 5. CRITICS ROUNDUP & VERDICTS (Recent movies only with critic reviews) ────────
   if (norm.includes('critic') || norm.includes('review') || norm.includes('take')) {
     const today = new Date();
-    const recentCutoff = new Date(today.getTime() - 14 * 86_400_000);
+    const recentCutoff = new Date(today.getTime() - 7 * 86_400_000);
     const todayDate = today.toISOString().slice(0, 10);
     const cutoffDate = recentCutoff.toISOString().slice(0, 10);
 
@@ -512,8 +538,8 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       .limit(limit * 3);
 
     if (reviews && reviews.length > 0) {
-      // Filter out rows where film poster is missing or quote is empty
-      const validReviews = reviews.filter((r: any) => r.films?.poster_url && r.quote && r.quote.trim().length > 15);
+      // Filter out rows where film poster is missing, quote is empty, or film was already published
+      const validReviews = reviews.filter((r: any) => r.films?.poster_url && r.films?.id && !publishedIds.has(r.films.id) && r.quote && r.quote.trim().length > 15);
       const rawFilms = validReviews.slice(0, limit).map((r: any) => ({
         ...r.films,
         criticReview: {
@@ -633,7 +659,7 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     };
 
     return (films || [])
-      .filter(f => (quotable.get(f.id) || 0) >= MIN_QUOTES)
+      .filter(f => !publishedIds.has(f.id) && (quotable.get(f.id) || 0) >= MIN_QUOTES)
       .map(f => {
         const ageDays = daysSince(f.release_date);
         let freshnessBonus = 0;
@@ -690,8 +716,9 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
   if (intent === 'streaming') {
     // Query active destinations directly so NolliStream/Docuth titles cannot be
     // pushed out of the pool by unrelated rows with newer update timestamps.
-    const recentUploadCutoff = new Date(Date.now() - 90 * 86_400_000).toISOString();
-    const recentReleaseCutoff = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    // Strictly enforce 1 to 7 days recency for streaming titles
+    const recentUploadCutoff = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const recentReleaseCutoff = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
     const currentYear = new Date().getFullYear();
 
     const { data: recentChannelVideos, error: recentChannelVideosError } = await supabase
@@ -765,13 +792,18 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
     if (error) throw error;
     filmRows = data || [];
   } else {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    const currentYear = new Date().getFullYear();
     const { data, error } = await supabase.from('films').select(filmSelect)
-      .not('poster_url', 'is', null).order('updated_at', { ascending: false }).limit(poolLimit);
+      .not('poster_url', 'is', null)
+      .or(`release_date.gte.${sevenDaysAgo},and(release_date.is.null,year.gte.${currentYear})`)
+      .order('release_date', { ascending: false, nullsFirst: false })
+      .limit(poolLimit);
     if (error) throw error;
     filmRows = data || [];
   }
 
-  const rankedFilms = rankAndDedupeFilms(filmRows, intent, limit);
+  const rankedFilms = rankAndDedupeFilms(filmRows, intent, limit, new Date(), publishedIds);
   const enriched = await enrichFilmCandidates(rankedFilms);
 
   return enriched.map((f: any) => {

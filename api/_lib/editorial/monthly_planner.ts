@@ -83,6 +83,7 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
     { data: films, error: filmsError },
     { data: existingReleaseRows, error: existingReleaseError },
     { data: existingBaseRows, error: existingBaseError },
+    { data: publishedContentRows, error: publishedContentError },
   ] = await Promise.all([
     supabase.from('social_content_series').select('id,slug').eq('active', true),
     supabase.from('films')
@@ -95,12 +96,18 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
     supabase.from('social_calendar').select('planner_key,status,selection_locked')
       .like('planner_key', 'base:%')
       .in('status', ['published', 'approved', 'draft_ready', 'subject_selected']),
+    supabase.from('social_content_items')
+      .select('source_entity_id')
+      .eq('status', 'published')
+      .not('source_entity_id', 'is', null),
   ]);
   if (seriesError) throw seriesError;
   if (filmsError) throw filmsError;
   if (existingReleaseError) throw existingReleaseError;
   if (existingBaseError) throw existingBaseError;
+  if (publishedContentError) throw publishedContentError;
 
+  const publishedFilmIds = new Set((publishedContentRows || []).map(row => row.source_entity_id));
   const lockedBaseKeys = new Set((existingBaseRows || []).map(row => row.planner_key));
 
   const seriesIds = new Map((series || []).map(row => [row.slug, row.id]));
@@ -137,6 +144,7 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
   const existingReleaseKeys = new Set((existingReleaseRows || []).map(row => row.planner_key));
   const releasesByDay = new Map<string, any[]>();
   for (const film of releases) {
+    if (publishedFilmIds.has(film.id)) continue;
     const plannerKey = `release:${film.id}:${film.release_date}`;
     if (existingReleaseKeys.has(plannerKey)) continue;
     const publishDate = film.release_date < startDate ? startDate : film.release_date;

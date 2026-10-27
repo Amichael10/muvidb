@@ -198,11 +198,14 @@ export function assessEditorialCandidate(
 
     const filmYear = data.year ? Number(data.year) : null;
     const currentYear = referenceDate.getFullYear();
-    const isOldMovie = (release !== null && release < referenceDate.getTime() - 90 * DAY_MS) ||
-      (filmYear !== null && filmYear < currentYear && (release === null || release < referenceDate.getTime() - 90 * DAY_MS));
+    const isOldMovie = (release !== null && release < referenceDate.getTime() - 7 * DAY_MS) ||
+      (filmYear !== null && filmYear < currentYear && (release === null || release < referenceDate.getTime() - 7 * DAY_MS));
 
     if (isOldMovie && intent === 'streaming') {
       warnings.push('Old release is not eligible for new streaming spotlight');
+      penalties -= 100;
+    } else if (isOldMovie && intent === 'catalogue') {
+      warnings.push('Release older than 7 days is not eligible for new film features');
       penalties -= 100;
     }
 

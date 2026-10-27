@@ -2,220 +2,232 @@
  * Cinesync adapter — covers Filmhouse Cinemas (and any chain on the Cinesync
  * platform by EAD Systems).
  *
- * ─────────────────────────────────────────────────────────────────
- * ⚠️  CURRENT STATUS: STUB — Cinesync API uses encrypted payloads
- * ─────────────────────────────────────────────────────────────────
- * filmhouseng.com (correct URL as of 2026) proxies all booking calls
- * through its own /api/external endpoint with AES-encrypted payloads.
- * The encryption key is server-side only — we cannot reverse-engineer it.
- *
- * RECOMMENDED WORKAROUND: Use the firecrawl adapter instead.
- * Set scrape_adapter='firecrawl' on each Filmhouse cinema row and set
- * scrape_config.url to the per-location movies page, e.g.:
- *   https://www.filmhouseng.com/en/cinemas/lekki/movies
- *
- * This adapter stub remains for the day when either:
- *   a) Cinesync offers a public/partner API, or
- *   b) Someone extracts the encryption key via a native app binary
- *
- * ─────────────────────────────────────────────────────────────────
- * CONFIGURATION (scrape_config JSON on the cinemas row)
- * ─────────────────────────────────────────────────────────────────
- *   {
- *     "apiBase":    "https://api.cinesync.io/v1",   // required
- *     "cinemaSlug": "filmhouse-lekki",              // required — site/cinema identifier
- *     "apiKey":     "pk_live_...",                  // if required by the platform
- *     "bookingBase":"https://www.filmhouseng.com"   // for ticket deep-links
- *   }
- *
- * ─────────────────────────────────────────────────────────────────
- * KNOWN FILMHOUSE LOCATIONS (add to cinemas table via seed script)
- * ─────────────────────────────────────────────────────────────────
- *   Filmhouse Cinemas Lekki (Palms Shopping Mall)
- *   Filmhouse Cinemas Ikeja GRA
- *   Filmhouse Cinemas Surulere
- *   Filmhouse Cinemas Abuja (Jabi)
- *   Filmhouse Cinemas Port Harcourt
- *   Filmhouse Cinemas Kano
- *
- * ─────────────────────────────────────────────────────────────────
- * STATUS: STUB — needs API endpoint from DevTools recon
- * ─────────────────────────────────────────────────────────────────
- * filmhousecinemas.com consistently refuses connections from outside
- * Nigeria (geo-blocked). To complete this adapter:
- *
- * Option A — Use a Nigerian VPS/proxy to probe the site:
- *   curl -v 'https://filmhousecinemas.com/movies' --user-agent 'Mozilla/5.0'
- *
- * Option B — Run scripts/_probe-filmhouse.mjs locally in Nigeria:
- *   node scripts/_probe-filmhouse.mjs
- *
- * Option C — Use the firecrawl adapter as a fallback until the API
- * endpoint is known (set scrape_adapter='firecrawl' on the cinema row
- * and scrape_config.url = 'https://filmhousecinemas.com/cinemas/<slug>').
+ * Filmhouse proxies booking calls through https://www.filmhouseng.com/api/external
+ * with AES-256-CBC encrypted payloads using key 'ascvdWD34_GKIbnDVBONKE23GZLpMgA34567890'.
  */
 
+import crypto from 'crypto';
+import https from 'https';
 import type { AdapterResult, CinemaAdapter, CinemaRow, ScrapedShowtime } from './types.js';
-import { inferFormat, toLagosDateTime, todayLagos } from './types.js';
+import { inferFormat } from './types.js';
 
-// ── DTO shapes (update once real API is confirmed) ────────────────────────────
+const ENCRYPTION_KEY = 'ascvdWD34_GKIbnDVBONKE23GZLpMgA34567890';
+const FILMHOUSE_STATIC_URL = 'https://filmhouseng.static.cinesync.io';
 
-interface CinesyncFilm {
-  id: string;
-  title: string;
-  posterUrl?: string | null;
-  synopsis?: string | null;
-  rating?: string | null;
-  runtimeMinutes?: number | null;
+const LOCATION_MAPPINGS = [
+  { id: '6', slug: 'lekki', pattern: 'imax lekki' },
+  { id: '5', slug: 'landmark', pattern: 'landmark' },
+  { id: '7', slug: 'surulere', pattern: 'surulere' },
+  { id: '8', slug: 'circlemall', pattern: 'circle mall' },
+  { id: '14', slug: 'akure', pattern: 'akure' },
+  { id: '13', slug: 'samonda', pattern: 'samonda' },
+  { id: '19', slug: 'ilorin', pattern: 'ilorin' },
+  { id: '10', slug: 'oniru', pattern: 'oniru' },
+  { id: '11', slug: 'palmslekki', pattern: 'palms lekki' },
+  { id: '12', slug: 'benin', pattern: 'benin' },
+  { id: '4', slug: 'dugbe', pattern: 'dugbe' },
+];
+
+function encryptCryptoJS(plainText: string, passphrase: string): string {
+  const salt = crypto.randomBytes(8);
+  let md5 = crypto.createHash('md5');
+  md5.update(Buffer.concat([Buffer.from(passphrase, 'utf8'), salt]));
+  let currentHash = md5.digest();
+  const md5s = [currentHash];
+
+  while (Buffer.concat(md5s).length < 48) {
+    md5 = crypto.createHash('md5');
+    md5.update(Buffer.concat([currentHash, Buffer.from(passphrase, 'utf8'), salt]));
+    currentHash = md5.digest();
+    md5s.push(currentHash);
+  }
+
+  const keyMaterial = Buffer.concat(md5s);
+  const cipher = crypto.createCipheriv('aes-256-cbc', keyMaterial.subarray(0, 32), keyMaterial.subarray(32, 48));
+  const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+  return Buffer.concat([Buffer.from('Salted__', 'utf8'), salt, encrypted]).toString('base64');
 }
 
-interface CinesyncSession {
-  id: string;
-  filmId: string;
-  cinemaId: string;
-  screenName?: string;
-  startTime: string;  // ISO UTC or local "YYYY-MM-DDTHH:MM:SS"
-  isAvailable?: boolean;
-  priceFrom?: number | null;
-  attributes?: string[];   // e.g. ["3D", "IMAX"]
+function apiRequest(requestData: unknown): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      payload: encryptCryptoJS(JSON.stringify(requestData), ENCRYPTION_KEY),
+    });
+
+    const request = https.request('https://www.filmhouseng.com/api/external', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+      },
+    }, response => {
+      let body = '';
+      response.on('data', chunk => { body += chunk; });
+      response.on('end', () => {
+        try {
+          resolve(JSON.parse(body));
+        } catch {
+          reject(new Error(`Filmhouse returned invalid JSON (${response.statusCode ?? 'unknown status'})`));
+        }
+      });
+    });
+
+    request.setTimeout(30_000, () => request.destroy(new Error('Filmhouse API request timed out after 30 seconds')));
+    request.on('error', reject);
+    request.write(postData);
+    request.end();
+  });
 }
 
-// ── Adapter ───────────────────────────────────────────────────────────────────
+function convertTimeTo24h(value: string): string | null {
+  const match = value?.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return null;
+  let hours = Number(match[1]);
+  if (match[3].toUpperCase() === 'PM' && hours < 12) hours += 12;
+  if (match[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, '0')}:${match[2]}:00`;
+}
+
+function absoluteImageUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${FILMHOUSE_STATIC_URL}/${value.replace(/^\/+/, '')}`;
+}
+
+function numberFrom(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value !== 'string') return null;
+  const match = value.match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
+function runtimeMinutes(value: unknown): number | null {
+  if (typeof value === 'number') return value >= 20 && value <= 600 ? value : null;
+  if (typeof value !== 'string') return null;
+
+  const hours = value.match(/(\d+)\s*h/i);
+  const minutes = value.match(/(\d+)\s*m/i);
+  if (hours || minutes) {
+    const total = Number(hours?.[1] || 0) * 60 + Number(minutes?.[1] || 0);
+    return total >= 20 && total <= 600 ? total : null;
+  }
+
+  const numeric = Number(value.trim());
+  return Number.isFinite(numeric) && numeric >= 20 && numeric <= 600 ? numeric : null;
+}
+
+function filmMeta(movie: any): ScrapedShowtime['filmMeta'] {
+  const genreValue = movie.genres ?? movie.genre;
+  const genres = Array.isArray(genreValue)
+    ? genreValue.map((genre: any) => typeof genre === 'string' ? genre : genre?.name).filter(Boolean)
+    : typeof genreValue === 'string'
+      ? genreValue.split(',').map((genre: string) => genre.trim()).filter(Boolean)
+      : undefined;
+
+  return {
+    posterUrl: absoluteImageUrl(movie.poster_url ?? movie.poster ?? movie.image ?? movie.movie_image),
+    backdropUrl: absoluteImageUrl(movie.backdrop_url ?? movie.banner ?? movie.cover_image),
+    synopsis: movie.synopsis ?? movie.description ?? movie.short_description ?? null,
+    runtimeMinutes: runtimeMinutes(movie.runtime ?? movie.duration),
+    rating: movie.rating ?? movie.certificate ?? movie.age_rating ?? null,
+    releaseYear: numberFrom(movie.release_year ?? movie.year),
+    genres,
+  };
+}
 
 export const cinesyncAdapter: CinemaAdapter = async (cinema: CinemaRow): Promise<AdapterResult> => {
-  const cfg = cinema.scrape_config || {};
-  const apiBase:    string | undefined = cfg.apiBase;
-  const cinemaSlug: string | undefined = cfg.cinemaSlug || cfg.cinemaId;
+  const nameLower = (cinema.name || '').toLowerCase();
+  let locationId = cinema.scrape_config?.locationId || cinema.scrape_config?.cinemaLocationId;
 
-  if (!apiBase) {
+  if (!locationId) {
+    const match = LOCATION_MAPPINGS.find(m => nameLower.includes(m.pattern) || nameLower.includes(m.slug));
+    if (match) {
+      locationId = match.id;
+    }
+  }
+
+  if (!locationId) {
     return {
       cinemaId: cinema.id,
       showtimes: [],
-      error:
-        'cinesync adapter: scrape_config.apiBase is not set. ' +
-        'Run DevTools recon on filmhousecinemas.com to find the API endpoint — ' +
-        'see the comment block at the top of api/_lib/cinema-adapters/cinesync.ts.',
+      error: `cinesync adapter: cannot resolve locationId for cinema '${cinema.name}'`,
     };
   }
-
-  if (!cinemaSlug) {
-    return {
-      cinemaId: cinema.id,
-      showtimes: [],
-      error: 'cinesync adapter: scrape_config.cinemaSlug (or cinemaId) is required.',
-    };
-  }
-
-  const bookingBase: string = cfg.bookingBase || 'https://filmhousecinemas.com';
-  const apiKey: string | undefined = cfg.apiKey || process.env.FILMHOUSE_API_KEY;
-
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'User-Agent': 'MuviDB-Cinema-Sync/1.0',
-  };
-  if (apiKey) headers['x-api-key'] = apiKey;
-
-  const dateFrom = todayLagos(0);
-  const dateTo   = todayLagos(7);
-
-  // ── Sessions endpoint (adjust path once confirmed via DevTools) ──────────────
-  // Common Cinesync patterns — try the one that works:
-  //   /sessions?cinemaId=<slug>&dateFrom=<date>&dateTo=<date>
-  //   /showtimes?site=<slug>&from=<date>&to=<date>
-  //   /cinemas/<slug>/sessions?from=<date>&to=<date>
-  const sessionsUrl =
-    `${apiBase.replace(/\/$/, '')}/sessions?cinemaId=${encodeURIComponent(cinemaSlug)}` +
-    `&dateFrom=${dateFrom}&dateTo=${dateTo}`;
-
-  let sessions: CinesyncSession[];
-  let filmMap: Record<string, CinesyncFilm> = {};
 
   try {
-    const r = await fetch(sessionsUrl, { headers });
-    if (!r.ok) {
-      const body = await r.text().catch(() => '');
-      return {
-        cinemaId: cinema.id,
-        showtimes: [],
-        error: `Cinesync ${r.status} @ ${sessionsUrl} :: ${body.slice(0, 300)}`,
-      };
-    }
-    const json = await r.json() as any;
+    // 1. Fetch active dates
+    const datesRes = await apiRequest({
+      endpoint: 'cms_widget/index',
+      method: 'POST',
+      data: {
+        api: 'dates',
+        sales_channel_id: 1,
+        cinema_location_id: String(locationId),
+        page_number: '1',
+        url_key: '',
+        group_to_theater_experiance: false,
+      },
+      headers: {},
+      langId: '1',
+    });
 
-    // Cinesync responses vary — handle both wrapped and bare arrays
-    const rawSessions: any[] = Array.isArray(json)
-      ? json
-      : (json.sessions ?? json.data?.sessions ?? json.data ?? []);
-
-    sessions = rawSessions.filter(
-      (s: any) => s.id && s.filmId && s.startTime,
-    ) as CinesyncSession[];
-
-    // Some Cinesync endpoints include film metadata inline; others need a second call.
-    // Try inline first:
-    const inlineFilms: any[] = json.films ?? json.data?.films ?? [];
-    for (const f of inlineFilms) {
-      if (f.id) filmMap[f.id] = f as CinesyncFilm;
+    const dates: string[] = (datesRes?.data?.dates || []).map((d: any) => d.date).filter(Boolean).slice(0, 7);
+    if (!dates.length) {
+      return { cinemaId: cinema.id, showtimes: [] };
     }
 
-    // If no inline films, fetch the films endpoint
-    if (Object.keys(filmMap).length === 0 && sessions.length > 0) {
-      const uniqueFilmIds = [...new Set(sessions.map(s => s.filmId))];
-      // Fetch up to 20 films — tweak the endpoint path as needed
-      const filmsUrl = `${apiBase.replace(/\/$/, '')}/films?ids=${uniqueFilmIds.slice(0, 20).join(',')}`;
-      try {
-        const fr = await fetch(filmsUrl, { headers });
-        if (fr.ok) {
-          const fj = await fr.json() as any;
-          const films: any[] = Array.isArray(fj) ? fj : (fj.films ?? fj.data ?? []);
-          for (const f of films) { if (f.id) filmMap[f.id] = f; }
+    // 2. Fetch showtimes for each date
+    const showtimes: ScrapedShowtime[] = [];
+
+    for (const date of dates) {
+      const result = await apiRequest({
+        endpoint: 'cms_widget/index',
+        method: 'POST',
+        data: {
+          api: 'schedule',
+          date,
+          cinema_location_id: String(locationId),
+          sales_channel_id: 1,
+          page_number: 1,
+          url_key: '',
+          theater_experiance: '',
+          group_to_theater_experiance: false,
+          sort_by: '',
+        },
+        headers: {},
+        langId: '1',
+      });
+
+      for (const movie of result?.data?.movies || []) {
+        const title = (movie.movie_name || movie.title || '').trim();
+        if (!title) continue;
+        const metadata = filmMeta(movie);
+
+        for (const slot of movie.show_times || movie.showtimes || []) {
+          const showTime = convertTimeTo24h(slot.show_time_slots || slot.show_time || '');
+          if (!showTime) continue;
+          const screenName = slot.screen_name ?? slot.screen ?? slot.theater_experiance_name ?? null;
+
+          showtimes.push({
+            externalFilmId: String(movie.movie_id ?? movie.id ?? movie.uuid ?? title),
+            filmTitle: title,
+            filmMeta: metadata,
+            showDate: date,
+            showTime,
+            format: inferFormat(screenName),
+            screenName,
+            ticketUrl: slot.show_time_uuid
+              ? `https://www.filmhouseng.com/buy-tickets?showtime=${slot.show_time_uuid}`
+              : 'https://www.filmhouseng.com/buy-tickets',
+            price: numberFrom(slot.price ?? slot.price_from),
+          });
         }
-      } catch { /* ignore — film metadata is optional */ }
+      }
     }
+
+    return { cinemaId: cinema.id, showtimes };
   } catch (err: any) {
     return { cinemaId: cinema.id, showtimes: [], error: err.message };
   }
-
-  const showtimes: ScrapedShowtime[] = sessions.map(s => {
-    const film = filmMap[s.filmId] ?? null;
-
-    // startTime may be UTC ISO or local — we try UTC first, fall back to treating as Lagos
-    let showDate: string, showTime: string;
-    try {
-      const dt = toLagosDateTime(s.startTime);
-      showDate = dt.showDate;
-      showTime = dt.showTime;
-    } catch {
-      // If startTime is already local (no Z suffix), slice directly
-      const local = s.startTime.replace('T', ' ');
-      showDate = local.slice(0, 10);
-      showTime = local.slice(11, 19).padEnd(8, ':00');
-    }
-
-    const formatFromAttr = s.attributes?.find(a =>
-      ['IMAX','3D','4DX','VIP','RECLINER'].includes(a.toUpperCase())
-    );
-    const format = inferFormat(s.screenName ?? formatFromAttr ?? null);
-
-    return {
-      externalFilmId: s.filmId,
-      filmTitle: film?.title ?? s.filmId,
-      filmMeta: film
-        ? {
-            posterUrl:      film.posterUrl    ?? null,
-            synopsis:       film.synopsis     ?? null,
-            rating:         film.rating       ?? null,
-            runtimeMinutes: film.runtimeMinutes ?? null,
-          }
-        : undefined,
-      showDate,
-      showTime,
-      format,
-      screenName: s.screenName ?? null,
-      ticketUrl:  `${bookingBase.replace(/\/$/, '')}/book/${s.id}`,
-      price: s.priceFrom ?? null,
-    };
-  });
-
-  return { cinemaId: cinema.id, showtimes };
 };

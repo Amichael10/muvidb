@@ -1,6 +1,6 @@
 import { supabase } from '../supabase.js';
 import { approveEditorialSlot } from '../social_studio.js';
-import { fetchSeriesCandidates, CandidateEntity } from './candidate_service.js';
+import { fetchSeriesCandidates, CandidateEntity, getPublishedEntityIds } from './candidate_service.js';
 import { preflightFilm } from './social_preflight.js';
 
 const LAGOS_OFFSET_HOURS = 1;
@@ -137,14 +137,14 @@ async function resolveEligibleCandidate(options: {
       };
     }
 
-    // Fetch fresh releases from past 60 days if still not found
-    const sixtyDaysAgo = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+    // Fetch fresh releases from past 1 to 7 days if still not found
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
     const { data: recentFilms } = await supabase
       .from('films')
       .select('id, title, poster_url, release_date')
       .eq('is_published', true)
       .not('poster_url', 'is', null)
-      .gte('release_date', sixtyDaysAgo)
+      .gte('release_date', sevenDaysAgo)
       .order('release_date', { ascending: false })
       .limit(30);
 
@@ -200,9 +200,14 @@ export async function autoScheduleDueCalendarSlots(now = new Date()): Promise<{
   const scheduledSlots: string[] = [];
   const skippedSlots: Array<{ slotId: string; reason: string }> = [];
 
-  // Track claimed candidate IDs across recent days and within this batch
-  // to ensure 2 daily pulse slots (or other slots) never choose the same entity twice.
+  // Track claimed candidate IDs across recent days, within this batch, and all historically published entities
+  // to ensure already-published or scheduled entities are NEVER chosen again.
   const claimedCandidateIds = new Set<string>();
+  const publishedIds = await getPublishedEntityIds().catch(() => new Set<string>());
+  for (const id of publishedIds) {
+    claimedCandidateIds.add(id);
+  }
+
   const recentCutoff = new Date(now.getTime() - 14 * 86_400_000).toISOString().slice(0, 10);
   const { data: recentSlots } = await supabase
     .from('social_calendar')

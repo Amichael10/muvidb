@@ -94,15 +94,15 @@ export function isFilmEligibleForIntent(film: any, intent: EditorialSeriesIntent
   if (intent === 'streaming') {
     if (lifecycle !== 'now_streaming') return false;
 
-    // Strict editorial rule: Never post old movies - only new releases.
+    // Strict editorial rule: Never post old movies - only fresh new releases (1 to 7 days).
     const nowMs = referenceDate.getTime();
     const currentYear = referenceDate.getFullYear();
     const release = dateValue(film?.release_date);
     const filmYear = film?.year ? Number(film.year) : null;
-    const maxAgeDays = 90;
+    const maxAgeDays = 7;
     const maxAgeMs = maxAgeDays * 86_400_000;
 
-    // 1. If release_date is known, must not be older than 90 days (never from previous years)
+    // 1. If release_date is known, must not be older than 7 days (never from previous years)
     if (release !== null) {
       if (release < nowMs - maxAgeMs) return false;
     } else if (filmYear !== null && filmYear < currentYear) {
@@ -110,7 +110,7 @@ export function isFilmEligibleForIntent(film: any, intent: EditorialSeriesIntent
       return false;
     }
 
-    // 2. If it is a YouTube upload, the upload date itself must not be older than 90 days
+    // 2. If it is a YouTube upload, the upload date itself must not be older than 7 days
     const uploadDate = dateValue(film?.youtubePublishedAt || film?.youtube_published_at);
     if (uploadDate !== null && uploadDate < nowMs - maxAgeMs) {
       return false;
@@ -130,7 +130,24 @@ export function isFilmEligibleForIntent(film: any, intent: EditorialSeriesIntent
     const withinOneYear = release !== null && release > referenceDate.getTime() && release <= referenceDate.getTime() + 366 * 86_400_000;
     return lifecycle === 'upcoming' && withinOneYear;
   }
-  if (intent === 'catalogue') return lifecycle === 'catalogue' || lifecycle === 'now_streaming' || lifecycle === 'now_in_cinemas';
+  if (intent === 'catalogue') {
+    // Strictly reject older movies from prior years or movies released > 7 days ago (1-7 days policy)
+    const nowMs = referenceDate.getTime();
+    const currentYear = referenceDate.getFullYear();
+    const release = dateValue(film?.release_date);
+    const upload = dateValue(film?.youtubePublishedAt || film?.youtube_published_at);
+    const effectiveDate = release || upload;
+    const filmYear = film?.year ? Number(film.year) : null;
+    const maxAgeMs = 7 * 86_400_000; // strictly 1 to 7 days for active social spotlights
+
+    if (effectiveDate !== null) {
+      if (effectiveDate < nowMs - maxAgeMs) return false;
+    } else if (filmYear !== null && filmYear < currentYear) {
+      return false;
+    }
+
+    return lifecycle === 'catalogue' || lifecycle === 'now_streaming' || lifecycle === 'now_in_cinemas';
+  }
   return false;
 }
 
@@ -138,17 +155,18 @@ export function filmCandidateScore(film: any, intent: EditorialSeriesIntent, ref
   const lifecycle = classifyFilmLifecycle(film, referenceDate);
   const platform = resolveFilmPlatform(film);
   const release = dateValue(film?.release_date);
-  const updated = dateValue(film?.updated_at) || dateValue(film?.created_at) || 0;
-  const freshnessDays = updated ? Math.max(0, (referenceDate.getTime() - updated) / 86_400_000) : 3650;
+  const upload = dateValue(film?.youtubePublishedAt || film?.youtube_published_at);
+  const effectiveDate = release || upload;
+  // Calculate freshness from actual release/upload date — never use database updated_at
+  const freshnessDays = effectiveDate ? Math.max(0, (referenceDate.getTime() - effectiveDate) / 86_400_000) : 365;
   const completeness = ((film?.poster_url || film?.backdrop_url) ? 25 : 0) + (film?.synopsis ? 10 : 0) + (film?.backdrop_url || film?.backdrop ? 5 : 0);
 
   if (intent === 'streaming') {
     // High prominence to new YouTube uploads
     let youtubeRecencyBonus = 0;
     if (platform === 'youtube' && (film?.poster_url || film?.backdrop_url)) {
-      const uploadDate = dateValue(film?.youtubePublishedAt || film?.youtube_published_at);
-      const uploadRecency = uploadDate !== null
-        ? Math.max(0, (referenceDate.getTime() - uploadDate) / 86_400_000)
+      const uploadRecency = upload !== null
+        ? Math.max(0, (referenceDate.getTime() - upload) / 86_400_000)
         : null;
       if (uploadRecency !== null && uploadRecency <= 7) {
         youtubeRecencyBonus = 1200; // Released in the last 7 days gets top prominence
@@ -172,10 +190,16 @@ export function filmCandidateScore(film: any, intent: EditorialSeriesIntent, ref
   return (lifecycle === 'now_in_cinemas' ? 200 : lifecycle === 'now_streaming' ? 150 : 50) + Math.max(0, 90 - freshnessDays) + completeness;
 }
 
-export function rankAndDedupeFilms(films: any[], intent: EditorialSeriesIntent, limit: number, referenceDate = new Date()): any[] {
+export function rankAndDedupeFilms(
+  films: any[],
+  intent: EditorialSeriesIntent,
+  limit: number,
+  referenceDate = new Date(),
+  excludedIds?: Set<string>,
+): any[] {
   const unique = new Map<string, any>();
   for (const film of films || []) {
-    if (!film?.id || unique.has(film.id) || !isFilmEligibleForIntent(film, intent, referenceDate)) continue;
+    if (!film?.id || unique.has(film.id) || (excludedIds && excludedIds.has(film.id)) || !isFilmEligibleForIntent(film, intent, referenceDate)) continue;
     unique.set(film.id, film);
   }
   return [...unique.values()]
