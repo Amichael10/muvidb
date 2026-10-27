@@ -11,12 +11,13 @@ export type PlatformCaptionLimits = {
   usesTitle: boolean;
 };
 
-export const PLATFORM_CAPTION_LIMITS: Record<SocialPlatform, PlatformCaptionLimits> = {
+export const PLATFORM_CAPTION_LIMITS: Record<string, PlatformCaptionLimits> = {
   instagram: { captionLimit: 2200, hashtagLimit: 12, usesTitle: false },
   facebook: { captionLimit: 2000, hashtagLimit: 4, usesTitle: false },
   threads: { captionLimit: 500, hashtagLimit: 3, usesTitle: false },
   tiktok: { captionLimit: 2200, hashtagLimit: 8, usesTitle: true },
   x: { captionLimit: 280, hashtagLimit: 3, usesTitle: false },
+  twitter: { captionLimit: 280, hashtagLimit: 3, usesTitle: false },
   youtube: { captionLimit: 5000, hashtagLimit: 15, usesTitle: true },
 };
 
@@ -270,10 +271,18 @@ function formatCrewList(credits: SnapshotCreditedPerson[], platform: SocialPlatf
   return `Crew:\n${picked.map(credit => `${credit.role.replace(/_/g, ' ')} — ${credit.name}`).join('\n')}`;
 }
 
-function actorBody(snapshot: ActorSpotlightSnapshot): string[] {
+function actorBody(snapshot: ActorSpotlightSnapshot, contentType?: string | null): string[] {
   const lines: string[] = [];
-  const handleOrName = snapshot.name;
-  lines.push(`Star Spotlight: ${handleOrName} 🌟`);
+  const isBehindCamera = contentType === 'behind_the_camera' || (snapshot.knownForDepartment && !['Acting', 'Actor', 'Actress'].includes(snapshot.knownForDepartment));
+  const header = isBehindCamera
+    ? `🎬 Industry Spotlight: Celebrating ${snapshot.name} – The Creative Mind Behind the Magic 🌟`
+    : `Star Spotlight: ${snapshot.name} 🌟`;
+  lines.push(header);
+
+  const intro = isBehindCamera
+    ? `Ever wondered about the creative forces that shape unforgettable cinematic stories? Meet ${snapshot.name}, a powerhouse in Nollywood screen culture.`
+    : null;
+  if (intro) lines.push(intro);
 
   const titles = snapshot.knownFor.map(film => film.title).filter(Boolean);
   if (titles.length) {
@@ -580,7 +589,7 @@ export function buildVariantContent(input: {
     input.snapshot.kind === 'birthday_spotlight'
       ? birthdayBody(input.snapshot)
       : input.snapshot.kind === 'actor_spotlight'
-        ? actorBody(input.snapshot)
+        ? actorBody(input.snapshot, input.contentType)
         : input.snapshot.kind === 'whats_on_stage'
           ? theatreBody(input.snapshot, input.platform)
           : input.snapshot.kind === 'upcoming_movie' && input.contentType === 'audience_pulse'

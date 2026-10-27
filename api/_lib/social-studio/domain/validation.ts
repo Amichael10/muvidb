@@ -21,7 +21,7 @@ const DEFAULT_TEMPLATE_SLUGS: Record<SocialContentType, string> = {
   critics_say: 'critics-say-simple-v1',
   where_to_watch: 'where-to-watch-simple-v1',
   weekend_watchlist: 'weekend-watchlist-simple-v1',
-  whats_on_stage: 'on-stage-simple-v1',
+  whats_on_stage: 'poster-only',
   film_conversation: 'film-conversation-simple-v1',
   audience_pulse: 'audience-pulse-v1',
 };
@@ -53,9 +53,11 @@ export function parseGenerateDraftRequest(body: unknown): {
   if (criticReviewId) assertUuid(criticReviewId, 'criticReviewId');
 
   const templateSlug =
-    typeof input.templateSlug === 'string' && input.templateSlug.trim()
-      ? input.templateSlug.trim()
-      : DEFAULT_TEMPLATE_SLUGS[contentType];
+    contentType === 'whats_on_stage'
+      ? 'poster-only'
+      : typeof input.templateSlug === 'string' && input.templateSlug.trim()
+        ? input.templateSlug.trim()
+        : DEFAULT_TEMPLATE_SLUGS[contentType];
 
   const platforms = normalizePlatforms(input.platforms);
   if (!platforms.length) throw new Error('Select at least one platform');

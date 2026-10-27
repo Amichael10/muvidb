@@ -24,6 +24,7 @@ vi.mock('../social_studio.js', () => ({
 
 vi.mock('./candidate_service.js', () => ({
   fetchSeriesCandidates: vi.fn(),
+  getPublishedEntityIds: vi.fn().mockResolvedValue(new Set()),
 }));
 
 vi.mock('./social_preflight.js', () => ({

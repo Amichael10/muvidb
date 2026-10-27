@@ -1071,7 +1071,9 @@ async function processJob(job: any, lockedBy: string, now: Date) {
           });
         }
         let knownPortrait = false;
-        if (variant.selected_asset_id) {
+        if (isCarousel && (variant.platform_options?.asset_format === 'portrait_4_5' || variant.selected_asset_id)) {
+          knownPortrait = true;
+        } else if (variant.selected_asset_id) {
           const { data: assetRow } = await supabase
             .from('social_assets')
             .select('width, height, format')
@@ -1446,8 +1448,8 @@ async function loadPersonSource(
 
   // Both person cards share this query; only the snapshot shape differs.
   return contentType === 'birthday_spotlight'
-    ? buildBirthdaySpotlightSnapshot({ person, credits: credits || [], capturedAt })
-    : buildActorSpotlightSnapshot({ person, credits: credits || [], capturedAt });
+    ? buildBirthdaySpotlightSnapshot({ person, credits: credits || [], capturedAt, knownForLimit: 4 })
+    : buildActorSpotlightSnapshot({ person, credits: credits || [], capturedAt, knownForLimit: 4 });
 }
 
 async function loadUpcomingMovieSource(filmId: string, capturedAt: string) {
@@ -1634,6 +1636,18 @@ export async function syncContentItemWithSource(
 
   // Already published posts are locked historical records unless forced
   if (item.status === 'published' && !options.force) {
+    return { updated: false, changes: [] };
+  }
+
+  // Custom carousel posts have curated slide sets and custom editorial copy; do not overwrite
+  const { data: existingVariants } = await supabase
+    .from('social_platform_variants')
+    .select('platform_options')
+    .eq('content_item_id', contentItemId);
+  const isCustomCarousel = (existingVariants || []).some(
+    v => (v.platform_options as any)?.post_format === 'carousel'
+  );
+  if (isCustomCarousel && !options.force) {
     return { updated: false, changes: [] };
   }
 
@@ -1945,14 +1959,16 @@ export function defaultContentTypeForSeries(seriesSlug: string, candidateType: s
   if (candidateType === 'play' || seriesSlug === 'whats_on_stage') return 'whats_on_stage';
   if (seriesSlug === 'audience_pulse') return 'audience_pulse';
   if (candidateType === 'person') return 'actor_spotlight';
-  if (seriesSlug === 'critics_say' || seriesSlug === 'the_critic') return 'critics_say';
+  if (seriesSlug === 'critics_say' || seriesSlug === 'the_critic' || seriesSlug === 'one_film_two_takes') return 'critics_say';
   if (seriesSlug === 'where_to_watch') return 'where_to_watch';
   if (seriesSlug === 'weekend_watchlist') return 'weekend_watchlist';
-  if (seriesSlug === 'film_conversation') return 'film_conversation';
-  return 'upcoming_movie';
+  if (seriesSlug === 'film_conversation' || seriesSlug === 'by_the_numbers' || seriesSlug === 'muvidb_by_the_numbers') return 'film_conversation';
+  if (seriesSlug === 'new_and_upcoming' || seriesSlug === 'new_upcoming') return 'upcoming_movie';
+  return 'where_to_watch';
 }
 
 export function defaultTemplateSlugForSeries(seriesSlug: string, candidateType: string): string {
+  if (candidateType === 'play' || seriesSlug === 'whats_on_stage') return 'poster-only';
   const aliases: Record<string, string> = {
     behind_the_camera: 'behind-camera-simple-v1',
     film_conversation: 'film-conversation-simple-v1',
@@ -1964,7 +1980,7 @@ export function defaultTemplateSlugForSeries(seriesSlug: string, candidateType: 
     filmography: 'filmography-simple-v1',
     weekend_watchlist: 'weekend-watchlist-simple-v1',
     critics_say: 'critics-say-simple-v1',
-    whats_on_stage: 'on-stage-simple-v1',
+    whats_on_stage: 'poster-only',
     where_to_watch: 'where-to-watch-simple-v1',
     you_know_the_face: 'you-know-the-face-simple-v1',
     audience_pulse: 'audience-pulse-v1',
@@ -2078,34 +2094,49 @@ export async function generateSocialDraft(
   const sourceEntityType = SOURCE_ENTITY_TYPES[input.contentType];
   const capturedAt = new Date().toISOString();
 
-  const { data: template, error: templateError } = await supabase
-    .from('social_templates')
-    .select('id,slug,version,is_active,template_config')
-    .eq('slug', input.templateSlug)
-    .maybeSingle();
+  // For stage plays alone, strictly bypass template designs and post using the poster alone with copy
+  const isStagePlay =
+    sourceEntityType === 'play' ||
+    input.contentType === 'whats_on_stage';
+
+  const requestedTemplateSlug = isStagePlay ? 'poster-only' : input.templateSlug;
+
+  const { data: template, error: templateError } = requestedTemplateSlug === 'poster-only'
+    ? { data: null, error: null }
+    : await supabase
+        .from('social_templates')
+        .select('id,slug,version,is_active,template_config')
+        .eq('slug', requestedTemplateSlug)
+        .maybeSingle();
 
   if (templateError) throw templateError;
-  // If no graphic template matches, fall back to pure portrait-poster mode.
-  // A real template must always win over the poster fallback; otherwise every
-  // movie/play with artwork silently bypasses its assigned editorial template.
-  const effectiveTemplate = template || (isHtmlSocialTemplate(input.templateSlug)
+  // If stage play or no graphic template matches, fall back to pure portrait-poster mode.
+  const effectiveTemplate = isStagePlay
     ? {
-        id: null,
-        slug: input.templateSlug,
-        version: 1,
-        is_active: true,
-        template_config: {
-          renderer: 'html',
-          formats: htmlTemplateFormats(input.templateSlug),
-        },
-      }
-    : {
         id: null,
         slug: 'poster-only',
         version: 1,
         is_active: true,
         template_config: { formats: ['portrait_4_5'] },
-      });
+      }
+    : (template || (isHtmlSocialTemplate(requestedTemplateSlug)
+        ? {
+            id: null,
+            slug: requestedTemplateSlug,
+            version: 1,
+            is_active: true,
+            template_config: {
+              renderer: 'html',
+              formats: htmlTemplateFormats(requestedTemplateSlug),
+            },
+          }
+        : {
+            id: null,
+            slug: 'poster-only',
+            version: 1,
+            is_active: true,
+            template_config: { formats: ['portrait_4_5'] },
+          }));
 
   let snapshot =
     sourceEntityType === 'person'
@@ -2129,10 +2160,11 @@ export async function generateSocialDraft(
   }
 
   // Pure portrait-poster mode is explicit. Having a poster is source material
-  // for an editorial template, not permission to bypass that template.
+  // for an editorial template, not permission to bypass that template, EXCEPT for stage plays
+  // which strictly use the poster alone and copy.
   const isPosterKind = snapshot.kind === 'upcoming_movie' || snapshot.kind === 'whats_on_stage';
   const posterSourceUrl = isPosterKind ? (snapshot as any).posterUrl : (snapshot as any).photoUrl;
-  const posterOnly = effectiveTemplate.slug === 'poster-only' && !input.skipAssets && Boolean(posterSourceUrl);
+  const posterOnly = (effectiveTemplate.slug === 'poster-only' || isStagePlay) && !input.skipAssets && Boolean(posterSourceUrl);
   const poster = posterOnly
     ? await preparePoster(await downloadSocialImage(posterSourceUrl)).catch((err: any) => {
         console.warn(`[generateSocialDraft] Poster preparation rejected for ${posterSourceUrl}:`, err.message);
@@ -2162,7 +2194,7 @@ export async function generateSocialDraft(
       template_id: effectiveTemplate.id,
       destination_id: input.destinationId || null,
       status: 'generating',
-      generation_method: 'template',
+      generation_method: posterOnly ? 'poster_only' : 'template',
       generation_notes: warnings.length ? warnings.join(' ') : null,
       created_by: actor.id,
     })
@@ -2179,6 +2211,8 @@ export async function generateSocialDraft(
     ? await storePosterAsset(contentItem.id, poster, posterSourceUrl || (snapshot as any).posterUrl)
     : input.skipAssets
     ? { rows: [] as StoredAsset[] }
+    : isStagePlay
+    ? { rows: [] as StoredAsset[], error: 'Poster preparation failed for stage play. Stage plays require a portrait poster alone.' }
     : (effectiveTemplate.slug === 'poster-only' && !isPosterKind)
     ? { rows: [] as StoredAsset[] }
     : await renderAndStoreAssets({
@@ -2198,7 +2232,8 @@ export async function generateSocialDraft(
     const content = buildVariantContent({ snapshot, platform, contentType: input.contentType });
     const format = preferredAssetFormat(platform, availableFormats);
     const slideAssets = format ? (assets.carouselAssets?.[format] || []) : [];
-    const useCarousel = (input.contentType === 'critics_say' || input.contentType === 'weekend_watchlist') && platform !== 'tiktok' && slideAssets.length >= 2;
+    const isSpotlight = ['actor_spotlight', 'birthday_spotlight', 'filmography', 'behind_the_camera', 'you_know_the_face'].includes(input.contentType);
+    const useCarousel = (isSpotlight || input.contentType === 'critics_say' || input.contentType === 'weekend_watchlist' || slideAssets.length >= 2) && platform !== 'tiktok' && slideAssets.length >= 2;
     return {
       content_item_id: contentItem.id,
       platform,
@@ -3616,8 +3651,20 @@ export async function approveEditorialSlot(
     seriesSlug = (slotRow as any)?.social_content_series?.slug || '';
   }
 
-  const contentType = input.contentType || defaultContentTypeForSeries(seriesSlug, input.candidateType);
-  const templateSlug = input.templateSlug || defaultTemplateSlugForSeries(seriesSlug, input.candidateType);
+  let contentType = input.contentType || defaultContentTypeForSeries(seriesSlug, input.candidateType);
+  if (input.candidateType === 'movie' && contentType === 'upcoming_movie') {
+    const { data: filmCheck } = await supabase
+      .from('films')
+      .select('release_date')
+      .eq('id', input.candidateId)
+      .maybeSingle();
+    const todayStr = input.scheduledDate || new Date().toISOString().slice(0, 10);
+    if (filmCheck?.release_date && filmCheck.release_date <= todayStr) {
+      contentType = 'where_to_watch';
+    }
+  }
+  const isStagePlay = input.candidateType === 'play' || (contentType as string) === 'theatre_spotlight' || (contentType as string) === 'whats_on_stage';
+  const templateSlug = isStagePlay ? 'poster-only' : (input.templateSlug || defaultTemplateSlugForSeries(seriesSlug, input.candidateType));
   // Editorial slots are rendered graphics, so TikTok is not a default
   // destination. An explicit `input.platforms` still wins.
   const platforms = input.platforms && input.platforms.length ? input.platforms : defaultPlatformsFor('graphic');

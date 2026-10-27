@@ -1459,7 +1459,7 @@ export type RenderedAsset = {
   slide?: number;
 };
 
-function defaultTemplateSlugForSnapshot(snapshot: SocialSourceSnapshot): string {
+export function defaultTemplateSlugForSnapshot(snapshot: SocialSourceSnapshot): string {
   if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
     const s = snapshot as any;
     const dept = String(s.knownForDepartment || (Array.isArray(s.roles) ? s.roles.join(' ') : s.roles) || '').toLowerCase();
@@ -1477,7 +1477,7 @@ function defaultTemplateSlugForSnapshot(snapshot: SocialSourceSnapshot): string 
     return 'you-know-the-face-simple-v1';
   }
   if (snapshot.kind === 'whats_on_stage') {
-    return 'on-stage-simple-v1';
+    return 'poster-only';
   }
   if (snapshot.kind === 'upcoming_movie') {
     const s = snapshot as UpcomingMovieSnapshot;

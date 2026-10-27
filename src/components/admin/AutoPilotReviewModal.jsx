@@ -32,7 +32,7 @@ const HTML_TEMPLATE_BY_SERIES = {
   critics_say: 'critics-say-v1',
   one_film_two_takes: 'critics-say-v1',
   weekend_watchlist: 'watchlist-this-week-v1',
-  whats_on_stage: 'on-stage-theatre-v1',
+  whats_on_stage: 'poster-only',
   film_conversation: 'nollywood-debate-v1',
   new_and_upcoming: 'now-showing-cinemas-v1',
   actor_spotlight: 'actor-spotlight-v1',
@@ -52,6 +52,9 @@ const HTML_TEMPLATE_SLUGS = new Set([
 
 function normalizeCandidateTemplate(nextCandidate, seriesSlug) {
   if (!nextCandidate) return null;
+  if (seriesSlug === 'whats_on_stage' || nextCandidate.type === 'play') {
+    return { ...nextCandidate, templateSlug: 'poster-only' };
+  }
   let templateSlug = nextCandidate.templateSlug;
   if (!templateSlug || !HTML_TEMPLATE_SLUGS.has(templateSlug)) {
     templateSlug = HTML_TEMPLATE_BY_SERIES[seriesSlug] || 'now-showing-cinemas-v1';
@@ -333,11 +336,13 @@ export default function AutoPilotReviewModal({
 
   const handleDownloadRenderedCard = async () => {
     if (!candidate) return;
-    const toastId = toast.loading(customImageUrl ? 'Preparing your poster…' : 'Rendering high-res MuviDB card…');
+    const isPosterMode = customImageUrl || isPlay || candidate?.templateSlug === 'poster-only';
+    const toastId = toast.loading(isPosterMode ? 'Preparing your poster…' : 'Rendering high-res MuviDB card…');
     try {
-      if (customImageUrl) {
-        const posterResponse = await fetch(customImageUrl);
-        if (!posterResponse.ok) throw new Error('Failed to download uploaded poster');
+      const posterTargetUrl = customImageUrl || (isPosterMode ? displayImage : null);
+      if (posterTargetUrl) {
+        const posterResponse = await fetch(posterTargetUrl);
+        if (!posterResponse.ok) throw new Error('Failed to download poster');
         const posterBlob = await posterResponse.blob();
         const posterObjectUrl = URL.createObjectURL(posterBlob);
         const posterLink = document.createElement('a');
@@ -345,7 +350,7 @@ export default function AutoPilotReviewModal({
         posterLink.download = `${(candidate.name || 'muvidb').replace(/[^a-zA-Z0-9]/g, '_')}_poster.jpg`;
         posterLink.click();
         URL.revokeObjectURL(posterObjectUrl);
-        toast.success('Downloaded your original post artwork!', { id: toastId });
+        toast.success('Downloaded original poster artwork!', { id: toastId });
         return;
       }
 
@@ -730,6 +735,12 @@ export default function AutoPilotReviewModal({
                     className="h-full w-full object-contain"
                   />
                 )
+              ) : isPlay || candidate?.templateSlug === 'poster-only' ? (
+                <img
+                  src={displayImage}
+                  alt={`${candidate?.name || 'Stage Play'} poster`}
+                  className="h-full w-full object-contain"
+                />
               ) : HTML_TEMPLATE_SLUGS.has(candidate?.templateSlug) ? (
                 <HtmlSocialTemplatePreview candidate={candidate} templateSlug={candidate.templateSlug} />
               ) : (

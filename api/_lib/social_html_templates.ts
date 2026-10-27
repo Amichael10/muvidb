@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { SocialAssetFormat, RenderedAsset } from './social_render.js';
@@ -17,6 +18,7 @@ type HtmlTemplateSpec = {
 
 const TEMPLATE_DIR = path.join(getLibDir(), 'social-html-templates');
 const DEFAULT_HANDLE = '@muvidb_';
+const nodeRequire = createRequire(import.meta.url);
 
 // @sparticuz/chromium expands its remote pack into /tmp. A single editorial
 // asset can render several formats/slides concurrently, so calling
@@ -121,10 +123,11 @@ type SimpleEditorialVariant =
   | 'you_know_the_face';
 
 function simpleSpec(variant: SimpleEditorialVariant): HtmlTemplateSpec {
+  const isSpotlight = variant === 'behind_camera' || variant === 'you_know_the_face' || variant === 'filmography';
   return {
     file: 'simple-editorial-v1.html',
     formats: ['portrait_4_5'],
-    slides: variant === 'weekend_watchlist' ? 5 : undefined,
+    slides: isSpotlight ? 6 : variant === 'weekend_watchlist' ? 5 : undefined,
     data: (snapshot, slide) => simpleEditorialData(snapshot, variant, slide),
   };
 }
@@ -333,6 +336,15 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
     : '';
   const personRole = suppliedRoles || person?.knownForDepartment || 'Screen professional';
   const personSummary = (person as any)?.summary || (person as any)?.shortBio || summarizePersonBio(person?.bio, 210);
+  const roleLines = String(personRole)
+    .split(/\s*(?:·|,|&|\/|\band\b)\s*/i)
+    .map(role => role.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  const siteOrigin = String(process.env.PUBLIC_SITE_URL || process.env.VITE_PUBLIC_SITE_URL || 'https://muvidb.com').replace(/\/$/, '');
+  const profileUrl = person?.slug ? `${siteOrigin}/people/${person.slug}` : `${siteOrigin}/people`;
+  const profilePath = profileUrl.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+  const featuredCredits = person?.knownFor?.map(f => f.title).filter(Boolean).slice(0, 2).join(' · ') || 'MUVIDB';
 
   const base = {
     title,
@@ -348,9 +360,94 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
     quote: '',
   };
 
+  const isSpotlightVariant = variant === 'behind_camera' || variant === 'you_know_the_face' || variant === 'filmography';
+  if (isSpotlightVariant && slide && slide > 1) {
+    if (slide === 2) {
+      return {
+        ...base,
+        variant: 'split-top',
+        series: 'Industry Spotlight',
+        badge: 'THE CREATIVE MIND',
+        title: 'The Mind Behind The Magic',
+        status: String(personRole).toUpperCase(),
+        detail: 'CRAFT & VISION',
+        support: `Ever wondered who breathes soul into your favorite Nollywood stories before an actor even steps on set? Meet ${title}.<br><br>${person?.bio ? summarizePersonBio(person.bio, 260) : `As a respected ${personRole.toLowerCase()}, they bring rare cultural nuance, emotional weight, and dedication to every production they shape.`}`,
+        image,
+      };
+    }
+    if (slide === 3) {
+      return {
+        ...base,
+        variant: 'poster-grid-slide',
+        series: 'Notable Filmography',
+        badge: 'CAREER HIGHLIGHTS',
+        title: 'Selected Filmography',
+        grid1: person?.knownFor?.[0]?.posterUrl || image,
+        gridTitle1: person?.knownFor?.[0]?.title || '',
+        grid2: person?.knownFor?.[1]?.posterUrl || image,
+        gridTitle2: person?.knownFor?.[1]?.title || '',
+        grid3: person?.knownFor?.[2]?.posterUrl || image,
+        gridTitle3: person?.knownFor?.[2]?.title || '',
+        grid4: person?.knownFor?.[3]?.posterUrl || image,
+        gridTitle4: person?.knownFor?.[3]?.title || '',
+      };
+    }
+    if (slide === 4) {
+      const knownTitles = person?.knownFor?.map(f => f.title).filter(Boolean).slice(0, 4).join(', ');
+      return {
+        ...base,
+        variant: 'editorial-story',
+        series: 'The Cinematic Journey',
+        badge: 'CAREER & CRAFT',
+        title: 'The Cinematic Journey',
+        status: String(personRole).toUpperCase(),
+        detail: 'AUTHENTIC ROOTS',
+        support: `${title}’s artistic journey is fueled by discipline, authentic storytelling, and a deep reverence for African heritage.<br><br>Their creative footprint is woven across memorable productions like ${knownTitles || 'landmark Nollywood titles'}.<br><br>Whether cutting through tension or capturing quiet emotional truth, their work gives Nollywood narratives their unmistakable heartbeat.`,
+      };
+    }
+    if (slide === 5) {
+      return {
+        ...base,
+        variant: 'editorial-story',
+        series: 'New Vanguard',
+        badge: 'VISION & IMPACT',
+        title: 'Pushing Boundaries',
+        status: 'EMPOWERING VOICES',
+        detail: 'AFRICAN CINEMA',
+        support: `Beyond traditional boundaries, ${title} is part of a bold wave of creators elevating African narratives from conception to the screen.<br><br>Their dedication proves that when regional authenticity meets uncompromising craft, Nollywood storytelling transcends borders and connects powerfully with audiences worldwide.`,
+      };
+    }
+    if (slide === 6) {
+      return {
+        ...base,
+        variant: 'celebration-closing',
+        title: `Join us in celebrating ${title}`,
+        support: `— an extraordinary ${personRole.toLowerCase()} reshaping the African screen landscape one story at a time! 🥂✨`,
+        status: 'EXPLORE THEIR WORK AT MUVIDB.COM',
+      };
+    }
+  }
+
+  if (isSpotlightVariant) {
+    const spotlightLabels = {
+      behind_camera: { series: 'Behind The Camera', badge: 'THE MAKERS' },
+      you_know_the_face: { series: 'You Know The Face', badge: 'PEOPLE' },
+      filmography: { series: 'The Filmography', badge: 'CAREER PROFILE' },
+    } as const;
+    return {
+      ...base,
+      ...spotlightLabels[variant],
+      variant: 'spotlight-cover',
+      roleLines,
+      support: summarizePersonBio(personSummary, 175),
+      featuredCredits: featuredCredits.toUpperCase(),
+      profileUrl,
+      profilePath,
+      footer: [person?.nationality, 'CINEMA'].filter(Boolean).join(' ').toUpperCase() || 'AFRICAN CINEMA',
+    };
+  }
+
   switch (variant) {
-    case 'behind_camera':
-      return { ...base, series: 'Behind The Camera', badge: 'THE MAKERS', status: `${person?.creditCount || 0} credits`, detail: personRole, support: personSummary };
     case 'film_conversation':
       return { ...base, image: film?.posterUrl || image, imagePosition: 'center top', series: 'Film Conversation', badge: 'JOIN IN', title: `What did you think of ${title}?`, status: 'Tell us', detail: 'In the comments' };
     case 'by_the_numbers':
@@ -363,19 +460,6 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
       return { ...base, series: 'Stage To Screen', badge: 'CROSSOVER', status: 'Stage & film', detail: stage?.year ? String(stage.year) : 'African stories' };
     case 'critic_spotlight':
       return { ...base, image: film?.posterUrl || image, imagePosition: 'center top', criticAvatar: film?.criticReview?.avatarUrl || '', variant: 'critic_spotlight', series: 'The Critic', badge: 'CRITIC SPOTLIGHT', quote: film?.criticReview?.quote || film?.tagline || '', title: film?.criticReview?.criticName || title, status: film?.criticReview?.criticName || 'Film critic', detail: film?.criticReview?.publication || film?.criticReview?.criticTitle || 'African cinema' };
-    case 'filmography':
-      return {
-        ...base,
-        series: 'The Filmography',
-        badge: 'CAREER PROFILE',
-        variant: 'filmography',
-        title,
-        support: 'A career across generations of African cinema.',
-        status: personRole,
-        detail: '',
-        metric: person?.creditCount || '',
-        metricLabel: 'DOCUMENTED CREDITS',
-      };
     case 'weekend_watchlist':
       {
         const pickIndex = Math.max(0, (slide || 2) - 2);
@@ -417,8 +501,6 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
       return { ...base, series: "What’s On Stage", badge: formatDateRange(stage?.runStartDate, stage?.runEndDate, stage?.year), status: stage?.status || 'Live on stage', detail: [stage?.venue, stage?.city].filter(Boolean).join(' · ') || 'Theatre' };
     case 'where_to_watch':
       return { ...base, series: 'Now Streaming', badge: 'NEW TO STREAMING', variant: 'now-streaming', status: film?.youtubeChannelName || filmStatus, detail: film?.youtubeChannelName ? 'YouTube' : filmDetail };
-    case 'you_know_the_face':
-      return { ...base, series: 'You Know The Face', badge: 'PEOPLE', status: `${person?.creditCount || 0} credits`, detail: personRole, support: personSummary };
     default:
       return base;
   }
@@ -470,9 +552,21 @@ async function renderHtmlTemplate(input: {
     : await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+    const templateData = { ...spec.data(input.snapshot, input.slide), ...(input.dataOverride || {}) };
+    if (typeof templateData.profileUrl === 'string' && templateData.profileUrl) {
+      const QRCode = nodeRequire('qrcode') as {
+        toDataURL: (value: string, options: Record<string, unknown>) => Promise<string>;
+      };
+      templateData.qrDataUrl = await QRCode.toDataURL(templateData.profileUrl, {
+        errorCorrectionLevel: 'H',
+        margin: 1,
+        width: 360,
+        color: { dark: '#080a0d', light: '#ffffff' },
+      });
+    }
     await page.addInitScript(data => {
       (window as any).MUVIDB_DATA = data;
-    }, { ...spec.data(input.snapshot, input.slide), ...(input.dataOverride || {}) });
+    }, templateData);
     await page.goto(url.toString(), { waitUntil: 'commit', timeout: 15_000 });
     await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => {});
     await page.evaluate(async () => {
@@ -528,10 +622,11 @@ export async function renderHtmlSocialTemplateAsset(input: {
     }
   }
 
-  // Final slide of ANY carousel is the official default back cover poster unless custom override requested
+  // Final slide of carousel is the official default back cover poster unless custom override requested or spotlight template
   const totalSlides = spec?.slides || 1;
+  const isSpotlightTemplate = input.templateSlug === 'behind-camera-simple-v1' || input.templateSlug === 'you-know-the-face-simple-v1' || input.templateSlug === 'filmography-simple-v1';
   const wantsCustomBackCover = Boolean(input.dataOverride && (input.dataOverride.variant || input.dataOverride.title || input.dataOverride.skipDefaultBackCover));
-  if (totalSlides > 1 && input.slide === totalSlides && !wantsCustomBackCover) {
+  if (totalSlides > 1 && input.slide === totalSlides && !wantsCustomBackCover && !isSpotlightTemplate) {
     const backCoverPath = path.join(process.cwd(), 'public', 'images', 'social', 'carousel-back-cover-v1.png');
     if (existsSync(backCoverPath)) {
       const sharp = (await import('sharp')).default;

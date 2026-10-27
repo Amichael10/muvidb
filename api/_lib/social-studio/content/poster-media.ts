@@ -1,3 +1,7 @@
+import * as dns from 'dns';
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {}
 import sharp from 'sharp';
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
