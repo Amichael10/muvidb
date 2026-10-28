@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), dispatch: vi.fn() }));
 vi.mock('./supabase.js', () => ({ supabase: { from: mocks.from, rpc: mocks.rpc } }));
 vi.mock('./whatsapp_movie_alerts.js', () => ({ dispatchMovieWhatsAppAlerts: mocks.dispatch }));
-import { runWhatsAppAlertQueue, backfillMovieWhatsAppAlertQueue } from './whatsapp_alert_queue';
+import { runWhatsAppAlertQueue, backfillMovieWhatsAppAlertQueue, isWhatsAppReleaseDateEligible } from './whatsapp_alert_queue';
 
 function query(data: unknown) {
   const q: any = { then: (resolve: any) => Promise.resolve({ data, error: null }).then(resolve) };
@@ -18,7 +18,7 @@ describe('WhatsApp credit alert queue', () => {
   });
 
   function setup(published = true) {
-    const film = query({ id: 'film', title: 'Film', content_type: 'movie', is_published: published, is_in_cinemas: false });
+    const film = query({ id: 'film', title: 'Film', release_date: new Date().toISOString().slice(0, 10), content_type: 'movie', is_published: published, is_in_cinemas: false });
     const completion = query(null);
     const unlock = query(null);
     mocks.from.mockReturnValueOnce(film).mockReturnValueOnce(completion).mockReturnValueOnce(unlock);
@@ -46,7 +46,7 @@ describe('WhatsApp credit alert queue', () => {
     const completion = query(null);
     const unlock = query(null);
     mocks.from.mockReturnValueOnce(query({
-      id: 'film', title: 'Episode 18', content_type: 'series', is_published: true, is_in_cinemas: false,
+      id: 'film', title: 'Episode 18', release_date: new Date().toISOString().slice(0, 10), content_type: 'series', is_published: true, is_in_cinemas: false,
     })).mockReturnValueOnce(completion).mockReturnValueOnce(unlock);
     const result = await runWhatsAppAlertQueue();
     expect(result.deferred).toBe(0);
@@ -67,6 +67,19 @@ describe('WhatsApp credit alert queue', () => {
     }));
     expect(completion.delete).not.toHaveBeenCalled();
   });
+
+  it('suppresses an old catalogue title even when it was queued before the release-date gate', async () => {
+    const completion = query(null);
+    const unlock = query(null);
+    mocks.from.mockReturnValueOnce(query({
+      id: 'film', title: 'Old catalogue title', release_date: '2024-01-23', content_type: 'movie', is_published: true, is_in_cinemas: false,
+    })).mockReturnValueOnce(completion).mockReturnValueOnce(unlock);
+    const result = await runWhatsAppAlertQueue();
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+    expect(result.suppressed).toBe(1);
+    expect(result.suppressedFilms[0]).toContain('ineligible release date');
+    expect(completion.delete).toHaveBeenCalled();
+  });
 });
 
 describe('credits that arrive after publication', () => {
@@ -77,7 +90,7 @@ describe('credits that arrive after publication', () => {
   });
 
   function setupPublished() {
-    const film = query({ id: 'film', title: 'Film', content_type: 'movie', is_published: true, is_in_cinemas: false });
+    const film = query({ id: 'film', title: 'Film', release_date: new Date().toISOString().slice(0, 10), content_type: 'movie', is_published: true, is_in_cinemas: false });
     const completion = query(null);
     const unlock = query(null);
     mocks.from.mockReturnValueOnce(film).mockReturnValueOnce(completion).mockReturnValueOnce(unlock);
@@ -101,7 +114,7 @@ describe('credits that arrive after publication', () => {
     const stale = new Date(Date.now() - 40 * 86400000).toISOString();
     mocks.rpc.mockResolvedValueOnce({ data: [{ film_id: 'film', queued_at: stale, locked_until: 'lease' }] })
       .mockResolvedValue({ data: [] });
-    const film = query({ id: 'film', title: 'Film', is_published: true, is_in_cinemas: false });
+    const film = query({ id: 'film', title: 'Film', release_date: new Date().toISOString().slice(0, 10), is_published: true, is_in_cinemas: false });
     const completion = query(null);
     const unlock = query(null);
     mocks.from.mockReturnValueOnce(film).mockReturnValueOnce(completion).mockReturnValueOnce(unlock);
@@ -129,6 +142,7 @@ describe('queue backfill', () => {
   }
 
   const recent = () => new Date(Date.now() - 86400000).toISOString();
+  const recentRelease = () => new Date().toISOString().slice(0, 10);
 
   beforeEach(() => vi.resetAllMocks());
 
@@ -137,7 +151,7 @@ describe('queue backfill', () => {
       follows: [{ user_id: 'u1', person_id: 'p1', notify_whatsapp: null }],
       users: [{ id: 'u1', whatsapp_enabled: true, whatsapp_phone: '+2348012345678' }],
       credits: [{ film_id: 'f1', person_id: 'p1' }],
-      films: [{ id: 'f1', is_published: true, is_in_cinemas: false, created_at: recent() }],
+      films: [{ id: 'f1', is_published: true, is_in_cinemas: false, created_at: recent(), release_date: recentRelease() }],
       whatsapp_movie_alert_log: [],
       whatsapp_movie_alert_queue: [],
     });
@@ -168,7 +182,7 @@ describe('queue backfill', () => {
       follows: [{ user_id: 'u1', person_id: 'p1', notify_whatsapp: null }],
       users: [{ id: 'u1', whatsapp_enabled: true, whatsapp_phone: '+2348012345678' }],
       credits: [{ film_id: 'f1', person_id: 'p1' }],
-      films: [{ id: 'f1', is_published: true, is_in_cinemas: false, created_at: recent() }],
+      films: [{ id: 'f1', is_published: true, is_in_cinemas: false, created_at: recent(), release_date: recentRelease() }],
       whatsapp_movie_alert_log: [{ film_id: 'f1', user_id: 'u1' }],
       whatsapp_movie_alert_queue: [],
     });
@@ -189,7 +203,7 @@ describe('queue backfill', () => {
         { id: 'u2', whatsapp_enabled: true, whatsapp_phone: '+2348087654321' },
       ],
       credits: [{ film_id: 'f1', person_id: 'p1' }],
-      films: [{ id: 'f1', is_published: true, is_in_cinemas: false, created_at: recent() }],
+      films: [{ id: 'f1', is_published: true, is_in_cinemas: false, created_at: recent(), release_date: recentRelease() }],
       whatsapp_movie_alert_log: [{ film_id: 'f1', user_id: 'u1' }],
       whatsapp_movie_alert_queue: [],
     });
@@ -202,7 +216,7 @@ describe('queue backfill', () => {
       follows: [{ user_id: 'u1', person_id: 'p1', notify_whatsapp: null }],
       users: [{ id: 'u1', whatsapp_enabled: true, whatsapp_phone: '+2348012345678' }],
       credits: [{ film_id: 'f1', person_id: 'p1' }],
-      films: [{ id: 'f1', is_published: true, is_in_cinemas: false, created_at: recent() }],
+      films: [{ id: 'f1', is_published: true, is_in_cinemas: false, created_at: recent(), release_date: recentRelease() }],
       whatsapp_movie_alert_log: [],
       whatsapp_movie_alert_queue: [{ film_id: 'f1' }],
     });
@@ -216,7 +230,7 @@ describe('queue backfill', () => {
       follows: [{ user_id: 'u1', person_id: 'p1', notify_whatsapp: null }],
       users: [{ id: 'u1', whatsapp_enabled: true, whatsapp_phone: '+2348012345678' }],
       credits: [{ film_id: 'f1', person_id: 'p1' }],
-      films: [{ id: 'f1', is_published: false, is_in_cinemas: false, created_at: recent() }],
+      films: [{ id: 'f1', is_published: false, is_in_cinemas: false, created_at: recent(), release_date: recentRelease() }],
       whatsapp_movie_alert_log: [],
       whatsapp_movie_alert_queue: [],
     });
@@ -229,11 +243,40 @@ describe('queue backfill', () => {
       follows: [{ user_id: 'u1', person_id: 'p1', notify_whatsapp: null }],
       users: [{ id: 'u1', whatsapp_enabled: true, whatsapp_phone: '+2348012345678' }],
       credits: [{ film_id: 'f1', person_id: 'p1' }],
-      films: [{ id: 'f1', content_type: 'series', is_published: true, is_in_cinemas: false, created_at: recent() }],
+      films: [{ id: 'f1', content_type: 'series', is_published: true, is_in_cinemas: false, created_at: recent(), release_date: recentRelease() }],
       whatsapp_movie_alert_log: [],
       whatsapp_movie_alert_queue: [],
     });
     expect((await backfillMovieWhatsAppAlertQueue()).candidateFilms).toBe(0);
     expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not treat a recently imported old movie as a new release', async () => {
+    const { upsert } = tables({
+      follows: [{ user_id: 'u1', person_id: 'p1', notify_whatsapp: null }],
+      users: [{ id: 'u1', whatsapp_enabled: true, whatsapp_phone: '+2348012345678' }],
+      credits: [{ film_id: 'f1', person_id: 'p1' }],
+      films: [{ id: 'f1', content_type: 'movie', is_published: true, is_in_cinemas: false, created_at: recent(), release_date: '2024-01-23' }],
+      whatsapp_movie_alert_log: [],
+      whatsapp_movie_alert_queue: [],
+    });
+    expect((await backfillMovieWhatsAppAlertQueue()).candidateFilms).toBe(0);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('WhatsApp release-date eligibility', () => {
+  const now = Date.parse('2026-10-28T12:00:00+01:00');
+
+  it('accepts releases from today and the configured lookback window', () => {
+    expect(isWhatsAppReleaseDateEligible('2026-10-28', now)).toBe(true);
+    expect(isWhatsAppReleaseDateEligible('2026-10-14', now)).toBe(true);
+  });
+
+  it('rejects old, future, missing, and malformed release dates', () => {
+    expect(isWhatsAppReleaseDateEligible('2024-01-23', now)).toBe(false);
+    expect(isWhatsAppReleaseDateEligible('2026-10-29', now)).toBe(false);
+    expect(isWhatsAppReleaseDateEligible(null, now)).toBe(false);
+    expect(isWhatsAppReleaseDateEligible('28/10/2026', now)).toBe(false);
   });
 });

@@ -16,6 +16,19 @@ const CREDIT_WAIT_MS = Number(process.env.WHATSAPP_ALERT_CREDIT_WAIT_DAYS || 7) 
  */
 const LOOKBACK_MS = Number(process.env.WHATSAPP_ALERT_LOOKBACK_DAYS || 14) * 86_400_000;
 
+function lagosDateAt(timestamp: number): string {
+  // Nigeria has no daylight-saving transition, so this produces the catalogue's
+  // local release date without depending on the server's timezone.
+  return new Date(timestamp + 60 * 60_000).toISOString().slice(0, 10);
+}
+
+export function isWhatsAppReleaseDateEligible(releaseDate: string | null | undefined, now = Date.now()): boolean {
+  if (!releaseDate || !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) return false;
+  const earliest = lagosDateAt(now - LOOKBACK_MS);
+  const today = lagosDateAt(now);
+  return releaseDate >= earliest && releaseDate <= today;
+}
+
 /** Ceiling per scan, so one pass cannot flood the queue. */
 const BACKFILL_LIMIT = Number(process.env.WHATSAPP_ALERT_BACKFILL_LIMIT || 25);
 
@@ -114,12 +127,14 @@ export async function backfillMovieWhatsAppAlertQueue(): Promise<AlertBackfillRe
   for (let i = 0; i < filmIds.length; i += 100) {
     const { data, error } = await supabase
       .from('films')
-      .select('id, content_type, is_published, is_in_cinemas, created_at')
+      .select('id, content_type, is_published, is_in_cinemas, created_at, release_date')
       .in('id', filmIds.slice(i, i + 100))
       .gte('created_at', since);
     if (error) throw new Error(`Cannot read films: ${error.message}`);
     for (const f of data || []) {
-      if (f.content_type !== 'series' && (f.is_published || f.is_in_cinemas)) live.push(f.id);
+      if (f.content_type !== 'series'
+        && (f.is_published || f.is_in_cinemas)
+        && isWhatsAppReleaseDateEligible(f.release_date)) live.push(f.id);
     }
   }
   result.candidateFilms = live.length;
@@ -189,7 +204,7 @@ export async function runWhatsAppAlertQueue() {
     let retryDelay = 5 * 60_000;
     try {
       const { data: film, error: filmError } = await supabase.from('films')
-        .select('id,title,slug,poster_url,release_type,content_type,is_published,is_in_cinemas')
+        .select('id,title,slug,poster_url,release_type,release_date,content_type,is_published,is_in_cinemas')
         .eq('id', job.film_id).single();
       if (filmError) throw new Error(filmError.message);
       // Episodic alerts quickly exhaust Meta's recipient-level marketing
@@ -198,6 +213,10 @@ export async function runWhatsAppAlertQueue() {
         console.log('[WhatsApp Alert] Suppressing episodic alert:', film.id, film.title);
         result.suppressed++;
         result.suppressedFilms.push(`${film.title || 'Untitled'} (${film.id})`);
+      } else if (!isWhatsAppReleaseDateEligible(film.release_date)) {
+        console.log('[WhatsApp Alert] Suppressing stale or undated release:', film.id, film.title, film.release_date);
+        result.suppressed++;
+        result.suppressedFilms.push(`${film.title || 'Untitled'} (${film.id}) — ineligible release date`);
       } else if (!film.is_published && !film.is_in_cinemas) {
         result.deferred++;
         retryDelay = 60 * 60_000;

@@ -80,7 +80,12 @@ async function handleScheduledEvent(event: ScheduledEvent, env: Env) {
     return;
   }
 
-  // Routine check (every 10 minutes): check if any post is due in Supabase
+  // Routine checks share one ten-minute Cloudflare trigger. This keeps the
+  // account within its Free-plan cron-trigger allowance while replacing the
+  // GitHub schedule that routinely arrived several hours late.
+  await dispatchTask(env, 'whatsapp_alerts');
+
+  // Check if any social post is due in Supabase.
   await checkAndDispatchPublishJobs(env, false);
 
   // 30-minute Pre-Post Verification Rule:

@@ -1,8 +1,8 @@
 name: WhatsApp Cast and Crew Alerts
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
+  # Scheduled delivery moved to the Cloudflare muvidb-cron-worker because
+  # GitHub's five-minute schedule was routinely delayed by several hours.
   workflow_dispatch:
 
 concurrency:
