@@ -75,7 +75,7 @@ export default function AdminLayout() {
     { path: '/admin/api-keys', label: 'Developer API', icon: 'solar:key-minimalistic-square-linear' },
   ];
 
-  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies', '/admin/critics', '/admin/plays', '/admin/title-checker'];
+  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies', '/admin/critics', '/admin/critic-videos', '/admin/plays', '/admin/title-checker'];
   
   // Security guard for manual URL entry by admin_limited
   const isPathAllowed = (path) => {

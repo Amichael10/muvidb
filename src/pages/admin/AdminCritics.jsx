@@ -4,6 +4,8 @@ import { fetchCritics, upsertCritic, deleteCritic, upsertCriticReview, deleteCri
 import { supabase } from '../../lib/supabase';
 import ImageField from '../../components/admin/ImageField';
 import Drawer from '../../components/admin/Drawer';
+import CriticReviewExtractorBox from '../../components/admin/CriticReviewExtractorBox';
+import { Link } from 'react-router';
 import SEO from '../../components/SEO';
 
 const BLANK_CRITIC = {
@@ -280,6 +282,16 @@ export default function AdminCritics() {
             Film Critics & Cultural Analysts
           </h1>
           <p className="text-xs text-text-muted mt-1">Manage verified film critic profiles, publications, and linked film reviews.</p>
+          <div className="mt-3">
+            <Link
+              to="/admin/critic-videos"
+              className="inline-flex items-center gap-2 bg-surface border border-brand/40 text-text-primary hover:border-brand font-bold px-3.5 py-2 rounded-xl transition-all text-xs"
+            >
+              <Icon icon="mdi:youtube" className="w-4 h-4 text-red-500" />
+              <span>Open YouTube & OCR Review Extractor</span>
+              <Icon icon="solar:camera-minimalistic-bold" className="w-4 h-4 text-brand" />
+            </Link>
+          </div>
         </div>
 
         <button
@@ -624,6 +636,23 @@ export default function AdminCritics() {
 
             {/* Film Search & Add Review Form */}
             <div className="p-4 bg-surface-2/40 border border-border rounded-xl space-y-4">
+              <CriticReviewExtractorBox
+                disabled={!editingCritic}
+                criticId={editingCritic?.id}
+                onExtracted={({ quote, rating, reviewUrl, matchedFilm, filmTitle }) => {
+                  setReviewForm(prev => ({
+                    ...prev,
+                    quote: quote || prev.quote,
+                    rating: rating != null ? String(rating) : prev.rating,
+                    review_url: reviewUrl || prev.review_url,
+                  }));
+                  if (matchedFilm?.id) {
+                    selectFilm(matchedFilm);
+                  } else if (filmTitle && !selectedFilm) {
+                    handleFilmSearch(filmTitle);
+                  }
+                }}
+              />
               <div ref={filmDropdownRef} className="relative">
                 <label className="block text-xs font-bold text-text-primary mb-1">Select Film to Review *</label>
                 <div className="flex items-center gap-2 bg-surface border border-border rounded-xl px-3.5 py-2.5 focus-within:border-brand transition-colors">

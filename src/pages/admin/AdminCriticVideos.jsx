@@ -5,7 +5,8 @@ import SEO from '../../components/SEO';
 import FilmSearchCombobox from '../../components/admin/FilmSearchCombobox';
 import { authHeaders } from '../../lib/apiAuth';
 import { fetchWithLocalClipperAuth } from '../../lib/localClipperFetch';
-import { fetchCritics } from '../../lib/critics';
+import { fetchCritics, upsertCriticReview } from '../../lib/critics';
+import CriticReviewExtractorBox from '../../components/admin/CriticReviewExtractorBox';
 
 /**
  * Video critic reviews.
@@ -65,6 +66,13 @@ export default function AdminCriticVideos() {
   const [submitUrl, setSubmitUrl] = useState('');
   const [submitCriticId, setSubmitCriticId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const [instantCriticId, setInstantCriticId] = useState('');
+  const [instantFilmId, setInstantFilmId] = useState('');
+  const [instantQuote, setInstantQuote] = useState('');
+  const [instantRating, setInstantRating] = useState('');
+  const [instantUrl, setInstantUrl] = useState('');
+  const [publishingInstant, setPublishingInstant] = useState(false);
 
   const criticsById = useMemo(
     () => Object.fromEntries(critics.map(critic => [critic.id, critic])),
@@ -254,6 +262,122 @@ export default function AdminCriticVideos() {
 
       {/* Not every critic is on YouTube, and channel polling only finds the
           ones who are. Anything else gets pasted in here. */}
+      {/* Instant OCR Screenshot & YouTube Review Extractor */}
+      <div className="rounded-xl border border-current/15 p-4 mb-6 space-y-4">
+        <div>
+          <h2 className="font-medium mb-1">Extract Review from Screenshot (OCR) or YouTube URL</h2>
+          <p className="text-sm opacity-70">
+            Upload or paste (Ctrl+V) a review screenshot or paste a YouTube review URL to extract the quote, rating, and movie, then publish straight to the critic&apos;s profile.
+          </p>
+        </div>
+
+        <CriticReviewExtractorBox
+          criticId={instantCriticId || null}
+          onExtracted={({ quote, rating, reviewUrl, matchedFilm, criticName }) => {
+            if (quote) setInstantQuote(quote);
+            if (rating != null) setInstantRating(String(rating));
+            if (reviewUrl) setInstantUrl(reviewUrl);
+            if (matchedFilm?.id) setInstantFilmId(matchedFilm.id);
+            if (criticName && !instantCriticId) {
+              const found = critics.find(
+                c => c.name?.toLowerCase().includes(criticName.toLowerCase()) ||
+                     c.publication?.toLowerCase().includes(criticName.toLowerCase())
+              );
+              if (found) setInstantCriticId(found.id);
+            }
+          }}
+        />
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs opacity-70 mb-1">Critic *</label>
+            <select
+              value={instantCriticId}
+              onChange={e => setInstantCriticId(e.target.value)}
+              className="w-full px-3 py-2 rounded-md bg-transparent border border-current/20 text-sm"
+            >
+              <option value="">Choose critic…</option>
+              {critics.map(c => (
+                <option key={c.id} value={c.id}>{c.name}{c.publication ? ` (${c.publication})` : ''}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs opacity-70 mb-1">Film *</label>
+            <FilmSearchCombobox value={instantFilmId} onChange={setInstantFilmId} />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs opacity-70 mb-1">Extracted Review Quote *</label>
+          <textarea
+            rows={3}
+            value={instantQuote}
+            onChange={e => setInstantQuote(e.target.value)}
+            placeholder="Extracted quote will appear here (editable)…"
+            className="w-full px-3 py-2 rounded-md bg-transparent border border-current/20 text-sm"
+          />
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-3 items-end">
+          <div>
+            <label className="block text-xs opacity-70 mb-1">Rating (1–5)</label>
+            <select
+              value={instantRating}
+              onChange={e => setInstantRating(e.target.value)}
+              className="w-full px-3 py-2 rounded-md bg-transparent border border-current/20 text-sm"
+            >
+              <option value="">— No Rating —</option>
+              <option value="1">1 ★</option>
+              <option value="2">2 ★★</option>
+              <option value="3">3 ★★★</option>
+              <option value="4">4 ★★★★</option>
+              <option value="5">5 ★★★★★</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs opacity-70 mb-1">Review Source URL (Optional)</label>
+            <input
+              type="url"
+              value={instantUrl}
+              onChange={e => setInstantUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=…"
+              className="w-full px-3 py-2 rounded-md bg-transparent border border-current/20 text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={publishingInstant || !instantCriticId || !instantFilmId || !instantQuote.trim()}
+            onClick={async () => {
+              setPublishingInstant(true);
+              try {
+                const critic = criticsById[instantCriticId] || {};
+                await upsertCriticReview({
+                  critic_id: instantCriticId,
+                  film_id: instantFilmId,
+                  quote: instantQuote.trim(),
+                  rating: instantRating !== '' ? Number(instantRating) : null,
+                  review_url: instantUrl.trim() || null,
+                  source_publication: critic.publication || null,
+                  critic_name: critic.name || 'Film critic',
+                });
+                toast.success('Critic review published!');
+                setInstantQuote('');
+                setInstantRating('');
+                setInstantUrl('');
+              } catch (err) {
+                toast.error(err.message || 'Failed to publish review');
+              } finally {
+                setPublishingInstant(false);
+              }
+            }}
+            className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
+          >
+            {publishingInstant ? 'Publishing…' : 'Publish Review Now'}
+          </button>
+        </div>
+      </div>
+
       <form onSubmit={submitByUrl} className="rounded-lg border border-current/15 p-4 mb-8">
         <h2 className="font-medium mb-1">Add a review by link</h2>
         <p className="text-sm opacity-70 mb-3">

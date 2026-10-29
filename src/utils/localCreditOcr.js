@@ -190,3 +190,14 @@ export async function extractCreditsWithLocalOCR(imageBase64, creditType = 'cast
     await worker.terminate();
   }
 }
+
+export async function extractRawTextWithLocalOCR(imageBase64) {
+  const tesseract = await getTesseract();
+  const worker = await tesseract.createWorker('eng');
+  try {
+    const ret = await worker.recognize(imageBase64);
+    return (ret?.data?.text || '').trim();
+  } finally {
+    await worker.terminate();
+  }
+}
