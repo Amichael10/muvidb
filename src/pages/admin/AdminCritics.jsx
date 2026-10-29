@@ -226,7 +226,7 @@ export default function AdminCritics() {
         quote: reviewForm.quote.trim(),
         rating: reviewForm.rating !== '' ? Number(reviewForm.rating) : null,
         review_url: reviewForm.review_url?.trim() || null,
-        source_publication: reviewForm.source_publication?.trim() || criticFormData.publication || null,
+        publication: reviewForm.source_publication?.trim() || criticFormData.publication || null,
         critic_name: criticFormData.name || '',
       };
       await upsertCriticReview(payload);

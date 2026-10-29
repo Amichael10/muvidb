@@ -26,6 +26,8 @@ export default defineConfig(({ mode, isSsrBuild }) => {
           // Template previews are loaded on demand in an iframe. Do not add
           // their embedded artwork to the offline service-worker cache.
           globIgnores: ['**/social-templates/*.html'],
+          skipWaiting: true,
+          clientsClaim: true,
           cleanupOutdatedCaches: true, // purge old precaches so stale chunks don't linger
           // SSR has no static index.html navigate target — never fall back to a SPA shell.
           navigateFallback: null,
