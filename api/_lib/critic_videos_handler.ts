@@ -343,7 +343,42 @@ Rules:
         return res.status(400).json({ error: `source must be one of ${TRANSCRIPT_SOURCES.join(', ')}` });
       }
       const result = await applyCriticVideoTranscript(videoId, transcript, source);
-      return res.status(200).json(result);
+      if (result.status === 'failed') {
+        const cleanTranscript = transcript.replace(/\[\d{1,2}:\d{2}(?::\d{2})?\]\s*/g, ' ').replace(/\s+/g, ' ').trim();
+        let fallbackQuote = '';
+        let fallbackRating: number | null = normalizeStarRating(null, cleanTranscript);
+        try {
+          const prompt = `Extract the sharpest 1-2 sentence film review pull-quote and star rating (1-5 scale) from this video review transcript. Return JSON only: {"quote":"...","rating":4}\n\nTRANSCRIPT:\n${cleanTranscript.slice(0, 14000)}`;
+          const aiRes = await generateAIContent(prompt);
+          const parsed = parseJSON(aiRes.text) as any;
+          if (parsed?.quote) fallbackQuote = String(parsed.quote).trim();
+          if (parsed?.rating != null) fallbackRating = normalizeStarRating(parsed.rating, cleanTranscript);
+        } catch {
+          const ex = await selectCriticExcerpt(cleanTranscript);
+          fallbackQuote = ex.excerpt;
+        }
+        if (fallbackQuote) {
+          await supabase
+            .from('critic_review_candidates')
+            .update({
+              status: 'pending_review',
+              transcript: cleanTranscript,
+              transcript_source: source,
+              quote: fallbackQuote,
+              rating: fallbackRating,
+              last_error: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('video_id', videoId);
+          return res.status(200).json({
+            status: 'pending_review',
+            quote: fallbackQuote,
+            rating: fallbackRating,
+            transcript: cleanTranscript,
+          });
+        }
+      }
+      return res.status(200).json({ ...result, transcript });
     }
 
     // ── The human review queue ──────────────────────────────────────────────
@@ -353,7 +388,7 @@ Rules:
       const { data, error } = await supabase
         .from('critic_review_candidates')
         .select('id,video_id,video_url,video_title,film_id,status,quote,excerpt_context,rating,'
-          + 'quote_start_seconds,transcript_source,last_error,video_published_at,created_at,'
+          + 'quote_start_seconds,transcript,transcript_source,last_error,video_published_at,created_at,'
           + 'source_platform,critic_id,critic_channel_id')
         .eq('status', status)
         .order('video_published_at', { ascending: false, nullsFirst: false })
@@ -366,6 +401,15 @@ Rules:
       if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST to approve' });
       const id = String(payload.id || payload.candidate_id || '').trim();
       if (!id) return res.status(400).json({ error: 'id is required' });
+      const patch: Record<string, any> = {};
+      if (typeof payload.quote === 'string' && payload.quote.trim()) patch.quote = payload.quote.trim();
+      if (payload.rating !== undefined) patch.rating = payload.rating === '' || payload.rating === null ? null : Number(payload.rating);
+      if (payload.film_id) patch.film_id = String(payload.film_id).trim();
+      if (payload.critic_id) patch.critic_id = String(payload.critic_id).trim();
+      if (Object.keys(patch).length > 0) {
+        patch.updated_at = new Date().toISOString();
+        await supabase.from('critic_review_candidates').update(patch).eq('id', id);
+      }
       return res.status(200).json(await approveCriticVideoCandidate(id));
     }
 
