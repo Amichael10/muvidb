@@ -197,6 +197,13 @@ export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidat
   } catch (err: any) {
     console.warn('[youtube_upload_notify] Instant drop processing error:', err?.message || err);
   }
+  if (titleDecision.action === 'skip') {
+    await markNotified(channel.id, video);
+    return { ok: false, skipped: 'sensational_title', filmId: null, draftId: null, telegramSent: false };
+  }
+  // Only send Telegram notification when the upload passed title curation
+  {
+  }
 
   const message = [
     '🎬 *New YouTube Film Dropped!*',
@@ -205,7 +212,7 @@ export async function sendUploadAlert(channel: ChannelRow, video: UploadCandidat
     `⏱️ *Length:* ${mins}${published ? ` · ${published} UTC` : ''}`,
     url,
     '',
-    '✅ Film imported to database catalogue.',
+    filmId ? '✅ Film imported to database catalogue.' : '⚠️ Film queued in channel videos (awaiting catalogue link).',
   ].join('\n');
 
   const inlineKeyboard: any[][] = [];

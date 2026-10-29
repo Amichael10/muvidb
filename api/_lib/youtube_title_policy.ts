@@ -29,15 +29,25 @@ const EMOTIONAL_PROMO = /(watch (?:this|dis|it|for|to)|watch it for|it'?s amazin
 
 const SUBJECT = /\b(he|she|they|her|his|him|my|i|you|everyone|everylady|girl|lady|man|woman|wife|husband|mother|father|maid|orphan|billionaire|ceo|prince|princess|king|queen)\b/i;
 
-const PLOT_VERB = /(?:fell|falls|falling|fall) (?:deeply )?(?:in|for) love|not knowing|never knew|never expected|pretend|disguis|maltreat|humiliat|reject|abandon|threw|throw|chased out|treated .*trash|married|marry|marries|marrying|saved|rescued|killed|destroyed|betrayed|cheat|chose|picked|hired|helped|used|sacrific|changed .*life|came back|returned|found out|thought .*poor|thinking .*poor|searching for (?:true )?love|looking for (?:true )?love|took in/i;
+const PLOT_VERB = /(?:fell|falls|falling|fall) (?:deeply )?(?:in|for) love|not knowing|never knew|never expected|pretend|disguis|maltreat|humiliat|reject|abandon|regret|threw|throw|chased out|treated .*trash|married|marry|marries|marrying|saved|rescued|killed|destroyed|betrayed|cheat|chose|picked|hired|helped|used|sacrific|changed .*life|came back|returned|found out|thought .*poor|thinking .*poor|searching for (?:true )?love|looking for (?:true )?love|took in/i;
 
 const SENSATIONAL_VOCAB = /\b(poor|wicked|evil|shock(?:ing|ed)?|mind.?blow|emotional|tears?|billionaire|orphan|maid|humble|helpless|worthless|betray|revenge|pregnan|ghost|disown|crippl|blind|beggar|homeless|heartbroken|jealous|abused|mistreated)\b/i;
 
 const STORY_VERB = /\b(is|was|were|has|had|came|went|got|gave|made|met|found|saw|told|admits|reveals|cries|refused|left|loved|hated|wanted|wants)\b/i;
 
-const NOISE = /(latest|new[- ]?(?:nigerian|nollywood|yoruba|african)?\s*(?:movie|movies|film)|full\s+(?:movie|film|video)|complete\s+(?:movie|film|season)|nigerian\s+(?:movie|movies)|nollywood|yoruba\s+(?:movie|movies)|african\s+(?:movie|movies)|\b20\d{2}\b|starring|featuring|\bfeat\.?\b|\bft\.?\b|\bbest of\b)/i;
+const NOISE = /(latest|new[- ]?(?:nigerian|nollywood|yoruba|african)?\s*(?:movie|movies|film)|full\s+(?:movie|film|video)|complete\s+(?:movie|film|season)|nigerian\s+(?:movie|movies)|nollywood|yoruba\s+(?:movie|movies)|african\s+(?:movie|movies)|classics\s+(?:movie|movies)|uchenna\s+mbunabo|\b20\d{2}\b|starring|featuring|\bfeat\.?\b|\bft\.?\b|\bbest of\b)/i;
 
-const BAD_PREFIX = /^(please|watch|you will|you must|you'?ll|you (?:cannot|can'?t|should|shall|would|could)|our |my |your |don'?t|dn'?t|do not|every(?:one|body|lady|woman|man)|i (?:ask|urge|beg)|if (?:you|u)|just released|new released|new movie alert|latest movie|this (?:movie|story)|keep |drop |no matter|be the first|how |why |what happened|the day |the moment |the story of |a story of |when a |where a )\b/i;
+const BAD_PREFIX = /^(please|watch|you will|you must|you'?ll|you (?:cannot|can'?t|should|shall|would|could)|don'?t|dn'?t|do not|every(?:one|body|lady|woman|man)|i (?:ask|urge|beg)|if (?:you|u)|just released|new released|new movie alert|latest movie|this (?:movie|story)|keep |drop |no matter|be the first|how |why |what happened|the day |the moment |the story of |a story of |when a |where a )\b/i;
+
+function hasSensationalPossessiveOpening(title: string): boolean {
+  if (!/^(?:my|our|your)\s+/i.test(title)) return false;
+  const words = wordCount(title);
+  if (words >= 6) return true;
+  if (words >= 4 && (PLOT_VERB.test(title) || STORY_VERB.test(title) || SENSATIONAL_VOCAB.test(title))) {
+    return true;
+  }
+  return false;
+}
 
 export const BLOGGER_NON_FILM_PATTERNS = [
   // Birthday / Personal parties
@@ -53,7 +63,7 @@ export const BLOGGER_NON_FILM_PATTERNS = [
   /\b(?:house\s+warming|buys?\s+(?:a\s+)?new\s+car|mansions?\s+and\s+cars|net\s*worth\s+of|biography\s+of|lifestyle\s+of)\b/i,
   /\b(?:wedding\s+ceremony\s+of|traditional\s+wedding\s+of|burial\s+ceremony\s+of)\b/i,
   // BTS / Bloopers / Compilations
-  /\b(?:behind\s+the\s+scenes|blooper(?:s)?|funny\s+moments\s+on\s+set)\b/i,
+  /\b(?:behind\s+the\s+scenes?|the\s+making\s+of|blooper(?:s)?|funny\s+moments\s+on\s+set)\b/i,
   /\b(?:the\s+best\s+of|greatest\s+scenes\s+of|top\s+\d+\s+scenes\s+of)\s+[A-Z]/i,
   // Interviews & talk shows
   /\b(?:full\s+interview\s+with|exclusive\s+interview\s+with|sit[- ]down\s+with|in\s+conversation\s+with)\b/i,
@@ -90,7 +100,7 @@ export function isSensationalizedYouTubeTitle(raw: string): boolean {
   const title = normalize(raw);
   if (!title) return false;
   if (isBloggerOrNonFilm(title)) return true;
-  if (STRONG_CLICKBAIT.test(title) || EMOTIONAL_PROMO.test(title) || BAD_PREFIX.test(title)) return true;
+  if (STRONG_CLICKBAIT.test(title) || EMOTIONAL_PROMO.test(title) || BAD_PREFIX.test(title) || hasSensationalPossessiveOpening(title)) return true;
 
   // Catch sentence plot headlines starting with How/Why/What/When/The Day/The Moment/A Story Of
   if (/^(?:how|why|what|when|the day|the moment|the story of|a story of)\s+(?:a|an|the|i|she|he|we|my|our|everyone|any|this|rich|poor)\b/i.test(title)) {
@@ -115,11 +125,11 @@ export function isSensationalizedYouTubeTitle(raw: string): boolean {
 }
 
 function isPlausibleFilmTitle(raw: string): boolean {
-  const title = cleanTitle(normalize(raw)).replace(/[\s:;|/\-]+$/g, '').trim();
+  const title = cleanTitle(normalize(raw)).replace(/[\s.:;|/\-~]+$/g, '').trim();
   const words = wordCount(title);
 
   if (title.length < 2 || title.length > 70 || words > 9) return false;
-  if (BAD_PREFIX.test(title) || EMOTIONAL_PROMO.test(title) || STRONG_CLICKBAIT.test(title)) return false;
+  if (BAD_PREFIX.test(title) || hasSensationalPossessiveOpening(title) || EMOTIONAL_PROMO.test(title) || STRONG_CLICKBAIT.test(title)) return false;
   if (/^(?:pt|part|episode|season)\s*\d+$/i.test(title)) return false;
   if (/\b(latest|movie|movies|film|films|telenovela|nollywood|20\d{2})\b/i.test(title)) return false;
   if (words >= 4 && SUBJECT.test(title) && PLOT_VERB.test(title)) return false;
@@ -214,6 +224,21 @@ export function extractEmbeddedFilmTitle(raw: string): EmbeddedTitle | null {
   const tightTrailingDash = title.search(/-(?=\s)/);
   if (tightTrailingDash >= 0) add(tightTrailingDash, 1);
 
+  const tightLeadingDash = title.search(/\s[\-\u2013\u2014](?=\S)/);
+  if (tightLeadingDash >= 0) add(tightLeadingDash, 2);
+
+  const tildeSep = title.search(/\s*~\s*/);
+  if (tildeSep > 0) {
+    const m = title.match(/\s*~\s*/);
+    add(tildeSep, m ? m[0].length : 1);
+  }
+
+  const starringSep = title.search(/(?:\.\s*|\s+)(?:starring|featuring|feat\.?|ft\.?)\b/i);
+  if (starringSep > 0) add(starringSep, 0);
+
+  const castParen = title.search(/\s*\([^)]+,[^)]+\)\s*(?:nigerian|nollywood|yoruba|african|latest|new|20\d{2})\b/i);
+  if (castParen > 0) add(castParen, 0);
+
   const slash = title.search(/\s\/\s/);
   if (slash >= 0) add(slash, 3);
 
@@ -236,7 +261,10 @@ export function extractEmbeddedFilmTitle(raw: string): EmbeddedTitle | null {
   for (const candidate of candidates) {
     if (!suffixLooksLikeUploadNoise(candidate.suffix)) continue;
     if (!isPlausibleFilmTitle(candidate.prefix)) continue;
-    return candidate;
+    return {
+      prefix: candidate.prefix.replace(/[\s.:;|/\-~]+$/g, '').trim(),
+      suffix: candidate.suffix,
+    };
   }
 
   return null;
