@@ -89,7 +89,14 @@ export default function PlayBoxOffice() {
         name: t.type || t.name,
         price: Number(t.priceNgn || t.price || 0),
         sold: t.sold != null ? Number(t.sold) : null,
-        gross: t.grossNgn != null ? Number(t.grossNgn) : (t.sold && t.priceNgn ? Number(t.sold) * Number(t.priceNgn) : null)
+        gross: t.grossNgn != null ? Number(t.grossNgn) : (t.gross != null ? Number(t.gross) : (t.sold && t.priceNgn ? Number(t.sold) * Number(t.priceNgn) : null))
+      }));
+    } else if (metricsTiers && typeof metricsTiers === 'object') {
+      return Object.entries(metricsTiers).map(([name, val]) => ({
+        name: val.name || name,
+        price: Number(val.priceNgn || val.price || 0),
+        sold: val.sold != null ? Number(val.sold) : null,
+        gross: val.grossNgn != null ? Number(val.grossNgn) : (val.gross != null ? Number(val.gross) : (val.sold && val.price ? Number(val.sold) * Number(val.price) : null))
       }));
     }
 
@@ -104,6 +111,11 @@ export default function PlayBoxOffice() {
       }));
     }
     return [];
+  }, [play]);
+
+  const sessions = useMemo(() => {
+    if (!play?.box_office_metrics?.session_breakdown) return [];
+    return play.box_office_metrics.session_breakdown;
   }, [play]);
 
   const totalSold = useMemo(() => {
@@ -391,6 +403,63 @@ export default function PlayBoxOffice() {
             </div>
           </div>
         </div>
+
+        {/* SHOWTIMES & SESSION BREAKDOWN */}
+        {sessions.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-text-primary flex items-center gap-2">
+                  <Icon icon="solar:calendar-date-bold" className="text-brand" />
+                  <span>Showtimes &amp; Session Performance</span>
+                </h2>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Verified admissions and box office gross per scheduled theatrical performance ({sessions.length} shows tracked).
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-surface overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-2/60 text-text-muted font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-3.5 pl-4 sm:pl-6 pr-3">Showtime / Date</th>
+                      <th className="py-3.5 px-3 text-right">Venue Capacity</th>
+                      <th className="py-3.5 px-3 text-right">Admissions Sold</th>
+                      <th className="py-3.5 px-3 text-right">Occupancy</th>
+                      <th className="py-3.5 pr-4 sm:pr-6 pl-3 text-right">Session Gross</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {sessions.map((s, idx) => {
+                      const occ = s.capacity > 0 ? ((s.tickets_sold / s.capacity) * 100).toFixed(0) : '—';
+                      return (
+                        <tr key={s.session_id || idx} className="hover:bg-surface-2/40 transition-colors">
+                          <td className="py-3.5 pl-4 sm:pl-6 pr-3 font-bold text-text-primary">
+                            <span>{s.display_name}</span>
+                          </td>
+                          <td className="py-3.5 px-3 text-right text-text-muted font-mono">
+                            {s.capacity ? `${s.capacity.toLocaleString()} seats` : '—'}
+                          </td>
+                          <td className="py-3.5 px-3 text-right text-purple-400 font-mono font-bold">
+                            {s.tickets_sold != null ? `${s.tickets_sold.toLocaleString()} tickets` : '0'}
+                          </td>
+                          <td className="py-3.5 px-3 text-right text-text-secondary font-mono">
+                            {occ !== '—' ? `${occ}%` : '—'}
+                          </td>
+                          <td className="py-3.5 pr-4 sm:pr-6 pl-3 text-right font-mono font-bold text-amber-400">
+                            ₦{Number(s.gross || 0).toLocaleString('en-NG')}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* VENUE & PRODUCTION DETAILS */}
         <div className="p-6 rounded-2xl bg-surface border border-border space-y-4">
