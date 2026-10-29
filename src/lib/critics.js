@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { authHeaders } from './apiAuth';
 
 /**
  * Fetch all verified film critics ordered by name
@@ -162,6 +163,53 @@ export async function deleteCritic(criticId) {
  * Links a critic to a film with a quote, star rating, and optional source URL.
  */
 export async function upsertCriticReview(reviewData) {
+  const { source_publication, ...rest } = reviewData || {};
+  const payload = {
+    ...rest,
+    publication: rest.publication ?? source_publication ?? null,
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    const res = await fetch('/api/critic-videos?action=publish-direct', {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && json?.review) return json.review;
+  } catch {
+    // Fall back to direct Supabase query below
+  }
+
+  const { data: existing } = await supabase
+    .from('critic_reviews')
+    .select('id')
+    .eq('critic_id', payload.critic_id)
+    .eq('film_id', payload.film_id)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { data, error } = await supabase
+      .from('critic_reviews')
+      .update(payload)
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from('critic_reviews')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function _legacyUpsertCriticReview(reviewData) {
   const { data, error } = await supabase
     .from('critic_reviews')
     .upsert(reviewData, { onConflict: 'critic_id,film_id' })

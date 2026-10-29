@@ -98,6 +98,63 @@ export async function handleCriticVideos(req: VercelRequest, res: VercelResponse
       return res.status(200).json({ candidates: await listCriticVideosAwaitingTranscript(limit) });
     }
 
+    // ── Direct Publish from OCR / YouTube Extractor ─────────────────────────
+    if (action === 'publish-direct') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST for publish-direct' });
+      const criticId = String(payload.critic_id || '').trim();
+      const filmId = String(payload.film_id || '').trim();
+      const quote = String(payload.quote || '').trim();
+      if (!criticId || !filmId || !quote) {
+        return res.status(400).json({ error: 'critic_id, film_id, and quote are required' });
+      }
+
+      const { data: criticRow } = await supabase
+        .from('critics')
+        .select('id, name, title, publication, avatar_url, handle')
+        .eq('id', criticId)
+        .maybeSingle();
+
+      const reviewPayload: Record<string, any> = {
+        critic_id: criticId,
+        film_id: filmId,
+        critic_name: criticRow?.name || payload.critic_name || 'Film critic',
+        critic_title: criticRow?.title || payload.critic_title || null,
+        publication: payload.publication || payload.source_publication || criticRow?.publication || null,
+        social_handle: criticRow?.handle || payload.social_handle || null,
+        avatar_url: criticRow?.avatar_url || payload.avatar_url || null,
+        quote,
+        rating: payload.rating !== null && payload.rating !== undefined && payload.rating !== '' ? Number(payload.rating) : null,
+        review_url: payload.review_url ? String(payload.review_url).trim() : null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: existing } = await supabase
+        .from('critic_reviews')
+        .select('id')
+        .eq('critic_id', criticId)
+        .eq('film_id', filmId)
+        .maybeSingle();
+
+      if (existing?.id) {
+        const { data: updated, error: updateErr } = await supabase
+          .from('critic_reviews')
+          .update(reviewPayload)
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (updateErr) throw new Error(updateErr.message);
+        return res.status(200).json({ ok: true, review: updated });
+      }
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from('critic_reviews')
+        .insert(reviewPayload)
+        .select()
+        .single();
+      if (insertErr) throw new Error(insertErr.message);
+      return res.status(200).json({ ok: true, review: inserted });
+    }
+
     // ── Instant Screenshot OCR Extractor ────────────────────────────────────
     if (action === 'extract-ocr') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST for extract-ocr' });
