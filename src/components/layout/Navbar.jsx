@@ -92,6 +92,7 @@ export default function Navbar() {
   ];
 
   const moreLinks = [
+    { name: 'Box Office Tracker', path: '/box-office', icon: 'solar:ticket-bold' },
     { name: 'Advanced Search', path: '/advanced-search', icon: 'solar:tuning-square-2-linear' },
     { name: 'Cinemas', path: '/cinemas', icon: 'solar:videocamera-linear' },
     { name: 'Channels', path: '/channels', icon: 'solar:tv-linear' },
@@ -109,21 +110,21 @@ export default function Navbar() {
     <>
       <nav 
         className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 border-b border-transparent
-          ${isScrolled ? 'bg-surface/80 backdrop-blur-xl border-border h-[64px]' : 'bg-transparent h-[80px] md:h-[90px]'}
+          ${isScrolled ? 'bg-surface/85 backdrop-blur-xl border-border h-14' : 'bg-transparent h-16'}
         `}
       >
-        <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8 border-x border-hairline">
+        <div className="max-w-[1440px] mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Logo */}
         <Link to="/" className="flex items-center group shrink-0">
           <img 
             src={theme === 'light' ? "/images/MuviDB Brand/Wordmark.svg" : "/images/MuviDB Brand/White Wordmark.svg"}
             alt="MuviDB" 
-            className="h-9 object-contain group-hover:scale-105 transition-all duration-500" 
+            className="h-7 sm:h-7.5 object-contain group-hover:scale-105 transition-all duration-300" 
           />
         </Link>
 
         {/* Center: primary links + More (desktop) */}
-        <div className="hidden lg:flex items-center gap-1 bg-surface-2/50 backdrop-blur-sm border border-border p-1 rounded-full">
+        <div className="hidden lg:flex items-center gap-1 bg-surface-2/60 backdrop-blur-md border border-border/70 p-1 rounded-full shadow-xs">
           {primaryLinks.map((link) => {
             const isActive =
               location.pathname === link.path ||
@@ -132,9 +133,9 @@ export default function Navbar() {
               <Link
                 key={link.name}
                 to={link.path}
-                className={`px-4 xl:px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap
                   ${isActive 
-                    ? 'bg-brand text-white shadow-md' 
+                    ? 'bg-brand text-white shadow-xs' 
                     : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/60'
                   }
                 `}
@@ -150,9 +151,9 @@ export default function Navbar() {
               onClick={() => setIsMoreOpen((open) => !open)}
               aria-expanded={isMoreOpen}
               aria-haspopup="menu"
-              className={`inline-flex items-center gap-1.5 px-4 xl:px-5 py-2 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap
+              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap cursor-pointer
                 ${isMoreOpen || isMoreActive
-                  ? 'bg-brand text-white shadow-md'
+                  ? 'bg-brand text-white shadow-xs'
                   : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/60'
                 }
               `}
@@ -160,8 +161,8 @@ export default function Navbar() {
               More
               <Icon
                 icon="solar:alt-arrow-down-linear"
-                width="16"
-                height="16"
+                width="13"
+                height="13"
                 className={`transition-transform duration-200 ${isMoreOpen ? 'rotate-180' : ''}`}
               />
             </button>
@@ -204,29 +205,29 @@ export default function Navbar() {
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2 md:gap-4 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Search Button */}
           <button 
             onClick={() => setIsSearchOpen(true)}
-            className="w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
+            className="w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
             aria-label="Search"
           >
-            <Icon icon="solar:magnifer-linear" width="22" height="22" />
+            <Icon icon="solar:magnifer-linear" width="19" height="19" />
           </button>
 
           {/* Theme Toggle */}
           <button 
             onClick={toggleTheme}
-            className="w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
+            className="w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
             aria-label="Toggle theme"
           >
-            <Icon icon={theme === 'dark' ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="22" height="22" />
+            <Icon icon={theme === 'dark' ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="19" height="19" />
           </button>
 
           {isHome && (
             <button
               onClick={() => setIsMotionEnabled((enabled) => !enabled)}
-              className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-90 ${
+              className={`w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all active:scale-90 ${
                 isMotionEnabled
                   ? 'bg-brand/10 text-brand hover:bg-brand/15'
                   : 'text-text-muted hover:text-brand hover:bg-brand/10'
@@ -245,21 +246,21 @@ export default function Navbar() {
           )}
 
           {isAuthenticated ? (
-            <div className="flex items-center gap-2 md:gap-4">
+            <div className="flex items-center gap-2 md:gap-3">
               {/* Notification Bell */}
-              <button className="relative w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90">
-                <Icon icon="solar:bell-linear" width="22" height="22" />
+              <button className="relative w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90">
+                <Icon icon="solar:bell-linear" width="19" height="19" />
                 {unreadNotifications && (
-                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
                 )}
               </button>
 
-              {/* User Avatar & Dropdown — avatar only; name + role revealed on hover */}
+              {/* User Avatar & Dropdown */}
               <div className="relative group/user">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   aria-label="Account menu"
-                  className="w-9 h-9 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs overflow-hidden transition-all active:scale-95 hover:ring-2 hover:ring-brand/40"
+                  className="w-8.5 h-8.5 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs overflow-hidden transition-all active:scale-95 hover:ring-2 hover:ring-brand/40"
                 >
                   {user.avatar_url ? (
                     <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -268,9 +269,9 @@ export default function Navbar() {
                   )}
                 </button>
 
-                {/* Hover tooltip (suppressed while the click menu is open) */}
+                {/* Hover tooltip */}
                 {!isUserMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 px-3.5 py-2 rounded-xl bg-surface border border-border shadow-xl whitespace-nowrap opacity-0 translate-y-1 pointer-events-none group-hover/user:opacity-100 group-hover/user:translate-y-0 transition-all duration-200 z-[105]">
+                  <div className="absolute right-0 top-full mt-2 px-3 py-1.5 rounded-xl bg-surface border border-border shadow-xl whitespace-nowrap opacity-0 translate-y-1 pointer-events-none group-hover/user:opacity-100 group-hover/user:translate-y-0 transition-all duration-200 z-[105]">
                     <p className="text-xs font-bold text-text-primary">{user.name}</p>
                     <p className="text-[10px] font-bold text-brand tracking-wide">
                       {user.role === 'user' ? 'Member'
@@ -297,22 +298,22 @@ export default function Navbar() {
                     <div className="p-2">
                       <Link 
                         to={(user.role === 'admin' || user.role === 'admin_limited') ? "/admin" : (user.role === 'professional' ? "/pro-dashboard" : "/dashboard")} 
-                        className="flex items-center gap-3 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors"
+                        className="flex items-center gap-3 px-3 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors"
                       >
-                        <Icon icon="solar:user-linear" width="18" height="18" />
+                        <Icon icon="solar:user-linear" width="16" height="16" />
                         Your Profile
                       </Link>
                       {(user.role === 'admin' || user.role === 'admin_limited') && (
-                        <Link to="/admin" className="flex items-center gap-3 px-3 py-2 text-sm text-brand hover:bg-brand/5 rounded-lg transition-colors">
-                          <Icon icon="solar:clapperboard-play-linear" width="18" height="18" />
+                        <Link to="/admin" className="flex items-center gap-3 px-3 py-2 text-xs font-semibold text-brand hover:bg-brand/5 rounded-lg transition-colors">
+                          <Icon icon="solar:clapperboard-play-linear" width="16" height="16" />
                           Admin Panel
                         </Link>
                       )}
                       <button 
                         onClick={logout}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors mt-1"
+                        className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-text-muted hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors mt-1"
                       >
-                        <Icon icon="solar:logout-linear" width="18" height="18" />
+                        <Icon icon="solar:logout-linear" width="16" height="16" />
                         Logout
                       </button>
                     </div>
@@ -323,7 +324,7 @@ export default function Navbar() {
           ) : (
             <Link 
               to="/login"
-              className="px-6 py-2 border-2 border-brand text-brand rounded-xl font-bold text-sm btn-hover shadow-lg shadow-brand/5"
+              className="px-3.5 sm:px-4 py-1 border border-brand text-brand hover:bg-brand hover:text-white rounded-full font-medium text-xs transition-all shadow-xs"
             >
               Sign In
             </Link>

@@ -212,6 +212,10 @@
       "destination": "/api/data?_r=person-media"
     },
     {
+      "source": "/api/film-media",
+      "destination": "/api/data?_r=film-media"
+    },
+    {
       "source": "/api/bachs/:path*",
       "destination": "/api/data?_r=bachs&path=:path*"
     },

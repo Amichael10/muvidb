@@ -49,11 +49,19 @@ function PlayCard({ play }) {
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand">
                 {play.genre || 'Stage Production'}
               </span>
-              {play.year && (
-                <span className="text-[11px] font-bold text-text-muted border border-border/80 px-2 py-0.5 rounded-md bg-bg/50">
-                  {play.year}
-                </span>
-              )}
+              <div className="flex items-center gap-1.5">
+                {Boolean(play.box_office_domestic > 0) && (
+                  <span className="text-[10px] font-bold text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded bg-amber-500/10 inline-flex items-center gap-1 shadow-sm">
+                    <Icon icon="solar:ticket-sale-bold" className="text-xs" />
+                    ₦{play.box_office_domestic >= 1000000 ? `${(play.box_office_domestic / 1000000).toFixed(1)}M` : Number(play.box_office_domestic).toLocaleString()}
+                  </span>
+                )}
+                {play.year && (
+                  <span className="text-[11px] font-bold text-text-muted border border-border/80 px-2 py-0.5 rounded-md bg-bg/50">
+                    {play.year}
+                  </span>
+                )}
+              </div>
             </div>
 
             <h3 className="text-lg sm:text-xl font-black font-heading tracking-tight text-text-primary group-hover:text-brand transition-colors line-clamp-2">
@@ -112,9 +120,10 @@ export default function PlaysList() {
       (acc, play) => {
         acc.all += 1;
         acc[play.status] = (acc[play.status] || 0) + 1;
+        if (Number(play.box_office_domestic) > 0) acc.box_office += 1;
         return acc;
       },
-      { all: 0, currently_running: 0, upcoming: 0, archived: 0 }
+      { all: 0, currently_running: 0, upcoming: 0, archived: 0, box_office: 0 }
     );
   }, [plays]);
 
@@ -137,8 +146,13 @@ export default function PlaysList() {
 
   // Filter plays
   const filtered = useMemo(() => {
-    return plays.filter((play) => {
-      const statusMatch = activeTab === 'all' || play.status === activeTab;
+    const list = plays.filter((play) => {
+      const statusMatch =
+        activeTab === 'all'
+          ? true
+          : activeTab === 'box_office'
+            ? Number(play.box_office_domestic) > 0
+            : play.status === activeTab;
       
       const cityMatch =
         selectedCity === 'all' ||
@@ -154,6 +168,11 @@ export default function PlaysList() {
 
       return statusMatch && cityMatch && searchMatch;
     });
+
+    if (activeTab === 'box_office') {
+      return [...list].sort((a, b) => (Number(b.box_office_domestic) || 0) - (Number(a.box_office_domestic) || 0));
+    }
+    return list;
   }, [plays, activeTab, selectedCity, search]);
 
   // Segmentation buckets
@@ -197,11 +216,12 @@ export default function PlaysList() {
               </p>
 
               {/* Status Segment Tabs */}
-              <div className="mt-7 grid grid-cols-2 sm:grid-cols-4 border border-border bg-surface divide-x divide-y sm:divide-y-0 divide-border rounded-2xl overflow-hidden shadow-lg shadow-black/10">
+              <div className="mt-7 grid grid-cols-2 sm:grid-cols-5 border border-border bg-surface divide-x divide-y sm:divide-y-0 divide-border rounded-2xl overflow-hidden shadow-lg shadow-black/10">
                 {[
                   { id: 'all', label: 'Overview (All)', count: counts.all },
                   { id: 'currently_running', label: 'On Stage', count: counts.currently_running, highlight: 'emerald' },
                   { id: 'upcoming', label: 'Upcoming', count: counts.upcoming, highlight: 'blue' },
+                  { id: 'box_office', label: 'Box Office', count: counts.box_office, highlight: 'amber' },
                   { id: 'archived', label: 'Archive', count: counts.archived },
                 ].map((item) => {
                   const isActive = activeTab === item.id;
@@ -222,6 +242,9 @@ export default function PlaysList() {
                         )}
                         {item.highlight === 'blue' && (
                           <span className="h-2 w-2 rounded-full bg-blue-400"></span>
+                        )}
+                        {item.highlight === 'amber' && (
+                          <span className="h-2 w-2 rounded-full bg-amber-400"></span>
                         )}
                       </div>
                       <span
@@ -359,7 +382,7 @@ export default function PlaysList() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-brand mb-1">
-                  {search.trim() ? 'Search Results' : activeTab === 'currently_running' ? 'Active Stage Runs' : activeTab === 'upcoming' ? 'Opening Soon' : 'Classic Archive'}
+                  {search.trim() ? 'Search Results' : activeTab === 'currently_running' ? 'Active Stage Runs' : activeTab === 'upcoming' ? 'Opening Soon' : activeTab === 'box_office' ? 'Theatrical Box Office Rankings' : 'Classic Archive'}
                 </p>
                 <h2 className="font-heading text-2xl sm:text-3xl font-black text-text-primary">
                   {filtered.length} {filtered.length === 1 ? 'Production' : 'Productions'} Found

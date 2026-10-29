@@ -135,10 +135,12 @@ async function uploadToR2(fileName, fileBytes, mimeType) {
 function loadState() {
   try {
     if (fs.existsSync(STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
+      const parsed = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
+      if (!parsed.film_processed_ids) parsed.film_processed_ids = {};
+      return parsed;
     }
   } catch {}
-  return { processed_ids: {}, total_photos: 0, total_videos: 0, last_run_at: null };
+  return { processed_ids: {}, film_processed_ids: {}, total_photos: 0, total_videos: 0, total_film_media: 0, last_run_at: null };
 }
 
 function saveState(state) {
@@ -428,45 +430,301 @@ async function processActorMedia(person, state) {
   console.log(`  ✨ Summary for ${person.name}: Added ${newPhotosCount} Photos, ${newVideosCount} Videos.`);
 }
 
+/**
+ * 4. Fetch High-Res Backdrops & Posters for Film
+ */
+async function fetchTmdbFilmImages(tmdbId) {
+  const headers = tmdbToken 
+    ? { 'Authorization': `Bearer ${tmdbToken}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' };
+  const queryParam = tmdbKey ? `?api_key=${tmdbKey}` : '';
+
+  const images = [];
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/images${queryParam}`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      for (const b of data.backdrops || []) {
+        if (b.file_path) {
+          images.push({
+            url: `https://image.tmdb.org/t/p/original${b.file_path}`,
+            thumbnail_url: `https://image.tmdb.org/t/p/w780${b.file_path}`,
+            width: b.width,
+            height: b.height,
+            aspect_ratio: b.aspect_ratio ? String(b.aspect_ratio.toFixed(2)) : '16:9',
+            category: 'backdrop',
+            title: 'Official Backdrop / Wallpaper'
+          });
+        }
+      }
+      for (const p of data.posters || []) {
+        if (p.file_path) {
+          images.push({
+            url: `https://image.tmdb.org/t/p/original${p.file_path}`,
+            thumbnail_url: `https://image.tmdb.org/t/p/w500${p.file_path}`,
+            width: p.width,
+            height: p.height,
+            aspect_ratio: p.aspect_ratio ? String(p.aspect_ratio.toFixed(2)) : '2:3',
+            category: 'poster',
+            title: 'Official Theatrical Poster'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`  ⚠️ TMDB Movie Images error for ${tmdbId}:`, err.message);
+  }
+  return images;
+}
+
+/**
+ * 5. Fetch Trailers & Clips for Film
+ */
+async function fetchTmdbFilmVideos(tmdbId) {
+  const headers = tmdbToken 
+    ? { 'Authorization': `Bearer ${tmdbToken}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' };
+  const queryParam = tmdbKey ? `?api_key=${tmdbKey}` : '';
+
+  const videos = [];
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/videos${queryParam}`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      for (const v of data.results || []) {
+        if (v.site === 'YouTube' && v.key) {
+          const cat = v.type?.toLowerCase() === 'trailer' ? 'trailer' : 'clip';
+          videos.push({
+            embed_provider: 'youtube',
+            embed_id: v.key,
+            url: `https://www.youtube.com/watch?v=${v.key}`,
+            thumbnail_url: `https://i.ytimg.com/vi/${v.key}/hqdefault.jpg`,
+            title: v.name || `${cat}`,
+            category: cat
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`  ⚠️ TMDB Movie Videos error for ${tmdbId}:`, err.message);
+  }
+  return videos;
+}
+
+async function resolveTmdbIdForFilm(film) {
+  if (film.tmdb_id) return film.tmdb_id;
+  if (!tmdbKey && !tmdbToken) return null;
+
+  try {
+    const headers = tmdbToken 
+      ? { 'Authorization': `Bearer ${tmdbToken}`, 'Content-Type': 'application/json' }
+      : { 'Content-Type': 'application/json' };
+    const queryParam = tmdbKey ? `&api_key=${tmdbKey}` : '';
+    const q = encodeURIComponent(film.title);
+    const yr = film.year ? `&year=${film.year}` : '';
+    const res = await fetch(`https://api.themoviedb.org/3/search/movie?query=${q}${yr}${queryParam}`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      const first = data.results?.[0];
+      if (first && first.id) {
+        await supabase.from('films').update({ tmdb_id: first.id }).eq('id', film.id);
+        return first.id;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * Process media for a single Film
+ */
+async function processFilmMedia(film, state) {
+  console.log(`\n======================================================`);
+  console.log(`🎬 Harvesting Film Media for: "${film.title}" (${film.id})`);
+
+  let newImagesCount = 0;
+  let newVideosCount = 0;
+
+  const { data: existingMedia } = await supabase
+    .from('film_media')
+    .select('url, embed_id, category, media_type')
+    .eq('film_id', film.id);
+
+  const existingUrls = new Set((existingMedia || []).map(m => m.url));
+  const existingEmbeds = new Set((existingMedia || []).map(m => m.embed_id).filter(Boolean));
+
+  const tmdbId = await resolveTmdbIdForFilm(film);
+
+  if (tmdbId) {
+    const rawImages = await fetchTmdbFilmImages(tmdbId);
+    console.log(`  🖼️ Found ${rawImages.length} images on TMDB for "${film.title}"`);
+
+    for (let i = 0; i < rawImages.length; i++) {
+      const img = rawImages[i];
+      if (existingUrls.has(img.url)) continue;
+
+      try {
+        let finalUrl = img.url;
+        let r2Key = null;
+
+        const r2Config = getR2Config();
+        if (r2Config) {
+          const res = await fetch(img.url);
+          if (res.ok) {
+            const buffer = Buffer.from(await res.arrayBuffer());
+            const fileName = `media/films/${film.id}/${img.category}/${Date.now()}_${i}.jpg`;
+            const r2Result = await uploadToR2(fileName, buffer, 'image/jpeg');
+            finalUrl = r2Result.url;
+            r2Key = r2Result.key;
+            console.log(`    ✅ Stored Film Image in R2 [${img.category}]: ${finalUrl}`);
+          }
+        }
+
+        const isPrimary = i === 0;
+
+        await supabase.from('film_media').insert({
+          film_id: film.id,
+          media_type: 'photo',
+          category: img.category,
+          title: img.title,
+          url: finalUrl,
+          thumbnail_url: img.thumbnail_url || finalUrl,
+          r2_key: r2Key,
+          embed_provider: r2Key ? 'r2' : 'tmdb',
+          width: img.width,
+          height: img.height,
+          aspect_ratio: img.aspect_ratio,
+          year: film.year || null,
+          is_primary: isPrimary,
+          status: 'approved'
+        });
+
+        // Also backfill poster_url or backdrop_url if missing on films table
+        const filmUpdates = {};
+        if (img.category === 'poster' && !film.poster_url) {
+          filmUpdates.poster_url = finalUrl;
+          film.poster_url = finalUrl;
+        }
+        if (img.category === 'backdrop' && !film.backdrop_url) {
+          filmUpdates.backdrop_url = finalUrl;
+          film.backdrop_url = finalUrl;
+        }
+        if (Object.keys(filmUpdates).length > 0) {
+          await supabase.from('films').update(filmUpdates).eq('id', film.id);
+        }
+
+        existingUrls.add(finalUrl);
+        newImagesCount++;
+        state.total_film_media = (state.total_film_media || 0) + 1;
+      } catch (err) {
+        console.warn(`    ⚠️ Failed film photo processing for ${img.url}:`, err.message);
+      }
+      await sleep(200);
+    }
+
+    const videos = await fetchTmdbFilmVideos(tmdbId);
+    for (const v of videos) {
+      if (v.embed_id && existingEmbeds.has(v.embed_id)) continue;
+      try {
+        await supabase.from('film_media').insert({
+          film_id: film.id,
+          media_type: 'video',
+          category: v.category,
+          title: v.title,
+          url: v.url,
+          thumbnail_url: v.thumbnail_url,
+          embed_provider: v.embed_provider,
+          embed_id: v.embed_id,
+          year: film.year || null,
+          status: 'approved'
+        });
+
+        if (!film.trailer_youtube_id && v.category === 'trailer') {
+          await supabase.from('films').update({ trailer_youtube_id: v.embed_id }).eq('id', film.id);
+          film.trailer_youtube_id = v.embed_id;
+        }
+
+        existingEmbeds.add(v.embed_id);
+        newVideosCount++;
+        console.log(`    🎬 Linked Film Video [${v.category}]: "${v.title}"`);
+      } catch (err) {
+        console.warn(`    ⚠️ Error linking film video:`, err.message);
+      }
+    }
+  }
+
+  console.log(`  ✨ Summary for Film "${film.title}": Added ${newImagesCount} Images, ${newVideosCount} Videos.`);
+}
+
 async function runMediaHarvesterDaemon() {
-  console.log('🚀 Starting Indefinite Actor Media Harvester Daemon (R2 Upload + YouTube/Vimeo Links)...');
+  console.log('🚀 Starting Continuous Media Harvester Daemon (Films & Actors -> R2 Upload + TMDB/YouTube Links)...');
   const state = loadState();
 
-  const BATCH_SIZE = 20;
+  const BATCH_SIZE = 15;
   const DELAY_MS = 1000;
 
-  let offset = 0;
+  let actorOffset = 0;
+  let filmOffset = 0;
 
   while (true) {
-    const { data: people, error } = await supabase
+    // 1. Process a batch of Films (prioritizing Box Office Cinema Movies)
+    let filmQuery = supabase
+      .from('films')
+      .select('id, title, year, tmdb_id, poster_url, backdrop_url, trailer_youtube_id, box_office_domestic');
+
+    // Box office films first
+    filmQuery = filmQuery
+      .gt('box_office_domestic', 0)
+      .order('box_office_domestic', { ascending: false })
+      .range(filmOffset, filmOffset + BATCH_SIZE - 1);
+
+    const { data: films, error: filmErr } = await filmQuery;
+
+    if (!filmErr && films && films.length > 0) {
+      console.log(`\n🎬 Film Media Harvester Batch: ${filmOffset} - ${filmOffset + films.length} (${films.length} box office films)`);
+      for (const film of films) {
+        try {
+          await processFilmMedia(film, state);
+          state.film_processed_ids[film.id] = new Date().toISOString();
+          saveState(state);
+        } catch (err) {
+          console.error(`❌ Error harvesting film media for "${film.title}":`, err.message);
+        }
+        await sleep(DELAY_MS);
+      }
+      filmOffset += BATCH_SIZE;
+    } else {
+      filmOffset = 0; // Wrap around
+    }
+
+    // 2. Process a batch of Actors
+    const { data: people, error: actorErr } = await supabase
       .from('people')
       .select('id, name, tmdb_id, popularity_score, film_count')
       .order('popularity_score', { ascending: false })
-      .range(offset, offset + BATCH_SIZE - 1);
+      .range(actorOffset, actorOffset + BATCH_SIZE - 1);
 
-    if (error || !people || people.length === 0) {
-      console.log('🔄 Reached end of actors list. Restarting media cycle in 60s...');
-      offset = 0;
-      await sleep(60000);
-      continue;
-    }
-
-    console.log(`\n📦 Media Harvester Batch ${offset} - ${offset + people.length} (${people.length} actors)`);
-
-    for (const p of people) {
-      try {
-        await processActorMedia(p, state);
-        state.processed_ids[p.id] = new Date().toISOString();
-        state.last_run_at = new Date().toISOString();
-        saveState(state);
-      } catch (err) {
-        console.error(`❌ Error processing media for ${p.name}:`, err.message);
+    if (!actorErr && people && people.length > 0) {
+      console.log(`\n👤 Actor Media Harvester Batch: ${actorOffset} - ${actorOffset + people.length} (${people.length} actors)`);
+      for (const p of people) {
+        try {
+          await processActorMedia(p, state);
+          state.processed_ids[p.id] = new Date().toISOString();
+          state.last_run_at = new Date().toISOString();
+          saveState(state);
+        } catch (err) {
+          console.error(`❌ Error processing media for ${p.name}:`, err.message);
+        }
+        await sleep(DELAY_MS);
       }
-      await sleep(DELAY_MS);
+      actorOffset += BATCH_SIZE;
+    } else {
+      actorOffset = 0; // Wrap around
     }
 
-    offset += BATCH_SIZE;
+    await sleep(2000);
   }
 }
 
 runMediaHarvesterDaemon().catch(console.error);
+

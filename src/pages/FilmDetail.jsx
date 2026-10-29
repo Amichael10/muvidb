@@ -29,6 +29,7 @@ import { normOrg } from '../lib/awards';
 import { formatFilmTitle, toSentenceCase, formatPersonName, toTitleCase } from '../utils/format';
 import { getFilmLanguages, getLanguageEndonym } from '../utils/languages';
 import { formatRole } from '../lib/creditRoles';
+import { formatViewCount } from '../utils/youtube';
 
 const RELATED_FILMS_LIMIT = 5;
 
@@ -292,6 +293,47 @@ export default function FilmDetail() {
   const [showAllCast, setShowAllCast] = useState(false);
   const [awardsOpen, setAwardsOpen] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview-section');
+
+  // Scrollspy observer for sticky tabs
+  useEffect(() => {
+    const sectionIds = [
+      'overview-section',
+      'episodes-section',
+      'trailer-section',
+      'cast-section',
+      'crew-section',
+      'awards-section',
+      'reviews-section',
+    ];
+
+    const elements = sectionIds.map((id) => document.getElementById(id)).filter(Boolean);
+    if (elements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.find((e) => e.isIntersecting);
+        if (visible && visible.target.id) {
+          setActiveTab(visible.target.id);
+        }
+      },
+      {
+        rootMargin: '-10% 0px -65% 0px',
+        threshold: 0.1,
+      }
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [film, cast, crew, episodes]);
+
+  const scrollToTab = (id) => {
+    setActiveTab(id);
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const fetchCriticSummary = async (uuid) => {
     try {
@@ -565,369 +607,763 @@ export default function FilmDetail() {
   }
 
   const trailerVideoId = youtubeId(film.trailer_youtube_id);
-  const availablePlatforms = PLATFORMS.filter((platform) => isFilmOnPlatform(film, platform.id));
+  const isRealYoutubeUrl = (url) => typeof url === 'string' && (url.includes('youtube.com') || url.includes('youtu.be'));
+  const fullYoutubeUrl = (isRealYoutubeUrl(film.youtube_watch_url) ? film.youtube_watch_url : null) || (isFilmOnPlatform(film, 'youtube') ? getWatchUrl(film, 'youtube') : null);
+  const availablePlatforms = PLATFORMS.filter((platform) => {
+    if (platform.id === 'cinema') return false;
+    if (platform.id === 'youtube' && fullYoutubeUrl) return true;
+    return isFilmOnPlatform(film, platform.id);
+  });
   // Languages belong in the hero, not only in the specs table further down —
   // the tongue a film is performed in is one of the first things a viewer here
   // wants to know. Shown as the endonym, with the English name on hover.
   const heroLanguages = getFilmLanguages(film).map(getLanguageEndonym).filter(Boolean);
-  const fullYoutubeUrl = film.youtube_watch_url || (isFilmOnPlatform(film, 'youtube') ? getWatchUrl(film, 'youtube') : null);
+
+  const directors = crew.filter((m) => (m.role || '').toLowerCase().includes('director'));
+  const writers = crew.filter((m) => {
+    const r = (m.role || '').toLowerCase();
+    return r.includes('writer') || r.includes('screenplay') || r.includes('story');
+  });
+  const topCast = cast.slice(0, 5);
+
+  const directorList = directors.length > 0
+    ? directors
+    : (film.director ? [{ name: film.director }] : []);
+
+  const formatRuntime = (mins) => {
+    if (!mins || isNaN(mins)) return null;
+    const num = Number(mins);
+    if (num <= 0) return null;
+    const hours = Math.floor(num / 60);
+    const remaining = num % 60;
+    if (hours > 0 && remaining > 0) return `${hours}h ${remaining}m`;
+    if (hours > 0) return `${hours}h`;
+    return `${remaining}m`;
+  };
+
+  const domGross = Number(film.box_office_domestic || film.streaming_links?.box_office?.domestic || 0);
+  const currency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
+  const symbol = currency === 'NGN' ? '₦' : `${currency} `;
+  const formattedGross = domGross >= 1_000_000_000 
+    ? `${(domGross / 1_000_000_000).toFixed(2)} Billion` 
+    : domGross >= 1_000_000
+    ? `${(domGross / 1_000_000).toFixed(1)} Million`
+    : domGross > 0 ? domGross.toLocaleString('en-NG') : null;
+  const rawFormatted = domGross.toLocaleString('en-NG');
+  const sourceLabel = film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN';
+  const openingGross = Number(film.box_office_opening_weekend || film.streaming_links?.box_office?.opening_weekend || 0);
+
+  // A film has genuine YouTube Movie views ONLY if:
+  // 1. It is explicitly a YouTube movie (release_type === 'youtube'), OR
+  // 2. It has an active YouTube watch URL AND is not a theatrical cinema release.
+  // Trailer views on cinema movies are promotional and strictly excluded from movie stream metrics.
+  const isCinemaFilm = domGross > 0 || film.release_type === 'cinema' || Boolean(film.is_in_cinemas);
+  const isActualYoutubeMovie = film.release_type === 'youtube' || (Boolean(film.youtube_watch_url) && !isCinemaFilm);
+  const showYoutubeViews = isActualYoutubeMovie && Boolean(film.view_count && Number(film.view_count) > 0);
+
+  const votesCount = film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count || (likesCount + dislikesCount);
+  const ratingValue = (film.imdb_rating || film.tmdb_rating || film.audience_rating)
+    ? Number(film.imdb_rating || film.tmdb_rating || film.audience_rating).toFixed(1)
+    : (film.liked_percent ? (film.liked_percent / 10).toFixed(1) : null);
+
+  const navTabs = [
+    { id: 'overview-section', label: 'Overview', icon: 'solar:document-text-linear' },
+    ...(episodes.length > 0 ? [{ id: 'episodes-section', label: `Episodes (${episodes.length})`, icon: 'solar:playlist-play-linear' }] : []),
+    ...(cast.length > 0 ? [{ id: 'cast-section', label: `Cast (${cast.length})`, icon: 'solar:users-group-rounded-linear' }] : []),
+    ...(crew.length > 0 ? [{ id: 'crew-section', label: `Crew (${crew.length})`, icon: 'solar:clapperboard-linear' }] : []),
+    ...(Array.isArray(film?.awards) && film.awards.length > 0 ? [{ id: 'awards-section', label: 'Awards', icon: 'solar:cup-star-linear' }] : []),
+    { id: 'reviews-section', label: 'Reviews', icon: 'solar:chat-round-dots-linear' },
+    ...(relatedFilms.length > 0 ? [{ id: 'related-section', label: 'More Like This', icon: 'solar:film-strip-linear' }] : []),
+  ];
 
   return (
     <div className="w-full bg-bg min-h-screen pb-20">
-      {/* 1. CINEMATIC HEADER */}
-      <div className="relative w-full border-b border-border">
-        {/* Backdrop image & gradients (strictly clipped to this container) */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <ImageWithFallback
-            src={getFilmBackdrop(film)}
-            alt={`${formatFilmTitle(film.title)} Backdrop`} 
-            className="w-full h-full object-cover"
-            fallbackType="film"
-            name={formatFilmTitle(film.title)}
-            width={1600}
-            quality={78}
-            sizes="100vw"
-            loading="eager"
-            fetchPriority="high"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/70 to-black/30"></div>
-          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-bg via-bg/80 to-transparent"></div>
-        </div>
+      {/* 1. CINEMATIC IMDB & NOLLYWIRE HERO STAGE */}
+      <section className="relative w-full bg-[#12141a] text-white border-b border-border overflow-hidden">
+        {/* Subtle radial ambient atmosphere */}
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-40"
+          style={{
+            background: 'radial-gradient(circle at 75% 15%, #2a2029 0%, #171922 45%, #0e1015 85%)'
+          }}
+        />
 
-        {/* Hero Content Container (Relative layout so poster and content never get clipped) */}
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-white/5 pt-8 md:pt-12 pb-10">
-          <div className="flex flex-col md:flex-row items-start md:items-end gap-6 md:gap-8">
-            
-            {/* Desktop Poster */}
-            <div className="hidden md:block w-56 lg:w-64 shrink-0 relative group self-end">
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/15 bg-surface-2">
-                <ImageWithFallback
-                  src={getFilmPoster(film)}
-                  alt={`${formatFilmTitle(film.title)} Poster`} 
-                  className="w-full aspect-[2/3] object-cover"
-                  fallbackType="film"
-                  name={formatFilmTitle(film.title)}
-                  width={512}
-                  sizes="256px"
-                  loading="eager"
-                />
-              </div>
-              {/* Floating Rotten Tomatoes-style "Watch Trailer" / "Play on YouTube" Pill Button */}
-              {(fullYoutubeUrl || trailerVideoId) && (
-                <div className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap">
-                  {fullYoutubeUrl ? (
-                    <a
-                      href={fullYoutubeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 bg-[#0d0f12]/95 hover:bg-[#FF0000] text-white text-xs font-black px-4 py-2 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 group/btn"
-                    >
-                      <div className="w-4 h-4 rounded-full bg-[#FF0000] group-hover/btn:bg-white text-white group-hover/btn:text-[#FF0000] flex items-center justify-center shrink-0 transition-colors">
-                        <Icon icon="solar:play-bold" className="text-[9px] ml-0.5" />
-                      </div>
-                      <span>Play on YouTube</span>
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const el = document.getElementById('trailer-section');
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      className="inline-flex items-center gap-2 bg-[#0d0f12]/95 hover:bg-brand text-white text-xs font-black px-4 py-2 rounded-full border border-white/20 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer group/btn"
-                    >
-                      <div className="w-4 h-4 rounded-full bg-[#FF0000] flex items-center justify-center text-white shrink-0 group-hover/btn:scale-110 transition-transform">
-                        <Icon icon="solar:play-bold" className="text-[9px] ml-0.5" />
-                      </div>
-                      <span>Watch Trailer</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 z-10 w-full">
-              {parentSeries && (
-                <Link 
-                  to={`/films/${parentSeries.slug || parentSeries.id}`}
-                  className="inline-flex items-center gap-1.5 bg-brand/15 border border-brand/30 text-brand px-3 py-1.5 rounded-md text-xs font-bold tracking-wide uppercase mb-3 hover:bg-brand/25 transition-all"
-                >
-                  <Icon icon="solar:tv-bold" className="text-xs" />
-                  <span>Part of Series: {parentSeries.title}</span>
-                </Link>
-              )}
-
-              {/* Mobile Poster + Title for mobile screens */}
-              <div className="flex md:hidden items-center gap-4 mb-3">
-                <div className="w-20 shrink-0 rounded-xl overflow-hidden border border-white/15 shadow-xl bg-surface-2 aspect-[2/3]">
-                  <ImageWithFallback
-                    src={getFilmPoster(film)}
-                    alt={formatFilmTitle(film.title)}
-                    className="w-full h-full object-cover"
-                    fallbackType="film"
-                    name={formatFilmTitle(film.title)}
-                    width={160}
-                    sizes="80px"
-                    loading="eager"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h1 className="font-heading font-bold text-2xl sm:text-3xl text-white leading-tight tracking-tight drop-shadow-2xl">
-                    {formatFilmTitle(film.title)}
-                  </h1>
-                </div>
+        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 pt-5 sm:pt-6 pb-6">
+          
+          {/* TITLE & RATING HEADER ROW (Nollywire / IMDb Style) */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4">
+            <div className="min-w-0">
+              {/* Eyebrow badge */}
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-4 h-0.5 bg-brand inline-block rounded-full"></span>
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-brand">
+                  {film.is_in_cinemas 
+                    ? 'In Cinemas' 
+                    : film.content_type === 'series'
+                    ? 'Original Series'
+                    : (film.coming_soon || film.status === 'upcoming')
+                    ? 'Coming Soon'
+                    : 'Film'}
+                </span>
+                {parentSeries && (
+                  <Link 
+                    to={`/films/${parentSeries.slug || parentSeries.id}`}
+                    className="ml-2 inline-flex items-center gap-1 text-[11px] font-bold text-white/70 hover:text-white transition-colors"
+                  >
+                    <span>· Part of {parentSeries.title}</span>
+                  </Link>
+                )}
               </div>
 
-              {/* Desktop Title */}
-              <h1 className="hidden md:block font-heading font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-white mb-3 leading-tight tracking-tighter drop-shadow-2xl">
+              {/* Title */}
+              <h1 className="font-heading font-black text-2xl sm:text-3xl md:text-4xl lg:text-[2.65rem] xl:text-[2.85rem] text-white tracking-tight leading-[1.1] mb-2">
                 {formatFilmTitle(film.title)}
               </h1>
 
-              {/* Metadata Row with Genres INLINE (replacing box office pill) */}
-              <div className="flex flex-wrap items-center gap-2.5 text-xs text-white/90 font-bold mb-5">
-                <span>{film.year}</span>
-                <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                <span>
-                  {film.content_type === 'series'
-                    ? (film.season_count ? `${film.season_count} Season${film.season_count > 1 ? 's' : ''}` : 'TV Series')
-                    : (film.content_type === 'short_film' || film.content_type === 'short film' || film.content_type === 'short')
-                    ? (film.runtime_minutes ? `Short Film • ${film.runtime_minutes} min` : 'Short Film')
-                    : `${film.runtime_minutes || film.runtime || 0} min`}
-                </span>
+              {/* Year line / metadata */}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-white/75 font-semibold">
+                {film.year && <span>{film.year}</span>}
+                {formatRuntime(film.runtime_minutes || film.runtime) && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-white/40"></span>
+                    <span>{formatRuntime(film.runtime_minutes || film.runtime)}</span>
+                  </>
+                )}
                 {film.nfvcb_rating && (
                   <>
-                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                    {/* Name the board, not just the letter. An unlabelled "15"
-                        could be anyone's rating; NFVCB is the Nigerian
-                        classifier, and saying so is the whole trust signal. */}
-                    <span
-                      className="inline-flex items-stretch rounded overflow-hidden border border-brand/50 text-[10px] font-bold leading-none"
-                      title={`Classified ${film.nfvcb_rating} by the National Film and Video Censors Board`}
+                    <span className="w-1 h-1 rounded-full bg-white/40"></span>
+                    <span 
+                      className="px-1.5 py-0.5 rounded border border-white/30 text-[10px] font-black text-white uppercase tracking-wider bg-white/10"
+                      title={`NFVCB ${film.nfvcb_rating}`}
                     >
-                      <span className="bg-brand/20 text-brand px-1.5 py-1 uppercase tracking-wider">NFVCB</span>
-                      <span className="bg-brand text-white px-1.5 py-1">{film.nfvcb_rating}</span>
+                      {film.nfvcb_rating}
                     </span>
                   </>
                 )}
-                {film.is_in_cinemas && (
+                {film.content_type && (
                   <>
-                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                    <span className="bg-gold text-bg px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider">
-                      In Cinemas
-                    </span>
-                  </>
-                )}
-                {(film.coming_soon || film.status === 'upcoming') && (
-                  <>
-                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                    <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-500/30 uppercase tracking-wider">
-                      Coming Soon
-                    </span>
+                    <span className="w-1 h-1 rounded-full bg-white/40"></span>
+                    <span className="capitalize">{film.content_type}</span>
                   </>
                 )}
                 {heroLanguages.length > 0 && (
                   <>
-                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {heroLanguages.map(({ name, endonym, label }) => (
-                        <span
-                          key={name}
-                          title={endonym ? `${endonym} — ${name}` : name}
-                          className="px-2.5 py-0.5 text-[10px] font-bold bg-brand/15 text-brand rounded-md border border-brand/30"
-                        >
-                          {label}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {film.genres && film.genres.length > 0 && (
-                  <>
-                    <span className="w-1 h-1 rounded-full bg-white/30"></span>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {film.genres.map(genre => (
-                        <span key={genre} className="px-2.5 py-0.5 text-[10px] font-bold bg-white/10 backdrop-blur-md text-white/90 rounded-md border border-white/15">
-                          {genre}
-                        </span>
-                      ))}
-                    </div>
+                    <span className="w-1 h-1 rounded-full bg-white/40"></span>
+                    <span>{heroLanguages.map(l => l.label).join(', ')}</span>
                   </>
                 )}
               </div>
+            </div>
+          </div>
 
-              {/* The gross is a peer of the score meters, not a smaller block
-                  floating off to the side. One stretched row keeps both cards
-                  the same height and level with each other. */}
-              <div className="flex flex-col lg:flex-row items-stretch gap-4 w-full mt-1">
-                <div className="w-full max-w-2xl">
+          {/* MEDIA GRID (Poster on Left | Big Trailer Stage in Center | Quick Media Links on Right) */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-3 items-stretch">
+            
+            {/* 1. Poster Column (md:col-span-4 lg:col-span-3) */}
+            <div className="md:col-span-4 lg:col-span-3 shrink-0 relative group rounded-xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl flex flex-col aspect-[2/3] max-w-[220px] sm:max-w-[260px] md:max-w-none mx-auto md:mx-0 w-full">
+              <ImageWithFallback
+                src={getFilmPoster(film)}
+                alt={`${formatFilmTitle(film.title)} Poster`}
+                className="w-full h-full object-cover group-hover:scale-[1.015] transition-transform duration-500"
+                fallbackType="film"
+                name={formatFilmTitle(film.title)}
+                width={512}
+                sizes="(max-width: 768px) 100vw, 300px"
+                loading="eager"
+              />
+              {film.is_in_cinemas && (
+                <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/85 backdrop-blur-md border border-amber-400/40 text-[10px] font-black uppercase tracking-wider text-amber-300 shadow-xl">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                  <span>In Cinemas</span>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Center: Trailer / Stage Video Player (md:col-span-8 lg:col-span-7) */}
+            <div id="trailer-stage" className="md:col-span-8 lg:col-span-7 relative rounded-xl overflow-hidden bg-black border border-white/10 shadow-2xl aspect-video md:aspect-auto flex flex-col h-full w-full self-stretch min-h-[200px] sm:min-h-[280px]">
+              {trailerVideoId ? (
+                <div className="w-full h-full relative flex-1 min-h-0">
+                  <iframe
+                    className="w-full h-full absolute inset-0"
+                    src={`https://www.youtube.com/embed/${trailerVideoId}?autoplay=0&rel=0&modestbranding=1`}
+                    title={`${formatFilmTitle(film.title)} Official Trailer`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : getFilmBackdrop(film) ? (
+                <div className="w-full h-full relative flex-1 min-h-0">
+                  <ImageWithFallback
+                    src={getFilmBackdrop(film)}
+                    alt={`${formatFilmTitle(film.title)} Backdrop`}
+                    className="w-full h-full object-cover opacity-80"
+                    fallbackType="film"
+                    name={formatFilmTitle(film.title)}
+                    width={1280}
+                    quality={85}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-6">
+                    <span className="text-[11px] uppercase tracking-widest font-black text-amber-400 mb-1">Official Backdrop</span>
+                    <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow">Trailer not published yet</h3>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center p-8 text-center text-white/50 w-full h-full flex-1 min-h-0">
+                  <Icon icon="solar:clapperboard-play-linear" className="text-5xl mb-2 opacity-40 text-brand" />
+                  <p className="text-sm font-bold text-white/80">Trailer not published</p>
+                  <p className="text-xs text-white/50 mt-1">{formatFilmTitle(film.title)}</p>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Media Cards Column (Desktop Right, lg:col-span-2) */}
+            <div className="hidden lg:grid grid-rows-2 gap-2 sm:gap-3 col-span-2">
+              {/* Videos Link */}
+              <a
+                href={fullYoutubeUrl || (trailerVideoId ? `https://www.youtube.com/watch?v=${trailerVideoId}` : '#trailer-stage')}
+                target={fullYoutubeUrl || trailerVideoId ? '_blank' : '_self'}
+                rel="noopener noreferrer"
+                className="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 transition-all group text-center cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white group-hover:scale-110 group-hover:bg-brand transition-all mb-1.5">
+                  <Icon icon="solar:play-bold" className="text-base ml-0.5" />
+                </div>
+                <span className="text-xs font-black uppercase tracking-wider text-white">
+                  {fullYoutubeUrl ? 'Play Movie' : '1 Video'}
+                </span>
+                <span className="text-[10px] text-white/50 font-medium mt-0.5">
+                  {showYoutubeViews 
+                    ? `${formatViewCount(film.view_count)} views · Full Movie`
+                    : (fullYoutubeUrl ? 'On YouTube' : 'Official Trailer')}
+                </span>
+              </a>
+
+              {/* Photos Link */}
+              <a
+                href="#overview-section"
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToTab('overview-section');
+                }}
+                className="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 transition-all group text-center cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white group-hover:scale-110 group-hover:bg-amber-500 transition-all mb-1.5">
+                  <Icon icon="solar:gallery-bold" className="text-base" />
+                </div>
+                <span className="text-xs font-black uppercase tracking-wider text-white">
+                  Photos & Stills
+                </span>
+                <span className="text-[10px] text-white/50 font-medium mt-0.5">
+                  Production Media
+                </span>
+              </a>
+            </div>
+          </div>
+
+          {/* INTEGRATED HERO SCORECARD STRIP (Critics Meter + Audience Popcornmeter + Box Office & YouTube Views) */}
+          <div className="pt-4 sm:pt-6 pb-1">
+            <div className="flex flex-col lg:flex-row items-stretch gap-3.5 sm:gap-4 w-full">
+              <div className="flex-1 min-w-0">
                 <RottenTomatoesScorecard
                   film={film}
                   criticScore={criticSummary.score}
                   criticCount={criticSummary.count}
                   featuredQuote={criticSummary.featuredQuote}
-                  audiencePercent={film.liked_percent}
+                  audiencePercent={film.liked_percent ?? (likesCount > 0 ? Math.round((likesCount / (likesCount + dislikesCount)) * 100) : null)}
                   starRating={film.imdb_rating || film.tmdb_rating || film.audience_rating}
-                  votesCount={film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count || (likesCount + dislikesCount)}
+                  votesCount={votesCount}
                   onRateClick={() => {
+                    setShowReviewForm(true);
                     const el = document.getElementById('rate-prompt-section') || document.getElementById('reviews-section');
                     if (el) el.scrollIntoView({ behavior: 'smooth' });
                   }}
-                  onWatchClick={() => {
-                    const el = document.getElementById('watch-options-section');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  onTrailerClick={trailerVideoId ? () => {
-                    const el = document.getElementById('trailer-section');
+                  onWatchClick={availablePlatforms.length > 0 ? () => {
+                    const el = document.getElementById('overview-section');
                     if (el) el.scrollIntoView({ behavior: 'smooth' });
                   } : null}
                 />
-                </div>
+              </div>
 
-                {/* Box office card — the second peer in the row above. */}
-                {(() => {
-              // The figure is read-only here. Box office is edited in the
-              // admin area, not from the public page, so this renders nothing
-              // at all when a film has no gross recorded.
-              const domGross = film.box_office_domestic || film.streaming_links?.box_office?.domestic;
-              if (!domGross) return null;
+              {/* Commercial & Reach Performance Card (Box Office & YouTube Views) */}
+              {(domGross > 0 || showYoutubeViews || isAdmin) && (
+                <div className="flex w-full lg:w-auto flex-col shrink-0">
+                  {/* Case 1: Both Box Office AND Valid YouTube Stream (Rare Hybrid) */}
+                  {domGross > 0 && showYoutubeViews ? (
+                    <div className="h-full flex flex-col justify-between p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-black/60 border border-white/15 backdrop-blur-xl shadow-2xl w-full lg:w-72 xl:w-80">
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">
+                        <span>Commercial Reach</span>
+                        <Link
+                          to={`/films/${film.slug || film.id}/box-office`}
+                          className="text-amber-400 hover:underline font-bold"
+                        >
+                          Full Breakdown →
+                        </Link>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 py-1">
+                        {/* Box Office Tile */}
+                        <Link 
+                          to={`/films/${film.slug || film.id}/box-office`}
+                          className="p-2.5 rounded-lg bg-amber-500/[0.08] border border-amber-500/25 hover:border-amber-400/50 transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-1 text-[10px] font-black text-amber-400 uppercase mb-0.5">
+                            <Icon icon="solar:ticket-bold" className="text-xs" />
+                            <span>Box Office</span>
+                          </div>
+                          <div className="text-base sm:text-lg font-black text-white font-heading leading-tight group-hover:text-amber-300">
+                            <span className="text-amber-400">{symbol}</span>{formattedGross}
+                          </div>
+                          <div className="text-[9px] text-white/50 uppercase tracking-wider mt-0.5 font-bold">
+                            Domestic
+                          </div>
+                        </Link>
 
-              const currency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
-              const symbol = currency === 'NGN' ? '₦' : `${currency} `;
-              const formatted = domGross >= 1_000_000_000 
-                ? `${(domGross / 1_000_000_000).toFixed(2)} Billion` 
-                : `${(domGross / 1_000_000).toFixed(1)} Million`;
-              const rawFormatted = Number(domGross).toLocaleString('en-NG');
-              const sourceLabel = film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN';
-
-              return (
-                /* Was desktop-only, which hid the single most distinctive
-                   number on the page from the majority of traffic. Now it
-                   flows full-width under the scorecard on small screens and
-                   keeps its right-hand slot from lg up. */
-                <div className="flex w-full lg:w-auto flex-col z-10">
-                  <div 
-                    onClick={() => setShowBoxOfficeBreakdown(true)}
-                    className="h-full flex flex-col justify-center p-4 sm:p-5 rounded-2xl bg-black/70 border border-amber-500/40 backdrop-blur-xl shadow-2xl shadow-amber-500/20 w-full lg:w-64 text-left lg:text-right space-y-2 cursor-pointer hover:border-amber-400 hover:shadow-amber-500/30 hover:scale-[1.02] transition-all duration-200 group"
-                    title="Click for Box Office breakdown"
-                  >
-                    <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-widest">
-                      <span className="text-[9px] text-amber-400/80 group-hover:text-amber-300 font-normal flex items-center gap-0.5">
-                        <span>Details</span>
-                        <Icon icon="solar:arrow-right-up-linear" className="text-xs group-hover:translate-x-0.5 transition-transform" />
-                      </span>
-                      <div className="flex items-center gap-1.5 ml-auto">
-                        <Icon icon="solar:ticket-bold" className="text-amber-400 text-sm" />
-                        <span>Box Office Revenue</span>
+                        {/* YouTube Stream Tile */}
+                        <a
+                          href={fullYoutubeUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(film.title)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2.5 rounded-lg bg-red-500/[0.08] border border-red-500/25 hover:border-red-400/50 transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-1 text-[10px] font-black text-red-400 uppercase mb-0.5">
+                            <Icon icon="simple-icons:youtube" className="text-xs text-red-500" />
+                            <span>YouTube</span>
+                          </div>
+                          <div className="text-base sm:text-lg font-black text-white font-heading leading-tight group-hover:text-red-400">
+                            {formatViewCount(film.view_count)}
+                          </div>
+                          <div className="text-[9px] text-white/50 uppercase tracking-wider mt-0.5 font-bold">
+                            Full Movie
+                          </div>
+                        </a>
+                      </div>
+                      <div className="text-[10px] text-white/40 font-medium mt-1.5">
+                        Theatrical Run &amp; Official Stream
                       </div>
                     </div>
-                    {/* One figure, not two. "₦74.1 Million" is what people
-                        quote; the exact naira amount is a tooltip rather than
-                        a second line saying the same thing. */}
-                    <p
-                      className="text-3xl md:text-2xl font-black text-white font-heading tracking-tight leading-none"
-                      title={`${symbol}${rawFormatted}`}
+                  ) : domGross > 0 ? (
+                    /* Case 2: Cinema Theatrical Release with Box Office */
+                    <Link
+                      to={`/films/${film.slug || film.id}/box-office`}
+                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-amber-500/30 backdrop-blur-xl shadow-2xl hover:border-amber-400/60 w-full lg:w-64 xl:w-72 text-left transition-all cursor-pointer group"
                     >
-                      <span className="text-amber-400">{symbol}</span>{formatted}
-                    </p>
-                    {/* Provenance is an internal detail — it tells us where a
-                        figure came from, which matters when reconciling
-                        sources, but means nothing to a visitor. */}
-                    {isAdmin && (
-                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-amber-500/20 text-[10px] font-bold">
-                        <span className="text-amber-300/90 font-mono">{symbol}{rawFormatted}</span>
-                        <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded uppercase text-[9px] border border-amber-500/30">
-                          {sourceLabel}
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <Icon icon="solar:ticket-bold" className="text-amber-400 text-sm" />
+                          <span>Box Office</span>
+                        </div>
+                        <span className="text-[10px] text-white/50 group-hover:text-amber-300 transition-colors">
+                          Full Page →
                         </span>
                       </div>
+                      <div className="my-auto py-1">
+                        <p className="text-xl sm:text-2xl font-black text-white font-heading tracking-tight leading-none group-hover:text-amber-300 transition-colors">
+                          <span className="text-amber-400">{symbol}</span>{formattedGross}
+                        </p>
+                        <div className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider mt-1.5">
+                          Domestic Gross
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-white/40 font-medium">
+                        {openingGross > 0 ? `₦${(openingGross / 1_000_000).toFixed(1)}M Opening Weekend` : 'Theatrical Cinema Release'}
+                      </div>
+                    </Link>
+                  ) : showYoutubeViews ? (
+                    /* Case 3: YouTube Full Movie Release with Stream Views */
+                    <a
+                      href={fullYoutubeUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(film.title)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-red-500/30 backdrop-blur-xl shadow-2xl hover:border-red-400/60 w-full lg:w-64 xl:w-72 text-left transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <Icon icon="simple-icons:youtube" className="text-red-500 text-sm" />
+                          <span>YouTube Stream</span>
+                        </div>
+                        <span className="text-[10px] text-white/50 group-hover:text-red-400 transition-colors">
+                          Watch →
+                        </span>
+                      </div>
+                      <div className="my-auto py-1">
+                        <p className="text-xl sm:text-2xl font-black text-white font-heading tracking-tight leading-none flex items-baseline gap-1.5 group-hover:text-red-400 transition-colors">
+                          <span className="text-red-500">{formatViewCount(film.view_count)}</span>
+                          <span className="text-xs text-white/60 font-bold">views</span>
+                        </p>
+                        <div className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider mt-1.5">
+                          Official Full Movie Stream
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-red-400/80 font-mono font-medium">
+                        {Number(film.view_count).toLocaleString()} total streams
+                      </div>
+                    </a>
+                  ) : (
+                    /* Case 4: Admin Shortcut to add Gross */
+                    <div
+                      onClick={() => setShowBoxOfficeModal(true)}
+                      className="h-full flex flex-col justify-center p-4 rounded-xl sm:rounded-2xl bg-black/40 border border-white/10 hover:border-amber-400/40 w-full lg:w-64 text-left transition-all cursor-pointer group"
+                    >
+                      <span className="text-[10px] font-black uppercase tracking-wider text-white/50">Box Office (Admin)</span>
+                      <span className="text-xs font-bold text-amber-400 mt-1">+ Record Domestic Gross</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SUMMARY ROW (Below Media Grid: Genres + Synopsis + Key Credits on Left | Action Cards on Right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 pt-6 sm:pt-8 items-start">
+            
+            {/* Left 8 Cols: Genres + Tagline + Synopsis + Credits */}
+            <div className="lg:col-span-8 space-y-4">
+              
+              {/* Genre Pills */}
+              {film.genres && film.genres.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {film.genres.map((genre) => (
+                    <Link
+                      key={genre}
+                      to={`/browse?genre=${encodeURIComponent(genre)}`}
+                      className="px-3.5 py-1 rounded-full text-xs font-bold bg-white/10 hover:bg-white/20 text-white/90 border border-white/15 transition-colors"
+                    >
+                      {genre}
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {/* Tagline */}
+              {film.tagline && (
+                <p className="text-base sm:text-lg text-amber-300/90 font-serif italic">
+                  "{film.tagline}"
+                </p>
+              )}
+
+              {/* Storyline / Synopsis */}
+              {film.synopsis && (
+                <p className="text-white/85 text-sm sm:text-base leading-relaxed max-w-3xl">
+                  {toSentenceCase(film.synopsis)}
+                </p>
+              )}
+
+              {/* Key Credits List (Director, Writers, Stars) */}
+              <div className="border-t border-white/15 divide-y divide-white/15 pt-1">
+                {directorList.length > 0 && (
+                  <div className="grid grid-cols-12 gap-4 py-3 text-sm">
+                    <span className="col-span-4 sm:col-span-3 lg:col-span-2 font-bold text-white/90">
+                      Director{directorList.length > 1 ? 's' : ''}
+                    </span>
+                    <div className="col-span-8 sm:col-span-9 lg:col-span-10 flex flex-wrap items-center gap-1.5 text-white/80">
+                      {directorList.map((dir, idx) => (
+                        <span key={dir.id || dir.name} className="flex items-center">
+                          {dir.slug || dir.id ? (
+                            <Link to={`/people/${dir.slug || dir.id}`} className="text-brand hover:underline font-bold">
+                              {formatPersonName(dir.name)}
+                            </Link>
+                          ) : (
+                            <span className="text-white font-bold">{formatPersonName(dir.name)}</span>
+                          )}
+                          {idx < directorList.length - 1 && <span className="text-white/40 ml-1.5 mr-0.5">·</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {writers.length > 0 && (
+                  <div className="grid grid-cols-12 gap-4 py-3 text-sm">
+                    <span className="col-span-4 sm:col-span-3 lg:col-span-2 font-bold text-white/90">
+                      Writer{writers.length > 1 ? 's' : ''}
+                    </span>
+                    <div className="col-span-8 sm:col-span-9 lg:col-span-10 flex flex-wrap items-center gap-1.5 text-white/80">
+                      {writers.slice(0, 4).map((w, idx, arr) => (
+                        <span key={w.id || w.name} className="flex items-center">
+                          {w.slug || w.id ? (
+                            <Link to={`/people/${w.slug || w.id}`} className="text-brand hover:underline font-bold">
+                              {formatPersonName(w.name)}
+                            </Link>
+                          ) : (
+                            <span className="text-white font-bold">{formatPersonName(w.name)}</span>
+                          )}
+                          {idx < arr.length - 1 && <span className="text-white/40 ml-1.5 mr-0.5">·</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {topCast.length > 0 && (
+                  <div className="grid grid-cols-12 gap-4 py-3 text-sm">
+                    <span className="col-span-4 sm:col-span-3 lg:col-span-2 font-bold text-white/90">
+                      Stars
+                    </span>
+                    <div className="col-span-8 sm:col-span-9 lg:col-span-10 flex flex-wrap items-center gap-1.5 text-white/80">
+                      {topCast.map((actor, idx) => (
+                        <span key={actor.id || actor.name} className="flex items-center">
+                          {actor.slug || actor.id ? (
+                            <Link to={`/people/${actor.slug || actor.id}`} className="text-brand hover:underline font-bold">
+                              {formatPersonName(actor.name)}
+                            </Link>
+                          ) : (
+                            <span className="text-white font-bold">{formatPersonName(actor.name)}</span>
+                          )}
+                          {idx < topCast.length - 1 && <span className="text-white/40 ml-1.5 mr-0.5">·</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right 4 Cols: Action Aside (IMDb-Style Prominent Streaming Module, Watchlist, Rate, Recommend) */}
+            <div className="lg:col-span-4 flex flex-col gap-3">
+              {/* 1. STREAMING / WHERE TO WATCH (Prominent IMDb-Style Module) */}
+              {(availablePlatforms.length > 0 || film.is_in_cinemas) && (
+                <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 shadow-lg backdrop-blur-md">
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-[11px] font-black uppercase tracking-widest text-brand flex items-center gap-1.5">
+                      <Icon icon="solar:tv-bold" className="text-sm" />
+                      Streaming
+                    </span>
+                    {availablePlatforms.length > 1 && (
+                      <span className="text-[10px] font-bold text-white/50 tracking-wider">
+                        {availablePlatforms.length} services available
+                      </span>
                     )}
                   </div>
+
+                  {/* Single Platform: Wide Prominent Feature Card (Like IMDb's Prime Video Slate) */}
+                  {availablePlatforms.length === 1 && (() => {
+                    const platform = availablePlatforms[0];
+                    const url = (platform.id === 'youtube' && fullYoutubeUrl)
+                      ? fullYoutubeUrl
+                      : getWatchUrl(film, platform.id);
+                    const cardContent = (
+                      <div
+                        className="w-full h-12 sm:h-13 rounded-xl flex items-center justify-between px-3.5 sm:px-4 transition-all duration-200 hover:scale-[1.02] shadow-md group cursor-pointer border border-white/20"
+                        style={{
+                          backgroundColor: platform.color ? `${platform.color}dd` : '#1e222d',
+                        }}
+                      >
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                          {platform.logo ? (
+                            <div className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-lg bg-white flex items-center justify-center p-1 shrink-0 shadow-sm">
+                              <img src={platform.logo} alt="" className="w-full h-full object-contain" />
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                              <Icon icon={platform.icon} className="text-lg text-white" />
+                            </div>
+                          )}
+                          <div className="flex flex-col min-w-0 text-left">
+                            <span className="text-[9px] sm:text-[10px] font-bold text-white/80 uppercase tracking-wider leading-none">
+                              Watch on
+                            </span>
+                            <span className="text-xs sm:text-sm font-black text-white truncate leading-tight mt-0.5">
+                              {platform.name}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-full bg-white/20 flex items-center justify-center text-white group-hover:bg-white group-hover:text-black transition-all shrink-0">
+                          <Icon icon="solar:play-bold" className="text-xs sm:text-sm ml-0.5" />
+                        </div>
+                      </div>
+                    );
+
+                    return url ? (
+                      <a href={url} target="_blank" rel="noopener noreferrer" title={`Watch on ${platform.name}`}>
+                        {cardContent}
+                      </a>
+                    ) : (
+                      <Link to={`/watch/${platform.id}`} title={`Explore ${platform.name}`}>
+                        {cardContent}
+                      </Link>
+                    );
+                  })()}
+
+                  {/* Multiple Platforms: Generous 2-Column Grid of Watch Tiles */}
+                  {availablePlatforms.length > 1 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {availablePlatforms.map((platform) => {
+                        const url = (platform.id === 'youtube' && fullYoutubeUrl)
+                          ? fullYoutubeUrl
+                          : getWatchUrl(film, platform.id);
+                        const cardContent = (
+                          <div
+                            className="h-11 sm:h-12 rounded-xl flex items-center justify-between px-2.5 sm:px-3 transition-all duration-200 hover:scale-[1.02] shadow-sm group cursor-pointer border border-white/10 bg-[#1e222d] hover:bg-[#282d3c] hover:border-white/25"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {platform.logo ? (
+                                <div className="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-lg bg-white flex items-center justify-center p-1 shrink-0 shadow-sm">
+                                  <img src={platform.logo} alt="" className="w-full h-full object-contain" />
+                                </div>
+                              ) : (
+                                <div
+                                  className="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-lg flex items-center justify-center shrink-0 bg-white/10"
+                                >
+                                  <Icon
+                                    icon={platform.icon}
+                                    className="text-base"
+                                    style={{ color: platform.color || '#fff' }}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex flex-col min-w-0 text-left">
+                                <span className="text-[9px] font-bold text-white/50 uppercase tracking-wider leading-none">
+                                  Watch on
+                                </span>
+                                <span className="text-xs font-black text-white truncate leading-tight mt-0.5">
+                                  {platform.name}
+                                </span>
+                              </div>
+                            </div>
+                            <Icon
+                              icon="solar:arrow-right-up-linear"
+                              className="text-xs text-white/40 group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-1"
+                            />
+                          </div>
+                        );
+
+                        return url ? (
+                          <a
+                            key={platform.id}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Watch on ${platform.name}`}
+                          >
+                            {cardContent}
+                          </a>
+                        ) : (
+                          <Link
+                            key={platform.id}
+                            to={`/watch/${platform.id}`}
+                            title={`Browse ${platform.name} titles`}
+                          >
+                            {cardContent}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Theatrical Cinema Release Bar if currently in cinemas */}
+                  {film.is_in_cinemas && (
+                    <div className="h-10 sm:h-11 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between px-3.5 text-amber-300">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        <span className="text-xs font-bold uppercase tracking-wider">In Cinemas Now</span>
+                      </div>
+                      <Link
+                        to="/cinemas"
+                        className="text-[11px] font-bold text-amber-300 hover:text-white transition-colors flex items-center gap-1"
+                      >
+                        <span>Showtimes</span>
+                        <Icon icon="solar:alt-arrow-right-linear" />
+                      </Link>
+                    </div>
+                  )}
                 </div>
-                );
-                })()}
+              )}
+
+              {/* 2. Primary: Watchlist Button (Nollywire / IMDb Style) */}
+              <button
+                type="button"
+                onClick={handleWatchlist}
+                disabled={watchlistLoading}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-[13px] font-bold tracking-wide transition-all duration-200 cursor-pointer active:scale-98 disabled:opacity-50 ${
+                  inWatchlist
+                    ? 'bg-amber-400/20 border border-amber-400/50 text-amber-300 shadow-sm'
+                    : 'bg-[#222530] hover:bg-[#2b303d] border border-white/15 text-white shadow-sm'
+                }`}
+              >
+                <Icon
+                  icon={inWatchlist ? 'solar:bookmark-check-bold' : 'solar:bookmark-linear'}
+                  className={`text-base sm:text-lg ${inWatchlist ? 'text-amber-400' : 'text-white/80'}`}
+                />
+                <span>{inWatchlist ? 'In Watchlist' : '+ Add to Watchlist'}</span>
+              </button>
+
+              {/* 3. Secondary Actions Grid (Rate & Review, Recommend) */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowReviewForm(true);
+                    const el = document.getElementById('rate-prompt-section') || document.getElementById('reviews-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2 px-2.5 sm:px-3 rounded-xl bg-[#222530]/80 hover:bg-[#2b303d] border border-white/15 text-white/90 text-xs font-bold transition-all cursor-pointer"
+                >
+                  <Icon icon="solar:star-linear" className="text-sm text-amber-400" />
+                  <span>Rate & Review</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleReaction('like')}
+                  disabled={reactionLoading}
+                  className={`flex items-center justify-center gap-1.5 py-2 px-2.5 sm:px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    userReaction === 'like'
+                      ? 'bg-brand/20 border-brand text-brand'
+                      : 'bg-[#222530]/80 hover:bg-[#2b303d] border-white/15 text-white/90'
+                  }`}
+                >
+                  <Icon icon={userReaction === 'like' ? 'solar:like-bold' : 'solar:like-linear'} className="text-sm text-brand" />
+                  <span>{likesCount > 0 ? `${likesCount} Likes` : 'Recommend'}</span>
+                </button>
               </div>
             </div>
+
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 2. CONTENT SECTION */}
-      <div className="max-w-7xl mx-auto border-x border-border min-h-[600px]">
-        <section className="lg:hidden p-4 sm:p-6 border-b border-border bg-surface/40 space-y-4">
-          <WatchOptions film={film} isFullWidth />
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={handleWatchlist}
-              disabled={watchlistLoading}
-              className={`min-h-[52px] rounded-lg border flex flex-col items-center justify-center gap-1 text-xs font-bold transition-colors disabled:opacity-50 ${inWatchlist ? 'bg-brand text-white border-brand' : 'bg-surface border-border text-text-primary'}`}
-            >
-              <Icon icon={inWatchlist ? 'solar:bookmark-bold' : 'solar:bookmark-linear'} width="18" />
-              {inWatchlist ? 'Saved' : 'Watchlist'}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleReaction('like')}
-              disabled={reactionLoading}
-              className={`min-h-[52px] rounded-lg border flex flex-col items-center justify-center gap-1 text-xs font-bold transition-colors disabled:opacity-50 ${userReaction === 'like' ? 'bg-brand/10 border-brand text-brand' : 'bg-surface border-border text-text-primary'}`}
-            >
-              <Icon icon={userReaction === 'like' ? 'solar:like-bold' : 'solar:like-linear'} width="18" />
-              {likesCount} Like
-            </button>
-            <button
-              type="button"
-              onClick={() => document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' })}
-              className="min-h-[52px] rounded-lg border border-border bg-surface text-text-primary flex flex-col items-center justify-center gap-1 text-xs font-bold"
-            >
-              <Icon icon="solar:star-linear" width="18" />
-              Rate
-            </button>
-          </div>
-          {availablePlatforms.length > 0 && (
-            <div className="pt-1">
-              <p className="text-xs font-bold text-text-muted mb-2">Where to watch</p>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                {availablePlatforms.map((platform) => {
-                  const url = getWatchUrl(film, platform.id);
-                  const className = 'shrink-0 inline-flex items-center gap-2 min-h-[40px] px-3 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary';
-                  const mark = platform.logo ? (
-                    <span className="w-6 h-6 rounded-md bg-white overflow-hidden shrink-0 inline-flex items-center justify-center">
-                      <img src={platform.logo} alt="" className="w-full h-full object-contain p-0.5" loading="lazy" />
-                    </span>
-                  ) : (
-                    <span
-                      className="w-6 h-6 rounded-md inline-flex items-center justify-center shrink-0"
-                      style={{ background: `${platform.color}22`, color: platform.color }}
-                    >
-                      <Icon icon={platform.icon} width="14" height="14" />
-                    </span>
-                  );
-                  const content = <>{mark}{platform.name}</>;
-                  return url ? (
-                    <a key={platform.id} href={url} target="_blank" rel="noopener noreferrer" className={className}>{content}</a>
-                  ) : (
-                    <Link key={platform.id} to={`/watch/${platform.id}`} className={className}>{content}</Link>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </section>
-        <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-border">
+      {/* 2. STICKY SUB-NAVIGATION BAR (Nollywire/IMDb scrollspy with native design tokens) */}
+      <nav 
+        aria-label="Film sub-navigation"
+        className="sticky top-16 z-30 bg-bg/95 backdrop-blur-md border-b border-border shadow-sm transition-all"
+      >
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 flex items-center justify-start gap-1 sm:gap-2 overflow-x-auto no-scrollbar py-2">
+          {navTabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => scrollToTab(tab.id)}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  isActive
+                    ? 'bg-brand text-white shadow-sm shadow-brand/20'
+                    : 'text-text-muted hover:text-text-primary hover:bg-surface-2/60'
+                }`}
+              >
+                {tab.icon && <Icon icon={tab.icon} className="text-sm" />}
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
-          {/* MAIN CONTENT (70%) — movie info (synopsis + specs) → episodes → trailer → cast → crew → awards → reviews */}
-          <div className="lg:col-span-2">
+      {/* 3. CONTENT SECTIONS (Nollywire & IMDb Clean Architecture) */}
+      <main className="max-w-[1440px] mx-auto min-h-[600px] divide-y divide-border">
             {/* Unified Movie Info (Storyline & Synopsis + Production & Industry Specs) */}
-            <FilmSpecsTable
-              film={film}
-              cast={cast}
-              crew={crew}
-              synopsis={film.synopsis}
-              isAdmin={isAdmin}
-              onEditBoxOffice={() => setShowBoxOfficeModal(true)}
-              onOpenBoxOfficeBreakdown={() => setShowBoxOfficeBreakdown(true)}
-              onSuggestEdit={() => setShowFilmEdit(true)}
-              onReport={() => setShowReport(true)}
-            />
+            <div id="overview-section" className="scroll-mt-28">
+              <FilmSpecsTable
+                film={film}
+                cast={cast}
+                crew={crew}
+                synopsis={film.synopsis}
+                isAdmin={isAdmin}
+                onEditBoxOffice={() => setShowBoxOfficeModal(true)}
+                onOpenBoxOfficeBreakdown={() => navigate(`/films/${film.slug || film.id}/box-office`)}
+                onSuggestEdit={() => setShowFilmEdit(true)}
+                onReport={() => setShowReport(true)}
+              />
+            </div>
             {showBoxOfficeModal && (
               <AdminBoxOfficeModal
                 film={film}
@@ -988,7 +1424,7 @@ export default function FilmDetail() {
               });
 
               return (
-              <section className="p-8 md:p-12 border-b border-border bg-surface-2/5">
+              <section id="episodes-section" className="p-8 md:p-12 border-b border-border bg-surface-2/5 scroll-mt-28">
                 <div className="flex flex-col gap-5 mb-6">
                   <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                     <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary tracking-tight leading-none flex items-center gap-2">
@@ -1128,52 +1564,54 @@ export default function FilmDetail() {
               );
             })()}
 
-            {/* Trailer */}
-            {trailerVideoId && (
-              <section id="trailer-section" className="p-8 md:p-12 border-b border-border bg-surface-2/10 relative overflow-hidden">
-                <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none"></div>
-                <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-6 tracking-tight leading-none relative z-10">Official Trailer</h2>
-                <div className="relative z-10 aspect-video rounded-xl overflow-hidden border border-border bg-surface-2 shadow-sm">
-                  <iframe
-                    className="w-full h-full"
-                    src={`https://www.youtube.com/embed/${trailerVideoId}?autoplay=0&rel=0&modestbranding=1`}
-                    title={`${formatFilmTitle(film.title)} Trailer`}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  ></iframe>
-                </div>
-              </section>
-            )}
-
-            {/* Cast */}
+            {/* Cast (Nollywire / IMDb Responsive Grid) */}
             {cast.length > 0 && (
-              <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-2 tracking-tight leading-none">Cast</h2>
-                <p className="text-xs text-text-muted mb-6">{cast.length} {cast.length === 1 ? 'credit' : 'credits'}</p>
-                <div className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2">
+              <section id="cast-section" className="p-5 sm:p-6 md:p-8 border-b border-border scroll-mt-28">
+                <div className="flex items-center justify-between mb-5 sm:mb-6">
+                  <div className="flex items-center gap-2.5 sm:gap-3">
+                    <span className="w-1.5 h-5 sm:h-6 rounded-full bg-brand shrink-0" />
+                    <h2 className="font-heading font-black text-xl sm:text-2xl text-text-primary tracking-tight leading-none">
+                      Top Cast
+                    </h2>
+                    <span className="text-[11px] sm:text-xs text-text-muted font-bold px-2 py-0.5 rounded-full bg-surface-2 border border-border">
+                      {cast.length} {cast.length === 1 ? 'credit' : 'credits'}
+                    </span>
+                  </div>
+                  {cast.length > 8 && (
+                    <button
+                      onClick={() => setShowAllCast(prev => !prev)}
+                      className="text-xs font-bold text-brand hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>{showAllCast ? 'Show top cast' : `See all ${cast.length}`}</span>
+                      <Icon icon={showAllCast ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-3.5">
                   {(showAllCast ? cast : cast.slice(0, 8)).map(person => (
                     <Link 
                       key={person.id} 
                       to={`/people/${person.slug || person.id}`}
-                      className="group flex flex-col w-28 sm:w-32 shrink-0 snap-start"
+                      className="group flex flex-col bg-surface/50 hover:bg-surface-2/60 rounded-xl p-2 sm:p-2.5 border border-border hover:border-brand/50 transition-all duration-300 shadow-sm"
                     >
-                      <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border border-border shadow-sm group-hover:border-brand transition-colors duration-300">
+                      <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border border-border/80 group-hover:border-brand/40 bg-surface-2 shadow-inner">
                         <ImageWithFallback
                           src={person.photo_url}
                           alt={formatPersonName(person.name)}
                           fallbackType="avatar"
                           name={formatPersonName(person.name)}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           width={256}
-                          sizes="(max-width: 639px) 112px, 128px"
+                          sizes="(max-width: 639px) 140px, 180px"
                           loading="lazy"
                         />
                       </div>
-                      <div className="mt-3 flex flex-col text-left">
-                        <span className="font-bold text-text-primary text-sm tracking-tight leading-snug line-clamp-1 group-hover:text-gold transition-colors">
+                      <div className="mt-2.5 flex flex-col text-left px-0.5 min-w-0">
+                        <span className="font-bold text-text-primary text-xs sm:text-sm tracking-tight leading-snug truncate group-hover:text-gold transition-colors">
                           {formatPersonName(person.name)}
                         </span>
-                        <span className="text-xs text-text-muted font-medium mt-0.5 line-clamp-1">
+                        <span className="text-[11px] text-text-muted font-medium mt-0.5 line-clamp-2 leading-relaxed">
                           {person.character_name ? `as ${toTitleCase(person.character_name)}` : toTitleCase(person.role || 'Cast')}
                         </span>
                       </div>
@@ -1182,12 +1620,13 @@ export default function FilmDetail() {
                 </div>
                 
                 {cast.length > 8 && (
-                  <div className="mt-6 flex justify-start">
+                  <div className="mt-6 flex justify-center">
                     <button
                       onClick={() => setShowAllCast(prev => !prev)}
-                      className="min-h-[44px] px-5 py-2 bg-surface border border-border text-text-primary text-xs font-bold rounded-lg hover:border-brand hover:text-brand transition-colors"
+                      className="min-h-[40px] px-5 py-2 bg-surface hover:bg-surface-2 border border-border hover:border-brand/50 text-text-primary text-xs font-bold rounded-lg transition-colors inline-flex items-center gap-2 shadow-sm"
                     >
-                      {showAllCast ? 'Show less' : `Show all ${cast.length} cast members`}
+                      <Icon icon={showAllCast ? 'solar:alt-arrow-up-linear' : 'solar:users-group-rounded-linear'} className="text-brand text-sm" />
+                      <span>{showAllCast ? 'Show less' : `Show all ${cast.length} cast members`}</span>
                     </button>
                   </div>
                 )}
@@ -1196,9 +1635,12 @@ export default function FilmDetail() {
 
             {/* Crew */}
             {crew.length > 0 && (
-              <section className="p-8 md:p-12 border-b border-border">
-                <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary mb-2 tracking-tight leading-none">Crew</h2>
-                <p className="text-xs text-text-muted mb-6">{crew.length} {crew.length === 1 ? 'member' : 'members'}</p>
+              <section id="crew-section" className="p-5 sm:p-6 md:p-8 border-b border-border scroll-mt-28">
+                <div className="flex items-center gap-2.5 sm:gap-3 mb-2">
+                  <span className="w-1.5 h-5 sm:h-6 rounded-full bg-brand shrink-0" />
+                  <h2 className="font-heading font-black text-xl sm:text-2xl text-text-primary tracking-tight leading-none">Crew</h2>
+                </div>
+                <p className="text-xs text-text-muted mb-5 pl-4">{crew.length} {crew.length === 1 ? 'member' : 'members'}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-0 border border-border rounded-lg overflow-hidden">
                   {crew.map((member, idx) => (
                     <Link 
@@ -1233,7 +1675,7 @@ export default function FilmDetail() {
               const wins = film.awards.filter((a) => a.won !== false).length;
               const nominations = film.awards.filter((a) => a.won === false).length;
               return (
-              <section className="p-8 md:p-12 border-b border-border">
+              <section id="awards-section" className="p-8 md:p-12 border-b border-border scroll-mt-28">
                 <button
                   type="button"
                   onClick={() => setAwardsOpen((prev) => !prev)}
@@ -1241,6 +1683,7 @@ export default function FilmDetail() {
                   className="w-full flex items-center justify-between gap-4 text-left group"
                 >
                   <div className="flex flex-wrap items-center gap-3 min-w-0">
+                    <span className="w-1.5 h-6 rounded-full bg-brand shrink-0" />
                     <h2 className="font-heading font-bold text-xl md:text-2xl text-text-primary tracking-tight leading-none">
                       Awards
                     </h2>
@@ -1309,12 +1752,12 @@ export default function FilmDetail() {
             })()}
 
             {/* Critic Reviews & Quotes */}
-            <div className="px-8 md:px-12 pt-4">
+            <div className="px-5 sm:px-6 md:px-8 pt-4">
               <CriticReviewsSection filmId={film.id} user={user} filmSlug={film.slug || slug} />
             </div>
 
             {/* Rotten Tomatoes "What did you think? / Rate it" interactive banner */}
-            <div id="rate-prompt-section" className="px-8 md:px-12 pt-6">
+            <div id="rate-prompt-section" className="px-5 sm:px-6 md:px-8 pt-5">
               <RateMoviePrompt
                 filmTitle={formatFilmTitle(film.title)}
                 userReaction={userReaction}
@@ -1330,7 +1773,7 @@ export default function FilmDetail() {
             </div>
 
             {/* Reviews */}
-            <section id="reviews-section" className="p-8 md:p-12">
+            <section id="reviews-section" className="p-5 sm:p-6 md:p-8 scroll-mt-28">
               <ReviewSection
                 filmId={film.id}
                 currentUser={user}
@@ -1340,123 +1783,59 @@ export default function FilmDetail() {
                 onCloseForm={() => setShowReviewForm(false)}
               />
             </section>
-          </div>
-
-          {/* SIDEBAR (30%) — Watch first, then facts / platforms / related */}
-          <div className="space-y-0 divide-y divide-border h-full lg:sticky lg:top-20 self-start">
-            <div className="hidden lg:block p-8 space-y-3">
-              <WatchOptions film={film} isFullWidth />
-              <button
-                onClick={handleWatchlist}
-                disabled={watchlistLoading}
-                className={`w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg font-bold text-xs tracking-wider transition-all duration-300 active:scale-95 min-h-[44px] disabled:opacity-50 ${inWatchlist
-                  ? 'bg-brand text-white shadow-lg shadow-brand/20'
-                  : 'bg-surface-2 border border-border text-text-primary hover:border-brand hover:text-brand'
-                  }`}
-              >
-                <Icon icon={inWatchlist ? "solar:bookmark-bold" : "solar:bookmark-linear"} width="16" />
-                {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
-              </button>
-
-              <div className="flex gap-3 mt-3">
-                <button
-                  onClick={() => handleReaction('dislike')}
-                  disabled={reactionLoading}
-                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-lg border min-h-[44px] transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'dislike' ? 'bg-red-500/10 border-red-500 text-red-500' : 'bg-surface-2 border-border text-text-secondary hover:border-white hover:text-white'}`}
-                  title="Dislike"
-                  aria-label={`Dislike (${dislikesCount})`}
-                >
-                  <Icon icon={userReaction === 'dislike' ? "solar:dislike-bold" : "solar:dislike-linear"} className="text-lg" />
-                  <span className="text-xs font-bold">{dislikesCount}</span>
-                </button>
-
-                <button
-                  onClick={() => handleReaction('like')}
-                  disabled={reactionLoading}
-                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-lg border min-h-[44px] transition-all duration-300 active:scale-95 disabled:opacity-50 ${userReaction === 'like' ? 'bg-brand/10 border-brand text-brand' : 'bg-surface-2 border-border text-text-secondary hover:border-white hover:text-white'}`}
-                  title="Like"
-                  aria-label={`Like (${likesCount})`}
-                >
-                  <Icon icon={userReaction === 'like' ? "solar:like-bold" : "solar:like-linear"} className="text-lg" />
-                  <span className="text-xs font-bold">{likesCount}</span>
-                </button>
-              </div>
-
-              <ShareAction
-                title={formatFilmTitle(film.title)}
-                text={`Check out ${formatFilmTitle(film.title)} on MuviDB`}
-              />
-
-              <button
-                type="button"
-                onClick={() => setShowFilmEdit(true)}
-                className="w-full mt-2 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-surface-2 hover:bg-brand/10 hover:text-brand border border-dashed border-border hover:border-brand/40 text-text-muted text-xs font-bold transition-all active:scale-95 cursor-pointer"
-              >
-                <Icon icon="solar:pen-2-bold" className="text-brand text-sm" />
-                <span>Notice missing info? Suggest an edit</span>
-              </button>
+      {/* More Like This (Nollywire / IMDb Style Responsive Grid) */}
+      {relatedFilms.length > 0 && (
+        <section id="related-section" className="p-5 sm:p-6 md:p-8 scroll-mt-28">
+          <div className="flex items-center justify-between mb-5 sm:mb-6">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <span className="w-1.5 h-5 sm:h-6 rounded-full bg-brand shrink-0" />
+              <h2 className="font-heading font-black text-xl sm:text-2xl text-text-primary tracking-tight leading-none">
+                More Like This
+              </h2>
+              <span className="text-[11px] sm:text-xs text-text-muted font-bold px-2 py-0.5 rounded-full bg-surface-2 border border-border">
+                Recommended
+              </span>
             </div>
-
-            {/* MORE LIKE THIS — Modern card stack (desktop) and smooth swipeable carousel (mobile) */}
-            <div className="p-6 md:p-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-heading font-bold text-base text-text-primary tracking-tight">More Like This</h3>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Recommended</span>
-              </div>
-              <div className="flex lg:flex-col gap-3.5 overflow-x-auto lg:overflow-visible no-scrollbar pb-3 lg:pb-0 snap-x">
-                {relatedFilms.slice(0, RELATED_FILMS_LIMIT).map(relatedFilm => (
-                  <Link
-                    key={relatedFilm.id}
-                    to={`/films/${relatedFilm.slug || relatedFilm.id}`}
-                    className="group flex flex-col sm:flex-row lg:flex-row gap-3 p-3 rounded-xl bg-surface hover:bg-surface-2 border border-border hover:border-brand/40 transition-all duration-300 min-w-[200px] sm:min-w-0 snap-start shadow-sm"
-                  >
-                    <div className="w-full sm:w-16 lg:w-16 aspect-[2/3] shrink-0 rounded-lg overflow-hidden border border-border group-hover:border-brand/40 shadow-sm relative bg-surface-2">
-                      <ImageWithFallback
-                        src={relatedFilm.poster_url || relatedFilm.poster} 
-                        alt={relatedFilm.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        fallbackType="film"
-                        name={relatedFilm.title}
-                        width={160}
-                        sizes="64px"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div className="flex flex-col justify-between flex-1 min-w-0">
-                      <div>
-                        <h4 className="font-bold text-text-primary text-xs sm:text-sm group-hover:text-brand transition-colors line-clamp-1 leading-snug tracking-tight mb-1">
-                          {formatFilmTitle(relatedFilm.title)}
-                        </h4>
-                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-text-muted">
-                          <span>{relatedFilm.year}</span>
-                          {relatedFilm.genres && relatedFilm.genres.length > 0 && (
-                            <>
-                              <span>•</span>
-                              <span className="text-text-secondary truncate">{relatedFilm.genres[0]}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/40 text-[10px] text-text-muted">
-                        <span className="font-bold text-brand group-hover:underline flex items-center gap-1 text-[11px]">
-                          <span>View film</span>
-                          <Icon icon="solar:arrow-right-linear" className="text-xs group-hover:translate-x-0.5 transition-transform" />
-                        </span>
-                        {relatedFilm.view_count > 0 && (
-                          <span className="text-[9px] font-medium text-text-muted">
-                            {relatedFilm.view_count.toLocaleString()} views
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
           </div>
-        </div>
-      </div>
-    </div>
-  );
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-3.5">
+            {relatedFilms.slice(0, 12).map((relatedFilm) => (
+              <Link
+                key={relatedFilm.id}
+                to={`/films/${relatedFilm.slug || relatedFilm.id}`}
+                className="group flex flex-col bg-surface/50 hover:bg-surface-2/60 rounded-xl p-2 sm:p-2.5 border border-border hover:border-brand/50 transition-all duration-300 shadow-sm"
+              >
+                <div className="relative w-full aspect-[2/3] rounded-lg overflow-hidden border border-border/80 group-hover:border-brand/40 bg-surface-2 shadow-inner">
+                  <ImageWithFallback
+                    src={relatedFilm.poster_url || relatedFilm.poster}
+                    alt={relatedFilm.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    fallbackType="film"
+                    name={relatedFilm.title}
+                    width={240}
+                    sizes="(max-width: 639px) 140px, 200px"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="mt-2.5 flex flex-col text-left px-0.5 min-w-0">
+                  <h4 className="font-bold text-text-primary text-xs sm:text-sm tracking-tight leading-snug truncate group-hover:text-gold transition-colors">
+                    {formatFilmTitle(relatedFilm.title)}
+                  </h4>
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-text-muted mt-0.5">
+                    <span>{relatedFilm.year}</span>
+                    {relatedFilm.genres && relatedFilm.genres.length > 0 && (
+                      <>
+                        <span>·</span>
+                        <span className="truncate">{relatedFilm.genres[0]}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+    </main>
+  </div>
+);
 }

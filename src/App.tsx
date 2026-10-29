@@ -57,6 +57,9 @@ const ClaimProfile = lazyWithRetry(() => import('./pages/ClaimProfile'));
 const PersonDetail = lazyWithRetry(() => import('./pages/PersonDetailV2'));
 const FilmmakerPortfolio = lazyWithRetry(() => import('./pages/FilmmakerPortfolio'));
 const Showtimes = lazyWithRetry(() => import('./pages/Showtimes'));
+const BoxOffice = lazyWithRetry(() => import('./pages/BoxOffice'));
+const FilmBoxOffice = lazyWithRetry(() => import('./pages/FilmBoxOffice'));
+const PlayBoxOffice = lazyWithRetry(() => import('./pages/PlayBoxOffice'));
 const Cinemas = lazyWithRetry(() => import('./pages/Cinemas'));
 const CinemaDetail = lazyWithRetry(() => import('./pages/CinemaDetail'));
 const Companies = lazyWithRetry(() => import('./pages/Companies'));
@@ -272,6 +275,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/careers': 'MuviDB | Careers',
   '/critics': 'MuviDB | Critics',
   '/plays': 'MuviDB | Plays',
+  '/box-office': 'MuviDB | Nollywood Box Office Tracker',
   '/tools/title-checker': 'MuviDB | Nollywood Title Radar',
   '/title-checker': 'MuviDB | Nollywood Title Radar',
   '/onboarding': 'MuviDB | Complete Your Profile',
@@ -336,6 +340,8 @@ export default function App() {
               <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Home />} />
+                <Route path="/films/:slug/box-office" element={<FilmBoxOffice />} />
+                <Route path="/film/:slug/box-office" element={<FilmBoxOffice />} />
                 <Route path="/films/:slug/reviews" element={<FilmReviews />} />
                 <Route path="/film/:slug/reviews" element={<FilmReviews />} />
                 <Route path="/films/:slug" element={<FilmDetail />} />
@@ -352,6 +358,7 @@ export default function App() {
                 <Route path="/@:handle" element={<FilmmakerPortfolio />} />
                 <Route path="/@*" element={<FilmmakerPortfolio />} />
                 <Route path="/showtimes" element={<Showtimes />} />
+                <Route path="/box-office" element={<BoxOffice />} />
                 <Route path="/cinemas" element={<Cinemas />} />
                 <Route path="/cinemas/:id" element={<CinemaDetail />} />
                 <Route path="/channels" element={<Channels />} />
@@ -369,6 +376,7 @@ export default function App() {
                 <Route path="/critics" element={<CriticsList />} />
                 <Route path="/critics/:slug" element={<CriticDetail />} />
                 <Route path="/plays" element={<PlaysList />} />
+                <Route path="/plays/:slug/box-office" element={<PlayBoxOffice />} />
                 <Route path="/plays/:slug" element={<PlayDetail />} />
                 <Route path="/tools/title-search" element={<TitleChecker />} />
                 <Route path="/title-search" element={<TitleChecker />} />

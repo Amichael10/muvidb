@@ -14,6 +14,8 @@ export default [
   // server `loader` + `meta` to build the SEO head. That replaces the meta
   // injection api/seo.ts used to do via vercel.json rewrites — see
   // src/lib/seo.server.ts.
+  route('films/:slug/box-office', 'routes/film-box-office.tsx'),
+  route('film/:slug/box-office', 'routes/film-box-office.tsx', { id: 'film-box-office-legacy-alias' }),
   route('films/:slug/reviews', 'pages/FilmReviews.jsx'),
   route('film/:slug/reviews', 'pages/FilmReviews.jsx', { id: 'film-reviews-legacy-alias' }),
   route('films/:slug', 'routes/film-detail.tsx'),
@@ -39,10 +41,12 @@ export default [
   route('critics', 'pages/CriticsList.jsx'),
   route('critics/:slug', 'pages/CriticDetail.jsx'),
   route('plays', 'pages/PlaysList.jsx'),
+  route('plays/:slug/box-office', 'routes/play-box-office.tsx'),
   route('plays/:slug', 'pages/PlayDetail.jsx'),
   route('awards', 'pages/Awards.jsx'),
   route('awards/:id', 'pages/AwardDetail.jsx'),
   route('showtimes', 'routes/showtimes.tsx'),
+  route('box-office', 'routes/box-office.tsx'),
   route('cinemas', 'routes/cinemas-list.tsx'),
   route('cinemas/:id', 'routes/cinema-detail.tsx'),
   route('channels', 'routes/channels-list.tsx'),

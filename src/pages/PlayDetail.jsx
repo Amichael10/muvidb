@@ -13,6 +13,7 @@ export default function PlayDetail() {
   const { user } = useAuth();
   const [play, setPlay] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showBoxOfficeModal, setShowBoxOfficeModal] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -107,7 +108,7 @@ export default function PlayDetail() {
 
       {/* Play Hero Header */}
       <section className="relative border-b border-border bg-surface/40 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
           <Link to="/plays" className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-brand transition-colors mb-6 font-semibold">
             <Icon icon="solar:alt-arrow-left-linear" className="w-4 h-4" />
             Back to All Plays
@@ -143,6 +144,17 @@ export default function PlayDetail() {
                 <span className="px-3 py-1 rounded-full bg-surface border border-border text-xs text-text-muted font-bold capitalize">
                   {play.status?.replace('_', ' ')}
                 </span>
+                {Boolean(play.box_office_domestic > 0) && (
+                  <Link
+                    to={`/plays/${play.slug || play.id}/box-office`}
+                    className="px-3.5 py-1.5 rounded-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-500/50 text-amber-400 text-xs font-bold tracking-wider inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer group"
+                    title="Click to view admissions, ticket tiers & venue breakdown"
+                  >
+                    <Icon icon="solar:ticket-sale-bold" className="text-sm group-hover:scale-110 transition-transform" />
+                    <span>₦{Number(play.box_office_domestic).toLocaleString()} Box Office</span>
+                    <Icon icon="solar:alt-arrow-right-linear" className="text-xs opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                  </Link>
+                )}
               </div>
 
               <h1 className="text-3xl sm:text-5xl font-extrabold text-text-primary mb-4">
@@ -194,7 +206,7 @@ export default function PlayDetail() {
       </section>
 
       {/* Main Content Area */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 space-y-12">
         {/* Ensemble Stage Cast Section */}
         <section className="pt-12">
           <div className="flex items-center justify-between mb-6">
@@ -272,6 +284,119 @@ export default function PlayDetail() {
 
         {/* Audience Reviews & Reactions */}
         <ReviewSection playId={play.id} currentUser={user} filmTitle={play.title} />
+      </div>
+
+      {/* Theatrical Box Office Breakdown Modal */}
+      {showBoxOfficeModal && (
+        <PlayBoxOfficeModal
+          play={play}
+          playDateLabel={playDateLabel}
+          isAdmin={user?.role === 'admin' || user?.role === 'admin_limited'}
+          onClose={() => setShowBoxOfficeModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function PlayBoxOfficeModal({ play, playDateLabel, onClose, isAdmin = false }) {
+  if (!play) return null;
+  const tiers = Array.isArray(play.box_office_metrics?.tier_breakdown) ? play.box_office_metrics.tier_breakdown : [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div 
+        className="relative w-full max-w-lg rounded-2xl bg-surface border border-border shadow-2xl p-6 space-y-6 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
+              <Icon icon="solar:ticket-sale-bold" className="text-sm" />
+              <span>Theatrical Stage Box Office & Admissions</span>
+            </div>
+            <h3 className="text-xl font-black text-text-primary font-heading tracking-tight">
+              {play.title}
+            </h3>
+            {playDateLabel && (
+              <p className="text-xs text-text-muted mt-0.5">{playDateLabel}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <Icon icon="solar:close-circle-bold" className="text-2xl" />
+          </button>
+        </div>
+
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-4 rounded-xl bg-surface-2 border border-border/60 space-y-1">
+            <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Gross Revenue</span>
+            <p className="text-2xl font-black text-amber-400 font-heading">
+              ₦{Number(play.box_office_domestic || 0).toLocaleString()}
+            </p>
+            <span className="text-[10px] text-text-muted font-mono block">Stage box office revenue</span>
+          </div>
+
+          <div className="p-4 rounded-xl bg-surface-2 border border-border/60 space-y-1">
+            <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Admissions</span>
+            <p className="text-2xl font-black text-purple-300 font-heading flex items-center gap-1.5">
+              <Icon icon="solar:users-group-two-rounded-bold" className="text-purple-400 text-xl" />
+              <span>{Number(play.box_office_tickets_sold || 0).toLocaleString()}</span>
+            </p>
+            <span className="text-[10px] text-text-muted font-mono block">Tickets sold across all tiers</span>
+          </div>
+        </div>
+
+        {/* Ticket Categories & Pricing Tiers */}
+        {tiers.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">Ticket Categories & Pricing</h4>
+            <div className="divide-y divide-border/40 rounded-xl border border-border overflow-hidden bg-surface-2/40">
+              {tiers.map((tier, idx) => (
+                <div key={idx} className="p-3 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-bold text-text-primary block">{tier.type}</span>
+                    <span className="text-[11px] text-text-muted">₦{Number(tier.priceNgn || 0).toLocaleString()} per ticket</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-amber-400 block">{tier.sold || 0} sold</span>
+                    <span className="text-[10px] text-text-muted">
+                      ₦{(Number(tier.priceNgn || 0) * Number(tier.sold || 0)).toLocaleString()} total
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Venue & Location */}
+        <div className="p-4 rounded-xl bg-surface-2/50 border border-border/60 space-y-2 text-xs">
+          <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-wider">Performance Venue & Location</h4>
+          <div className="flex items-start gap-2.5">
+            <Icon icon="solar:map-point-wave-bold" className="text-brand text-lg shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-text-primary">{play.venue || 'Venue TBA'}</p>
+              <p className="text-text-muted text-[11px]">{play.city || 'City TBA'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Source verification footer — visible ONLY to admins */}
+        {isAdmin && (
+          <div className="pt-3 border-t border-border flex items-center justify-between text-xs text-text-muted bg-surface-2/30 -mx-6 -mb-6 p-4 rounded-b-2xl">
+            <div className="flex items-center gap-1.5">
+              <Icon icon="solar:shield-check-bold" className="text-emerald-400 text-sm" />
+              <span>Verified Source (Admin): <strong className="text-text-primary">{play.box_office_source || 'Immersia'}</strong></span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

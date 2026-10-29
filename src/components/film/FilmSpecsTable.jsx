@@ -2,6 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { formatPersonName, toSentenceCase, formatLanguage } from '../../utils/format';
+import { formatViewCount } from '../../utils/youtube';
+import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../../lib/platforms';
 
 /**
  * Rotten Tomatoes-inspired "Movie Info / Film Specs" Section.
@@ -50,6 +52,12 @@ export default function FilmSpecsTable({
         : `${symbol}${(domGross / 1_000_000).toFixed(1)} Million`;
   }
 
+  // A film has genuine YouTube Movie views ONLY if it is an actual YouTube film,
+  // excluding trailers from cinema theatrical runs.
+  const isCinema = (Number(domGross) || 0) > 0 || film.release_type === 'cinema' || Boolean(film.is_in_cinemas);
+  const isYoutubeMovie = film.release_type === 'youtube' || (Boolean(film.youtube_watch_url) && !isCinema);
+  const showYoutubeStream = isYoutubeMovie && Boolean(film.view_count && Number(film.view_count) > 0);
+
   // Format Runtime
   const runtimeMins = film.runtime_minutes || film.runtime;
   let formattedRuntime = null;
@@ -58,6 +66,15 @@ export default function FilmSpecsTable({
     const mins = runtimeMins % 60;
     formattedRuntime = hours > 0 ? `${hours}h ${mins}m (${runtimeMins} min)` : `${runtimeMins} min`;
   }
+
+  // Active Streaming Platforms
+  const isRealYoutubeUrl = (url) => typeof url === 'string' && (url.includes('youtube.com') || url.includes('youtu.be'));
+  const fullYoutubeUrl = (isRealYoutubeUrl(film.youtube_watch_url) ? film.youtube_watch_url : null) || (isFilmOnPlatform(film, 'youtube') ? getWatchUrl(film, 'youtube') : null);
+  const activePlatforms = PLATFORMS.filter((p) => {
+    if (p.id === 'cinema') return false;
+    if (p.id === 'youtube' && fullYoutubeUrl) return true;
+    return isFilmOnPlatform(film, p.id);
+  });
 
   // Specs Rows Array
   const specs = [
@@ -159,6 +176,42 @@ export default function FilmSpecsTable({
       ) : null,
     },
     {
+      label: 'Where to Watch',
+      value: (activePlatforms.length > 0 || film.is_in_cinemas) ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {film.is_in_cinemas && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              In Cinemas
+            </span>
+          )}
+          {activePlatforms.map((p) => {
+            const url = (p.id === 'youtube' && fullYoutubeUrl) ? fullYoutubeUrl : getWatchUrl(film, p.id);
+            const content = (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-2 hover:bg-surface-3 border border-border text-text-primary text-xs font-semibold transition-all hover:border-brand/40">
+                {p.logo ? (
+                  <img src={p.logo} alt="" className="w-3.5 h-3.5 object-contain" />
+                ) : (
+                  <Icon icon={p.icon} className="text-xs" style={{ color: p.color }} />
+                )}
+                <span>{p.name}</span>
+                {url && <Icon icon="solar:arrow-right-up-linear" className="text-[10px] text-text-muted" />}
+              </span>
+            );
+            return url ? (
+              <a key={p.id} href={url} target="_blank" rel="noopener noreferrer" title={`Watch on ${p.name}`}>
+                {content}
+              </a>
+            ) : (
+              <Link key={p.id} to={`/watch/${p.id}`} title={`Browse ${p.name} titles`}>
+                {content}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null,
+    },
+    {
       label: 'Box Office (Domestic Gross)',
       value: formattedBoxOffice ? (
         <span className="inline-flex items-center gap-2 flex-wrap font-bold text-amber-400">
@@ -208,6 +261,16 @@ export default function FilmSpecsTable({
       ) : null,
     },
     {
+      label: 'YouTube Streams',
+      value: showYoutubeStream ? (
+        <span className="inline-flex items-center gap-1.5 font-bold text-red-500">
+          <Icon icon="simple-icons:youtube" className="text-sm" />
+          <span>{Number(film.view_count).toLocaleString()} views</span>
+          <span className="text-text-muted text-xs font-normal">({formatViewCount(film.view_count)})</span>
+        </span>
+      ) : null,
+    },
+    {
       label: 'Runtime',
       value: formattedRuntime ? <span className="text-text-primary">{formattedRuntime}</span> : null,
     },
@@ -249,10 +312,10 @@ export default function FilmSpecsTable({
   ].filter((s) => s.value != null);
 
   return (
-    <section className={`p-8 md:p-12 border-b border-border bg-surface-2/5 ${className}`}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <section className={`p-5 sm:p-6 md:p-8 border-b border-border bg-surface-2/5 ${className}`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 sm:mb-6">
         <div>
-          <h2 className="font-heading font-bold text-2xl md:text-[1.75rem] text-text-primary tracking-tight leading-none">
+          <h2 className="font-heading font-black text-xl sm:text-2xl text-text-primary tracking-tight leading-none">
             Movie Info
           </h2>
           <p className="text-xs text-text-muted mt-1">
@@ -297,19 +360,19 @@ export default function FilmSpecsTable({
 
       {/* Storyline / Synopsis */}
       {(synopsis || film.synopsis) && (
-        <div className="mb-8 pb-8 border-b border-border/80">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="mb-6 pb-6 border-b border-border/80">
+          <div className="flex items-center gap-2 mb-2.5">
             <span className="w-1.5 h-1.5 rounded-full bg-brand" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-text-muted">
               Storyline & Synopsis
             </h3>
           </div>
-          <p className="text-text-secondary text-base sm:text-lg leading-relaxed border-l-2 border-brand pl-6">
+          <p className="text-text-secondary text-sm sm:text-[15px] leading-relaxed border-l-2 border-brand pl-4">
             {toSentenceCase(synopsis || film.synopsis)}
           </p>
 
           {(onSuggestEdit || onReport) && (
-            <div className="flex flex-wrap items-center gap-4 mt-5 pl-6">
+            <div className="flex flex-wrap items-center gap-4 mt-4 pl-4">
               {onSuggestEdit && (
                 <button
                   type="button"
@@ -336,13 +399,13 @@ export default function FilmSpecsTable({
       )}
 
       {/* 2-Column Responsive Key/Value Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 text-xs">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 sm:gap-x-12 gap-y-3 sm:gap-y-3.5 text-xs">
         {specs.map((spec, idx) => (
           <div
             key={idx}
-            className="flex flex-col sm:flex-row sm:items-baseline justify-between py-2.5 border-b border-border/60 gap-1 sm:gap-4"
+            className="flex flex-col sm:flex-row sm:items-baseline justify-between py-2 border-b border-border/60 gap-1 sm:gap-4"
           >
-            <span className="font-bold text-text-muted uppercase tracking-wider text-[11px] shrink-0 min-w-[140px]">
+            <span className="font-bold text-text-muted uppercase tracking-wider text-[11px] shrink-0 min-w-[130px]">
               {spec.label}
             </span>
             <div className="text-left sm:text-right flex-1 break-words">

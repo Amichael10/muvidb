@@ -57,6 +57,15 @@ export default function MergeModal({
     { key: 'status', label: 'Status' },
     { key: 'release_type', label: 'Release Type' },
     { key: 'content_type', label: 'Content Type' },
+    { key: 'box_office_domestic', label: 'Domestic Box Office', type: 'currency' },
+    { key: 'box_office_worldwide', label: 'Worldwide Box Office', type: 'currency' },
+    { key: 'box_office_opening_weekend', label: 'Opening Weekend Gross', type: 'currency' },
+    { key: 'view_count', label: 'YouTube Views', type: 'number' },
+    { key: 'source_video_id', label: 'YouTube Video ID' },
+    { key: 'youtube_watch_url', label: 'YouTube Watch URL' },
+    { key: 'trailer_youtube_id', label: 'Trailer YouTube ID' },
+    { key: 'imdb_id', label: 'IMDb ID' },
+    { key: 'backdrop_url', label: 'Backdrop', type: 'image' },
     { key: 'tmdb_id', label: 'TMDB ID' },
     { key: 'mubi_id', label: 'MUBI ID' },
   ];
@@ -64,7 +73,9 @@ export default function MergeModal({
   // Create a composite secondary to show the best available data from ALL duplicates
   const compositeSecondary = secondaries.reduce((acc, curr) => {
     fieldConfig.forEach(f => {
-      if (!acc[f.key] && curr[f.key]) acc[f.key] = curr[f.key];
+      if ((acc[f.key] === undefined || acc[f.key] === null || acc[f.key] === '') && curr[f.key] != null && curr[f.key] !== '') {
+        acc[f.key] = curr[f.key];
+      }
     });
     return acc;
   }, {});
@@ -72,7 +83,13 @@ export default function MergeModal({
   const handleInitializeEnrichment = () => {
     const initial = {};
     fieldConfig.forEach(f => {
-      initial[f.key] = primary[f.key] || compositeSecondary[f.key] || '';
+      const primaryVal = primary[f.key];
+      const secondaryVal = compositeSecondary[f.key];
+      if ((f.type === 'currency' || f.type === 'number') && (primaryVal == null || primaryVal === 0 || primaryVal === '0' || primaryVal === '')) {
+        initial[f.key] = (secondaryVal != null && secondaryVal !== '') ? secondaryVal : (primaryVal ?? '');
+      } else {
+        initial[f.key] = (primaryVal != null && primaryVal !== '') ? primaryVal : (secondaryVal ?? '');
+      }
     });
     setEnrichedData(initial);
     setStep(2);
@@ -213,6 +230,18 @@ export default function MergeModal({
                       </div>
                     ) : field.type === 'longtext' ? (
                       <p className="text-xs text-text-primary line-clamp-3 leading-relaxed">{primary[field.key] || <em className="text-text-muted/50">No data</em>}</p>
+                    ) : field.type === 'currency' ? (
+                      <span className="text-sm font-bold text-text-primary">
+                        {primary[field.key] != null && primary[field.key] !== ''
+                          ? `₦${Number(primary[field.key]).toLocaleString('en-NG')}`
+                          : <em className="text-text-muted/50">No data</em>}
+                      </span>
+                    ) : field.type === 'number' ? (
+                      <span className="text-sm font-bold text-text-primary">
+                        {primary[field.key] != null && primary[field.key] !== ''
+                          ? Number(primary[field.key]).toLocaleString()
+                          : <em className="text-text-muted/50">No data</em>}
+                      </span>
                     ) : (
                       <span className="text-sm font-bold text-text-primary">{primary[field.key] || <em className="text-text-muted/50">No data</em>}</span>
                     )}
@@ -250,6 +279,18 @@ export default function MergeModal({
                       </div>
                     ) : field.type === 'longtext' ? (
                       <p className="text-xs text-text-primary line-clamp-3 leading-relaxed">{compositeSecondary[field.key] || <em className="text-text-muted/50">No data</em>}</p>
+                    ) : field.type === 'currency' ? (
+                      <span className="text-sm font-bold text-text-primary">
+                        {compositeSecondary[field.key] != null && compositeSecondary[field.key] !== ''
+                          ? `₦${Number(compositeSecondary[field.key]).toLocaleString('en-NG')}`
+                          : <em className="text-text-muted/50">No data</em>}
+                      </span>
+                    ) : field.type === 'number' ? (
+                      <span className="text-sm font-bold text-text-primary">
+                        {compositeSecondary[field.key] != null && compositeSecondary[field.key] !== ''
+                          ? Number(compositeSecondary[field.key]).toLocaleString()
+                          : <em className="text-text-muted/50">No data</em>}
+                      </span>
                     ) : (
                       <span className="text-sm font-bold text-text-primary">{compositeSecondary[field.key] || <em className="text-text-muted/50">No data</em>}</span>
                     )}

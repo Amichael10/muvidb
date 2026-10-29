@@ -634,8 +634,10 @@ function editDistance(a: string, b: string) {
   return row[b.length];
 }
 
+let peopleByToken: Map<string, any[]> | null = null;
+
 async function ensurePeopleLookup() {
-  if (peopleLookup && peopleByNormalizedName) return;
+  if (peopleLookup && peopleByNormalizedName && peopleByToken) return;
   peopleLookup = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from('people')
@@ -645,11 +647,24 @@ async function ensurePeopleLookup() {
     if ((data?.length || 0) < 1000) break;
   }
   peopleByNormalizedName = new Map();
+  peopleByToken = new Map();
   for (const person of peopleLookup) {
     const key = normPersonName(person.name);
+    (person as any)._norm = key;
+    const tokens = key.split(' ').filter(Boolean);
+    (person as any)._tokens = tokens;
+
     const rows = peopleByNormalizedName.get(key) || [];
     rows.push(person);
     peopleByNormalizedName.set(key, rows);
+
+    for (const tok of tokens) {
+      if (tok.length > 2) {
+        const tRows = peopleByToken.get(tok) || [];
+        tRows.push(person);
+        peopleByToken.set(tok, tRows);
+      }
+    }
   }
   console.log(`   people lookup loaded: ${peopleLookup.length}`);
 }
@@ -660,16 +675,20 @@ async function matchPerson(name: string) {
   const exact = peopleByNormalizedName!.get(wanted);
   if (exact?.length) return [...exact].sort((a, b) => personRichness(b) - personRichness(a))[0];
 
-  // Conservative fuzzy/alias check. Only compare names sharing a first or last
-  // token and require near-identity, avoiding cross-person award/credit merges.
   const tokens = wanted.split(' ').filter(Boolean);
   if (tokens.length >= 2) {
     const first = tokens[0];
     const last = tokens[tokens.length - 1];
     let best: { person: any; score: number } | null = null;
-    for (const person of peopleLookup!) {
-      const candidate = normPersonName(person.name);
-      const ct = candidate.split(' ').filter(Boolean);
+
+    const pool = new Set([
+      ...(peopleByToken!.get(first) || []),
+      ...(peopleByToken!.get(last) || [])
+    ]);
+
+    for (const person of pool) {
+      const candidate = (person as any)._norm || normPersonName(person.name);
+      const ct = (person as any)._tokens || candidate.split(' ').filter(Boolean);
       if (ct.length < 2 || (ct[0] !== first && ct[ct.length - 1] !== last)) continue;
       const score = 1 - editDistance(wanted, candidate) / Math.max(wanted.length, candidate.length, 1);
       if (score >= 0.88 && (!best || score > best.score)) best = { person, score };
@@ -1132,11 +1151,33 @@ async function upsertPerson(
   }
 
   if (filmId && existing && !DRY) {
-    const { error } = await supabase.from('credits').upsert(
-      { film_id: filmId, person_id: existing.id, role, character_name: character },
-      { onConflict: 'film_id,person_id,role' },
-    );
-    if (!error) cp.stats.creditsLinked++;
+    const { data: existingCredit } = await supabase
+      .from('credits')
+      .select('id, role, character_name')
+      .eq('film_id', filmId)
+      .eq('person_id', existing.id)
+      .maybeSingle();
+
+    if (existingCredit) {
+      const updates: Record<string, any> = {};
+      if (character && (!existingCredit.character_name || character.length > existingCredit.character_name.length)) {
+        updates.character_name = character;
+      }
+      if (role && (!existingCredit.role || existingCredit.role === 'Cast')) {
+        updates.role = role;
+      }
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('credits').update(updates).eq('id', existingCredit.id);
+      }
+    } else {
+      const { error } = await supabase.from('credits').insert({
+        film_id: filmId,
+        person_id: existing.id,
+        role,
+        character_name: character,
+      });
+      if (!error) cp.stats.creditsLinked++;
+    }
   }
 }
 

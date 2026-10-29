@@ -33,6 +33,10 @@ const BLANK_FORM = {
   performance_time: '',
   source_url: '',
   status: 'archived',
+  box_office_domestic: '',
+  box_office_tickets_sold: '',
+  box_office_source: '',
+  box_office_metrics: null,
 };
 
 const ALL_PLAY_GENRES = [
@@ -127,6 +131,10 @@ export default function AdminPlays() {
         performance_time: play.performance_time || '',
         source_url: play.source_url || '',
         status: play.status || 'archived',
+        box_office_domestic: play.box_office_domestic ?? '',
+        box_office_tickets_sold: play.box_office_tickets_sold ?? '',
+        box_office_source: play.box_office_source || '',
+        box_office_metrics: play.box_office_metrics || null,
       });
       loadSavedCredits(play.id);
     } else {
@@ -412,18 +420,32 @@ export default function AdminPlays() {
   }
 
   // ---- Filtering -----------------------------------------------------------
+  const runningCount = plays.filter(p => p.status === 'currently_running').length;
+  const upcomingCount = plays.filter(p => p.status === 'upcoming').length;
+  const archivedCount = plays.filter(p => p.status === 'archived').length;
+  const boxOfficePlays = plays.filter(p => Number(p.box_office_domestic || 0) > 0);
+  const boxOfficeCount = boxOfficePlays.length;
+  const totalBoxOfficeGross = boxOfficePlays.reduce((acc, p) => acc + (Number(p.box_office_domestic) || 0), 0);
+  const totalAdmissions = boxOfficePlays.reduce((acc, p) => acc + (Number(p.box_office_tickets_sold) || 0), 0);
+
   const filteredPlays = plays.filter(play => {
     const matchesSearch = !searchQuery.trim() ||
       play.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       play.playwright?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       play.venue?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || play.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'all'
+        ? true
+        : statusFilter === 'box_office'
+        ? Number(play.box_office_domestic || 0) > 0
+        : play.status === statusFilter;
     return matchesSearch && matchesStatus;
+  }).sort((a, b) => {
+    if (statusFilter === 'box_office') {
+      return (Number(b.box_office_domestic) || 0) - (Number(a.box_office_domestic) || 0);
+    }
+    return 0;
   });
-
-  const runningCount = plays.filter(p => p.status === 'currently_running').length;
-  const upcomingCount = plays.filter(p => p.status === 'upcoming').length;
-  const archivedCount = plays.filter(p => p.status === 'archived').length;
 
   return (
     <div className="min-h-screen bg-bg text-text-primary p-6 md:p-10 max-w-7xl mx-auto">
@@ -449,7 +471,7 @@ export default function AdminPlays() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         <div className="bg-surface border border-border p-4 rounded-xl text-center">
           <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Total Plays</span>
           <p className="text-2xl font-extrabold text-text-primary mt-1">{plays.length}</p>
@@ -465,6 +487,16 @@ export default function AdminPlays() {
         <div className="bg-surface border border-border p-4 rounded-xl text-center">
           <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Stage Archive</span>
           <p className="text-2xl font-extrabold text-text-muted mt-1">{archivedCount}</p>
+        </div>
+        <div className="bg-surface border border-border p-4 rounded-xl text-center col-span-2 sm:col-span-1 border-amber-500/20 bg-amber-500/5">
+          <span className="text-[10px] text-amber-500 uppercase font-bold tracking-wider flex items-center justify-center gap-1">
+            <Icon icon="solar:ticket-sale-bold" className="w-3.5 h-3.5" />
+            Tracked Box Office
+          </span>
+          <p className="text-2xl font-extrabold text-amber-500 mt-1">
+            {totalBoxOfficeGross > 0 ? `₦${(totalBoxOfficeGross / 1000000).toFixed(1)}M` : '₦0'}
+          </p>
+          <p className="text-[10px] text-text-muted font-bold mt-0.5">{totalAdmissions.toLocaleString()} admissions</p>
         </div>
       </div>
 
@@ -487,6 +519,7 @@ export default function AdminPlays() {
             { id: 'currently_running', label: 'Running' },
             { id: 'upcoming', label: 'Upcoming' },
             { id: 'archived', label: 'Archived' },
+            { id: 'box_office', label: `Box Office (${boxOfficeCount})` },
           ].map(tab => (
             <button
               key={tab.id}
@@ -564,6 +597,21 @@ export default function AdminPlays() {
                     <p className="text-xs text-text-muted font-semibold mt-0.5">
                       By {play.playwright}
                     </p>
+                  )}
+
+                  {Number(play.box_office_domestic || 0) > 0 && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[11px] font-extrabold">
+                      <Icon icon="solar:ticket-sale-bold" className="w-3.5 h-3.5" />
+                      <span>₦{Number(play.box_office_domestic) >= 1000000 ? `${(Number(play.box_office_domestic)/1000000).toFixed(1)}M` : Number(play.box_office_domestic).toLocaleString()}</span>
+                      {Number(play.box_office_tickets_sold || 0) > 0 && (
+                        <span className="text-amber-400/80 font-normal">({Number(play.box_office_tickets_sold).toLocaleString()} tix)</span>
+                      )}
+                      {play.box_office_source && (
+                        <span className="text-[9px] uppercase tracking-wider text-amber-400/60 font-black ml-1">
+                          • {play.box_office_source}
+                        </span>
+                      )}
+                    </div>
                   )}
 
                   <div className="mt-3 text-[11px] text-text-muted space-y-1">
@@ -949,6 +997,71 @@ export default function AdminPlays() {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Box Office & Theatrical Admissions */}
+              <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon icon="solar:ticket-sale-bold" className="w-4 h-4 text-amber-500" />
+                    <h5 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Theatrical Box Office & Admissions</h5>
+                  </div>
+                  {formData.box_office_source && (
+                    <span className="text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">
+                      {formData.box_office_source}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Gross Domestic (NGN ₦)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.box_office_domestic}
+                      onChange={e => setFormData({ ...formData, box_office_domestic: e.target.value })}
+                      placeholder="e.g. 69700000"
+                      className="w-full bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:border-amber-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Tickets Sold / Admissions</label>
+                    <input
+                      type="number"
+                      value={formData.box_office_tickets_sold}
+                      onChange={e => setFormData({ ...formData, box_office_tickets_sold: e.target.value })}
+                      placeholder="e.g. 2302"
+                      className="w-full bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:border-amber-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Data Source Tag</label>
+                  <input
+                    type="text"
+                    value={formData.box_office_source}
+                    onChange={e => setFormData({ ...formData, box_office_source: e.target.value })}
+                    placeholder="e.g. immersia"
+                    className="w-full bg-surface border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:border-amber-500 outline-none"
+                  />
+                </div>
+
+                {formData.box_office_metrics?.tier_breakdown && formData.box_office_metrics.tier_breakdown.length > 0 && (
+                  <div className="pt-2 border-t border-amber-500/10 space-y-1.5">
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-amber-400/80">Tracked Tier Breakdown</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {formData.box_office_metrics.tier_breakdown.map((tb, idx) => (
+                        <div key={idx} className="bg-surface/80 border border-amber-500/20 px-2 py-1 rounded text-[10px] text-text-primary">
+                          <span className="font-bold">{tb.tier}: </span>
+                          <span className="text-amber-500 font-extrabold">{Number(tb.sold_tickets).toLocaleString()} tix</span>
+                          <span className="text-text-muted ml-1">(₦{Number(tb.gross_revenue).toLocaleString()})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           </div>

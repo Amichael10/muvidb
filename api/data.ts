@@ -81,6 +81,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handlePersonMedia } = await import('./_lib/person_media_handler.js');
       return handlePersonMedia(req, res);
     }
+    if (key === 'film-media') {
+      const { handleFilmMedia } = await import('./_lib/film_media_handler.js');
+      return handleFilmMedia(req, res);
+    }
     if (key === 'bachs' || key === 'webhooks/bachs') {
       const { handleBachs } = await import('./_lib/bachs_handler.js');
       return handleBachs(req, res);

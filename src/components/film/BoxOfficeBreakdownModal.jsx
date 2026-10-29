@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Icon } from '@iconify/react';
+import { useAuth } from '../../context/AuthContext';
 
 function formatNaira(amount) {
   if (!amount || isNaN(amount)) return '—';
@@ -12,8 +13,11 @@ function formatNaira(amount) {
   return `₦${Number(amount).toLocaleString('en-NG')}`;
 }
 
-export default function BoxOfficeBreakdownModal({ film, onClose }) {
+export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIsAdmin = false }) {
   if (!film) return null;
+
+  const { user } = useAuth();
+  const isAdmin = propIsAdmin || user?.role === 'admin' || user?.role === 'admin_limited';
 
   const [expandedDate, setExpandedDate] = useState(null);
 
@@ -27,6 +31,11 @@ export default function BoxOfficeBreakdownModal({ film, onClose }) {
   const sourceIssue = boxOfficeData.source_issue;
   const weeklyHistory = boxOfficeData.history || [];
   const reachMetrics = boxOfficeData.reach_metrics;
+
+  const totalWeeklyGross = weeklyHistory.reduce((acc, w) => acc + (Number(w.gross) || 0), 0);
+  const remainingGross = (domestic && totalWeeklyGross > 0 && domestic > totalWeeklyGross)
+    ? domestic - totalWeeklyGross
+    : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
@@ -210,7 +219,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose }) {
               {weeklyHistory.map((week, idx) => (
                 <div key={idx} className="p-3 flex items-center justify-between text-xs">
                   <div>
-                    <span className="font-bold text-text-primary block">{week.label || `Week ${idx + 1}`}</span>
+                    <span className="font-bold text-text-primary block">{week.label || (week.date ? '' : `Week ${idx + 1}`)}</span>
                     <span className="text-[11px] text-text-muted">{week.date || ''}</span>
                   </div>
                   <div className="text-right">
@@ -221,20 +230,36 @@ export default function BoxOfficeBreakdownModal({ film, onClose }) {
                   </div>
                 </div>
               ))}
+
+              {/* Others / Remaining Reported Box Office Gross */}
+              {remainingGross > 0 && (
+                <div className="p-3 flex items-center justify-between text-xs bg-amber-500/5 border-t border-dashed border-amber-500/20">
+                  <div>
+                    <span className="font-bold text-text-primary block">Others</span>
+                    <span className="text-[11px] text-text-muted">Remaining reported box office balance</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-amber-400 block">{formatNaira(remainingGross)}</span>
+                    <span className="text-[10px] text-text-muted font-mono">₦{Number(remainingGross).toLocaleString('en-NG')}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Source & Verification Footer */}
-        <div className="pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-text-muted">
-          <div className="flex items-center gap-1.5">
-            <Icon icon="solar:shield-check-bold" className="text-emerald-400 text-sm" />
-            <span>Verified Source: <strong className="text-text-primary">{source}</strong></span>
+        {/* Source & Verification Footer — Restricted to Admins only */}
+        {isAdmin && (
+          <div className="pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-text-muted bg-surface-2/30 -mx-6 -mb-6 p-4 rounded-b-2xl">
+            <div className="flex items-center gap-1.5">
+              <Icon icon="solar:shield-check-bold" className="text-emerald-400 text-sm" />
+              <span>Verified Source (Admin): <strong className="text-text-primary">{source}</strong></span>
+            </div>
+            {sourceIssue && (
+              <span className="text-[11px] text-text-muted italic truncate max-w-xs">{sourceIssue}</span>
+            )}
           </div>
-          {sourceIssue && (
-            <span className="text-[11px] text-text-muted italic truncate max-w-xs">{sourceIssue}</span>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

@@ -38,35 +38,35 @@ export default function RottenTomatoesScorecard({
   const reviewsUrl = film?.slug || film?.id ? `/films/${film.slug || film.id}/reviews` : null;
 
   return (
-    <div className={`w-full bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-5 sm:p-6 shadow-2xl transition-all duration-300 ${className}`}>
+    <div className={`w-full bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 md:p-5 shadow-xl transition-all duration-300 ${className}`}>
       {/* 1. TOP METERS ROW: Critics Score + Audience Score + Star & Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-white/10 pb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-white/10 pb-3">
         
         {/* CRITICS SCORE (TOMATOMETER STYLE) */}
         {reviewsUrl ? (
           <Link
             to={`${reviewsUrl}?tab=all_critics`}
-            className="flex items-center gap-3.5 pr-2 group/critic hover:opacity-95 cursor-pointer transition-opacity"
+            className="flex items-center gap-3 pr-2 group/critic hover:opacity-95 cursor-pointer transition-opacity"
             title="View all critic reviews"
           >
-            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10 group-hover/critic:border-emerald-500/40 transition-colors">
+            <div className="relative shrink-0 flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/5 border border-white/10 group-hover/critic:border-emerald-500/40 transition-colors">
               {cScorePct != null ? (
                 isCriticFresh ? (
-                  <Icon icon="solar:medal-ribbon-star-bold" className="text-emerald-400 text-3xl drop-shadow-[0_0_12px_rgba(52,211,153,0.5)]" />
+                  <Icon icon="solar:medal-ribbon-star-bold" className="text-emerald-400 text-2xl drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]" />
                 ) : (
-                  <Icon icon="solar:danger-triangle-bold" className="text-amber-500 text-3xl drop-shadow" />
+                  <Icon icon="solar:danger-triangle-bold" className="text-amber-500 text-2xl drop-shadow" />
                 )
               ) : (
-                <Icon icon="solar:pen-2-bold" className="text-white/30 text-2xl" />
+                <Icon icon="solar:pen-2-bold" className="text-white/30 text-xl" />
               )}
             </div>
             <div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none group-hover/critic:text-emerald-400 transition-colors">
+                <span className="text-xl sm:text-2xl font-black font-heading text-white tracking-tight leading-none group-hover/critic:text-emerald-400 transition-colors">
                   {cScorePct != null ? `${cScorePct}%` : (cScore ? `${cScore}/10` : '—')}
                 </span>
                 {cScorePct != null && isCriticFresh && (
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                     Fresh
                   </span>
                 )}
@@ -81,25 +81,25 @@ export default function RottenTomatoesScorecard({
             </div>
           </Link>
         ) : (
-          <div className="flex items-center gap-3.5 pr-2">
-            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10">
+          <div className="flex items-center gap-3 pr-2">
+            <div className="relative shrink-0 flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/5 border border-white/10">
               {cScorePct != null ? (
                 isCriticFresh ? (
-                  <Icon icon="solar:medal-ribbon-star-bold" className="text-emerald-400 text-3xl drop-shadow-[0_0_12px_rgba(52,211,153,0.5)]" />
+                  <Icon icon="solar:medal-ribbon-star-bold" className="text-emerald-400 text-2xl drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]" />
                 ) : (
-                  <Icon icon="solar:danger-triangle-bold" className="text-amber-500 text-3xl drop-shadow" />
+                  <Icon icon="solar:danger-triangle-bold" className="text-amber-500 text-2xl drop-shadow" />
                 )
               ) : (
-                <Icon icon="solar:pen-2-bold" className="text-white/30 text-2xl" />
+                <Icon icon="solar:pen-2-bold" className="text-white/30 text-xl" />
               )}
             </div>
             <div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none">
+                <span className="text-xl sm:text-2xl font-black font-heading text-white tracking-tight leading-none">
                   {cScorePct != null ? `${cScorePct}%` : (cScore ? `${cScore}/10` : '—')}
                 </span>
                 {cScorePct != null && isCriticFresh && (
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                     Fresh
                   </span>
                 )}
@@ -118,26 +118,26 @@ export default function RottenTomatoesScorecard({
         {reviewsUrl ? (
           <Link
             to={`${reviewsUrl}?tab=all_audience`}
-            className="flex items-center gap-3.5 pt-3 sm:pt-0 sm:px-4 group/audience hover:opacity-95 cursor-pointer transition-opacity"
+            className="flex items-center gap-3 pt-3 sm:pt-0 sm:px-3 md:px-4 group/audience hover:opacity-95 cursor-pointer transition-opacity"
             title="View all audience reviews"
           >
-            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10 group-hover/audience:border-brand/40 transition-colors">
+            <div className="relative shrink-0 flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/5 border border-white/10 group-hover/audience:border-brand/40 transition-colors">
               {pct != null ? (
                 <Icon
                   icon="mdi:popcorn"
-                  className={`text-3xl ${isAudienceFresh ? 'text-[#FA320A] drop-shadow-[0_0_12px_rgba(250,50,10,0.5)]' : 'text-gray-400'}`}
+                  className={`text-2xl ${isAudienceFresh ? 'text-[#FA320A] drop-shadow-[0_0_10px_rgba(250,50,10,0.5)]' : 'text-gray-400'}`}
                 />
               ) : (
-                <Icon icon="mdi:popcorn" className="text-white/30 text-3xl" />
+                <Icon icon="mdi:popcorn" className="text-white/30 text-2xl" />
               )}
             </div>
             <div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none group-hover/audience:text-brand transition-colors">
+                <span className="text-xl sm:text-2xl font-black font-heading text-white tracking-tight leading-none group-hover/audience:text-brand transition-colors">
                   {pct != null ? `${pct}%` : '—'}
                 </span>
                 {pct != null && isAudienceFresh && (
-                  <span className="text-[10px] font-black uppercase tracking-wider text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
                     Liked
                   </span>
                 )}
@@ -152,24 +152,24 @@ export default function RottenTomatoesScorecard({
             </div>
           </Link>
         ) : (
-          <div className="flex items-center gap-3.5 pt-3 sm:pt-0 sm:px-4">
-            <div className="relative shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl bg-white/5 border border-white/10">
+          <div className="flex items-center gap-3 pt-3 sm:pt-0 sm:px-3 md:px-4">
+            <div className="relative shrink-0 flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/5 border border-white/10">
               {pct != null ? (
                 <Icon
                   icon="mdi:popcorn"
-                  className={`text-3xl ${isAudienceFresh ? 'text-[#FA320A] drop-shadow-[0_0_12px_rgba(250,50,10,0.5)]' : 'text-gray-400'}`}
+                  className={`text-2xl ${isAudienceFresh ? 'text-[#FA320A] drop-shadow-[0_0_10px_rgba(250,50,10,0.5)]' : 'text-gray-400'}`}
                 />
               ) : (
-                <Icon icon="mdi:popcorn" className="text-white/30 text-3xl" />
+                <Icon icon="mdi:popcorn" className="text-white/30 text-2xl" />
               )}
             </div>
             <div>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black font-heading text-white tracking-tight leading-none">
+                <span className="text-xl sm:text-2xl font-black font-heading text-white tracking-tight leading-none">
                   {pct != null ? `${pct}%` : '—'}
                 </span>
                 {pct != null && isAudienceFresh && (
-                  <span className="text-[10px] font-black uppercase tracking-wider text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
                     Liked
                   </span>
                 )}
@@ -185,15 +185,15 @@ export default function RottenTomatoesScorecard({
         )}
 
         {/* MBD/STAR & QUICK ACTION DOCK */}
-        <div className="flex items-center justify-between gap-3 pt-3 sm:pt-0 sm:pl-4">
+        <div className="flex items-center justify-between gap-3 pt-3 sm:pt-0 sm:pl-3 md:pl-4">
           {star != null ? (
             <div className="flex items-center gap-2.5">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
-                <Icon icon="solar:star-bold" className="text-2xl drop-shadow" />
+              <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+                <Icon icon="solar:star-bold" className="text-xl drop-shadow" />
               </div>
               <div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-black font-heading text-white leading-none">
+                  <span className="text-lg sm:text-xl font-black font-heading text-white leading-none">
                     {star}
                   </span>
                   <span className="text-white/40 text-[10px] font-bold">/10</span>
@@ -209,29 +209,17 @@ export default function RottenTomatoesScorecard({
             </div>
           )}
 
-          <div className="flex items-center gap-2 ml-auto">
-            {onTrailerClick && (
-              <button
-                type="button"
-                onClick={onTrailerClick}
-                className="inline-flex items-center gap-1.5 bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
-              >
-                <Icon icon="solar:play-bold" className="text-xs" />
-                <span>Trailer</span>
-              </button>
-            )}
-
-            {onRateClick && (
-              <button
-                type="button"
-                onClick={onRateClick}
-                className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
-              >
-                <Icon icon="solar:star-linear" className="text-sm" />
-                <span>Rate</span>
-              </button>
-            )}
-          </div>
+          {onRateClick && (
+            <button
+              type="button"
+              onClick={onRateClick}
+              className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer shrink-0 ml-auto"
+              title="Rate this movie"
+            >
+              <Icon icon="solar:star-linear" className="text-xs text-amber-400" />
+              <span>Rate</span>
+            </button>
+          )}
         </div>
 
       </div>
