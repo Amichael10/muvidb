@@ -443,6 +443,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(await searchCandidates(q, type, limit));
       }
 
+      if (task === 'instagram_audio_search') {
+        await requireSocialStudioAdmin(req);
+        const { searchInstagramAudio } = await import('./_lib/social-studio/platforms/instagram-audio.js');
+        const audioType = String(req.query?.audioType || 'music') === 'original_sound' ? 'original_sound' : 'music';
+        const query = String(req.query?.q || '');
+        const connectionId = String(req.query?.connectionId || '') || null;
+        return res.status(200).json(await searchInstagramAudio({ query, audioType, connectionId }));
+      }
+
+      if (task === 'instagram_audio_recommend') {
+        await requireSocialStudioAdmin(req);
+        const { recommendInstagramAudioForContent } = await import('./_lib/social-studio/platforms/instagram-audio.js');
+        return res.status(200).json(await recommendInstagramAudioForContent({
+          title: String(req.query?.title || ''),
+          genres: String(req.query?.genres || ''),
+          synopsis: String(req.query?.synopsis || ''),
+          theme: String(req.query?.theme || ''),
+          contentType: String(req.query?.contentType || ''),
+          connectionId: String(req.query?.connectionId || '') || null,
+        }));
+      }
+
       if (task === 'publish_due') {
         await requireSocialPublisherAuth(req);
         const result = await runSocialPublisher({
@@ -761,6 +783,86 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           captions: captions && typeof captions === 'object' ? captions : {},
           platforms: Array.isArray(platforms) ? platforms : [],
         }, actor));
+      }
+
+      if (task === 'generate_reel') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { contentItemId, seriesLabel, audioStreamUrl, instagramAudio } = req.body || {};
+        if (typeof contentItemId !== 'string' || !contentItemId) {
+          return res.status(400).json({ error: 'contentItemId is required' });
+        }
+        const { generateAndAttachReelForContentItem } = await import('./_lib/social_studio.js');
+        return res.status(200).json(await generateAndAttachReelForContentItem({
+          contentItemId,
+          seriesLabel,
+          audioStreamUrl,
+          instagramAudio,
+        }, actor));
+      }
+
+      if (task === 'instant_publish') {
+        const actor = await requireSocialStudioAdmin(req);
+        const body = req.body || {};
+        const parsed = parseGenerateDraftRequest({
+          ...body,
+          source: 'ad_hoc',
+        });
+        const { supportsReelAutoGeneration } = await import('./_lib/social-studio/domain/content-types.js');
+        const { generateAndAttachReelForContentItem } = await import('./_lib/social_studio.js');
+        const shouldGenerateReel =
+          body.asReel !== false &&
+          supportsReelAutoGeneration({
+            contentType: parsed.contentType,
+            themeId: body.themeId,
+            seriesSlug: body.seriesSlug,
+          });
+
+        const draft = await generateSocialDraft({
+          ...parsed,
+          skipAssets: shouldGenerateReel,
+        }, actor);
+
+        const contentItemId = draft.contentItem.id;
+
+        // Apply custom captions and platform options (e.g., instagram_audio) to variants
+        const customCaptions = body.captions && typeof body.captions === 'object' ? body.captions : {};
+        for (const variant of draft.variants || []) {
+          const customCaption = typeof customCaptions[variant.platform] === 'string'
+            ? customCaptions[variant.platform].trim()
+            : typeof body.caption === 'string' && body.caption.trim()
+              ? body.caption.trim()
+              : null;
+          if (customCaption) {
+            await updateSocialVariantCaption({ variantId: variant.id, caption: customCaption }, actor);
+          }
+          if (variant.platform === 'instagram' && body.instagramAudio) {
+            await updateSocialVariantOptions({
+              variantId: variant.id,
+              options: {
+                ...(variant.platform_options || {}),
+                instagram_audio: body.instagramAudio,
+              },
+            }, actor);
+          }
+        }
+
+        let reelResult = null;
+        if (shouldGenerateReel) {
+          reelResult = await generateAndAttachReelForContentItem({
+            contentItemId,
+            seriesLabel: parsed.contentType === 'upcoming_movie' ? 'New & Upcoming' : 'Now Streaming',
+            audioStreamUrl: body.audioStreamUrl || null,
+            instagramAudio: body.instagramAudio || null,
+          }, actor);
+        }
+
+        const published = await publishContentItemNow({ contentItemId }, actor);
+        return res.status(200).json({
+          success: true,
+          contentItemId,
+          reel: reelResult,
+          published,
+        });
       }
 
       if (task === 'publish_editor_video_now' || task === 'publish_now') {

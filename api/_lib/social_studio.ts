@@ -3776,7 +3776,101 @@ export async function approveEditorialSlot(
 export async function seedEditorialCalendarSlots(options: any = 30) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
   const { planRollingSocialCalendar } = await import('./editorial/monthly_planner.js');
-  const days = typeof options === 'number' ? options : Number(options?.days) || 30;
+  const days = typeof options === 'number' ? options : Number(options?.dryRun ? 30 : options?.days) || 30;
   const result = await planRollingSocialCalendar({ days, dryRun: Boolean(options?.dryRun) });
   return { seeded: result.totalSlots, planner: result };
+}
+
+/**
+ * Generates an animated 9:16 MP4 Reel for a "Now Streaming" or "New & Upcoming Release"
+ * content item, attaches it (plus optional Instagram trending soundtrack) to the draft's
+ * variants, and returns the updated asset + variants.
+ */
+export async function generateAndAttachReelForContentItem(
+  input: {
+    contentItemId: string;
+    seriesLabel?: 'Now Streaming' | 'New & Upcoming';
+    audioStreamUrl?: string | null;
+    instagramAudio?: Record<string, unknown> | null;
+  },
+  actor: SocialActor
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const { supportsReelAutoGeneration } = await import('./social-studio/domain/content-types.js');
+  const { renderAndStoreReelAsset } = await import('./social-studio/video/reel-generator.js');
+
+  const { data: item, error: itemErr } = await supabase
+    .from('social_content_items')
+    .select('id,content_type,source_entity_id,source_snapshot,title')
+    .eq('id', input.contentItemId)
+    .maybeSingle();
+
+  if (itemErr) throw itemErr;
+  if (!item) throw httpError(404, 'Content item not found');
+
+  if (!supportsReelAutoGeneration({ contentType: item.content_type })) {
+    throw httpError(
+      400,
+      `Reel auto-generation is only enabled for "Now Streaming" and "New & Upcoming Release" (current: ${item.content_type}).`
+    );
+  }
+
+  const capturedAt = new Date().toISOString();
+  const snapshot =
+    item.source_snapshot?.kind === 'upcoming_movie'
+      ? item.source_snapshot
+      : await loadUpcomingMovieSource(item.source_entity_id, capturedAt);
+
+  const seriesLabel =
+    input.seriesLabel ||
+    (item.content_type === 'upcoming_movie' ? 'New & Upcoming' : 'Now Streaming');
+
+  const renderedReel = await renderAndStoreReelAsset({
+    contentItemId: item.id,
+    snapshot,
+    seriesLabel,
+    audioStreamUrl: input.audioStreamUrl || null,
+  });
+
+  const { data: variants, error: varErr } = await supabase
+    .from('social_platform_variants')
+    .select('id,platform,platform_options')
+    .eq('content_item_id', item.id);
+  if (varErr) throw varErr;
+
+  for (const variant of variants || []) {
+    const nextOptions: Record<string, unknown> = {
+      ...(variant.platform_options || {}),
+      post_format: 'single',
+      asset_format: 'video_vertical_9_16',
+      asset_url: renderedReel.publicUrl,
+      video_url: renderedReel.publicUrl,
+      cover_url: renderedReel.coverImageUrl || (variant.platform_options as any)?.cover_url || null,
+    };
+    if (variant.platform === 'instagram' && input.instagramAudio) {
+      nextOptions.instagram_audio = input.instagramAudio;
+    }
+    await supabase
+      .from('social_platform_variants')
+      .update({
+        selected_asset_id: renderedReel.assetId,
+        platform_options: nextOptions,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', variant.id);
+  }
+
+  await insertSocialEvent({
+    contentItemId: item.id,
+    eventType: 'reel_auto_generated',
+    eventData: {
+      actor_id: actor.id,
+      asset_id: renderedReel.assetId,
+      public_url: renderedReel.publicUrl,
+      series_label: seriesLabel,
+      has_instagram_audio: Boolean(input.instagramAudio?.audio_id),
+    },
+  });
+
+  return renderedReel;
 }

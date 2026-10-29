@@ -52,6 +52,11 @@ export const HTML_SOCIAL_TEMPLATES: Record<string, HtmlTemplateSpec> = {
   'stage-to-screen-simple-v1': simpleSpec('stage_to_screen'),
   'critic-spotlight-simple-v1': simpleSpec('critic_spotlight'),
   'filmography-simple-v1': simpleSpec('filmography'),
+  'actor-spotlight-v1': simpleSpec('filmography'),
+  'watchlist-this-week-v1': simpleSpec('weekend_watchlist'),
+  'critics-say-v1': simpleSpec('critics_say'),
+  'now-showing-cinemas-v1': simpleSpec('where_to_watch'),
+  'nollywood-debate-v1': simpleSpec('film_conversation'),
   'weekend-watchlist-simple-v1': simpleSpec('weekend_watchlist'),
   'critics-say-simple-v1': simpleSpec('critics_say'),
   'on-stage-simple-v1': simpleSpec('on_stage'),
@@ -624,7 +629,7 @@ export async function renderHtmlSocialTemplateAsset(input: {
 
   // Final slide of carousel is the official default back cover poster unless custom override requested or spotlight template
   const totalSlides = spec?.slides || 1;
-  const isSpotlightTemplate = input.templateSlug === 'behind-camera-simple-v1' || input.templateSlug === 'you-know-the-face-simple-v1' || input.templateSlug === 'filmography-simple-v1';
+  const isSpotlightTemplate = input.templateSlug === 'behind-camera-simple-v1' || input.templateSlug === 'you-know-the-face-simple-v1' || input.templateSlug === 'filmography-simple-v1' || input.templateSlug === 'actor-spotlight-v1';
   const wantsCustomBackCover = Boolean(input.dataOverride && (input.dataOverride.variant || input.dataOverride.title || input.dataOverride.skipDefaultBackCover));
   if (totalSlides > 1 && input.slide === totalSlides && !wantsCustomBackCover && !isSpotlightTemplate) {
     const backCoverPath = path.join(process.cwd(), 'public', 'images', 'social', 'carousel-back-cover-v1.png');

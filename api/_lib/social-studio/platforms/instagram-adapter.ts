@@ -290,6 +290,22 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
     if (isVideo) {
       containerParams.set('media_type', 'REELS');
       containerParams.set('video_url', assetUrl);
+      const audio = request.options?.instagram_audio;
+      if (audio && typeof audio === 'object') {
+        const selected = audio as Record<string, unknown>;
+        const audioId = String(selected.audio_id || '').trim();
+        if (audioId) {
+          const clampVolume = (value: unknown, fallback: number) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) ? Math.min(100, Math.max(0, Math.round(numeric))) : fallback;
+          };
+          containerParams.set('audio_configuration', JSON.stringify({
+            audio_id: audioId,
+            audio_volume: clampVolume(selected.audio_volume, 100),
+            video_volume: clampVolume(selected.video_volume, 20),
+          }));
+        }
+      }
       const coverUrl = request.options?.cover_url || request.options?.cover_image_url || request.options?.thumbnail_url;
       if (coverUrl && typeof coverUrl === 'string' && coverUrl.trim()) {
         containerParams.set('cover_url', coverUrl.trim());

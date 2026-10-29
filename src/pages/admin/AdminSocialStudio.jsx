@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { uploadAdminSocialMedia } from '../../lib/imageUpload';
 import SocialDraftComposer, { EDITORIAL_THEMES } from '../../components/admin/SocialDraftComposer';
 import UniversalSocialComposer from '../../components/admin/UniversalSocialComposer';
+import InstantEditorialPublisher from '../../components/admin/InstantEditorialPublisher';
 import AutoPilotReviewModal from '../../components/admin/AutoPilotReviewModal';
 import SocialIntakeInbox from '../../components/admin/SocialIntakeInbox';
 import FilmSearchCombobox from '../../components/admin/FilmSearchCombobox';
@@ -2120,6 +2121,22 @@ export default function AdminSocialStudio() {
 
         <button
           type="button"
+          onClick={() => setActiveTab('instant')}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
+            activeTab === 'instant'
+              ? 'bg-gradient-to-r from-brand via-orange-500 to-amber-500 text-white shadow-md shadow-brand/25'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+          }`}
+        >
+          <Icon icon="solar:bolt-bold" width="16" className={activeTab === 'instant' ? 'text-white' : 'text-brand'} />
+          <span>Instant Post Now</span>
+          <span className="rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-300 border border-emerald-400/30">
+            Live
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('composer')}
           className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
             activeTab === 'composer'
@@ -2227,6 +2244,14 @@ export default function AdminSocialStudio() {
             }}
           />
         </div>
+      )}
+
+      {activeTab === 'instant' && (
+        <InstantEditorialPublisher
+          onPublished={async () => {
+            await refreshAll();
+          }}
+        />
       )}
 
       {/* ========================================================================= */}

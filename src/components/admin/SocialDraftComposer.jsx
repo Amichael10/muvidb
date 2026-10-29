@@ -14,12 +14,15 @@ export const EDITORIAL_THEMES = [
     seriesSlug: 'filmography',
     name: 'Actor Spotlight & Filmography',
     category: 'Talent & Stars',
-    badge: 'Monday Theme',
+    badge: 'Monday Theme · 6-Slide 4:5 Carousel',
     icon: 'solar:user-star-linear',
     entity: 'person',
-    description: 'Career highlights, standout filmography, direct social handles, and favorite role questions.',
-    placeholder: 'Search actor by name (e.g. Odunlade Adekola, Bimbo Ademoye, Lateef Adedimeji)…',
-    templateSlug: 'actor-spotlight-v1',
+    postFormat: 'carousel',
+    slides: 6,
+    aspectRatio: '4:5',
+    description: 'Multi-slide 4:5 carousel (6 slides): Cover portrait, Creative Mind bio, 4-poster Filmography grid, Cinematic Journey, New Vanguard, and Celebration closing slide.',
+    placeholder: 'Search actor by name (e.g. Lateef Adedimeji, Akinfolarin, Odunlade Adekola, Bimbo Ademoye)…',
+    templateSlug: 'filmography-simple-v1',
     contentType: 'actor_spotlight',
     suggestions: ['Odunlade Adekola', 'Bimbo Ademoye', 'Lateef Adedimeji', 'Funke Akindele', 'Kunle Remi', 'Ibrahim Chatta'],
   },
@@ -56,12 +59,15 @@ export const EDITORIAL_THEMES = [
     seriesSlug: 'behind_the_camera',
     name: 'Behind The Camera (Crew & Directors)',
     category: 'Filmmaking & Craft',
-    badge: 'Thursday Theme',
+    badge: 'Thursday Theme · 6-Slide 4:5 Carousel',
     icon: 'solar:clapperboard-edit-linear',
     entity: 'person',
-    description: 'Highlight visionary directors, producers, cinematographers, writers, and their notable projects.',
-    placeholder: 'Search director or crew (e.g. Kunle Afolayan, Kemi Adetiba, CJ Obasi, Jade Osiberu)…',
-    templateSlug: 'actor-spotlight-v1',
+    postFormat: 'carousel',
+    slides: 6,
+    aspectRatio: '4:5',
+    description: 'Multi-slide 4:5 carousel (6 slides) highlighting visionary directors, editors, producers, cinematographers, and their notable projects.',
+    placeholder: 'Search director or crew (e.g. Akinfolarin, Kunle Afolayan, Kemi Adetiba, CJ Obasi, Jade Osiberu)…',
+    templateSlug: 'behind-camera-simple-v1',
     contentType: 'actor_spotlight',
     suggestions: ['Kunle Afolayan', 'Kemi Adetiba', 'Jade Osiberu', 'CJ Obasi', 'Toka McBaror'],
   },
@@ -225,7 +231,7 @@ function carouselLimitFor(platforms) {
 // These themes are authored as swipeable multi-slide stories. TikTok's
 // publishing path in this studio is video/photo-single only, so fail fast in
 // the composer instead of generating a draft that can never render correctly.
-const CAROUSEL_THEMES = new Set(['critics_say', 'weekend_watchlist']);
+const CAROUSEL_THEMES = new Set(['actor_spotlight', 'behind_the_camera', 'critics_say', 'weekend_watchlist']);
 function supportsThemeOnPlatform(themeId, platform) {
   return !(CAROUSEL_THEMES.has(themeId) && platform === 'tiktok');
 }
@@ -515,6 +521,11 @@ export default function SocialDraftComposer({
   const [scheduling, setScheduling] = useState(false);
   const [customScheduleDate, setCustomScheduleDate] = useState('');
   const [tiktokSettings, setTikTokSettings] = useState(DEFAULT_TIKTOK_SETTINGS);
+  const [instagramAudioQuery, setInstagramAudioQuery] = useState('');
+  const [instagramAudioType, setInstagramAudioType] = useState('music');
+  const [instagramAudioResults, setInstagramAudioResults] = useState([]);
+  const [instagramAudioLoading, setInstagramAudioLoading] = useState(false);
+  const [instagramAudio, setInstagramAudio] = useState(null);
   const [step1Open, setStep1Open] = useState(true);
   const [step2Open, setStep2Open] = useState(true);
   const [step3Open, setStep3Open] = useState(true);
@@ -1180,6 +1191,12 @@ export default function SocialDraftComposer({
         })),
       };
       setResult(normalized);
+      const primaryCarousel = normalized.variants?.find(v => Array.isArray(v.platform_options?.carousel_assets) && v.platform_options.carousel_assets.length > 1);
+      if (primaryCarousel) {
+        setPostFormat('carousel');
+        setCarouselAssets(primaryCarousel.platform_options.carousel_assets);
+        setCanvasAspectRatio('4:5');
+      }
       const tiktokVariant = normalized.variants.find(variant => variant.platform === 'tiktok');
       setTikTokSettings({
         ...DEFAULT_TIKTOK_SETTINGS,
@@ -1414,6 +1431,84 @@ export default function SocialDraftComposer({
     }));
   };
 
+  const persistInstagramAudio = async () => {
+    const variant = result?.variants?.find(entry => entry.platform === 'instagram');
+    if (!variant) return;
+    const nextOptions = { ...(variant.platform_options || {}) };
+    if (instagramAudio?.audio_id) nextOptions.instagram_audio = instagramAudio;
+    else nextOptions.instagram_audio = null;
+    const res = await fetch('/api/social?task=update_variant_options', {
+      method: 'POST',
+      headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variantId: variant.id, options: nextOptions }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Instagram audio could not be saved (HTTP ${res.status})`);
+    setResult(current => ({
+      ...current,
+      variants: (current?.variants || []).map(entry => entry.id === variant.id
+        ? { ...entry, platform_options: data.platformOptions }
+        : entry),
+    }));
+  };
+
+  const autoRecommendInstagramAudio = async () => {
+    setInstagramAudioLoading(true);
+    try {
+      const snap = result?.contentItem?.snapshot || {};
+      const params = new URLSearchParams({
+        title: snap.title || selected?.name || result?.contentItem?.title || '',
+        genres: Array.isArray(snap.genres) ? snap.genres.join(', ') : (selected?.data?.genres || []).join(', '),
+        synopsis: snap.synopsis || selected?.subtext || '',
+        theme: themeId || '',
+        contentType: result?.contentItem?.content_type || '',
+      });
+      const res = await fetch(`/api/social?task=instagram_audio_recommend&${params}`, {
+        headers: await authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not auto-pick Instagram music');
+      const allTracks = [data.recommended, ...(data.alternatives || [])].filter(Boolean);
+      setInstagramAudioResults(allTracks);
+      if (data.recommended) {
+        setInstagramAudio({
+          audio_id: data.recommended.audioId,
+          audio_type: data.recommended.audioType,
+          title: data.recommended.title,
+          artist: data.recommended.artist,
+          artwork_url: data.recommended.artworkUrl,
+          audio_volume: 85,
+          video_volume: 15,
+          match_reason: data.recommended.matchReason,
+        });
+        toast.success(`Auto-picked "${data.recommended.title}" (${String(data.mood || '').replace('_', ' ')})`);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Could not auto-pick Instagram music');
+    } finally {
+      setInstagramAudioLoading(false);
+    }
+  };
+
+  const searchInstagramAudio = async () => {
+    setInstagramAudioLoading(true);
+    try {
+      const params = new URLSearchParams({ audioType: instagramAudioType });
+      if (instagramAudioQuery.trim()) params.set('q', instagramAudioQuery.trim());
+      const res = await fetch(`/api/social?task=instagram_audio_search&${params}`, {
+        headers: await authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Instagram music search failed');
+      setInstagramAudioResults(Array.isArray(data.tracks) ? data.tracks : []);
+      if (!data.tracks?.length) toast('No authorized Instagram audio matched this search.');
+    } catch (err) {
+      toast.error(err.message || 'Instagram music search failed');
+    } finally {
+      setInstagramAudioLoading(false);
+    }
+  };
+
   const handleSchedule = async (preset, customValue) => {
     if (!result?.contentItem?.id) return;
     const invalidCarousels = (result.variants || []).filter(variant => {
@@ -1453,6 +1548,7 @@ export default function SocialDraftComposer({
     try {
       await savePendingCaptions();
       await persistTikTokSettings();
+      await persistInstagramAudio();
       const res = await fetch('/api/social?task=schedule', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
@@ -1581,6 +1677,10 @@ export default function SocialDraftComposer({
   const selectedSingleAsset = result?.assets?.find(asset => asset.id === activeVariant?.selected_asset_id)
     || result?.assets?.find(asset => asset.format === 'custom_design')
     || result?.assets?.[0];
+  const selectedSingleAssetUrl = selectedSingleAsset?.publicUrl || selectedSingleAsset?.public_url || '';
+  const activeAssetIsReel = /\.(mp4|mov|webm)(?:$|\?)/i.test(selectedSingleAssetUrl)
+    || String(selectedSingleAsset?.mime_type || selectedSingleAsset?.mimeType || '').startsWith('video/')
+    || String(selectedSingleAsset?.format || '').includes('video');
 
   const activeVariantPostFormat = activeVariant?.platform_options?.post_format
     || (Array.isArray(activeVariant?.platform_options?.carousel_assets) && activeVariant.platform_options.carousel_assets.length > 1 ? 'carousel' : postFormat);
@@ -1619,6 +1719,11 @@ export default function SocialDraftComposer({
       else setCanvasAspectRatio('1:1');
     }
   }, [activeVariant?.id, activeVariant?.platform, activeVariant?.selected_asset_id, activeVariant?.platform_options?.post_format]);
+
+  useEffect(() => {
+    if (activeVariant?.platform !== 'instagram') return;
+    setInstagramAudio(activeVariant?.platform_options?.instagram_audio || null);
+  }, [activeVariant?.id, activeVariant?.platform, activeVariant?.platform_options?.instagram_audio?.audio_id]);
 
   const handleSetPostFormat = async (targetFormat) => {
     if (targetFormat === 'carousel' && !supportsThemeOnPlatform(activeTheme.id, activeVariant?.platform)) {
@@ -3440,6 +3545,151 @@ export default function SocialDraftComposer({
                       ))}
                     </div>
                   </div>
+
+                  {activeVariant?.platform === 'instagram' && (
+                    <div className="overflow-hidden rounded-2xl border border-fuchsia-400/25 bg-[radial-gradient(circle_at_top_right,rgba(236,72,153,0.16),transparent_42%),linear-gradient(135deg,rgba(24,24,27,0.98),rgba(9,9,11,0.98))]">
+                      <div className="flex items-start justify-between gap-4 border-b border-white/10 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 via-rose-500 to-amber-400 text-white shadow-lg shadow-fuchsia-950/40">
+                            <Icon icon="solar:music-note-3-bold" width="21" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-[0.16em] text-white">Instagram Reel Soundtrack</p>
+                            <p className="mt-1 max-w-lg text-[10px] leading-relaxed text-zinc-400">
+                              Search Instagram’s authorized music catalogue and attach the track when this Reel publishes.
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-wider ${activeAssetIsReel ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}>
+                          {activeAssetIsReel ? 'Reel ready' : 'Needs video'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3 p-4">
+                        {!activeAssetIsReel && (
+                          <div className="flex items-start gap-2 rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-[10px] leading-relaxed text-amber-100">
+                            <Icon icon="solar:videocamera-record-bold" width="16" className="mt-0.5 shrink-0 text-amber-300" />
+                            <span>Instagram music can only attach to a Reel. Upload or render a 9:16 MP4 first; the existing post artwork can be used as its branded cover.</span>
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <select
+                            value={instagramAudioType}
+                            onChange={event => setInstagramAudioType(event.target.value)}
+                            className="h-10 rounded-xl border border-white/10 bg-black/30 px-3 text-xs font-bold text-white outline-none focus:border-fuchsia-400"
+                          >
+                            <option value="music">Music</option>
+                            <option value="original_sound">Original sounds</option>
+                          </select>
+                          <div className="relative flex-1">
+                            <Icon icon="solar:magnifer-linear" width="16" className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                            <input
+                              value={instagramAudioQuery}
+                              onChange={event => setInstagramAudioQuery(event.target.value)}
+                              onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); searchInstagramAudio(); } }}
+                              placeholder="Search song, artist, mood — or leave blank for trending"
+                              className="h-10 w-full rounded-xl border border-white/10 bg-black/30 pl-9 pr-3 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-fuchsia-400"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={searchInstagramAudio}
+                            disabled={instagramAudioLoading}
+                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-black transition hover:bg-fuchsia-100 disabled:opacity-50"
+                          >
+                            <Icon icon={instagramAudioLoading ? 'solar:spinner-linear' : 'solar:music-library-2-bold'} width="16" className={instagramAudioLoading ? 'animate-spin' : ''} />
+                            {instagramAudioLoading ? 'Searching' : instagramAudioQuery.trim() ? 'Search' : 'Trending'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={autoRecommendInstagramAudio}
+                            disabled={instagramAudioLoading}
+                            title="Automatically match the best trending Afrobeats soundtrack to this film's genre & mood (with no-repeat rotation)"
+                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-fuchsia-400/40 bg-fuchsia-500/15 px-3.5 text-xs font-black text-fuchsia-200 transition hover:bg-fuchsia-500/25 disabled:opacity-50"
+                          >
+                            <Icon icon="solar:magic-stick-3-bold" width="15" />
+                            Auto-Match Mood
+                          </button>
+                        </div>
+
+                        {instagramAudioResults.length > 0 && (
+                          <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+                            {instagramAudioResults.map(track => {
+                              const selectedTrack = instagramAudio?.audio_id === track.audioId;
+                              return (
+                                <button
+                                  key={track.audioId}
+                                  type="button"
+                                  onClick={() => setInstagramAudio({
+                                    audio_id: track.audioId,
+                                    audio_type: track.audioType,
+                                    title: track.title,
+                                    artist: track.artist,
+                                    artwork_url: track.artworkUrl,
+                                    audio_volume: 85,
+                                    video_volume: 15,
+                                  })}
+                                  className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition ${selectedTrack ? 'border-fuchsia-400/60 bg-fuchsia-400/10' : 'border-white/5 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.06]'}`}
+                                >
+                                  {track.artworkUrl ? <img src={track.artworkUrl} alt="" className="h-10 w-10 rounded-lg object-cover" /> : (
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-fuchsia-400/10 text-fuchsia-300"><Icon icon="solar:music-note-bold" width="18" /></span>
+                                  )}
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-xs font-black text-white">{track.title}</span>
+                                    <span className="mt-0.5 block truncate text-[10px] text-zinc-500">{track.artist || (track.audioType === 'music' ? 'Instagram Music' : 'Original sound')}{track.durationMs ? ` · ${Math.round(track.durationMs / 1000)}s` : ''}{track.matchReason ? ` · ${track.matchReason}` : ''}</span>
+                                  </span>
+                                  <Icon icon={selectedTrack ? 'solar:check-circle-bold' : 'solar:add-circle-linear'} width="19" className={selectedTrack ? 'text-fuchsia-300' : 'text-zinc-600'} />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {instagramAudio?.audio_id && (
+                          <div className="rounded-xl border border-fuchsia-400/25 bg-black/25 p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-black text-fuchsia-100">{instagramAudio.title || 'Selected Instagram audio'}</p>
+                                <p className="truncate text-[10px] text-zinc-500">{instagramAudio.artist || 'Instagram audio'} · attached when published</p>
+                              </div>
+                              <button type="button" onClick={() => setInstagramAudio(null)} className="rounded-lg p-1.5 text-zinc-500 hover:bg-white/5 hover:text-rose-300" aria-label="Remove selected audio">
+                                <Icon icon="solar:trash-bin-trash-linear" width="16" />
+                              </button>
+                            </div>
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <label className="text-[9px] font-black uppercase tracking-wider text-zinc-500">
+                                Music volume · {instagramAudio.audio_volume ?? 85}%
+                                <input type="range" min="0" max="100" value={instagramAudio.audio_volume ?? 85} onChange={event => setInstagramAudio(current => ({ ...current, audio_volume: Number(event.target.value) }))} className="mt-2 w-full accent-fuchsia-400" />
+                              </label>
+                              <label className="text-[9px] font-black uppercase tracking-wider text-zinc-500">
+                                Original video · {instagramAudio.video_volume ?? 15}%
+                                <input type="range" min="0" max="100" value={instagramAudio.video_volume ?? 15} onChange={event => setInstagramAudio(current => ({ ...current, video_volume: Number(event.target.value) }))} className="mt-2 w-full accent-amber-400" />
+                              </label>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await persistInstagramAudio();
+                                  toast.success('Instagram soundtrack saved');
+                                } catch (err) {
+                                  toast.error(err.message || 'Could not save Instagram soundtrack');
+                                }
+                              }}
+                              disabled={!activeAssetIsReel}
+                              className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-fuchsia-500 to-rose-500 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-fuchsia-950/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
+                            >
+                              <Icon icon="solar:diskette-bold" width="15" />
+                              Save Reel Soundtrack
+                            </button>
+                          </div>
+                        )}
+
+                        <p className="text-[9px] leading-relaxed text-zinc-600">Instagram does not provide a combined preview through its API. Catalogue availability can vary by account and region.</p>
+                      </div>
+                    </div>
+                  )}
 
                   {activeVariant?.platform === 'tiktok' && (
                     <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/5 p-4">

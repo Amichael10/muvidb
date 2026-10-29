@@ -133,6 +133,43 @@ describe('InstagramPlatformAdapter', () => {
     expect(containerBody.get('collaborators')).toBe('["muvi_database"]');
   });
 
+  it('attaches selected Instagram library audio to a Reel', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_video' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_reel_audio' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_reel_audio', permalink: 'https://instagram.com/reel/audio' }), { status: 200 }));
+    const adapter = new InstagramPlatformAdapter({
+      accessToken: 'token', instagramAccountId: 'ig-user-1', fetchImpl, pollIntervalMs: 10,
+    });
+
+    await adapter.publish(request({
+      assetUrl: 'https://cdn.example.com/reel.mp4',
+      options: {
+        instagram_audio: { audio_id: 'audio_123', audio_volume: 84, video_volume: 16 },
+      },
+    }));
+
+    const containerBody = fetchImpl.mock.calls[0][1].body as URLSearchParams;
+    expect(JSON.parse(String(containerBody.get('audio_configuration')))).toEqual({
+      audio_id: 'audio_123', audio_volume: 84, video_volume: 16,
+    });
+  });
+
+  it('never attaches Instagram library audio to a static image post', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_container_image' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status_code: 'FINISHED' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_image' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'ig_image', permalink: 'https://instagram.com/p/image' }), { status: 200 }));
+    const adapter = new InstagramPlatformAdapter({ accessToken: 'token', instagramAccountId: 'ig-user-1', fetchImpl, pollIntervalMs: 10 });
+
+    await adapter.publish(request({ options: { instagram_audio: { audio_id: 'audio_123' } } }));
+
+    const containerBody = fetchImpl.mock.calls[0][1].body as URLSearchParams;
+    expect(containerBody.get('audio_configuration')).toBeNull();
+  });
+
   it('publishes ordered images as one carousel and attaches collaborator to parent', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'child_1' }), { status: 200 }))

@@ -268,11 +268,8 @@ async function scrapeMusonPlays(): Promise<PlayPayload[]> {
       const byMatch = item.desc.match(/By\s+([A-Za-z\s]+?)(?:\.|$|\n)/i);
       const playwright = byMatch ? byMatch[1].trim() : null;
 
-      // Extract ticket tiers & availability from eticketsolutions
-      let gross = 0;
-      let totalSold = 0;
-      let totalCap = 0;
-      const tierAggregates: Record<string, { price: number; total: number; sold: number; gross: number }> = {};
+      // Only store verified pricing tiers and ticket types; do NOT assume sales or revenue without exact receipts
+      const tierPricing: Record<string, { price: number }> = {};
 
       try {
         const ticketRes = await fetch(item.ticketUrl, {
@@ -283,30 +280,14 @@ async function scrapeMusonPlays(): Promise<PlayPayload[]> {
           const $t = cheerio.load(tHtml);
           $t('.pricetag').each((_, pel) => {
             const rawPrice = Number($t(pel).find('input[name="price"]').attr('value') || 0);
-            const remaining = Number($t(pel).find('input[name="quantity"]').attr('max')?.trim() || 0);
             const meta = $t(pel).find('.content3 ul').text().replace(/\s+/g, ' ').trim();
             
-            // Section/tier name
             let tierName = 'Regular';
             if (/VIP/i.test(meta)) tierName = 'VIP';
             else if (/MEMBER/i.test(meta)) tierName = 'Member';
             else if (/STUDENT/i.test(meta)) tierName = 'Student';
 
-            // Assume benchmark capacity of 70 per tier block if remaining <= 70
-            const assumedCap = Math.max(70, remaining);
-            const sold = Math.max(0, assumedCap - remaining);
-            const subtotal = sold * rawPrice;
-
-            totalSold += sold;
-            gross += subtotal;
-            totalCap += assumedCap;
-
-            tierAggregates[tierName] = {
-              price: rawPrice,
-              total: assumedCap,
-              sold,
-              gross: subtotal
-            };
+            tierPricing[tierName] = { price: rawPrice };
           });
         }
       } catch (err: any) {
@@ -326,16 +307,15 @@ async function scrapeMusonPlays(): Promise<PlayPayload[]> {
         year: 2026,
         status: 'upcoming',
         source_url: item.ticketUrl,
-        box_office_domestic: gross,
-        box_office_tickets_sold: totalSold,
+        box_office_domestic: null,
+        box_office_tickets_sold: null,
         box_office_currency: 'NGN',
-        box_office_source: 'MUSON Official E-Ticketing',
+        box_office_source: null,
         box_office_updated_at: new Date().toISOString(),
         box_office_metrics: {
           source: 'MUSON Official E-Ticketing System',
           harvested_at: new Date().toISOString(),
-          total_capacity: totalCap,
-          tier_breakdown: tierAggregates
+          tier_pricing: tierPricing
         },
         poster_url: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=800'
       });
@@ -364,7 +344,7 @@ async function scrapeLangfieldPicturesPlay(): Promise<PlayPayload[]> {
     }
     const data = await res.json();
     
-    const tierAggregates: Record<string, { price: number; total: number; sold: number; gross: number }> = {};
+    const tierPricing: Record<string, { price: number }> = {};
     const ticketField = data.GroupFields?.[0]?.Fields?.find((f: any) => /ticket\s*type/i.test(f.FieldName));
     
     const rawOptions = ticketField?.EformOptions || [];
@@ -374,24 +354,12 @@ async function scrapeLangfieldPicturesPlay(): Promise<PlayPayload[]> {
       if (match) {
         price = Number(match[1]) * 1000;
       }
-      tierAggregates[opt.OptionName] = {
-        price,
-        total: 100,
-        sold: 0,
-        gross: 0
-      };
+      tierPricing[opt.OptionName] = { price };
     }
-
-    // Agip Recital Hall at MUSON Centre capacity: 350 seats per show × 2 shows (4PM & 7PM) = 700 seats
-    const totalCapacity = 700;
-    // Benchmark 75% attendance for completed October 18, 2026 production
-    const estimatedTicketsSold = 525;
-    const averageTicketPrice = 30000;
-    const estimatedGross = estimatedTicketsSold * averageTicketPrice;
 
     plays.push({
       title: 'DURO: Wait to be Pampered',
-      slug: 'duro-wait-to-be-pampered',
+      slug: 'duro-the-play',
       producer: 'Langfield Pictures',
       venue: 'Agip Recital Hall, MUSON Centre, Lagos',
       city: 'Lagos',
@@ -406,18 +374,18 @@ async function scrapeLangfieldPicturesPlay(): Promise<PlayPayload[]> {
       source_url: 'https://langfieldpictures.webfyxhub.com/duro_ticket',
       poster_url: 'https://igunle5009.blob.core.windows.net/igunlestorage/langfieldpictures/Tickets/IMG_9840.jpg',
       banner_url: 'https://igunle5009.blob.core.windows.net/igunlestorage/langfieldpictures/Tickets/IMG_9662.jpg',
-      box_office_domestic: estimatedGross,
-      box_office_tickets_sold: estimatedTicketsSold,
+      box_office_domestic: null,
+      box_office_tickets_sold: null,
       box_office_currency: 'NGN',
-      box_office_source: 'Langfield Pictures & MUSON E-Ticketing',
+      box_office_source: null,
       box_office_updated_at: new Date().toISOString(),
       box_office_metrics: {
         source: 'Langfield Pictures (Webfyxhub Ticketing)',
         show_date: '2026-10-18',
         shows: ['4:00 PM', '7:00 PM'],
         hall: 'Agip Recital Hall, MUSON Centre',
-        total_capacity: totalCapacity,
-        tier_breakdown: tierAggregates
+        hall_capacity_per_show: 350,
+        tier_pricing: tierPricing
       }
     });
   } catch (err: any) {
