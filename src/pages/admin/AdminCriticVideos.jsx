@@ -117,6 +117,41 @@ export default function AdminCriticVideos() {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
 
+  function startDesktopClipper() {
+    try {
+      const launcher = document.createElement('a');
+      launcher.href = 'muvidb-clipper://start';
+      launcher.style.display = 'none';
+      document.body.appendChild(launcher);
+      launcher.click();
+      launcher.remove();
+      toast.success('Starting the desktop clipper… a separate PowerShell window should open.');
+      window.setTimeout(async () => {
+        try {
+          const response = await fetchWithLocalClipperAuth(`${LOCAL_CLIPPER_URL}/health`, { method: 'GET' });
+          if (response.ok) setClipperStatus('running');
+        } catch {}
+      }, 2500);
+    } catch {
+      toast.error('Install the MuviDB clipper launcher on this computer first.');
+    }
+  }
+
+  function stopDesktopClipper() {
+    try {
+      const launcher = document.createElement('a');
+      launcher.href = 'muvidb-clipper://stop';
+      launcher.style.display = 'none';
+      document.body.appendChild(launcher);
+      launcher.click();
+      launcher.remove();
+      toast.success('Stopping the desktop clipper…');
+    } catch {
+      toast.error('Could not stop the desktop clipper.');
+    }
+  }
+  }, []);
+
   /** Fetch one transcript on this machine and hand it to the server. */
   async function fetchTranscript(candidate) {
     if (clipperStatus !== 'running') {
@@ -234,6 +269,19 @@ export default function AdminCriticVideos() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={clipperStatus === 'running' ? stopDesktopClipper : startDesktopClipper}
+            className={`px-3 py-2 text-sm rounded-md font-medium flex items-center gap-1.5 border ${
+              clipperStatus === 'running'
+                ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/25'
+                : 'bg-brand text-on-brand border-brand hover:bg-brand-hover'
+            }`}
+            title="Start or stop the local FFmpeg/YouTube desktop video clipper"
+          >
+            <Icon icon={clipperStatus === 'running' ? 'solar:check-circle-bold' : 'solar:laptop-minimalistic-bold'} className="w-4 h-4" />
+            <span>{clipperStatus === 'running' ? 'Clipper Ready' : 'Start Clipper'}</span>
+          </button>
           <button type="button" onClick={pollChannels}
             className="px-3 py-2 text-sm rounded-md border border-current/20 hover:bg-current/5">
             <Icon icon="mdi:magnify-scan" className="inline mr-1" />
@@ -258,6 +306,16 @@ export default function AdminCriticVideos() {
           : clipperStatus === 'checking'
             ? 'Looking for the desktop clipper…'
             : 'Desktop clipper offline. Start it to fetch transcripts; everything else still works.'}
+        {clipperStatus !== 'running' && (
+          <button
+            type="button"
+            onClick={startDesktopClipper}
+            className="ml-auto px-3 py-1 rounded-md text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 flex items-center gap-1 shrink-0"
+          >
+            <Icon icon="solar:laptop-minimalistic-bold" className="w-3.5 h-3.5" />
+            <span>Start Clipper</span>
+          </button>
+        )}
       </div>
 
       {/* Not every critic is on YouTube, and channel polling only finds the

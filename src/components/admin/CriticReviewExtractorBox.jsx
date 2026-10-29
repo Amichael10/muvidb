@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { authHeaders } from '../../lib/apiAuth';
 import { fetchWithLocalClipperAuth } from '../../lib/localClipperFetch';
@@ -19,7 +19,37 @@ export default function CriticReviewExtractorBox({
   const [extractingOcr, setExtractingOcr] = useState(false);
   const [rawOcrText, setRawOcrText] = useState('');
   const [statusMsg, setStatusMsg] = useState(null);
+  const [clipperStatus, setClipperStatus] = useState('checking');
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await fetchWithLocalClipperAuth(`${LOCAL_CLIPPER_URL}/health`, { method: 'GET' });
+        if (!cancelled) setClipperStatus(res.ok ? 'running' : 'offline');
+      } catch {
+        if (!cancelled) setClipperStatus('offline');
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, []);
+
+  function startDesktopClipper() {
+    try {
+      const launcher = document.createElement('a');
+      launcher.href = 'muvidb-clipper://start';
+      launcher.style.display = 'none';
+      document.body.appendChild(launcher);
+      launcher.click();
+      launcher.remove();
+      setStatusMsg({ type: 'info', text: 'Starting the desktop clipper… a separate PowerShell window should open.' });
+    } catch {
+      setStatusMsg({ type: 'error', text: 'Install the MuviDB clipper launcher on this computer first.' });
+    }
+  }
 
   async function processScreenshotDataUrl(dataUrl, mimeType = 'image/png') {
     if (!dataUrl || disabled) return;
@@ -302,6 +332,20 @@ export default function CriticReviewExtractorBox({
               className="w-full bg-surface border border-border rounded-xl pl-9 pr-3.5 py-2 text-xs text-text-primary focus:border-brand outline-none"
             />
           </div>
+          <button
+            type="button"
+            onClick={startDesktopClipper}
+            disabled={clipperStatus === 'running'}
+            className={`px-3 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 whitespace-nowrap border transition-colors ${
+              clipperStatus === 'running'
+                ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
+                : 'bg-surface border-border text-text-primary hover:border-brand'
+            }`}
+            title="Start the local FFmpeg/YouTube desktop video clipper"
+          >
+            <Icon icon={clipperStatus === 'running' ? 'solar:check-circle-bold' : 'solar:laptop-minimalistic-bold'} className="w-4 h-4" />
+            <span>{clipperStatus === 'running' ? 'Clipper Ready' : 'Start Clipper'}</span>
+          </button>
           <button
             type="button"
             disabled={extractingVideo || !videoUrl.trim()}
