@@ -712,7 +712,7 @@ export default function AdminCritics() {
               {/* Rating + Source URL */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-text-primary mb-1">Star Rating (1–5)</label>
+                  <label className="block text-xs font-bold text-text-primary mb-1">Rating (1–5 ★ or /10)</label>
                   <select
                     value={reviewForm.rating}
                     onChange={e => setReviewForm(prev => ({ ...prev, rating: e.target.value }))}
@@ -720,11 +720,15 @@ export default function AdminCritics() {
                     className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-text-primary focus:border-brand outline-none disabled:opacity-50"
                   >
                     <option value="">— No Rating —</option>
-                    <option value="1">1 ★</option>
-                    <option value="2">2 ★★</option>
-                    <option value="3">3 ★★★</option>
-                    <option value="4">4 ★★★★</option>
-                    <option value="5">5 ★★★★★</option>
+                    <option value="1">1 ★ (2/10)</option>
+                    <option value="1.5">1.5 ★ (3/10)</option>
+                    <option value="2">2 ★★ (4/10)</option>
+                    <option value="2.5">2.5 ★★ (5/10)</option>
+                    <option value="3">3 ★★★ (6/10)</option>
+                    <option value="3.5">3.5 ★★★ (7/10)</option>
+                    <option value="4">4 ★★★★ (8/10)</option>
+                    <option value="4.5">4.5 ★★★★ (9/10)</option>
+                    <option value="5">5 ★★★★★ (10/10)</option>
                   </select>
                 </div>
 
