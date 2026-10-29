@@ -131,7 +131,8 @@ function isPlausibleFilmTitle(raw: string): boolean {
   if (title.length < 2 || title.length > 70 || words > 9) return false;
   if (BAD_PREFIX.test(title) || hasSensationalPossessiveOpening(title) || EMOTIONAL_PROMO.test(title) || STRONG_CLICKBAIT.test(title)) return false;
   if (/^(?:pt|part|episode|season)\s*\d+$/i.test(title)) return false;
-  if (/\b(latest|movie|movies|film|films|telenovela|nollywood|20\d{2})\b/i.test(title)) return false;
+  const titleWithoutTheMovie = title.replace(/\(\s*the\s+movie\s*\)/gi, '').trim();
+  if (/\b(latest|movie|movies|film|films|telenovela|nollywood|20\d{2})\b/i.test(titleWithoutTheMovie)) return false;
   if (words >= 4 && SUBJECT.test(title) && PLOT_VERB.test(title)) return false;
   if (words >= 6 && SENSATIONAL_VOCAB.test(title) && SUBJECT.test(title)) return false;
   if (words >= 5 && /^the most\b/i.test(title)) return false;

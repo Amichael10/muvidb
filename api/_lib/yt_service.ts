@@ -301,6 +301,7 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
   base = base.replace(/^(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA)\s+(?:LATEST|NEW|HOT|TRENDING|TOP|BEST|AWARD WINNING|EPIC|DRAMA|NIGERIAN|NOLLYWOOD|AFRICAN|YORUBA|IGBO)?\s*(?:MOVIE|FILM|MOVIES|FILMS|NOLLYWOOD|NIGERIAN|AFRICAN)?\s*(?:\d{4})?\s*[-–—:]\s*/i, '');
   base = base.replace(/\s*\[[^\]]+\]/g, '');
   base = base.replace(/\s*\{[^}]+\}/g, '');
+  const hasTheMovieTag = /\(\s*the\s+movie\s*\)/i.test(base);
   base = base.replace(/\s*\([^)]*\)/g, '');
   base = base.replace(/\s+[-–—]\s*(?:Latest|New|Nigerian|Nollywood|Yoruba|African|Watch|Ft\.|Starring|Featuring|Full\s+Nollywood\s+Movie|Full\s+Movie).*/i, '');
   base = base.replace(/\s+[-–—]\s+[A-Z][a-z]+\s+[A-Z][a-z]+.*$/i, ''); // star chains
@@ -331,7 +332,7 @@ export function parseTitleMetadata(raw: string): ParsedTitleMetadata {
   const contentType = isSeries ? 'series' : 'movie';
 
   // 6. Build the standardized final title
-  let finalTitle = base;
+  let finalTitle = hasTheMovieTag && !isSeries ? `${base} (The Movie)` : base;
 
   if (isSeries) {
     const seasonTag = (seasonNumber && seasonNumber > 1) ? `S${seasonNumber} ` : '';
