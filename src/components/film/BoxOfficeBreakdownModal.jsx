@@ -46,7 +46,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-brand uppercase tracking-wider mb-1">
               <Icon icon="solar:ticket-bold" className="text-sm" />
               <span>Theatrical Box Office Breakdown</span>
             </div>
@@ -68,7 +68,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
         <div className="grid grid-cols-2 gap-3">
           <div className="p-4 rounded-xl bg-surface-2 border border-border/60 space-y-1">
             <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Box Office</span>
-            <p className="text-2xl font-black text-amber-400 font-heading">
+            <p className="text-2xl font-black text-brand font-heading">
               {formatNaira(domestic)}
             </p>
             {domestic ? (
@@ -94,7 +94,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
             <div className="p-4 rounded-xl bg-surface-2 border border-border/60 space-y-1">
               <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Admissions (Tickets)</span>
               <p className="text-xl font-bold text-text-primary flex items-center gap-1.5">
-                <Icon icon="solar:users-group-two-rounded-bold" className="text-amber-400" />
+                <Icon icon="solar:users-group-two-rounded-bold" className="text-brand" />
                 <span>{Number(admissions).toLocaleString('en-NG')}</span>
               </p>
               {weekendAdmissions ? (
@@ -109,7 +109,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
             <div className="p-4 rounded-xl bg-surface-2 border border-border/60 space-y-1">
               <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Screen Reach</span>
               <p className="text-xl font-bold text-text-primary flex items-center gap-1.5">
-                <Icon icon="solar:clapperboard-play-bold" className="text-amber-400" />
+                <Icon icon="solar:clapperboard-play-bold" className="text-brand" />
                 <span>{locations} Locations</span>
               </p>
               <span className="text-[10px] text-text-muted block">Nationwide coverage</span>
@@ -119,9 +119,9 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
 
         {/* Reach Cinema Daily Live Intelligence */}
         {reachMetrics && reachMetrics.cumulative_reach_tickets > 0 && (
-          <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3">
+          <div className="p-4 rounded-xl bg-brand/5 border border-brand/20 space-y-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="font-bold text-brand uppercase tracking-wider flex items-center gap-1.5">
                 <Icon icon="solar:chart-square-bold" className="text-sm" />
                 <span>Live Reach POS Circuit Tracking</span>
               </span>
@@ -139,7 +139,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
               </div>
               <div className="p-2 rounded-lg bg-surface/80 border border-border/50">
                 <span className="text-[10px] text-text-muted block">Circuit Revenue</span>
-                <span className="text-base font-bold text-amber-400">
+                <span className="text-base font-bold text-brand">
                   {formatNaira(reachMetrics.cumulative_reach_revenue)}
                 </span>
               </div>
@@ -152,7 +152,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
             </div>
 
             {reachMetrics.daily_history && reachMetrics.daily_history.length > 0 && (
-              <div className="pt-2 border-t border-amber-500/10">
+              <div className="pt-2 border-t border-brand/10">
                 <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block mb-1.5">
                   Daily Admissions & Price Tracking
                 </span>
@@ -175,7 +175,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
                           </div>
                           <div className="flex items-center gap-2 text-[10px]">
                             {dh.avgTicketPrice ? (
-                              <span className="text-amber-400 font-mono">~₦{dh.avgTicketPrice.toLocaleString()}/tkt</span>
+                              <span className="text-brand font-mono">~₦{dh.avgTicketPrice.toLocaleString()}/tkt</span>
                             ) : null}
                             <span className="text-emerald-400">{dh.occupancyRate}% full</span>
                             {locationEntries.length > 0 && (
@@ -223,7 +223,7 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
                     <span className="text-[11px] text-text-muted">{week.date || ''}</span>
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-amber-400 block">{formatNaira(week.gross)}</span>
+                    <span className="font-bold text-brand block">{formatNaira(week.gross)}</span>
                     {week.admissions ? (
                       <span className="text-[10px] text-text-muted">{Number(week.admissions).toLocaleString()} admissions</span>
                     ) : null}
@@ -233,13 +233,13 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
 
               {/* Others / Remaining Reported Box Office Gross */}
               {remainingGross > 0 && (
-                <div className="p-3 flex items-center justify-between text-xs bg-amber-500/5 border-t border-dashed border-amber-500/20">
+                <div className="p-3 flex items-center justify-between text-xs bg-brand/5 border-t border-dashed border-brand/20">
                   <div>
                     <span className="font-bold text-text-primary block">Others</span>
                     <span className="text-[11px] text-text-muted">Remaining reported box office balance</span>
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-amber-400 block">{formatNaira(remainingGross)}</span>
+                    <span className="font-bold text-brand block">{formatNaira(remainingGross)}</span>
                     <span className="text-[10px] text-text-muted font-mono">₦{Number(remainingGross).toLocaleString('en-NG')}</span>
                   </div>
                 </div>

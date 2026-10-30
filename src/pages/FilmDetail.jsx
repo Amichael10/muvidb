@@ -30,6 +30,7 @@ import { formatFilmTitle, toSentenceCase, formatPersonName, toTitleCase } from '
 import { getFilmLanguages, getLanguageEndonym } from '../utils/languages';
 import { formatRole } from '../lib/creditRoles';
 import { formatViewCount } from '../utils/youtube';
+import { calculateYoutubeBoxOffice, calculateStreamingVelocity } from '../lib/youtubeBoxOffice';
 
 const RELATED_FILMS_LIMIT = 5;
 
@@ -671,6 +672,23 @@ export default function FilmDetail() {
   const isActualYoutubeMovie = film.release_type === 'youtube' || (Boolean(film.youtube_watch_url) && !isCinemaFilm);
   const showYoutubeViews = isActualYoutubeMovie && Boolean(film.view_count && Number(film.view_count) > 0);
 
+  const youtubeBoxOffice = showYoutubeViews
+    ? calculateYoutubeBoxOffice({
+        viewCount: Number(film.view_count),
+        runtimeMinutes: film.runtime_minutes || film.duration,
+        language: film.language,
+        title: film.title,
+      })
+    : null;
+
+  const streamingVelocity = showYoutubeViews
+    ? calculateStreamingVelocity({
+        viewCount: Number(film.view_count),
+        releaseDate: film.release_date,
+        year: film.year,
+      })
+    : null;
+
   const votesCount = film.imdb_vote_count || film.tmdb_vote_count || film.audience_rating_count || (likesCount + dislikesCount);
   const ratingValue = (film.imdb_rating || film.tmdb_rating || film.audience_rating)
     ? Number(film.imdb_rating || film.tmdb_rating || film.audience_rating).toFixed(1)
@@ -782,8 +800,8 @@ export default function FilmDetail() {
                 loading="eager"
               />
               {film.is_in_cinemas && (
-                <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/85 backdrop-blur-md border border-amber-400/40 text-[10px] font-black uppercase tracking-wider text-amber-300 shadow-xl">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/85 backdrop-blur-md border border-brand/40 text-[10px] font-black uppercase tracking-wider text-brand shadow-xl">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse"></span>
                   <span>In Cinemas</span>
                 </div>
               )}
@@ -813,7 +831,7 @@ export default function FilmDetail() {
                     quality={85}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-6">
-                    <span className="text-[11px] uppercase tracking-widest font-black text-amber-400 mb-1">Official Backdrop</span>
+                    <span className="text-[11px] uppercase tracking-widest font-black text-brand mb-1">Official Backdrop</span>
                     <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow">Trailer not published yet</h3>
                   </div>
                 </div>
@@ -904,7 +922,7 @@ export default function FilmDetail() {
                         <span>Commercial Reach</span>
                         <Link
                           to={`/films/${film.slug || film.id}/box-office`}
-                          className="text-amber-400 hover:underline font-bold"
+                          className="text-brand hover:underline font-bold"
                         >
                           Full Breakdown →
                         </Link>
@@ -913,14 +931,14 @@ export default function FilmDetail() {
                         {/* Box Office Tile */}
                         <Link 
                           to={`/films/${film.slug || film.id}/box-office`}
-                          className="p-2.5 rounded-lg bg-amber-500/[0.08] border border-amber-500/25 hover:border-amber-400/50 transition-all cursor-pointer group"
+                          className="p-2.5 rounded-lg bg-brand/[0.08] border border-brand/25 hover:border-brand/50 transition-all cursor-pointer group"
                         >
-                          <div className="flex items-center gap-1 text-[10px] font-black text-amber-400 uppercase mb-0.5">
+                          <div className="flex items-center gap-1 text-[10px] font-black text-brand uppercase mb-0.5">
                             <Icon icon="solar:ticket-bold" className="text-xs" />
                             <span>Box Office</span>
                           </div>
-                          <div className="text-base sm:text-lg font-black text-white font-heading leading-tight group-hover:text-amber-300">
-                            <span className="text-amber-400">{symbol}</span>{formattedGross}
+                          <div className="text-base sm:text-lg font-black text-white font-heading leading-tight group-hover:text-brand">
+                            <span className="text-brand">{symbol}</span>{formattedGross}
                           </div>
                           <div className="text-[9px] text-white/50 uppercase tracking-wider mt-0.5 font-bold">
                             Domestic
@@ -954,20 +972,20 @@ export default function FilmDetail() {
                     /* Case 2: Cinema Theatrical Release with Box Office */
                     <Link
                       to={`/films/${film.slug || film.id}/box-office`}
-                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-amber-500/30 backdrop-blur-xl shadow-2xl hover:border-amber-400/60 w-full lg:w-64 xl:w-72 text-left transition-all cursor-pointer group"
+                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-brand/30 backdrop-blur-xl shadow-2xl hover:border-brand/60 w-full lg:w-64 xl:w-72 text-left transition-all cursor-pointer group"
                     >
-                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1.5">
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-brand uppercase tracking-widest mb-1.5">
                         <div className="flex items-center gap-1.5">
-                          <Icon icon="solar:ticket-bold" className="text-amber-400 text-sm" />
+                          <Icon icon="solar:ticket-bold" className="text-brand text-sm" />
                           <span>Box Office</span>
                         </div>
-                        <span className="text-[10px] text-white/50 group-hover:text-amber-300 transition-colors">
+                        <span className="text-[10px] text-white/50 group-hover:text-brand transition-colors">
                           Full Page →
                         </span>
                       </div>
                       <div className="my-auto py-1">
-                        <p className="text-xl sm:text-2xl font-black text-white font-heading tracking-tight leading-none group-hover:text-amber-300 transition-colors">
-                          <span className="text-amber-400">{symbol}</span>{formattedGross}
+                        <p className="text-xl sm:text-2xl font-black text-white font-heading tracking-tight leading-none group-hover:text-brand transition-colors">
+                          <span className="text-brand">{symbol}</span>{formattedGross}
                         </p>
                         <div className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider mt-1.5">
                           Domestic Gross
@@ -978,43 +996,65 @@ export default function FilmDetail() {
                       </div>
                     </Link>
                   ) : showYoutubeViews ? (
-                    /* Case 3: YouTube Full Movie Release with Stream Views */
-                    <a
-                      href={fullYoutubeUrl || `https://www.youtube.com/results?search_query=${encodeURIComponent(film.title)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-red-500/30 backdrop-blur-xl shadow-2xl hover:border-red-400/60 w-full lg:w-64 xl:w-72 text-left transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1.5">
+                    /* Case 3: YouTube Full Movie Release with ViewStats-style Analytics Card */
+                    <div className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-brand/30 backdrop-blur-xl shadow-2xl hover:border-brand/60 w-full lg:w-72 xl:w-80 text-left transition-all group">
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-brand uppercase tracking-widest mb-1.5">
                         <div className="flex items-center gap-1.5">
                           <Icon icon="simple-icons:youtube" className="text-red-500 text-sm" />
-                          <span>YouTube Stream</span>
+                          <span>YouTube Box Office</span>
                         </div>
-                        <span className="text-[10px] text-white/50 group-hover:text-red-400 transition-colors">
-                          Watch →
+                        {fullYoutubeUrl ? (
+                          <a
+                            href={fullYoutubeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[10px] text-white/60 hover:text-brand transition-colors"
+                          >
+                            <span>Watch</span>
+                            <Icon icon="solar:arrow-right-up-linear" className="text-xs" />
+                          </a>
+                        ) : (
+                          <Link
+                            to="/box-office?section=youtube"
+                            className="text-[10px] text-white/60 hover:text-brand transition-colors"
+                          >
+                            Tracker →
+                          </Link>
+                        )}
+                      </div>
+                      <div className="my-auto py-1 space-y-1">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <p className="text-xl sm:text-2xl font-black text-brand font-heading tracking-tight leading-none">
+                            {youtubeBoxOffice?.formattedNgn}
+                          </p>
+                        </div>
+                        <div className="text-[11px] text-white/70 font-semibold flex items-center gap-2">
+                          <span>{youtubeBoxOffice?.formattedUsd}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-2 text-text-muted border border-border">
+                            Est. AdSense Box Office
+                          </span>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px]">
+                        <span className="font-mono text-white/90 font-bold">
+                          {formatViewCount(film.view_count)} views
                         </span>
+                        {streamingVelocity && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                            <Icon icon={streamingVelocity.badge.icon} className="text-xs" />
+                            <span>{streamingVelocity.formattedViewsPerDay}</span>
+                          </span>
+                        )}
                       </div>
-                      <div className="my-auto py-1">
-                        <p className="text-xl sm:text-2xl font-black text-white font-heading tracking-tight leading-none flex items-baseline gap-1.5 group-hover:text-red-400 transition-colors">
-                          <span className="text-red-500">{formatViewCount(film.view_count)}</span>
-                          <span className="text-xs text-white/60 font-bold">views</span>
-                        </p>
-                        <div className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider mt-1.5">
-                          Official Full Movie Stream
-                        </div>
-                      </div>
-                      <div className="text-[10px] text-red-400/80 font-mono font-medium">
-                        {Number(film.view_count).toLocaleString()} total streams
-                      </div>
-                    </a>
+                    </div>
                   ) : (
                     /* Case 4: Admin Shortcut to add Gross */
                     <div
                       onClick={() => setShowBoxOfficeModal(true)}
-                      className="h-full flex flex-col justify-center p-4 rounded-xl sm:rounded-2xl bg-black/40 border border-white/10 hover:border-amber-400/40 w-full lg:w-64 text-left transition-all cursor-pointer group"
+                      className="h-full flex flex-col justify-center p-4 rounded-xl sm:rounded-2xl bg-black/40 border border-white/10 hover:border-brand/40 w-full lg:w-64 text-left transition-all cursor-pointer group"
                     >
                       <span className="text-[10px] font-black uppercase tracking-wider text-white/50">Box Office (Admin)</span>
-                      <span className="text-xs font-bold text-amber-400 mt-1">+ Record Domestic Gross</span>
+                      <span className="text-xs font-bold text-brand mt-1">+ Record Domestic Gross</span>
                     </div>
                   )}
                 </div>
@@ -1261,14 +1301,14 @@ export default function FilmDetail() {
 
                   {/* Theatrical Cinema Release Bar if currently in cinemas */}
                   {film.is_in_cinemas && (
-                    <div className="h-10 sm:h-11 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between px-3.5 text-amber-300">
+                    <div className="h-10 sm:h-11 rounded-xl bg-brand/10 border border-brand/30 flex items-center justify-between px-3.5 text-brand">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
                         <span className="text-xs font-bold uppercase tracking-wider">In Cinemas Now</span>
                       </div>
                       <Link
                         to="/cinemas"
-                        className="text-[11px] font-bold text-amber-300 hover:text-white transition-colors flex items-center gap-1"
+                        className="text-[11px] font-bold text-brand hover:text-white transition-colors flex items-center gap-1"
                       >
                         <span>Showtimes</span>
                         <Icon icon="solar:alt-arrow-right-linear" />
@@ -1285,13 +1325,13 @@ export default function FilmDetail() {
                 disabled={watchlistLoading}
                 className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-[13px] font-bold tracking-wide transition-all duration-200 cursor-pointer active:scale-98 disabled:opacity-50 ${
                   inWatchlist
-                    ? 'bg-amber-400/20 border border-amber-400/50 text-amber-300 shadow-sm'
+                    ? 'bg-brand/20 border border-brand/50 text-brand shadow-sm'
                     : 'bg-[#222530] hover:bg-[#2b303d] border border-white/15 text-white shadow-sm'
                 }`}
               >
                 <Icon
                   icon={inWatchlist ? 'solar:bookmark-check-bold' : 'solar:bookmark-linear'}
-                  className={`text-base sm:text-lg ${inWatchlist ? 'text-amber-400' : 'text-white/80'}`}
+                  className={`text-base sm:text-lg ${inWatchlist ? 'text-brand' : 'text-white/80'}`}
                 />
                 <span>{inWatchlist ? 'In Watchlist' : '+ Add to Watchlist'}</span>
               </button>

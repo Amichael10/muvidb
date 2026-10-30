@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react';
 import { formatPersonName, toSentenceCase, formatLanguage } from '../../utils/format';
 import { formatViewCount } from '../../utils/youtube';
 import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../../lib/platforms';
+import { calculateYoutubeBoxOffice } from '../../lib/youtubeBoxOffice';
 
 /**
  * Rotten Tomatoes-inspired "Movie Info / Film Specs" Section.
@@ -57,6 +58,14 @@ export default function FilmSpecsTable({
   const isCinema = (Number(domGross) || 0) > 0 || film.release_type === 'cinema' || Boolean(film.is_in_cinemas);
   const isYoutubeMovie = film.release_type === 'youtube' || (Boolean(film.youtube_watch_url) && !isCinema);
   const showYoutubeStream = isYoutubeMovie && Boolean(film.view_count && Number(film.view_count) > 0);
+  const youtubeBoxOffice = showYoutubeStream
+    ? calculateYoutubeBoxOffice({
+        viewCount: Number(film.view_count),
+        runtimeMinutes: film.runtime_minutes || film.duration,
+        language: film.language,
+        title: film.title,
+      })
+    : null;
 
   // Format Runtime
   const runtimeMins = film.runtime_minutes || film.runtime;
@@ -180,8 +189,8 @@ export default function FilmSpecsTable({
       value: (activePlatforms.length > 0 || film.is_in_cinemas) ? (
         <div className="flex flex-wrap items-center gap-1.5">
           {film.is_in_cinemas && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-brand/15 border border-brand/30 text-brand text-xs font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
               In Cinemas
             </span>
           )}
@@ -214,15 +223,15 @@ export default function FilmSpecsTable({
     {
       label: 'Box Office (Domestic Gross)',
       value: formattedBoxOffice ? (
-        <span className="inline-flex items-center gap-2 flex-wrap font-bold text-amber-400">
+        <span className="inline-flex items-center gap-2 flex-wrap font-bold text-brand">
           <button
             type="button"
             onClick={onOpenBoxOfficeBreakdown}
-            className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors cursor-pointer group"
+            className="inline-flex items-center gap-1.5 hover:text-brand-hover transition-colors cursor-pointer group"
             title="Click to view full box office breakdown"
           >
             <Icon icon="solar:ticket-bold" className="text-sm" />
-            <span className="underline decoration-dotted decoration-amber-500/50 underline-offset-4 group-hover:decoration-amber-300">
+            <span className="underline decoration-dotted decoration-brand/50 underline-offset-4 group-hover:decoration-brand-hover">
               {formattedBoxOffice}
             </span>
             <Icon icon="solar:arrow-right-up-linear" className="text-xs opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
@@ -238,7 +247,7 @@ export default function FilmSpecsTable({
             <button
               type="button"
               onClick={onEditBoxOffice}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-brand/10 hover:bg-brand/20 text-brand border border-brand/30 transition-colors cursor-pointer"
               title="Edit Box Office Figures"
             >
               <Icon icon="solar:pen-bold" className="text-xs" />
@@ -252,7 +261,7 @@ export default function FilmSpecsTable({
           <button
             type="button"
             onClick={onEditBoxOffice}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-brand/10 hover:bg-brand/20 text-brand border border-brand/30 transition-colors cursor-pointer"
           >
             <Icon icon="solar:add-circle-bold" className="text-xs" />
             <span>Add Box Office</span>
@@ -261,13 +270,30 @@ export default function FilmSpecsTable({
       ) : null,
     },
     {
-      label: 'YouTube Streams',
+      label: 'YouTube Box Office',
       value: showYoutubeStream ? (
-        <span className="inline-flex items-center gap-1.5 font-bold text-red-500">
-          <Icon icon="simple-icons:youtube" className="text-sm" />
-          <span>{Number(film.view_count).toLocaleString()} views</span>
-          <span className="text-text-muted text-xs font-normal">({formatViewCount(film.view_count)})</span>
-        </span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              to="/box-office?section=youtube"
+              className="inline-flex items-center gap-1.5 font-bold text-brand hover:text-brand-hover transition-colors"
+              title="View YouTube Box Office Tracker"
+            >
+              <Icon icon="simple-icons:youtube" className="text-red-500 text-sm" />
+              <span>{youtubeBoxOffice?.formattedNgn}</span>
+              <span className="text-xs text-text-muted font-normal">({youtubeBoxOffice?.formattedUsd})</span>
+              <Icon icon="solar:arrow-right-up-linear" className="text-xs text-text-muted" />
+            </Link>
+            <span className="text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
+              Est. AdSense Box Office
+            </span>
+          </div>
+          <div className="text-xs text-text-muted flex items-center gap-2 font-mono">
+            <span>{Number(film.view_count).toLocaleString()} total streams</span>
+            <span>•</span>
+            <span className="text-text-secondary">{youtubeBoxOffice?.effectiveRpmUsd}/1K RPM</span>
+          </div>
+        </div>
       ) : null,
     },
     {
@@ -327,7 +353,7 @@ export default function FilmSpecsTable({
             <button
               type="button"
               onClick={onEditBoxOffice}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500 hover:text-bg border border-amber-500/30 text-amber-400 text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/10 hover:bg-brand hover:text-white border border-brand/30 text-brand text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
               title="Set or update Box Office revenue"
             >
               <Icon icon="solar:ticket-bold" className="text-sm" />

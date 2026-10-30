@@ -174,6 +174,11 @@ export default function BoxOffice() {
                 backdrop_url,
                 genres,
                 view_count,
+                runtime_minutes,
+                duration,
+                language,
+                release_date,
+                liked_percent,
                 source_video_id,
                 youtube_watch_url,
                 credits (
@@ -224,9 +229,25 @@ export default function BoxOffice() {
 
   const topPlay = plays[0] || null;
 
-  // Compute key stats for YouTube
+  // Compute key stats for YouTube (ViewStats-inspired)
   const totalYoutubeViews = useMemo(() => {
     return youtubeFilms.reduce((acc, y) => acc + (Number(y.view_count) || 0), 0);
+  }, [youtubeFilms]);
+
+  const totalYoutubeEstimatedGross = useMemo(() => {
+    let sumNgn = 0;
+    let sumUsd = 0;
+    youtubeFilms.forEach((film) => {
+      const est = calculateYoutubeBoxOffice({
+        viewCount: Number(film.view_count || 0),
+        runtimeMinutes: film.runtime_minutes || film.duration,
+        language: film.language,
+        title: film.title,
+      });
+      sumNgn += (est.lowNgn + est.highNgn) / 2;
+      sumUsd += (est.lowUsd + est.highUsd) / 2;
+    });
+    return { sumNgn, sumUsd };
   }, [youtubeFilms]);
 
   const tenMillionClub = useMemo(() => {
@@ -343,10 +364,10 @@ export default function BoxOffice() {
             <div className="space-y-2 max-w-2xl">
               <div className="flex items-center gap-2">
                 <span className={`w-3 h-0.5 inline-block rounded-full ${
-                  activeSection === 'plays' ? 'bg-purple-400' : activeSection === 'youtube' ? 'bg-red-500' : 'bg-amber-400'
+                  activeSection === 'plays' ? 'bg-purple-400' : activeSection === 'youtube' ? 'bg-red-500' : 'bg-brand'
                 }`}></span>
                 <span className={`text-[11px] font-black uppercase tracking-[0.2em] ${
-                  activeSection === 'plays' ? 'text-purple-400' : activeSection === 'youtube' ? 'text-red-500' : 'text-amber-400'
+                  activeSection === 'plays' ? 'text-purple-400' : activeSection === 'youtube' ? 'text-red-500' : 'text-brand'
                 }`}>
                   {activeSection === 'plays'
                     ? 'Stage Play & Theatre Tracker'
@@ -377,14 +398,14 @@ export default function BoxOffice() {
                 <>
                   <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[140px]">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Total Theatrical Gross</span>
-                    <span className="text-lg sm:text-xl font-black text-amber-400 font-heading">
+                    <span className="text-lg sm:text-xl font-black text-brand font-heading">
                       {formatNaira(totalCinemaGross)}
                     </span>
                   </div>
                   <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[120px]">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">₦1B Club Titles</span>
                     <span className="text-lg sm:text-xl font-black text-text-primary font-heading flex items-center gap-1.5">
-                      <Icon icon="solar:crown-bold" className="text-amber-400" />
+                      <Icon icon="solar:crown-bold" className="text-brand" />
                       {billionClubFilms.length}
                     </span>
                   </div>
@@ -472,7 +493,7 @@ export default function BoxOffice() {
               onClick={() => handleSectionChange('cinema')}
               className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeSection === 'cinema'
-                  ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20'
+                  ? 'bg-brand text-white shadow-md shadow-brand/20'
                   : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-2'
               }`}
             >
@@ -548,11 +569,11 @@ export default function BoxOffice() {
                   onClick={() => setCinemaTab(tab.id)}
                   className={`shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     cinemaTab === tab.id
-                      ? 'bg-amber-400 text-black shadow-xs font-bold'
+                      ? 'bg-brand text-white shadow-xs font-bold'
                       : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-2'
                   }`}
                 >
-                  {tab.icon && <Icon icon={tab.icon} className="text-amber-500 text-sm" />}
+                  {tab.icon && <Icon icon={tab.icon} className={cinemaTab === tab.id ? 'text-white text-sm' : 'text-brand text-sm'} />}
                   <span>{tab.label}</span>
                 </button>
               ))
@@ -600,7 +621,7 @@ export default function BoxOffice() {
                       : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-2'
                   }`}
                 >
-                  {tab.icon && <Icon icon={tab.icon} className="text-amber-300 text-sm" />}
+                  {tab.icon && <Icon icon={tab.icon} className="text-brand text-sm" />}
                   <span>{tab.label}</span>
                 </button>
               ))
@@ -712,7 +733,7 @@ export default function BoxOffice() {
                           {/* Rank */}
                           <td className="py-3.5 pl-4 sm:pl-6 pr-2 text-center">
                             {rank === 1 ? (
-                              <span className="w-6 h-6 rounded-full bg-amber-400 text-black font-black text-xs inline-flex items-center justify-center shadow-xs">
+                              <span className="w-6 h-6 rounded-full bg-brand text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
                                 1
                               </span>
                             ) : rank === 2 ? (
@@ -720,7 +741,7 @@ export default function BoxOffice() {
                                 2
                               </span>
                             ) : rank === 3 ? (
-                              <span className="w-6 h-6 rounded-full bg-amber-700 text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
+                              <span className="w-6 h-6 rounded-full bg-[#9A3412] text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
                                 3
                               </span>
                             ) : (
@@ -747,14 +768,14 @@ export default function BoxOffice() {
                               <div className="min-w-0">
                                 <Link
                                   to={`/films/${film.slug || film.id}`}
-                                  className="font-heading font-bold text-sm text-text-primary hover:text-amber-400 transition-colors block truncate"
+                                  className="font-heading font-bold text-sm text-text-primary hover:text-brand transition-colors block truncate"
                                 >
                                   {film.title}
                                 </Link>
                                 <div className="flex items-center gap-2 mt-0.5 text-[11px] text-text-muted">
                                   <span className="sm:hidden">{film.year}</span>
                                   {isBillion && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand bg-brand/10 px-1.5 py-0.2 rounded border border-brand/20">
                                       <Icon icon="solar:crown-bold" className="text-xs" />
                                       <span>₦1B+ Club</span>
                                     </span>
@@ -791,7 +812,7 @@ export default function BoxOffice() {
                               className="inline-flex flex-col items-end cursor-pointer group/btn"
                               title="Click to view full box office run breakdown"
                             >
-                              <span className="font-heading font-black text-sm text-amber-400 group-hover/btn:underline decoration-amber-400/50 underline-offset-2 flex items-center gap-1">
+                              <span className="font-heading font-black text-sm text-brand group-hover/btn:underline decoration-brand/50 underline-offset-2 flex items-center gap-1">
                                 <span>{formatNaira(dom)}</span>
                                 <Icon icon="solar:arrow-right-up-linear" className="text-xs opacity-60 group-hover/btn:opacity-100 group-hover/btn:translate-x-0.5 transition-all" />
                               </span>
@@ -864,7 +885,7 @@ export default function BoxOffice() {
                                 2
                               </span>
                             ) : rank === 3 ? (
-                              <span className="w-6 h-6 rounded-full bg-amber-700 text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
+                              <span className="w-6 h-6 rounded-full bg-[#9A3412] text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
                                 3
                               </span>
                             ) : (
@@ -1018,7 +1039,7 @@ export default function BoxOffice() {
                                 2
                               </span>
                             ) : rank === 3 ? (
-                              <span className="w-6 h-6 rounded-full bg-amber-700 text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
+                              <span className="w-6 h-6 rounded-full bg-[#9A3412] text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
                                 3
                               </span>
                             ) : (
