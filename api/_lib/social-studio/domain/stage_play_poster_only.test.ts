@@ -39,6 +39,8 @@ describe('stage play poster-alone policy', () => {
       performanceTime: '6:00 PM',
       playwright: 'Wole Soyinka',
       director: 'Bolanle Austen-Peters',
+      producer: null,
+      ticketUrl: null,
       status: 'upcoming',
       year: 2026,
     })).toBe('poster-only');

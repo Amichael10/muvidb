@@ -5,11 +5,14 @@ vi.mock('../supabase.js', () => {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(),
+    lt: vi.fn().mockReturnThis(),
+    lte: vi.fn().mockReturnThis(),
     not: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
+    then: (resolve: any) => resolve({ data: [], error: null }),
   };
   return {
     supabase: {
@@ -59,23 +62,30 @@ describe('autoScheduleDueCalendarSlots candidate fallback', () => {
     const fromMock = vi.mocked(supabase.from);
     fromMock.mockImplementation((table: string) => {
       if (table === 'social_calendar') {
-        return {
+        const query: any = {
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
           in: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
+          lt: vi.fn().mockReturnThis(),
+          lte: vi.fn().mockReturnThis(),
           not: vi.fn().mockReturnThis(),
           order: vi.fn().mockResolvedValue({ data: [mockSlot], error: null }),
           update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
-        } as any;
+          then: (resolve: any) => resolve({ data: [], error: null }),
+        };
+        return query;
       }
       return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         not: vi.fn().mockReturnThis(),
         gte: vi.fn().mockReturnThis(),
+        lt: vi.fn().mockReturnThis(),
+        lte: vi.fn().mockReturnThis(),
         order: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        then: (resolve: any) => resolve({ data: [], error: null }),
       } as any;
     });
 

@@ -334,6 +334,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               performanceTime: parsedCandidate.data?.performance_time || null,
               playwright: parsedCandidate.data?.playwright || null,
               director: parsedCandidate.data?.director || null,
+              producer: parsedCandidate.data?.producer || null,
+              ticketUrl: parsedCandidate.data?.ticket_url || parsedCandidate.data?.ticketUrl || parsedCandidate.data?.source_url || null,
               status: parsedCandidate.data?.status || parsedCandidate.data?.derivedStatus || null,
               year: parsedCandidate.data?.year || null,
             }
