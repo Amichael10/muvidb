@@ -88,3 +88,19 @@ export function formatLanguage(code) {
   const trimmed = String(code).trim().toLowerCase();
   return LANGUAGE_MAP[trimmed] || toTitleCase(code);
 }
+
+
+export function formatViews(count) {
+  if (!count || isNaN(count)) return '—';
+  const num = Number(count);
+  if (num >= 1000000000) {
+    return (num / 1000000000).toFixed(2) + 'B Views';
+  }
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M Views';
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K Views';
+  }
+  return num.toLocaleString('en-US') + ' Views';
+}

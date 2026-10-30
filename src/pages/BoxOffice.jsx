@@ -13,7 +13,7 @@ import {
   parseRuntimeMinutes,
   USD_TO_NGN,
 } from '../lib/youtubeBoxOffice';
-import { formatPersonName } from '../utils/format';
+import { formatPersonName, formatViews } from '../utils/format';
 
 function formatNaira(amount) {
   if (!amount || isNaN(amount)) return '—';
@@ -27,21 +27,6 @@ function formatNaira(amount) {
   return `₦${num.toLocaleString('en-NG')}`;
 }
 
-function formatViews(count) {
-  if (!count || isNaN(count)) return '—';
-  const num = Number(count);
-  if (num >= 1_000_000_000) {
-    return `${(num / 1_000_000_000).toFixed(2)}B Views`;
-  }
-  if (num >= 1_000_000) {
-    return `${(num / 1_000_000).toFixed(1)}M Views`;
-  }
-  if (num >= 1_000) {
-    return `${(num / 1_000).toFixed(1)}K Views`;
-  }
-  return `${num.toLocaleString('en-US')} Views`;
-}
-
 export default function BoxOffice() {
   const loaderData = useLoaderData();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -51,6 +36,16 @@ export default function BoxOffice() {
   const [activeSection, setActiveSection] = useState(
     ['cinema', 'plays', 'youtube'].includes(initialSection) ? initialSection : 'cinema'
   );
+
+  // Keep activeSection in sync when URL searchParams change
+  useEffect(() => {
+    const sec = searchParams.get('section');
+    if (sec && ['cinema', 'plays', 'youtube'].includes(sec)) {
+      setActiveSection(sec);
+    } else if (!sec) {
+      setActiveSection('cinema');
+    }
+  }, [searchParams]);
 
   const seeded = !!loaderData?.seeded && (loaderData.films?.length ?? 0) > 0;
 
@@ -77,6 +72,9 @@ export default function BoxOffice() {
   const handleSectionChange = (section) => {
     setActiveSection(section);
     setSearchQuery('');
+    if (section === 'cinema') setCinemaTab('all');
+    if (section === 'plays') setPlaysTab('all');
+    if (section === 'youtube') setYoutubeTab('all');
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -268,16 +266,17 @@ export default function BoxOffice() {
   // Filtered Cinema Films
   const filteredFilms = useMemo(() => {
     return films.filter((film) => {
+      const filmYear = Number(film.year) || (film.release_date ? new Date(film.release_date).getFullYear() : null);
       if (cinemaTab === 'billion') {
         if (Number(film.box_office_domestic) < 1_000_000_000) return false;
       } else if (cinemaTab === '2026') {
-        if (film.year !== 2026 && film.year !== '2026') return false;
+        if (filmYear !== 2026) return false;
       } else if (cinemaTab === '2025') {
-        if (film.year !== 2025 && film.year !== '2025') return false;
+        if (filmYear !== 2025) return false;
       } else if (cinemaTab === '2024') {
-        if (film.year !== 2024 && film.year !== '2024') return false;
+        if (filmYear !== 2024) return false;
       } else if (cinemaTab === '2023') {
-        if (film.year !== 2023 && film.year !== '2023') return false;
+        if (filmYear !== 2023) return false;
       }
 
       if (searchQuery.trim()) {
@@ -296,12 +295,13 @@ export default function BoxOffice() {
   const filteredPlays = useMemo(() => {
     return plays.filter((play) => {
       const gross = Number(play.box_office_domestic || 0);
+      const playYear = Number(play.year) || (play.run_start_date ? new Date(play.run_start_date).getFullYear() : null);
       if (playsTab === 'top-tier') {
         if (gross < 5_000_000) return false;
       } else if (playsTab === '2026') {
-        if (play.year !== 2026 && play.year !== '2026') return false;
+        if (playYear !== 2026) return false;
       } else if (playsTab === '2025') {
-        if (play.year !== 2025 && play.year !== '2025') return false;
+        if (playYear !== 2025) return false;
       }
 
       if (searchQuery.trim()) {
@@ -321,16 +321,17 @@ export default function BoxOffice() {
   const filteredYoutube = useMemo(() => {
     return youtubeFilms.filter((film) => {
       const views = Number(film.view_count || 0);
+      const ytYear = Number(film.year) || (film.release_date ? new Date(film.release_date).getFullYear() : null);
       if (youtubeTab === '10m') {
         if (views < 10_000_000) return false;
       } else if (youtubeTab === '5m') {
         if (views < 5_000_000) return false;
       } else if (youtubeTab === '2026') {
-        if (film.year !== 2026 && film.year !== '2026') return false;
+        if (ytYear !== 2026) return false;
       } else if (youtubeTab === '2025') {
-        if (film.year !== 2025 && film.year !== '2025') return false;
+        if (ytYear !== 2025) return false;
       } else if (youtubeTab === '2024') {
-        if (film.year !== 2024 && film.year !== '2024') return false;
+        if (ytYear !== 2024) return false;
       }
 
       if (searchQuery.trim()) {
