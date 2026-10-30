@@ -275,9 +275,9 @@ export default function FilmSpecsTable({
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Link
-              to="/box-office?section=youtube"
+              to={`/films/${film.slug || film.id}/box-office`}
               className="inline-flex items-center gap-1.5 font-bold text-brand hover:text-brand-hover transition-colors"
-              title="View YouTube Box Office Tracker"
+              title="View Film YouTube Box Office Breakdown"
             >
               <Icon icon="simple-icons:youtube" className="text-red-500 text-sm" />
               <span>{youtubeBoxOffice?.formattedNgn}</span>

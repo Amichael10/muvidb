@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, Link, useLoaderData } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLoaderData } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
@@ -20,9 +20,18 @@ function formatNaira(amount) {
 
 export default function PlayBoxOffice() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const loaderData = useLoaderData();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'admin_limited';
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/box-office?section=plays');
+    }
+  };
 
   const [play, setPlay] = useState(loaderData?.play ?? null);
   const [loading, setLoading] = useState(!loaderData?.play);
@@ -165,20 +174,21 @@ export default function PlayBoxOffice() {
       {/* Breadcrumb / Back Bar */}
       <section className="border-b border-border bg-surface-2/40 py-3.5">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 flex items-center justify-between gap-4">
-          <Link
-            to={`/plays/${play.slug || play.id}`}
-            className="inline-flex items-center gap-2 text-xs font-bold text-text-muted hover:text-brand transition-colors group"
+          <button
+            type="button"
+            onClick={handleBack}
+            className="inline-flex items-center gap-2 text-xs font-bold text-text-muted hover:text-brand transition-colors group cursor-pointer"
           >
             <Icon icon="solar:arrow-left-linear" className="text-sm group-hover:-translate-x-0.5 transition-transform" />
-            <span>Back to <strong className="text-text-primary group-hover:text-brand">{play.title}</strong></span>
-          </Link>
+            <span>Back</span>
+          </button>
 
           <Link
-            to="/plays"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
+            to="/box-office?section=plays"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-400 hover:underline"
           >
             <Icon icon="solar:masks-bold" className="text-sm" />
-            <span>All Stage Plays</span>
+            <span>Stage Play Tracker</span>
           </Link>
         </div>
       </section>
@@ -201,7 +211,7 @@ export default function PlayBoxOffice() {
 
             <div className="space-y-3 min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-black uppercase tracking-wider">
+                <span className="px-2.5 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-400 text-[10px] font-black uppercase tracking-wider">
                   Live Stage Box Office
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full bg-brand/15 border border-brand/30 text-brand text-[10px] font-black uppercase tracking-wider">
@@ -254,14 +264,14 @@ export default function PlayBoxOffice() {
         {/* KEY STAGE PLAY METRICS CARDS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Gross Box Office */}
-          <div className="p-5 rounded-2xl bg-amber-500/[0.07] border border-amber-500/25 shadow-sm space-y-2 col-span-2 sm:col-span-1">
+          <div className="p-5 rounded-2xl bg-brand/[0.07] border border-brand/25 shadow-sm space-y-2 col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+              <span className="text-[10px] font-black uppercase tracking-wider text-brand">
                 Gross Box Office
               </span>
-              <Icon icon="solar:ticket-sale-bold" className="text-amber-400 text-base" />
+              <Icon icon="solar:ticket-sale-bold" className="text-brand text-base" />
             </div>
-            <div className="text-2xl sm:text-3xl font-black font-heading text-amber-400 tracking-tight">
+            <div className="text-2xl sm:text-3xl font-black font-heading text-brand tracking-tight">
               ₦{domesticGross.toLocaleString('en-NG')}
             </div>
             <div className="text-[11px] text-text-muted font-mono">
@@ -361,7 +371,7 @@ export default function PlayBoxOffice() {
                             <span className="w-2 h-2 rounded-full bg-brand" />
                             <span className="capitalize">{tier.name || `Tier ${idx + 1}`}</span>
                           </td>
-                          <td className="py-3.5 px-3 text-right font-mono font-bold text-amber-400">
+                          <td className="py-3.5 px-3 text-right font-mono font-bold text-brand">
                             {tierPrice > 0 ? `₦${tierPrice.toLocaleString('en-NG')}` : 'Free / Complimentary'}
                           </td>
                           <td className="py-3.5 px-3 text-right text-text-secondary font-mono">
@@ -394,7 +404,7 @@ export default function PlayBoxOffice() {
                     <td className="py-4 px-3 text-right font-mono text-purple-400">
                       {totalSold > 0 ? `${totalSold.toLocaleString()} tickets` : '—'}
                     </td>
-                    <td className="py-4 pr-4 sm:pr-6 pl-3 text-right font-mono text-base text-amber-400">
+                    <td className="py-4 pr-4 sm:pr-6 pl-3 text-right font-mono text-base text-brand">
                       ₦{domesticGross.toLocaleString('en-NG')}
                     </td>
                   </tr>
@@ -448,7 +458,7 @@ export default function PlayBoxOffice() {
                           <td className="py-3.5 px-3 text-right text-text-secondary font-mono">
                             {occ !== '—' ? `${occ}%` : '—'}
                           </td>
-                          <td className="py-3.5 pr-4 sm:pr-6 pl-3 text-right font-mono font-bold text-amber-400">
+                          <td className="py-3.5 pr-4 sm:pr-6 pl-3 text-right font-mono font-bold text-brand">
                             ₦{Number(s.gross || 0).toLocaleString('en-NG')}
                           </td>
                         </tr>

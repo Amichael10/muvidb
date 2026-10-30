@@ -1190,9 +1190,8 @@ export default function BoxOffice() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedYoutubeFilmForModal(film)}
+                        <Link
+                          to={`/films/${film.slug || film.id}/box-office`}
                           className="p-2 rounded-lg bg-surface-2 border border-border text-left group hover:border-brand/40 transition-colors cursor-pointer"
                         >
                           <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Est. AdSense Gross</span>
@@ -1202,16 +1201,19 @@ export default function BoxOffice() {
                           <span className="text-[10px] text-text-muted font-mono block">
                             {est.formattedUsd}
                           </span>
-                        </button>
-                        <div className="p-2 rounded-lg bg-surface-2 border border-border text-left">
+                        </Link>
+                        <Link
+                          to={`/films/${film.slug || film.id}/box-office`}
+                          className="p-2 rounded-lg bg-surface-2 border border-border text-left group hover:border-brand/40 transition-colors"
+                        >
                           <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Lifetime Streams</span>
-                          <span className="text-xs font-black text-text-primary font-heading block truncate">
+                          <span className="text-xs font-black text-text-primary group-hover:text-brand font-heading block truncate">
                             {formatViews(views)}
                           </span>
                           <span className="text-[10px] text-text-muted font-mono block">
                             {views.toLocaleString('en-US')} streams
                           </span>
-                        </div>
+                        </Link>
                       </div>
 
                       <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40 text-xs">
@@ -1242,10 +1244,10 @@ export default function BoxOffice() {
                       <th className="py-3.5 px-3">Film / YouTube Release</th>
                       <th className="py-3.5 px-3 hidden sm:table-cell">Year</th>
                       <th className="py-3.5 px-3 hidden md:table-cell">Director / Cast</th>
-                      <th className="py-3.5 px-3 text-right">Est. AdSense Box Office</th>
-                      <th className="py-3.5 px-3 hidden lg:table-cell text-center">Velocity & Pacing</th>
+                      <th className="py-3.5 px-3 text-right whitespace-nowrap min-w-[190px]">Est. AdSense Box Office</th>
+                      <th className="py-3.5 px-3 hidden lg:table-cell text-center whitespace-nowrap">Velocity & Pacing</th>
                       <th className="py-3.5 px-3 hidden sm:table-cell text-center">Watch</th>
-                      <th className="py-3.5 pr-4 sm:pr-6 pl-3 text-right">Lifetime Streams</th>
+                      <th className="py-3.5 pr-4 sm:pr-6 pl-3 text-right whitespace-nowrap min-w-[140px]">Lifetime Streams</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
@@ -1349,21 +1351,20 @@ export default function BoxOffice() {
                           </td>
 
                           {/* Est. AdSense Box Office */}
-                          <td className="py-3.5 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedYoutubeFilmForModal(film)}
+                          <td className="py-3.5 px-3 text-right whitespace-nowrap min-w-[190px]">
+                            <Link
+                              to={`/films/${film.slug || film.id}/box-office`}
                               className="inline-flex flex-col items-end cursor-pointer group/est text-right"
-                              title="Click to view detailed ViewStats breakdown"
+                              title="Click to view full YouTube streaming & ViewStats breakdown"
                             >
-                              <span className="font-heading font-black text-sm text-brand group-hover/est:underline decoration-brand/50 underline-offset-2 flex items-center gap-1">
+                              <span className="font-heading font-black text-sm text-brand group-hover/est:underline decoration-brand/50 underline-offset-2 flex items-center gap-1 whitespace-nowrap">
                                 <span>{est.formattedNgn}</span>
                                 <Icon icon="solar:arrow-right-up-linear" className="text-xs opacity-60 group-hover/est:opacity-100 group-hover/est:translate-x-0.5 transition-all" />
                               </span>
-                              <span className="text-[10px] text-text-muted font-mono">
+                              <span className="text-[10px] text-text-muted font-mono whitespace-nowrap">
                                 {est.formattedUsd} • {est.effectiveRpmUsd} RPM
                               </span>
-                            </button>
+                            </Link>
                           </td>
 
                           {/* Velocity & Pacing - strictly on a straight line */}
@@ -1394,17 +1395,17 @@ export default function BoxOffice() {
                           </td>
 
                           {/* Views */}
-                          <td className="py-3.5 pr-4 sm:pr-6 pl-3 text-right">
+                          <td className="py-3.5 pr-4 sm:pr-6 pl-3 text-right whitespace-nowrap min-w-[140px]">
                             <Link
-                              to={`/films/${film.slug || film.id}`}
+                              to={`/films/${film.slug || film.id}/box-office`}
                               className="inline-flex flex-col items-end cursor-pointer group/btn"
-                              title="Click to view full movie details"
+                              title="Click to view full YouTube streaming & ViewStats breakdown"
                             >
-                              <span className="font-heading font-black text-sm text-text-primary group-hover/btn:text-brand transition-colors flex items-center gap-1">
+                              <span className="font-heading font-black text-sm text-text-primary group-hover/btn:text-brand transition-colors flex items-center gap-1 whitespace-nowrap">
                                 <Icon icon="solar:fire-bold" className="text-xs text-brand opacity-75" />
                                 <span>{formatViews(views)}</span>
                               </span>
-                              <span className="text-[10px] text-text-muted font-mono">
+                              <span className="text-[10px] text-text-muted font-mono whitespace-nowrap">
                                 {views.toLocaleString('en-US')} streams
                               </span>
                             </Link>

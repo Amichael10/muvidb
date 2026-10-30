@@ -10,6 +10,9 @@ export interface RevenueEstimate {
   highUsd: number;
   lowNgn: number;
   highNgn: number;
+  effectiveLowRpm: number;
+  effectiveHighRpm: number;
+  effectiveMidRpm: number;
   formattedUsd: string;
   formattedNgn: string;
   effectiveRpmUsd: string;
@@ -33,30 +36,23 @@ export const USD_TO_NGN = 1480;
 /**
  * Format large currency amounts concisely (e.g. ₦4.5M, $12.8K)
  */
-export function formatCompactCurrency(amount: number, currency: 'NGN' | 'USD'): string {
-  if (amount <= 0) return currency === 'NGN' ? '₦0' : '$0';
-
-  if (currency === 'NGN') {
-    if (amount >= 1_000_000_000) {
-      return `₦${(amount / 1_000_000_000).toFixed(1)}B`;
-    }
-    if (amount >= 1_000_000) {
-      return `₦${(amount / 1_000_000).toFixed(1)}M`;
-    }
-    if (amount >= 1_000) {
-      return `₦${(amount / 1_000).toFixed(0)}K`;
-    }
-    return `₦${Math.round(amount).toLocaleString()}`;
+export function formatCompactCurrency(amount: number, currency: 'NGN' | 'USD' = 'NGN'): string {
+  if (amount === undefined || amount === null || isNaN(amount) || amount <= 0) {
+    return currency === 'NGN' ? '₦0' : '$0';
   }
 
-  // USD
+  const prefix = currency === 'NGN' ? '₦' : '$';
+
+  if (amount >= 1_000_000_000) {
+    return `${prefix}${(amount / 1_000_000_000).toFixed(1)}B`;
+  }
   if (amount >= 1_000_000) {
-    return `$${(amount / 1_000_000).toFixed(1)}M`;
+    return `${prefix}${(amount / 1_000_000).toFixed(1)}M`;
   }
   if (amount >= 1_000) {
-    return `$${(amount / 1_000).toFixed(1)}K`;
+    return `${prefix}${(amount / 1_000).toFixed(1)}K`;
   }
-  return `$${Math.round(amount).toLocaleString()}`;
+  return `${prefix}${Math.round(amount).toLocaleString()}`;
 }
 
 /**
@@ -144,11 +140,16 @@ export function calculateYoutubeBoxOffice(options: {
   else if (views >= 3_000_000) tier = 'hit';
   else if (views >= 1_000_000) tier = 'moderate';
 
+  const effectiveMidRpm = (effectiveLowRpm + effectiveHighRpm) / 2;
+
   return {
     lowUsd: Math.round(lowUsd),
     highUsd: Math.round(highUsd),
     lowNgn: Math.round(lowNgn),
     highNgn: Math.round(highNgn),
+    effectiveLowRpm: Number(effectiveLowRpm.toFixed(2)),
+    effectiveHighRpm: Number(effectiveHighRpm.toFixed(2)),
+    effectiveMidRpm: Number(effectiveMidRpm.toFixed(2)),
     formattedUsd: `${formatCompactCurrency(lowUsd, 'USD')} – ${formatCompactCurrency(highUsd, 'USD')}`,
     formattedNgn: `${formatCompactCurrency(lowNgn, 'NGN')} – ${formatCompactCurrency(highNgn, 'NGN')}`,
     effectiveRpmUsd: `$${effectiveLowRpm.toFixed(2)} – $${effectiveHighRpm.toFixed(2)}`,

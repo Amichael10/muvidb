@@ -998,11 +998,11 @@ export default function FilmDetail() {
                       </div>
                     </Link>
                   ) : showYoutubeViews ? (
-                    /* Case 3: YouTube Full Movie Release with ViewStats-style Analytics Card */
-                    <div 
-                      onClick={() => setShowYouTubeBreakdownModal(true)}
+                    /* Case 3: YouTube Full Movie Release with Dedicated Streaming Box Office Page Link */
+                    <Link 
+                      to={`/films/${film.slug || film.id}/box-office`}
                       className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-brand/30 backdrop-blur-xl shadow-2xl hover:border-brand/60 hover:bg-black/80 w-full lg:w-72 xl:w-80 text-left transition-all cursor-pointer group"
-                      title="Click to view detailed ViewStats breakdown"
+                      title="Click to view full YouTube streaming & ViewStats breakdown page"
                     >
                       <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-brand uppercase tracking-widest mb-1.5">
                         <div className="flex items-center gap-1.5">
@@ -1010,7 +1010,7 @@ export default function FilmDetail() {
                           <span>YouTube Box Office</span>
                         </div>
                         <span className="inline-flex items-center gap-1 text-[10px] text-text-muted group-hover:text-brand transition-colors">
-                          <span>Breakdown</span>
+                          <span>View Breakdown</span>
                           <Icon icon="solar:arrow-right-up-linear" className="text-xs" />
                         </span>
                       </div>
@@ -1038,7 +1038,7 @@ export default function FilmDetail() {
                           </span>
                         )}
                       </div>
-                    </div>
+                    </Link>
                   ) : (
                     /* Case 4: Admin Shortcut to add Gross */
                     <div

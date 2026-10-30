@@ -395,9 +395,20 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
     const posterBuf = Buffer.from(await posterRes.arrayBuffer());
     const posterDataUri = `data:${posterMime};base64,${posterBuf.toString('base64')}`;
 
-    const logoPath = path.join(process.cwd(), 'public', 'brand', 'White Logo.png');
-    const logoBuf = await fs.readFile(logoPath);
-    const logoDataUri = `data:image/png;base64,${logoBuf.toString('base64')}`;
+    let logoDataUri = '';
+    const possibleLogoPaths = [
+      path.join(process.cwd(), 'public', 'brand', 'White Logo.png'),
+      path.join(process.cwd(), 'api', '_lib', 'decor', 'White Logo.png'),
+      path.join(__dirname, '..', '..', 'decor', 'White Logo.png'),
+      path.join(__dirname, '..', 'decor', 'White Logo.png'),
+    ];
+    for (const lp of possibleLogoPaths) {
+      try {
+        const logoBuf = await fs.readFile(lp);
+        logoDataUri = `data:image/png;base64,${logoBuf.toString('base64')}`;
+        break;
+      } catch {}
+    }
 
     const avail = String(snap.watchAvailability || '').trim();
     const channel = String(snap.youtubeChannelName || '').trim();

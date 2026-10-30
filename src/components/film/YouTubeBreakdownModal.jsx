@@ -141,6 +141,7 @@ export default function YouTubeBreakdownModal({ film, onClose }) {
     const rows = [];
     const avgDailyViews = velocity.viewsPerDay || Math.round(views / Math.max(1, velocity.daysActive));
     const now = new Date();
+    const rpmToUse = Number(est.effectiveMidRpm) || 2.25;
 
     // Fluctuations for recent 7 days (mimics real YouTube viewing patterns with higher weekend traffic)
     const varianceMultipliers = [0.94, 0.91, 1.08, 1.15, 1.04, 0.96, 0.92];
@@ -151,7 +152,7 @@ export default function YouTubeBreakdownModal({ film, onClose }) {
       const dayViews = Math.max(10, Math.round(avgDailyViews * mult));
       
       // Calculate AdSense for this single day
-      const dayRevUsd = (dayViews / 1000) * (est.effectiveRpmUsd || 1.85);
+      const dayRevUsd = (dayViews / 1000) * rpmToUse;
       const dayRevNgn = dayRevUsd * USD_TO_NGN;
 
       rows.push({
@@ -159,14 +160,14 @@ export default function YouTubeBreakdownModal({ film, onClose }) {
         views: dayViews,
         revenueUsd: dayRevUsd,
         revenueNgn: dayRevNgn,
-        formattedNgn: `₦${formatCompactCurrency(dayRevNgn)}`,
-        formattedUsd: `$${formatCompactCurrency(dayRevUsd)}`,
+        formattedNgn: formatCompactCurrency(dayRevNgn, 'NGN'),
+        formattedUsd: formatCompactCurrency(dayRevUsd, 'USD'),
       });
     }
 
     // Averages
     const dailyAvgViews = avgDailyViews;
-    const dailyAvgUsd = (dailyAvgViews / 1000) * (est.effectiveRpmUsd || 1.85);
+    const dailyAvgUsd = (dailyAvgViews / 1000) * rpmToUse;
     const dailyAvgNgn = dailyAvgUsd * USD_TO_NGN;
 
     const weeklyAvgViews = avgDailyViews * 7;
@@ -180,12 +181,12 @@ export default function YouTubeBreakdownModal({ film, onClose }) {
     return {
       rows,
       averages: {
-        daily: { views: dailyAvgViews, ngn: `₦${formatCompactCurrency(dailyAvgNgn)}`, usd: `$${formatCompactCurrency(dailyAvgUsd)}` },
-        weekly: { views: weeklyAvgViews, ngn: `₦${formatCompactCurrency(weeklyAvgNgn)}`, usd: `$${formatCompactCurrency(weeklyAvgUsd)}` },
-        monthly: { views: monthlyAvgViews, ngn: `₦${formatCompactCurrency(monthlyAvgNgn)}`, usd: `$${formatCompactCurrency(monthlyAvgUsd)}` },
+        daily: { views: dailyAvgViews, ngn: formatCompactCurrency(dailyAvgNgn, 'NGN'), usd: formatCompactCurrency(dailyAvgUsd, 'USD') },
+        weekly: { views: weeklyAvgViews, ngn: formatCompactCurrency(weeklyAvgNgn, 'NGN'), usd: formatCompactCurrency(weeklyAvgUsd, 'USD') },
+        monthly: { views: monthlyAvgViews, ngn: formatCompactCurrency(monthlyAvgNgn, 'NGN'), usd: formatCompactCurrency(monthlyAvgUsd, 'USD') },
       }
     };
-  }, [views, velocity.viewsPerDay, velocity.daysActive, est.effectiveRpmUsd]);
+  }, [views, velocity.viewsPerDay, velocity.daysActive, est.effectiveMidRpm]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in">

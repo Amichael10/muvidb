@@ -78,6 +78,8 @@ project.tar.gz
 !public/images/**/*.jpeg
 !public/images/**/*.webp
 !public/images/**/*.svg
+!public/brand/**
+!api/_lib/decor/**
 *.bak
 
 # Playwright storageState — holds live login cookies (NetflixId/SecureNetflixId
@@ -170,6 +172,8 @@ project.tar.gz
 !public/images/**/*.jpeg
 !public/images/**/*.webp
 !public/images/**/*.svg
+!public/brand/**
+!api/_lib/decor/**
 *.bak
 
 # Playwright storageState — holds live login cookies (NetflixId/SecureNetflixId
