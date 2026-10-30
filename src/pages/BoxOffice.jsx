@@ -403,16 +403,16 @@ export default function BoxOffice() {
             </div>
 
             {/* Quick Metrics Bar (Dynamic for each section) */}
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
               {activeSection === 'cinema' && (
                 <>
-                  <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[140px]">
+                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[140px] flex-1 sm:flex-initial">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Total Theatrical Gross</span>
                     <span className="text-lg sm:text-xl font-black text-brand font-heading">
                       {formatNaira(totalCinemaGross)}
                     </span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[120px]">
+                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[120px] flex-1 sm:flex-initial">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">₦1B Club Titles</span>
                     <span className="text-lg sm:text-xl font-black text-text-primary font-heading flex items-center gap-1.5">
                       <Icon icon="solar:crown-bold" className="text-brand" />
@@ -420,7 +420,7 @@ export default function BoxOffice() {
                     </span>
                   </div>
                   {topCinemaFilm && (
-                    <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[160px]">
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[160px] col-span-2 sm:col-span-1">
                       <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">#1 All-Time Cinema</span>
                       <Link 
                         to={`/films/${topCinemaFilm.slug || topCinemaFilm.id}/box-office`}
@@ -436,13 +436,13 @@ export default function BoxOffice() {
 
               {activeSection === 'plays' && (
                 <>
-                  <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[140px]">
+                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[140px] flex-1 sm:flex-initial">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Total Stage Gross</span>
                     <span className="text-lg sm:text-xl font-black text-purple-400 font-heading">
                       {formatNaira(totalPlaysGross)}
                     </span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[130px]">
+                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[130px] flex-1 sm:flex-initial">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Tracked Admissions</span>
                     <span className="text-lg sm:text-xl font-black text-text-primary font-heading flex items-center gap-1.5">
                       <Icon icon="solar:ticket-bold" className="text-purple-400" />
@@ -450,7 +450,7 @@ export default function BoxOffice() {
                     </span>
                   </div>
                   {topPlay && (
-                    <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[160px]">
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[160px] col-span-2 sm:col-span-1">
                       <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">#1 Stage Production</span>
                       <Link 
                         to={`/plays/${topPlay.slug || topPlay.id}/box-office`}
@@ -466,13 +466,13 @@ export default function BoxOffice() {
 
               {activeSection === 'youtube' && (
                 <>
-                  <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[140px]">
+                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[140px] flex-1 sm:flex-initial">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Tracked Viewership</span>
                     <span className="text-lg sm:text-xl font-black text-red-500 font-heading">
                       {formatViews(totalYoutubeViews)}
                     </span>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[130px]">
+                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[130px] flex-1 sm:flex-initial">
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">10M+ Super-Hits</span>
                     <span className="text-lg sm:text-xl font-black text-text-primary font-heading flex items-center gap-1.5">
                       <Icon icon="solar:fire-bold" className="text-red-500" />
@@ -480,7 +480,7 @@ export default function BoxOffice() {
                     </span>
                   </div>
                   {topYoutubeFilm && (
-                    <div className="p-3.5 rounded-xl bg-surface border border-border min-w-[160px]">
+                    <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[160px] col-span-2 sm:col-span-1">
                       <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">#1 Most-Viewed</span>
                       <Link 
                         to={`/films/${topYoutubeFilm.slug || topYoutubeFilm.id}`}
@@ -497,11 +497,11 @@ export default function BoxOffice() {
           </div>
 
           {/* Master Category Selector Tabs */}
-          <div className="mt-8 pt-6 border-t border-border/70 flex flex-wrap items-center gap-3">
+          <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-border/70 flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:flex-wrap">
             <button
               type="button"
               onClick={() => handleSectionChange('cinema')}
-              className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              className={`shrink-0 whitespace-nowrap inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeSection === 'cinema'
                   ? 'bg-brand text-white shadow-md shadow-brand/20'
                   : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-2'
@@ -519,7 +519,7 @@ export default function BoxOffice() {
             <button
               type="button"
               onClick={() => handleSectionChange('plays')}
-              className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              className={`shrink-0 whitespace-nowrap inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeSection === 'plays'
                   ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                   : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-2'
@@ -537,7 +537,7 @@ export default function BoxOffice() {
             <button
               type="button"
               onClick={() => handleSectionChange('youtube')}
-              className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              className={`shrink-0 whitespace-nowrap inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeSection === 'youtube'
                   ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
                   : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-2'
@@ -706,7 +706,79 @@ export default function BoxOffice() {
             </div>
           ) : (
             <div className="rounded-2xl border border-border overflow-hidden bg-surface shadow-xs">
-              <div className="overflow-x-auto">
+              {/* Mobile Card View (sm:hidden) */}
+              <div className="block sm:hidden divide-y divide-border/60">
+                {filteredFilms.map((film, index) => {
+                  const rank = index + 1;
+                  const dom = Number(film.box_office_domestic || 0);
+                  const opening = Number(film.box_office_opening_weekend || 0);
+                  const isBillion = dom >= 1_000_000_000;
+                  const distCompanies = (film.film_companies || [])
+                    .filter((fc) => fc.role === 'distribution' || fc.role === 'distributor')
+                    .map((fc) => fc.company?.name)
+                    .filter(Boolean);
+                  const distributors = distCompanies.length > 0 ? distCompanies : (film.distributor ? [film.distributor] : []);
+                  const directorName = film.director || film.credits?.find((c) => c.role?.toLowerCase() === 'director')?.person?.name;
+
+                  return (
+                    <div key={film.id} className="p-3.5 space-y-3 hover:bg-surface-2/30 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <span className={`w-6 h-6 rounded-full font-black text-xs inline-flex items-center justify-center shrink-0 shadow-xs ${
+                          rank === 1 ? 'bg-brand text-white' : rank === 2 ? 'bg-slate-300 text-black' : rank === 3 ? 'bg-[#9A3412] text-white' : 'bg-surface-2 text-text-muted font-mono'
+                        }`}>
+                          {rank}
+                        </span>
+                        <Link to={`/films/${film.slug || film.id}`} className="shrink-0 w-11 h-15 rounded-lg overflow-hidden border border-border bg-surface-2">
+                          <ImageWithFallback src={film.poster_url} alt={film.title} fallbackType="film" className="w-full h-full object-cover" />
+                        </Link>
+                        <div className="min-w-0 flex-1">
+                          <Link to={`/films/${film.slug || film.id}`} className="font-heading font-bold text-sm text-text-primary hover:text-brand transition-colors block line-clamp-2">
+                            {film.title}
+                          </Link>
+                          <div className="flex items-center gap-1.5 text-[10px] text-text-muted mt-1 flex-wrap">
+                            {film.year && <span>{film.year}</span>}
+                            {directorName && <span>• {formatPersonName(directorName)}</span>}
+                          </div>
+                          {isBillion && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20 mt-1">
+                              <Icon icon="solar:crown-bold" className="text-xs" />
+                              <span>₦1B+ Club</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedFilmForModal(film)}
+                          className="p-2 rounded-lg bg-surface-2 border border-border text-left group hover:border-brand/40 transition-colors cursor-pointer"
+                        >
+                          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Lifetime Domestic</span>
+                          <span className="text-xs font-black text-brand font-heading block truncate group-hover:underline">
+                            {formatNaira(dom)} ↗
+                          </span>
+                          <span className="text-[10px] text-text-muted font-mono block">
+                            ₦{dom.toLocaleString('en-NG')}
+                          </span>
+                        </button>
+                        <div className="p-2 rounded-lg bg-surface-2 border border-border text-left">
+                          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Opening Weekend</span>
+                          <span className="text-xs font-black text-text-primary font-heading block truncate">
+                            {opening > 0 ? formatNaira(opening) : '—'}
+                          </span>
+                          <span className="text-[10px] text-text-muted truncate block">
+                            {distributors[0] || 'Theatrical Circuit'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View (hidden sm:block) */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-border bg-surface-2/60 text-text-muted font-bold uppercase tracking-wider text-[10px]">
@@ -859,7 +931,62 @@ export default function BoxOffice() {
             </div>
           ) : (
             <div className="rounded-2xl border border-border overflow-hidden bg-surface shadow-xs">
-              <div className="overflow-x-auto">
+              {/* Mobile Card View (sm:hidden) */}
+              <div className="block sm:hidden divide-y divide-border/60">
+                {filteredPlays.map((play, index) => {
+                  const rank = index + 1;
+                  const gross = Number(play.box_office_domestic || 0);
+                  const tickets = Number(play.box_office_tickets_sold || 0);
+
+                  return (
+                    <div key={play.id} className="p-3.5 space-y-3 hover:bg-surface-2/30 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <span className={`w-6 h-6 rounded-full font-black text-xs inline-flex items-center justify-center shrink-0 shadow-xs ${
+                          rank === 1 ? 'bg-purple-500 text-white' : rank === 2 ? 'bg-slate-300 text-black' : rank === 3 ? 'bg-[#9A3412] text-white' : 'bg-surface-2 text-text-muted font-mono'
+                        }`}>
+                          {rank}
+                        </span>
+                        <Link to={`/plays/${play.slug || play.id}/box-office`} className="shrink-0 w-11 h-15 rounded-lg overflow-hidden border border-border bg-surface-2">
+                          <ImageWithFallback src={play.poster_url || play.banner_url} alt={play.title} fallbackType="play" className="w-full h-full object-cover" />
+                        </Link>
+                        <div className="min-w-0 flex-1">
+                          <Link to={`/plays/${play.slug || play.id}/box-office`} className="font-heading font-bold text-sm text-text-primary hover:text-purple-400 transition-colors block line-clamp-2">
+                            {play.title}
+                          </Link>
+                          <div className="flex items-center gap-1.5 text-[10px] text-text-muted mt-1 flex-wrap">
+                            {play.year && <span>{play.year}</span>}
+                            {play.venue && <span>• {play.venue}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50 text-xs">
+                        <div className="p-2 rounded-lg bg-surface-2 border border-border text-left">
+                          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Stage Box Office</span>
+                          <span className="text-xs font-black text-purple-400 font-heading block truncate">
+                            {formatNaira(gross)}
+                          </span>
+                          <span className="text-[10px] text-text-muted font-mono block">
+                            ₦{gross.toLocaleString('en-NG')}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-surface-2 border border-border text-left">
+                          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Tickets Sold</span>
+                          <span className="text-xs font-black text-text-primary font-heading block truncate">
+                            {tickets > 0 ? `${tickets.toLocaleString()} tickets` : '—'}
+                          </span>
+                          <span className="text-[10px] text-text-muted truncate block">
+                            {play.city || 'Nigeria'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View (hidden sm:block) */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-border bg-surface-2/60 text-text-muted font-bold uppercase tracking-wider text-[10px]">
@@ -1012,7 +1139,102 @@ export default function BoxOffice() {
             </div>
           ) : (
             <div className="rounded-2xl border border-border overflow-hidden bg-surface shadow-xs">
-              <div className="overflow-x-auto">
+              {/* Mobile Card View (sm:hidden) */}
+              <div className="block sm:hidden divide-y divide-border/60">
+                {filteredYoutube.map((film, index) => {
+                  const rank = index + 1;
+                  const views = Number(film.view_count || 0);
+                  const est = calculateYoutubeBoxOffice({
+                    viewCount: views,
+                    runtimeMinutes: film.runtime_minutes || film.duration,
+                    language: film.language,
+                    title: film.title,
+                  });
+                  const velocity = calculateStreamingVelocity({
+                    viewCount: views,
+                    releaseDate: film.release_date,
+                    year: film.year,
+                  });
+                  const runtimeMins = parseRuntimeMinutes(film.runtime_minutes || film.duration);
+                  const isSuperHit = views >= 10_000_000;
+                  const watchUrl = film.youtube_watch_url || (film.source_video_id ? `https://www.youtube.com/watch?v=${film.source_video_id}` : null);
+                  const directorName = film.director || film.credits?.find((c) => c.role?.toLowerCase() === 'director')?.person?.name;
+
+                  return (
+                    <div key={film.id} className="p-3.5 space-y-3 hover:bg-surface-2/30 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <span className={`w-6 h-6 rounded-full font-black text-xs inline-flex items-center justify-center shrink-0 shadow-xs ${
+                          rank === 1 ? 'bg-brand text-white' : rank === 2 ? 'bg-slate-300 text-black' : rank === 3 ? 'bg-[#9A3412] text-white' : 'bg-surface-2 text-text-muted font-mono'
+                        }`}>
+                          {rank}
+                        </span>
+                        <Link to={`/films/${film.slug || film.id}`} className="shrink-0 w-11 h-15 rounded-lg overflow-hidden border border-border bg-surface-2">
+                          <ImageWithFallback src={film.poster_url} alt={film.title} fallbackType="film" className="w-full h-full object-cover" />
+                        </Link>
+                        <div className="min-w-0 flex-1">
+                          <Link to={`/films/${film.slug || film.id}`} className="font-heading font-bold text-sm text-text-primary hover:text-brand transition-colors block line-clamp-2">
+                            {film.title}
+                          </Link>
+                          <div className="flex items-center gap-1.5 text-[10px] text-text-muted mt-1 flex-wrap">
+                            {film.year && <span>{film.year}</span>}
+                            <span>• {Math.floor(runtimeMins / 60)}h {runtimeMins % 60}m</span>
+                            {directorName && <span>• {formatPersonName(directorName)}</span>}
+                          </div>
+                          {isSuperHit && (
+                            <span className="inline-flex items-center gap-1 text-[9px] font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20 mt-1">
+                              <Icon icon="solar:fire-bold" className="text-xs" />
+                              <span>10M+ Club</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedYoutubeFilmForModal(film)}
+                          className="p-2 rounded-lg bg-surface-2 border border-border text-left group hover:border-brand/40 transition-colors cursor-pointer"
+                        >
+                          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Est. AdSense Gross</span>
+                          <span className="text-xs font-black text-brand font-heading block truncate group-hover:underline">
+                            {est.formattedNgn} ↗
+                          </span>
+                          <span className="text-[10px] text-text-muted font-mono block">
+                            {est.formattedUsd}
+                          </span>
+                        </button>
+                        <div className="p-2 rounded-lg bg-surface-2 border border-border text-left">
+                          <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Lifetime Streams</span>
+                          <span className="text-xs font-black text-text-primary font-heading block truncate">
+                            {formatViews(views)}
+                          </span>
+                          <span className="text-[10px] text-text-muted font-mono block">
+                            {views.toLocaleString('en-US')} streams
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40 text-xs">
+                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${velocity.badge.color}`}>
+                          <Icon icon={velocity.badge.icon} className="text-xs shrink-0" />
+                          <span className="whitespace-nowrap">{velocity.badge.label}</span>
+                          <span className="font-mono opacity-80 whitespace-nowrap">({velocity.formattedViewsPerDay})</span>
+                        </span>
+                        {watchUrl && (
+                          <a href={watchUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-brand hover:underline">
+                            <Icon icon="solar:play-bold" className="text-xs" />
+                            <span>Watch</span>
+                            <Icon icon="solar:arrow-right-up-linear" className="text-[10px]" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View (hidden sm:block) */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-border bg-surface-2/60 text-text-muted font-bold uppercase tracking-wider text-[10px]">
@@ -1144,12 +1366,12 @@ export default function BoxOffice() {
                             </button>
                           </td>
 
-                          {/* Velocity & Pacing */}
-                          <td className="py-3.5 px-3 hidden lg:table-cell text-center">
-                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${velocity.badge.color}`}>
-                              <Icon icon={velocity.badge.icon} className="text-xs" />
-                              <span>{velocity.badge.label}</span>
-                              <span className="font-mono opacity-80">({velocity.formattedViewsPerDay})</span>
+                          {/* Velocity & Pacing - strictly on a straight line */}
+                          <td className="py-3.5 px-3 hidden lg:table-cell text-center whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${velocity.badge.color}`}>
+                              <Icon icon={velocity.badge.icon} className="text-xs shrink-0" />
+                              <span className="whitespace-nowrap">{velocity.badge.label}</span>
+                              <span className="font-mono opacity-80 whitespace-nowrap">({velocity.formattedViewsPerDay})</span>
                             </span>
                           </td>
 

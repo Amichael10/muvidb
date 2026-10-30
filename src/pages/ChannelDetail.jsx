@@ -129,6 +129,47 @@ const Description = ({ text }) => {
   );
 };
 
+function parseDurationToSeconds(durationStr, totalSeconds) {
+  if (totalSeconds && totalSeconds > 0) return totalSeconds;
+  if (!durationStr) return 0;
+  const parts = String(durationStr).trim().split(':').map(Number);
+  if (parts.some(isNaN)) return 0;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 1) return parts[0];
+  return 0;
+}
+
+function isRegularMovie(video) {
+  // If linked to an official film record in DB, it is a verified regular film
+  if (video.film_id) return true;
+
+  const totalSecs = parseDurationToSeconds(video.duration, video.totalSeconds);
+
+  // Exclude shorts, reels, clips, and promo teasers under 20 mins (1200 seconds)
+  if (totalSecs > 0 && totalSecs < 1200) {
+    return false;
+  }
+
+  const titleLower = (video.title || '').toLowerCase();
+  const shortKeywords = [
+    '#shorts', '#short', 'shorts', 'bts', 'behind the scene', 
+    'behind the scenes', 'bloopers', 'teaser', 'trailer', 
+    'scene', 'clip', 'snippet', 'skit'
+  ];
+  
+  if (shortKeywords.some(kw => titleLower.includes(kw))) {
+    if (totalSecs < 2100) return false;
+  }
+
+  // If duration is known, require at least 20 minutes (1200s) for Nollywood full movies
+  if (totalSecs > 0) {
+    return totalSecs >= 1200;
+  }
+
+  return true;
+}
+
 export default function ChannelDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -222,6 +263,7 @@ export default function ChannelDetail() {
           thumbnail: v.thumbnail_url || `https://i.ytimg.com/vi/${v.video_id}/mqdefault.jpg`,
           publishedAt: v.published_at,
           duration: durationStr,
+          totalSeconds: totalSecs,
           viewCount: 0,
           film_id: v.film_id
         };
@@ -258,14 +300,16 @@ export default function ChannelDetail() {
             ...combinedMap[v.videoId],
             viewCount: v.viewCount || combinedMap[v.videoId].viewCount,
             publishedAt: v.publishedAt || combinedMap[v.videoId].publishedAt,
-            duration: v.duration || combinedMap[v.videoId].duration
+            duration: v.duration || combinedMap[v.videoId].duration,
+            totalSeconds: v.totalSeconds || combinedMap[v.videoId].totalSeconds
           };
         } else {
           combinedMap[v.videoId] = v;
         }
       });
 
-      setAllVideos(Object.values(combinedMap));
+      const regularMovies = Object.values(combinedMap).filter(isRegularMovie);
+      setAllVideos(regularMovies);
 
     } catch (err) {
       setError(err.message === 'Channel not found' ? 'Channel not found' : 'Failed to load channel');
@@ -372,10 +416,6 @@ export default function ChannelDetail() {
                     <Icon icon="solar:play-bold" className="text-sm" />
                     Visit Channel <Icon icon="solar:arrow-right-up-linear" className="text-sm" />
                   </a>
-                  <button className="flex items-center gap-2 border border-border bg-surface hover:bg-surface-2 text-text-primary font-bold text-[11px] px-6 py-2.5 rounded-lg transition-all">
-                    <Icon icon="solar:add-square-linear" className="text-sm" />
-                    Follow
-                  </button>
                 </div>
               </div>
             </div>
@@ -421,7 +461,7 @@ export default function ChannelDetail() {
               {/* Category Filter Tabs */}
               <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 {[
-                  { id: 'all', label: `All Movies & Uploads (${allVideos.length})` },
+                  { id: 'all', label: `All Movies (${allVideos.length})` },
                   { id: 'premieres', label: `Movie Premieres ⭐ (${allVideos.filter(v => v.film_id).length})` },
                   { id: 'popular', label: 'Most Popular' },
                   { id: 'latest', label: 'Latest Uploads' }
