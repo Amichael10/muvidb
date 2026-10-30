@@ -20,10 +20,18 @@ export async function loader() {
           box_office_domestic,
           box_office_opening_weekend,
           box_office_currency,
+          distributor,
           streaming_links,
           credits (
             role,
             person:people (
+              id,
+              name
+            )
+          ),
+          film_companies (
+            role,
+            company:companies (
               id,
               name
             )
@@ -68,6 +76,11 @@ export async function loader() {
           backdrop_url,
           genres,
           view_count,
+          runtime_minutes,
+          duration,
+          language,
+          release_date,
+          liked_percent,
           source_video_id,
           youtube_watch_url,
           credits (
@@ -98,16 +111,4 @@ export async function loader() {
       { headers: { 'Cache-Control': CACHE_OK } }
     );
   }
-}
-
-export function meta() {
-  const title = 'Nollywood Box Office Tracker | MuviDB';
-  const description =
-    'Official theatrical grosses, ₦1B milestone records, and all-time highest-grossing Nollywood movies on MuviDB.';
-  return [
-    { title },
-    { name: 'description', content: description },
-    { property: 'og:title', content: title },
-    { property: 'og:description', content: description },
-  ];
 }

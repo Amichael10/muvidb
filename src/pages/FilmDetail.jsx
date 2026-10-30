@@ -15,6 +15,7 @@ import RottenTomatoesScorecard from '../components/film/RottenTomatoesScorecard'
 import FilmSpecsTable from '../components/film/FilmSpecsTable';
 import AdminBoxOfficeModal from '../components/film/AdminBoxOfficeModal';
 import BoxOfficeBreakdownModal from '../components/film/BoxOfficeBreakdownModal';
+import YouTubeBreakdownModal from '../components/film/YouTubeBreakdownModal';
 import RateMoviePrompt from '../components/film/RateMoviePrompt';
 import WatchOptions from '../components/film/WatchOptions';
 import { PLATFORMS, isFilmOnPlatform, getWatchUrl } from '../lib/platforms';
@@ -290,6 +291,7 @@ export default function FilmDetail() {
   const [showFilmEdit, setShowFilmEdit] = useState(false);
   const [showBoxOfficeModal, setShowBoxOfficeModal] = useState(false);
   const [showBoxOfficeBreakdown, setShowBoxOfficeBreakdown] = useState(false);
+  const [showYouTubeBreakdownModal, setShowYouTubeBreakdownModal] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
   const [awardsOpen, setAwardsOpen] = useState(false);
@@ -997,34 +999,24 @@ export default function FilmDetail() {
                     </Link>
                   ) : showYoutubeViews ? (
                     /* Case 3: YouTube Full Movie Release with ViewStats-style Analytics Card */
-                    <div className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-brand/30 backdrop-blur-xl shadow-2xl hover:border-brand/60 w-full lg:w-72 xl:w-80 text-left transition-all group">
+                    <div 
+                      onClick={() => setShowYouTubeBreakdownModal(true)}
+                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-brand/30 backdrop-blur-xl shadow-2xl hover:border-brand/60 hover:bg-black/80 w-full lg:w-72 xl:w-80 text-left transition-all cursor-pointer group"
+                      title="Click to view detailed ViewStats breakdown"
+                    >
                       <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-brand uppercase tracking-widest mb-1.5">
                         <div className="flex items-center gap-1.5">
                           <Icon icon="simple-icons:youtube" className="text-red-500 text-sm" />
                           <span>YouTube Box Office</span>
                         </div>
-                        {fullYoutubeUrl ? (
-                          <a
-                            href={fullYoutubeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[10px] text-white/60 hover:text-brand transition-colors"
-                          >
-                            <span>Watch</span>
-                            <Icon icon="solar:arrow-right-up-linear" className="text-xs" />
-                          </a>
-                        ) : (
-                          <Link
-                            to="/box-office?section=youtube"
-                            className="text-[10px] text-white/60 hover:text-brand transition-colors"
-                          >
-                            Tracker →
-                          </Link>
-                        )}
+                        <span className="inline-flex items-center gap-1 text-[10px] text-text-muted group-hover:text-brand transition-colors">
+                          <span>Breakdown</span>
+                          <Icon icon="solar:arrow-right-up-linear" className="text-xs" />
+                        </span>
                       </div>
                       <div className="my-auto py-1 space-y-1">
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          <p className="text-xl sm:text-2xl font-black text-brand font-heading tracking-tight leading-none">
+                          <p className="text-xl sm:text-2xl font-black text-brand font-heading tracking-tight leading-none group-hover:underline decoration-brand/50 underline-offset-2">
                             {youtubeBoxOffice?.formattedNgn}
                           </p>
                         </div>
@@ -1430,6 +1422,12 @@ export default function FilmDetail() {
               <BoxOfficeBreakdownModal
                 film={film}
                 onClose={() => setShowBoxOfficeBreakdown(false)}
+              />
+            )}
+            {showYouTubeBreakdownModal && (
+              <YouTubeBreakdownModal
+                film={film}
+                onClose={() => setShowYouTubeBreakdownModal(false)}
               />
             )}
             {showFilmEdit && (

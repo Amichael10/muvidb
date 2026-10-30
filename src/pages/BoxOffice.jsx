@@ -5,6 +5,14 @@ import { supabase } from '../lib/supabase';
 import SEO from '../components/SEO';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import BoxOfficeBreakdownModal from '../components/film/BoxOfficeBreakdownModal';
+import YouTubeBreakdownModal from '../components/film/YouTubeBreakdownModal';
+import {
+  calculateYoutubeBoxOffice,
+  calculateStreamingVelocity,
+  formatCompactCurrency,
+  parseRuntimeMinutes,
+  USD_TO_NGN,
+} from '../lib/youtubeBoxOffice';
 import { formatPersonName } from '../utils/format';
 
 function formatNaira(amount) {
@@ -52,6 +60,7 @@ export default function BoxOffice() {
   const [loading, setLoading] = useState(false);
 
   const [selectedFilmForModal, setSelectedFilmForModal] = useState(null);
+  const [selectedYoutubeFilmForModal, setSelectedYoutubeFilmForModal] = useState(null);
   const [cinemaTab, setCinemaTab] = useState('all'); // 'all' | 'billion' | '2026' | '2025' | '2024' | '2023'
   const [playsTab, setPlaysTab] = useState('all');   // 'all' | 'top-tier' | '2026' | '2025'
   const [youtubeTab, setYoutubeTab] = useState('all'); // 'all' | '10m' | '5m' | '2026' | '2025' | '2024'
@@ -986,8 +995,7 @@ export default function BoxOffice() {
         )}
 
         {/* --------------------------------------------------------------- */}
-        {/* SECTION 3: YOUTUBE BOX OFFICE TABLE                             */}
-        {/* --------------------------------------------------------------- */}
+        {/* SECTION 3: YOUTUBE BOX OFFICE TABLE (ViewStats-inspired) */}
         {activeSection === 'youtube' && (
           loading ? (
             <div className="space-y-3">
@@ -1011,8 +1019,10 @@ export default function BoxOffice() {
                       <th className="py-3.5 px-3">Film / YouTube Release</th>
                       <th className="py-3.5 px-3 hidden sm:table-cell">Year</th>
                       <th className="py-3.5 px-3 hidden md:table-cell">Director / Cast</th>
-                      <th className="py-3.5 px-3 hidden lg:table-cell text-center">Watch Link</th>
-                      <th className="py-3.5 pr-4 sm:pr-6 pl-3 text-right">Lifetime YouTube Views</th>
+                      <th className="py-3.5 px-3 text-right">Est. AdSense Box Office</th>
+                      <th className="py-3.5 px-3 hidden lg:table-cell text-center">Velocity & Pacing</th>
+                      <th className="py-3.5 px-3 hidden sm:table-cell text-center">Watch</th>
+                      <th className="py-3.5 pr-4 sm:pr-6 pl-3 text-right">Lifetime Streams</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
@@ -1022,6 +1032,21 @@ export default function BoxOffice() {
                       const isSuperHit = views >= 10_000_000;
                       const directorName = film.director || film.credits?.find((c) => c.role?.toLowerCase() === 'director')?.person?.name;
                       const watchUrl = film.youtube_watch_url || (film.source_video_id ? `https://www.youtube.com/watch?v=${film.source_video_id}` : null);
+                      const est = calculateYoutubeBoxOffice({
+                        viewCount: views,
+                        runtimeMinutes: film.runtime_minutes || film.duration,
+                        language: film.language,
+                        title: film.title,
+                      });
+                      const velocity = calculateStreamingVelocity({
+                        viewCount: views,
+                        releaseDate: film.release_date,
+                        year: film.year,
+                      });
+                      const runtimeMins = parseRuntimeMinutes(film.runtime_minutes || film.duration);
+                      const runtimeFormatted = runtimeMins >= 60
+                        ? `${Math.floor(runtimeMins / 60)}h ${runtimeMins % 60}m`
+                        : `${runtimeMins}m`;
 
                       return (
                         <tr 
@@ -1031,7 +1056,7 @@ export default function BoxOffice() {
                           {/* Rank */}
                           <td className="py-3.5 pl-4 sm:pl-6 pr-2 text-center">
                             {rank === 1 ? (
-                              <span className="w-6 h-6 rounded-full bg-red-600 text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
+                              <span className="w-6 h-6 rounded-full bg-brand text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
                                 1
                               </span>
                             ) : rank === 2 ? (
@@ -1066,16 +1091,18 @@ export default function BoxOffice() {
                               <div className="min-w-0">
                                 <Link
                                   to={`/films/${film.slug || film.id}`}
-                                  className="font-heading font-bold text-sm text-text-primary hover:text-red-500 transition-colors block truncate"
+                                  className="font-heading font-bold text-sm text-text-primary hover:text-brand transition-colors block truncate"
                                 >
                                   {film.title}
                                 </Link>
-                                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-text-muted">
-                                  <span className="sm:hidden font-mono">{film.year}</span>
+                                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-text-muted flex-wrap">
+                                  <span className="font-mono text-[10px] bg-surface-2 px-1.5 py-0.5 rounded border border-border">
+                                    {runtimeFormatted}
+                                  </span>
                                   {isSuperHit && (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-500 bg-red-500/10 px-1.5 py-0.2 rounded border border-red-500/20">
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand bg-brand/10 px-1.5 py-0.2 rounded border border-brand/20">
                                       <Icon icon="solar:fire-bold" className="text-xs" />
-                                      <span>10M+ Super-Hit</span>
+                                      <span>10M+ Club</span>
                                     </span>
                                   )}
                                   {film.source_video_id && (
@@ -1098,18 +1125,45 @@ export default function BoxOffice() {
                             {directorName ? formatPersonName(directorName) : '—'}
                           </td>
 
-                          {/* Direct YouTube Link */}
+                          {/* Est. AdSense Box Office */}
+                          <td className="py-3.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedYoutubeFilmForModal(film)}
+                              className="inline-flex flex-col items-end cursor-pointer group/est text-right"
+                              title="Click to view detailed ViewStats breakdown"
+                            >
+                              <span className="font-heading font-black text-sm text-brand group-hover/est:underline decoration-brand/50 underline-offset-2 flex items-center gap-1">
+                                <span>{est.formattedNgn}</span>
+                                <Icon icon="solar:arrow-right-up-linear" className="text-xs opacity-60 group-hover/est:opacity-100 group-hover/est:translate-x-0.5 transition-all" />
+                              </span>
+                              <span className="text-[10px] text-text-muted font-mono">
+                                {est.formattedUsd} • {est.effectiveRpmUsd} RPM
+                              </span>
+                            </button>
+                          </td>
+
+                          {/* Velocity & Pacing */}
                           <td className="py-3.5 px-3 hidden lg:table-cell text-center">
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${velocity.badge.color}`}>
+                              <Icon icon={velocity.badge.icon} className="text-xs" />
+                              <span>{velocity.badge.label}</span>
+                              <span className="font-mono opacity-80">({velocity.formattedViewsPerDay})</span>
+                            </span>
+                          </td>
+
+                          {/* Direct YouTube Link */}
+                          <td className="py-3.5 px-3 hidden sm:table-cell text-center">
                             {watchUrl ? (
                               <a
                                 href={watchUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all text-[11px] font-semibold"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand/10 text-brand hover:bg-brand hover:text-white transition-all text-[11px] font-semibold"
                                 title="Watch on YouTube"
                               >
                                 <Icon icon="solar:play-bold" className="text-xs" />
-                                <span>YouTube</span>
+                                <span>Watch</span>
                               </a>
                             ) : (
                               <span className="text-text-muted">—</span>
@@ -1123,12 +1177,12 @@ export default function BoxOffice() {
                               className="inline-flex flex-col items-end cursor-pointer group/btn"
                               title="Click to view full movie details"
                             >
-                              <span className="font-heading font-black text-sm text-red-500 group-hover/btn:underline decoration-red-500/50 underline-offset-2 flex items-center gap-1">
-                                <Icon icon="solar:fire-bold" className="text-xs opacity-75" />
+                              <span className="font-heading font-black text-sm text-text-primary group-hover/btn:text-brand transition-colors flex items-center gap-1">
+                                <Icon icon="solar:fire-bold" className="text-xs text-brand opacity-75" />
                                 <span>{formatViews(views)}</span>
                               </span>
                               <span className="text-[10px] text-text-muted font-mono">
-                                {views.toLocaleString('en-US')} views
+                                {views.toLocaleString('en-US')} streams
                               </span>
                             </Link>
                           </td>
@@ -1137,6 +1191,18 @@ export default function BoxOffice() {
                     })}
                   </tbody>
                 </table>
+              </div>
+              {/* ViewStats Methodology Footer */}
+              <div className="p-3 sm:p-4 bg-surface-2/40 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-text-muted">
+                <div className="flex items-center gap-1.5">
+                  <Icon icon="solar:info-circle-linear" className="text-brand text-xs shrink-0" />
+                  <span>
+                    <strong>ViewStats Estimation Model:</strong> YouTube AdSense earnings are estimated using verified movie runtimes (mid-roll ad density) and Nollywood diaspora audience benchmarks (US/UK/Canada vs Domestic).
+                  </span>
+                </div>
+                <span className="font-mono text-[10px] text-text-muted shrink-0">
+                  Dual NGN/USD Exchange @ ₦${USD_TO_NGN}/$1
+                </span>
               </div>
             </div>
           )
@@ -1148,6 +1214,14 @@ export default function BoxOffice() {
         <BoxOfficeBreakdownModal
           film={selectedFilmForModal}
           onClose={() => setSelectedFilmForModal(null)}
+        />
+      )}
+
+      {/* YouTube ViewStats Breakdown Modal */}
+      {selectedYoutubeFilmForModal && (
+        <YouTubeBreakdownModal
+          film={selectedYoutubeFilmForModal}
+          onClose={() => setSelectedYoutubeFilmForModal(null)}
         />
       )}
     </div>

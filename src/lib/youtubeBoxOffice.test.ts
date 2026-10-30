@@ -66,3 +66,4 @@ describe('youtubeBoxOffice engine', () => {
     expect(velocity.badge.label).toBeDefined();
   });
 });
+
