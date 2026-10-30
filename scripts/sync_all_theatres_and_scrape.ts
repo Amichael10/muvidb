@@ -46,7 +46,7 @@ async function upsertPlay(play: PlayPayload): Promise<'created' | 'updated' | 'u
   try {
     const { data: existing, error: fetchErr } = await supabase
       .from('plays')
-      .select('id, title, slug, status, run_start_date, run_end_date, synopsis')
+      .select('id, title, slug, status, run_start_date, run_end_date, synopsis, poster_url, banner_url')
       .or(`slug.eq.${play.slug},title.eq.${play.title}`)
       .limit(1)
       .maybeSingle();

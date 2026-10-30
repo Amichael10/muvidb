@@ -253,7 +253,7 @@ export async function syncImmersiaBoxOffice() {
   // Fetch existing plays from Supabase to match
   const { data: existingPlays, error: fetchErr } = await supabase
     .from('plays')
-    .select('id, title, slug, source_url, box_office_domestic, box_office_tickets_sold');
+    .select('id, title, slug, source_url, box_office_domestic, box_office_tickets_sold, poster_url, banner_url');
 
   if (fetchErr) {
     console.error('❌ Error fetching existing plays:', fetchErr.message);
@@ -318,8 +318,12 @@ export async function syncImmersiaBoxOffice() {
         if (metrics.runEndDate) updatePayload.run_end_date = metrics.runEndDate;
         if (metrics.performanceTime) updatePayload.performance_time = metrics.performanceTime;
         if (venue) updatePayload.venue = venue;
-        if (posterUrl) updatePayload.poster_url = posterUrl;
-        if (bannerUrl) updatePayload.banner_url = bannerUrl;
+        if (posterUrl && (!existing.poster_url || existing.poster_url.includes('unsplash.com') || existing.poster_url.includes('placeholder'))) {
+          updatePayload.poster_url = posterUrl;
+        }
+        if (bannerUrl && (!existing.banner_url || existing.banner_url.includes('unsplash.com') || existing.banner_url.includes('placeholder'))) {
+          updatePayload.banner_url = bannerUrl;
+        }
         if (metrics.sourceUrl) updatePayload.source_url = metrics.sourceUrl;
 
         const { error: updErr } = await supabase

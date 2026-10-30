@@ -406,9 +406,9 @@ export default function AdminPlays() {
     try {
       const payload = editingPlay ? { ...formData, id: editingPlay.id } : formData;
       const saved = await upsertPlay(payload);
+      setEditingPlay(saved);
       setFormMsg({ type: 'success', text: editingPlay ? 'Play updated successfully!' : 'Play created successfully!' });
       if (!editingPlay) {
-        setEditingPlay(saved);
         loadSavedCredits(saved.id);
       }
       loadData();

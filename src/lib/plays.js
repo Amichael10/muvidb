@@ -199,8 +199,8 @@ export async function fetchPersonStageCredits(personId) {
  * Upsert stage play (Admin)
  */
 export async function upsertPlay(playData) {
-  const runStartDate = playData.run_start_date || null;
-  const runEndDate = playData.run_end_date || null;
+  const runStartDate = playData.run_start_date?.trim?.() || playData.run_start_date || null;
+  const runEndDate = playData.run_end_date?.trim?.() || playData.run_end_date || null;
   const derivedYear = runStartDate ? Number(runStartDate.slice(0, 4)) : null;
 
   const derivedStatus = derivePlayStatus({
@@ -209,27 +209,71 @@ export async function upsertPlay(playData) {
     run_end_date: runEndDate,
   });
 
-  const payload = {
-    ...playData,
-    run_start_date: runStartDate,
-    run_end_date: runEndDate,
-    status: playData.status || derivedStatus,
-    performance_time: playData.performance_time?.trim() || null,
-    source_url: playData.source_url?.trim() || null,
-    year: derivedYear || (playData.year ? Number(playData.year) : null),
-    slug: playData.slug || playData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+  const parseNumOrNull = (val) => {
+    if (val === '' || val === null || val === undefined) return null;
+    const n = Number(val);
+    return isNaN(n) ? null : n;
   };
 
-  const { data, error } = await supabase
-    .from('plays')
-    .upsert(payload, { onConflict: 'slug' })
-    .select()
-    .single();
+  const parseTextOrNull = (val) => {
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      return trimmed === '' ? null : trimmed;
+    }
+    return val || null;
+  };
 
-  if (error) throw error;
+  const payload = {
+    title: playData.title?.trim() || '',
+    slug: parseTextOrNull(playData.slug) || (playData.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+    playwright: parseTextOrNull(playData.playwright),
+    director: parseTextOrNull(playData.director),
+    producer: parseTextOrNull(playData.producer),
+    venue: parseTextOrNull(playData.venue),
+    city: parseTextOrNull(playData.city) || 'Lagos',
+    country: parseTextOrNull(playData.country) || 'Nigeria',
+    poster_url: parseTextOrNull(playData.poster_url),
+    banner_url: parseTextOrNull(playData.banner_url),
+    synopsis: parseTextOrNull(playData.synopsis),
+    genre: parseTextOrNull(playData.genre),
+    year: derivedYear || parseNumOrNull(playData.year) || new Date().getFullYear(),
+    run_start_date: runStartDate,
+    run_end_date: runEndDate,
+    performance_time: parseTextOrNull(playData.performance_time),
+    source_url: parseTextOrNull(playData.source_url),
+    status: playData.status || derivedStatus,
+    box_office_domestic: parseNumOrNull(playData.box_office_domestic),
+    box_office_tickets_sold: parseNumOrNull(playData.box_office_tickets_sold),
+    box_office_currency: parseTextOrNull(playData.box_office_currency) || 'NGN',
+    box_office_source: parseTextOrNull(playData.box_office_source),
+    box_office_metrics: playData.box_office_metrics || null,
+  };
+
+  let result;
+  if (playData.id) {
+    const { data, error } = await supabase
+      .from('plays')
+      .update(payload)
+      .eq('id', playData.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    result = data;
+  } else {
+    const { data, error } = await supabase
+      .from('plays')
+      .upsert(payload, { onConflict: 'slug' })
+      .select()
+      .single();
+
+    if (error) throw error;
+    result = data;
+  }
+
   return {
-    ...data,
-    status: derivePlayStatus(data),
+    ...result,
+    status: derivePlayStatus(result),
   };
 }
 

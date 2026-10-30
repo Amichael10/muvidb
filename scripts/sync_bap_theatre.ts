@@ -253,7 +253,7 @@ async function upsertPlay(payload: PlayPayload, counters: { processed: number; c
   counters.processed++;
   const { data: existing, error: fetchError } = await supabase
     .from('plays')
-    .select('id,title,slug')
+    .select('id,title,slug,poster_url,banner_url')
     .or(`slug.eq.${payload.slug},title.eq.${payload.title}`)
     .limit(1)
     .maybeSingle();
