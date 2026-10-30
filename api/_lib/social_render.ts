@@ -1519,7 +1519,7 @@ export async function renderSnapshotAssets(input: {
   if (isHtmlSocialTemplate(templateSlug)) {
     const rendered: RenderedAsset[] = [];
     for (const format of input.formats) {
-      const slides = htmlTemplateSlides(templateSlug);
+      const slides = htmlTemplateSlides(templateSlug, input.snapshot);
       for (let slide = 1; slide <= slides; slide += 1) {
         rendered.push(await renderSnapshotAsset({ snapshot: input.snapshot, format, templateSlug, slide }));
       }

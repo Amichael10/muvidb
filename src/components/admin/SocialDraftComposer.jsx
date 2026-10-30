@@ -79,9 +79,9 @@ export const EDITORIAL_THEMES = [
     badge: 'Friday Theme',
     icon: 'solar:film-strip-linear',
     entity: 'film',
-    description: 'In-cinema showtimes, upcoming theatrical runs, poster reveals, and "Are you seated?" hype copy.',
+    description: 'Curated 4:5 carousel of 2 to 8 African films across cinemas and streaming platforms.',
     placeholder: 'Search cinema movie (e.g. Alahun, Everybody Loves Jenifa, Farmer\'s Bride)…',
-    templateSlug: 'watchlist-this-week-v1',
+    templateSlug: 'weekend-watchlist-simple-v1',
     contentType: 'weekend_watchlist',
     suggestions: ['Alahun', 'Everybody Loves Jenifa', 'Farmer\'s Bride', 'Ajosepo'],
   },
@@ -183,7 +183,7 @@ const THEME_WORD_LIMITS = {
   critics_say: 85,
   where_to_watch: 45,
   behind_the_camera: 55,
-  weekend_watchlist: 50,
+  weekend_watchlist: 250,
   whats_on_stage: 50,
   film_conversation: 65,
   birthday_spotlight: 45,
@@ -1153,7 +1153,7 @@ export default function SocialDraftComposer({
 
   const generate = async () => {
     const isWatchlist = activeTheme.id === 'weekend_watchlist';
-    if (isWatchlist && selectedFilms.length !== 3) return toast.error('Weekend Watchlist needs exactly three films');
+    if (isWatchlist && (selectedFilms.length < 2 || selectedFilms.length > 8)) return toast.error('Weekend Watchlist requires between 2 and 8 films');
     if (!isWatchlist && !selected) return toast.error('Please pick a subject first');
     if (activeTheme.id === 'critics_say' && !selectedCriticReview) return toast.error('Select the critic review you want to feature');
     if (!platforms.length) return toast.error('Select at least one platform');
@@ -1186,7 +1186,7 @@ export default function SocialDraftComposer({
         ...data,
         variants: (data.variants || []).map(variant => ({
           ...variant,
-          caption: activeTheme.id === 'where_to_watch' ? variant.caption : clampWords(variant.caption, themeWordLimit),
+          caption: (activeTheme.id === 'where_to_watch' || activeTheme.id === 'weekend_watchlist') ? variant.caption : clampWords(variant.caption, themeWordLimit),
           hashtags: Array.isArray(variant.hashtags) ? variant.hashtags.slice(0, 3) : [],
         })),
       };
@@ -1664,7 +1664,7 @@ export default function SocialDraftComposer({
   };
   const entityLabel = activeTheme.entity === 'person' ? 'Actor / Talent' : activeTheme.entity === 'play' ? 'Theatre Play' : 'Movie / Film';
   const isWeekendWatchlist = activeTheme.id === 'weekend_watchlist';
-  const canGenerate = isWeekendWatchlist ? selectedFilms.length === 3 : Boolean(selected);
+  const canGenerate = isWeekendWatchlist ? (selectedFilms.length >= 2 && selectedFilms.length <= 8) : Boolean(selected);
   const activeVariant = result?.variants?.find(variant => variant.platform === activePreviewPlatform) || result?.variants?.[0];
   const activePlatform = PLATFORMS.find(platform => platform.value === activeVariant?.platform) || PLATFORMS[0];
   const activeSpec = PLATFORM_SPECS[activeVariant?.platform] || PLATFORM_SPECS.instagram;
@@ -2185,13 +2185,13 @@ export default function SocialDraftComposer({
                   <div className="rounded-lg border border-brand/30 bg-brand/5 p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs font-black text-text-primary">Build the 3-film thread</p>
-                        <p className="mt-0.5 text-[11px] text-text-muted">Choose three films. Each one fills its own numbered Watchlist card.</p>
+                        <p className="text-xs font-black text-text-primary">Build the Weekend Watchlist (up to 8 films)</p>
+                        <p className="mt-0.5 text-[11px] text-text-muted">Choose between 2 and 8 films. Each film fills its own numbered Watchlist card.</p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-brand px-2.5 py-1 text-[11px] font-black text-white">{selectedFilms.length}/3</span>
+                      <span className="shrink-0 rounded-full bg-brand px-2.5 py-1 text-[11px] font-black text-white">{selectedFilms.length}/8</span>
                     </div>
                     {selectedFilms.length > 0 && (
-                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                         {selectedFilms.map((film, index) => (
                           <div key={film.id} className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-surface p-2">
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-brand/10 text-[10px] font-black text-brand">{index + 1}</span>
@@ -2204,7 +2204,7 @@ export default function SocialDraftComposer({
                       </div>
                     )}
                   </div>
-                  {selectedFilms.length < 3 && (
+                  {selectedFilms.length < 8 && (
                     <div className="relative">
                       <input
                         value={query}

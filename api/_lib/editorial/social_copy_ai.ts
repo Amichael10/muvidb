@@ -176,15 +176,21 @@ Goal: Entertainment guide for African live theatre.
 
   if (seriesSlug.includes('weekend') || seriesSlug === 'weekend_watchlist') {
     return `
-CONTENT TYPE: WEEKEND WATCHLIST
-Goal: Thoughtful recommendation, not an advertisement.
+CONTENT TYPE: WEEKEND WATCHLIST (CURATED MULTI-FILM GUIDE)
+Goal: Curated, authoritative weekend streaming guide that covers ALL selected films in the lineup.
+- Do NOT focus on just one movie. You must feature every selected film in the curated lineup (films 1 through N).
+- For each film, clearly list:
+  • Number and Title with release year
+  • Platform or Cinema destination (e.g. Netflix, Prime Video, YouTube channel, Cinemas)
+  • A punchy 1-sentence hook explaining why it's worth watching
+- Conclude with an engaging community question asking which film they are streaming first.
 - Example structure:
-  Looking for something to watch this weekend?
-  Put [Film Title] on your radar.
-  [Short intriguing premise sentence without spoilers].
-  Available on [Platform].
-  Would you add this to your weekend list?
-  #MuviDB #AfricanCinema #[FilmTitle]`;
+  🍿 WEEKEND WATCHLIST: Looking for what to stream this weekend? Here are our curated African cinema picks:
+  1. [Film 1] ([Platform]) — [Punchy premise hook]
+  2. [Film 2] ([Platform]) — [Punchy premise hook]
+  3. [Film 3] ([Platform]) — [Punchy premise hook]
+  Which one are you pressing play on first? Let us know below! 👇
+  #MuviDB #AfricanCinema #WeekendWatchlist #[Film1Title] #[Film2Title]`;
   }
 
   return `
@@ -247,9 +253,9 @@ function getSeriesStoryContract(seriesSlug: string): string {
 - Story movement: human career thesis → 2–3 representative works as evidence → why the body of work matters.
 - Graphic: person's name + career thesis + roles. Credit count is tiny evidence, never the headline.`,
     weekend_watchlist: `STORY CONTRACT — WEEKEND WATCHLIST
-- Subject: why this film suits a particular weekend mood or viewer.
-- Story movement: viewing mood → spoiler-free premise → where to watch → taste-based question.
-- Graphic: title + one specific viewing promise; availability remains secondary utility text.`,
+- Subject: Curated multi-film weekend viewing guide across streaming platforms and cinemas.
+- Story movement: Weekend framing hook → numbered entries for each curated film with verified platform & 1-sentence hook → community debate CTA.
+- Tone: Knowledgeable, curated, enthusiastic African cinema guide; clean structure, never generic hype.`,
     critics_say: `STORY CONTRACT — THE CRITIC'S TAKE
 - Subject: one exact, clearly attributed critical claim about the film.
 - Story movement: verbatim quote → source attribution → outbound full-review direction → agree/disagree question.
@@ -357,6 +363,24 @@ function buildMuviDBPrompt(req: AICopyRequest): string {
   const verifiedCreditCount = data.film_count || data.verified_credits_count || (Array.isArray(data.knownFor) ? data.knownFor.length : 'Multiple verified credits');
   const recentProject = data.recent_project || data.spotlight_project || (Array.isArray(data.knownFor) && data.knownFor[0]?.title) || '';
 
+  const rawWatchlist = Array.isArray(data.watchlistPicks) && data.watchlistPicks.length
+    ? data.watchlistPicks
+    : Array.isArray(data.films) && data.films.length
+      ? data.films
+      : [];
+  const isWatchlistLineup = (seriesSlug.includes('weekend') || seriesSlug === 'weekend_watchlist') && rawWatchlist.length > 0;
+
+  const watchlistSection = isWatchlistLineup ? `
+CURATED WEEKEND WATCHLIST LINEUP (${rawWatchlist.length} FILMS):
+${rawWatchlist.map((f: any, idx: number) => {
+  const fTitle = f.name || f.title || `Film ${idx + 1}`;
+  const fYear = f.year ? ` (${f.year})` : '';
+  const fPlatform = f.platformDisplayName || f.watchAvailability || (f.youtubeChannelName ? `YouTube (${f.youtubeChannelName})` : (f.streaming_links?.netflix ? 'Netflix' : f.streaming_links?.prime_video ? 'Prime Video' : 'Streaming Platforms'));
+  const fHook = f.synopsis || f.subtext || f.tagline || 'Curated African cinema pick';
+  return `${idx + 1}. ${fTitle}${fYear} — Platform: ${fPlatform} — Premise/Hook: ${fHook}`;
+}).join('\n')}
+` : '';
+
   const personSection = isPerson ? `
 STRUCTURED TALENT & CAREER DATA:
 - PERSON NAME: ${title}
@@ -368,7 +392,13 @@ STRUCTURED TALENT & CAREER DATA:
 - BIO / CONTEXT: ${bio || 'N/A'}
 ` : '';
 
-  const taskInstructions = isPerson
+  const taskInstructions = isWatchlistLineup
+    ? `TASK:
+Generate 3 DISTINCT curated Weekend Watchlist guide variations covering ALL ${rawWatchlist.length} selected films:
+- Variation A (Curated Viewing Guide): Authoritative weekend guide. Number and present each film (1 to ${rawWatchlist.length}), verified platform, and a 1-sentence hook explaining what makes it compelling.
+- Variation B (Editorial & Storytelling): Connect the films through weekend themes and variety (e.g. drama, romance, thriller), highlighting all ${rawWatchlist.length} titles with their streaming destinations.
+- Variation C (Community Debate): High-engagement conversation-starter asking the audience which of these ${rawWatchlist.length} titles they are streaming first, including all ${rawWatchlist.length} films with clear platforms.`
+    : isPerson
     ? `TASK:
 Generate 3 DISTINCT editorial copy variations for ${title}:
 - Variation A (Career Story): Focus on the creative journey and progression. Hook the reader on a career taking shape, weave at most 2–3 chronological credits into the prose as narrative evidence, and frame every film as adding another piece to their verified record on MuviDB.
@@ -425,6 +455,7 @@ SOURCE DATA:
 - BIO / CONTEXT: ${bio}
 - VENUE / DATES: ${venue}
 ${personSection}
+${watchlistSection}
 
 ${taskInstructions}
 
@@ -601,6 +632,9 @@ function applyVerifiedMovieAttribution(req: AICopyRequest, variations: AICopyVar
   const channelName = String(data.youtubeChannelName || '').trim();
   const seriesSlug = String(req.series?.slug || '').toLowerCase().replace(/-/g, '_');
   const destination = channelName || String(data.platformDisplayName || '').trim();
+  if (seriesSlug === 'weekend_watchlist' || seriesSlug.includes('weekend')) {
+    return variations;
+  }
 
   return variations.map(variation => {
     const captions = { ...variation.captions };
@@ -771,6 +805,67 @@ function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
     ? data.synopsis
     : (typeof candidate.subtext === 'string' ? candidate.subtext : '');
 
+  const seriesSlug = String(series?.slug || '').toLowerCase().replace(/-/g, '_');
+  const rawWatchlist = Array.isArray(data.watchlistPicks) && data.watchlistPicks.length
+    ? data.watchlistPicks
+    : Array.isArray(data.films) && data.films.length
+      ? data.films
+      : [];
+  const isWatchlistLineup = (seriesSlug.includes('weekend') || seriesSlug === 'weekend_watchlist') && rawWatchlist.length > 0;
+
+  if (isWatchlistLineup) {
+    const total = rawWatchlist.length;
+    const filmListText = rawWatchlist.map((f: any, i: number) => {
+      const fTitle = f.name || f.title;
+      const fYear = f.year ? ` (${f.year})` : '';
+      const fPlatform = f.platformDisplayName || f.watchAvailability || (f.youtubeChannelName ? `YouTube (${f.youtubeChannelName})` : 'Streaming');
+      const fHook = f.synopsis || f.subtext || f.tagline || 'Essential viewing for the weekend.';
+      const cleanH = fHook.slice(0, 140).trim();
+      return `${i + 1}️⃣ ${fTitle.toUpperCase()}${fYear}\n📺 ${fPlatform}\n💡 ${cleanH}`;
+    }).join('\n\n');
+
+    const threadList = rawWatchlist.map((f: any, i: number) => {
+      const fTitle = f.name || f.title;
+      const fPlatform = f.platformDisplayName || f.watchAvailability || (f.youtubeChannelName ? f.youtubeChannelName : 'Streaming');
+      return `${i + 1}. ${fTitle} — ${fPlatform}`;
+    }).join('\n');
+
+    const filmTags = rawWatchlist.slice(0, 3).map((f: any) => `#${(f.name || f.title || '').replace(/[^a-zA-Z0-9]/g, '')}`).filter(Boolean).join(' ');
+
+    return [
+      {
+        key: 'A',
+        label: 'Curated Guide',
+        captions: {
+          instagram: `🍿 WEEKEND WATCHLIST | ${total} FILMS TO STREAM THIS WEEKEND\n\nLooking for something great to watch? Here are ${total} verified African cinema titles to stream this Friday through Sunday:\n\n${filmListText}\n\nWhich one are you pressing play on first? Let us know below! 👇\n\n#MuviDB #AfricanCinema #WeekendWatchlist ${filmTags}`.trim(),
+          threads: `🍿 Weekend Watchlist (${total} films to stream):\n\n${threadList}\n\nWhich one are you watching first? 👇 #AfricanCinema #WeekendWatchlist`,
+          facebook: `🍿 WEEKEND WATCHLIST | ${total} African films to stream this weekend!\n\n${filmListText}\n\nExplore full cast, crew and reviews on MuviDB. Which one is on your list?`,
+          tiktok: `🍿 Weekend Watchlist: ${total} African films to stream right now! Check out the lineup on MuviDB. #WeekendWatchlist #AfricanCinema`,
+        },
+      },
+      {
+        key: 'B',
+        label: 'Editorial',
+        captions: {
+          instagram: `🍿 WEEKEND WATCHLIST: What's on your screen this weekend?\n\nFrom compelling human drama to crowd-pleasing entertainment, we've rounded up ${total} African titles you should know about:\n\n${filmListText}\n\nSave this for your weekend movie night! What are you watching first? 👇\n\n#MuviDB #AfricanCinema #WeekendWatchlist ${filmTags}`.trim(),
+          threads: `Looking for what to watch this weekend? Here's our ${total}-film lineup:\n\n${threadList}\n\nTell us your top pick in the replies! 👇 #MuviDB #AfricanCinema`,
+          facebook: `Curated Weekend Watchlist: ${total} films to enjoy this weekend:\n\n${filmListText}\n\nHead to MuviDB for verified credits and more recommendations!`,
+          tiktok: `Here are ${total} films you need to watch this weekend. Track them all on MuviDB! #WeekendWatchlist #AfricanCinema`,
+        },
+      },
+      {
+        key: 'C',
+        label: 'Community Debate',
+        captions: {
+          instagram: `🍿 FRIDAY DEBATE: You have free time this weekend — which of these ${total} films are you watching first?\n\n${filmListText}\n\nDrop your ratings and thoughts if you've already seen any of them! 👇\n\n#MuviDB #AfricanCinema #WeekendWatchlist ${filmTags}`.trim(),
+          threads: `If you could only stream one of these ${total} films this weekend, which one is it?\n\n${threadList}\n\nDrop your vote below! 👇 #MuviDB #AfricanCinema`,
+          facebook: `Weekend Movie Dilemma: Which of these ${total} films gets your vote this weekend?\n\n${filmListText}\n\nLet's hear your picks in the comments! 👇`,
+          tiktok: `Which of these ${total} films are you picking for movie night? Vote in the comments! 👇 #MuviDB #WeekendWatchlist`,
+        },
+      },
+    ];
+  }
+
   if (data.lifecycle === 'upcoming' || data.coming_soon) {
     const releaseLine = data.release_date ? `Releases ${data.release_date}.` : 'Coming soon.';
     return [
@@ -889,7 +984,8 @@ function buildCleanFallbackVariations(req: AICopyRequest): AICopyVariation[] {
 }
 
 function applyCaptionBankToFallback(variations: AICopyVariation[], req: AICopyRequest): AICopyVariation[] {
-  if (req.candidate?.type === 'person') {
+  const sSlug = String(req.series?.slug || '').toLowerCase().replace(/-/g, '_');
+  if (req.candidate?.type === 'person' || sSlug === 'weekend_watchlist' || sSlug.includes('weekend')) {
     // For person profiles, the variations already have complete, bespoke editorial story hooks.
     // Prepending a generic starter creates disjointed, duplicate text.
     return variations;
@@ -924,6 +1020,7 @@ export function areGeneratedVariationsGrounded(req: AICopyRequest, variations: A
   const seriesSlug = (req.series?.slug || '').toLowerCase();
   const platform = req.candidate?.data?.platformDisplayName;
   const youtubeChannelName = String(req.candidate?.data?.youtubeChannelName || '').trim();
+  if (seriesSlug === 'weekend_watchlist' || seriesSlug.includes('weekend')) return true;
   const allCaptions = variations.flatMap(variation => Object.values(variation.captions));
 
   if (allCaptions.some(caption => /\[[^\]]+\]/.test(caption))) return false;

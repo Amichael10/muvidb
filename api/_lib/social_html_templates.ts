@@ -210,11 +210,7 @@ function criticsData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
 function watchlistData(snapshot: SocialSourceSnapshot): Record<string, unknown> {
   const s = movie(snapshot);
   const films = s.watchlistPicks?.length ? s.watchlistPicks : [s];
-  // The supplied thread artwork has three numbered film pages. Preserve legacy
-  // one-film drafts by repeating their film rather than sending undefined pages.
-  const picksSource = [...films];
-  while (picksSource.length < 3) picksSource.push(picksSource[0]);
-  const picks = picksSource.slice(0, 3).map(film => ({
+  const picks = films.slice(0, 8).map(film => ({
     title: film.title,
     subtitle: film.year ? String(film.year) : '',
     poster: film.posterUrl || film.backdropUrl || '',
@@ -468,8 +464,9 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
     case 'weekend_watchlist':
       {
         const pickIndex = Math.max(0, (slide || 2) - 2);
-        const pick = film?.watchlistPicks?.[pickIndex] || film;
-        const totalPicks = film?.watchlistPicks?.length || 3;
+        const picks = film?.watchlistPicks?.length ? film.watchlistPicks : (film ? [film] : []);
+        const totalPicks = picks.length || 1;
+        const pick = picks[pickIndex] || film;
         return {
           ...base,
           series: 'Weekend Watchlist',
@@ -618,7 +615,7 @@ export async function renderHtmlSocialTemplateAsset(input: {
   const { width, height } = spec?.dimensions?.[input.format] || defaultDimensions;
 
   // Slide 1 of weekend_watchlist is always the official default cover poster
-  if (input.templateSlug === 'weekend-watchlist-simple-v1' && (!input.slide || input.slide === 1)) {
+  if ((input.templateSlug === 'weekend-watchlist-simple-v1' || input.templateSlug === 'watchlist-this-week-v1') && (!input.slide || input.slide === 1)) {
     const coverPath = path.join(process.cwd(), 'public', 'images', 'social', 'weekend-watchlist-cover-v1.png');
     if (existsSync(coverPath)) {
       const sharp = (await import('sharp')).default;
@@ -628,7 +625,7 @@ export async function renderHtmlSocialTemplateAsset(input: {
   }
 
   // Final slide of carousel is the official default back cover poster unless custom override requested or spotlight template
-  const totalSlides = spec?.slides || 1;
+  const totalSlides = htmlTemplateSlides(input.templateSlug, input.snapshot);
   const isSpotlightTemplate = input.templateSlug === 'behind-camera-simple-v1' || input.templateSlug === 'you-know-the-face-simple-v1' || input.templateSlug === 'filmography-simple-v1' || input.templateSlug === 'actor-spotlight-v1';
   const wantsCustomBackCover = Boolean(input.dataOverride && (input.dataOverride.variant || input.dataOverride.title || input.dataOverride.skipDefaultBackCover));
   if (totalSlides > 1 && input.slide === totalSlides && !wantsCustomBackCover && !isSpotlightTemplate) {
@@ -644,6 +641,13 @@ export async function renderHtmlSocialTemplateAsset(input: {
   return { format: input.format, png, width, height, usedArtwork: true, slide: input.slide };
 }
 
-export function htmlTemplateSlides(slug: string): number {
+export function htmlTemplateSlides(slug: string, snapshot?: SocialSourceSnapshot): number {
+  if (slug === 'weekend-watchlist-simple-v1' || slug === 'watchlist-this-week-v1') {
+    const picks = (snapshot as UpcomingMovieSnapshot)?.watchlistPicks;
+    if (Array.isArray(picks) && picks.length > 0) {
+      return picks.length + 2;
+    }
+    return 5;
+  }
   return HTML_SOCIAL_TEMPLATES[slug]?.slides || 1;
 }

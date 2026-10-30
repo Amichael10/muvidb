@@ -83,18 +83,17 @@ export const INSTANT_EDITORIAL_THEMES = [
   {
     id: 'weekend_watchlist',
     seriesSlug: 'weekend_watchlist',
-    name: 'Weekend Watchlist (3 Films)',
+    name: 'Weekend Watchlist',
     shortName: 'Weekend Watchlist',
-    badge: '5-Slide 4:5 Carousel',
+    badge: 'Multi-Slide 4:5 Carousel',
     icon: 'solar:film-strip-bold',
-    entity: 'watchlist_3',
+    entity: 'watchlist',
     contentType: 'weekend_watchlist',
     templateSlug: 'weekend-watchlist-simple-v1',
     isReel: false,
     isCarousel: true,
-    slides: 5,
-    formatBadge: '5-Slide 4:5 Carousel',
-    description: 'Pick 3 films to build the 5-slide 4:5 Weekend Watchlist carousel (Cover + 3 numbered picks + Back cover).',
+    formatBadge: 'Dynamic 4:5 Carousel (2–8 Films)',
+    description: 'Pick 2 to 8 films to build the Weekend Watchlist carousel (Cover + film slides + Back cover).',
   },
   {
     id: 'whats_on_stage',
@@ -271,13 +270,33 @@ export default function InstantEditorialPublisher({ onPublished }) {
   }, [activeTheme.id, selectedCandidate?.id]);
 
   // 2. Automatically generate caption + auto-match trending audio when subject is selected
-  const triggerAutoFill = async (subject) => {
+  const triggerAutoFill = async (subject, currentPicks) => {
     if (!subject) return;
     setLoadingAutoFill(true);
     setPublishResult(null);
 
+    const isWatchlist = activeTheme.id === 'weekend_watchlist' || activeTheme.entity === 'watchlist' || activeTheme.entity === 'watchlist_3';
+    const picks = currentPicks || watchlistPicks;
+
     try {
       const headers = { ...(await authHeaders()), 'Content-Type': 'application/json' };
+
+      const candidateData = isWatchlist && picks.length > 0 ? {
+        ...(subject.data || {}),
+        watchlistPicks: picks.map(p => ({
+          id: p.id,
+          name: p.name || p.title,
+          title: p.name || p.title,
+          year: p.data?.year || p.year,
+          watchAvailability: p.data?.watchAvailability || p.data?.platformDisplayName || p.subtext,
+          platformDisplayName: p.data?.platformDisplayName || p.subtext,
+          synopsis: p.data?.synopsis || p.subtext,
+          topCast: p.data?.topCast,
+          directors: p.data?.directors,
+          youtubeChannelName: p.data?.youtubeChannelName,
+        })),
+        films: picks,
+      } : (subject.data || {});
 
       // Run AI caption generation and (if Reel theme) Instagram Trending Audio mood match in parallel
       const copyPromise = fetch('/api/social?task=ai_generate_copy', {
@@ -287,11 +306,11 @@ export default function InstantEditorialPublisher({ onPublished }) {
           candidate: {
             id: subject.id,
             type: activeTheme.entity === 'person' ? 'person' : activeTheme.entity === 'play' ? 'play' : 'movie',
-            name: subject.name || subject.title,
-            subtext: subject.subtext,
+            name: isWatchlist && picks.length > 0 ? picks.map(p => p.name || p.title).join(', ') : (subject.name || subject.title),
+            subtext: isWatchlist && picks.length > 0 ? `${picks.length} films curated for Weekend Watchlist` : subject.subtext,
             imageUrl: subject.imageUrl,
             category: activeTheme.name,
-            data: subject.data || {},
+            data: candidateData,
           },
           series: {
             slug: activeTheme.seriesSlug,
@@ -332,7 +351,9 @@ export default function InstantEditorialPublisher({ onPublished }) {
           tiktok: tk,
         });
       } else {
-        const fallback = `${subject.name || subject.title}${subject.subtext ? ` — ${subject.subtext}` : ''}\n\nExplore full credits and details on muvidb.com.`;
+        const fallback = isWatchlist && picks.length > 0
+          ? `🍿 Weekend Watchlist (${picks.length} films):\n\n${picks.map((p, i) => `${i + 1}. ${p.name || p.title}${p.subtext ? ` — ${p.subtext}` : ''}`).join('\n')}\n\nExplore full credits and reviews on muvidb.com.`
+          : `${subject.name || subject.title}${subject.subtext ? ` — ${subject.subtext}` : ''}\n\nExplore full credits and details on muvidb.com.`;
         setCaption(fallback);
         setPlatformCaptions({ instagram: fallback, threads: fallback, facebook: fallback, tiktok: fallback });
       }
@@ -353,21 +374,41 @@ export default function InstantEditorialPublisher({ onPublished }) {
   };
 
   const handleChooseCandidate = (item) => {
-    setDropdownOpen(false);
-    if (activeTheme.entity === 'watchlist_3') {
+    const isWatchlist = activeTheme.id === 'weekend_watchlist' || activeTheme.entity === 'watchlist' || activeTheme.entity === 'watchlist_3';
+    if (isWatchlist) {
       setWatchlistPicks(prev => {
-        if (prev.some(p => p.id === item.id)) return prev;
-        const next = [...prev, item].slice(0, 3);
-        if (next.length === 3) {
+        const already = prev.some(p => p.id === item.id);
+        const next = already ? prev.filter(p => p.id !== item.id) : [...prev, item].slice(0, 8);
+        if (next.length >= 2) {
           setSelectedCandidate(next[0]);
-          triggerAutoFill(next[0]);
+          triggerAutoFill(next[0], next);
+        } else if (next.length === 1) {
+          setSelectedCandidate(next[0]);
+        } else {
+          setSelectedCandidate(null);
         }
         return next;
       });
       return;
     }
+    setDropdownOpen(false);
     setSelectedCandidate(item);
     triggerAutoFill(item);
+  };
+
+  const handleRemoveWatchlistPick = (pickId) => {
+    setWatchlistPicks(prev => {
+      const next = prev.filter(p => p.id !== pickId);
+      if (next.length >= 2) {
+        setSelectedCandidate(next[0]);
+        triggerAutoFill(next[0], next);
+      } else if (next.length === 1) {
+        setSelectedCandidate(next[0]);
+      } else {
+        setSelectedCandidate(null);
+      }
+      return next;
+    });
   };
 
   const handleSearchAudioManual = async () => {
@@ -432,9 +473,9 @@ export default function InstantEditorialPublisher({ onPublished }) {
 
   // 3. ONE-CLICK POST NOW (No schedule, no approval queue — straight to live socials)
   const handlePostNow = async () => {
-    const isWatchlist = activeTheme.entity === 'watchlist_3';
-    if (isWatchlist && watchlistPicks.length !== 3) {
-      return toast.error('Please pick 3 films for Weekend Watchlist first.');
+    const isWatchlist = activeTheme.id === 'weekend_watchlist' || activeTheme.entity === 'watchlist' || activeTheme.entity === 'watchlist_3';
+    if (isWatchlist && (watchlistPicks.length < 2 || watchlistPicks.length > 8)) {
+      return toast.error('Please pick between 2 and 8 films for Weekend Watchlist.');
     }
     if (!isWatchlist && !selectedCandidate) {
       return toast.error('Please select a movie, person, or stage play first.');
@@ -457,7 +498,7 @@ export default function InstantEditorialPublisher({ onPublished }) {
       activeTheme.isReel
         ? `Rendering 9:16 Reel with "${selectedAudio?.title || 'Trending Audio'}" & publishing live to ${platforms.join(', ')}...`
         : activeTheme.isCarousel
-          ? `Rendering ${activeTheme.slides || 'multi'}-slide 4:5 carousel & publishing live to ${platforms.join(', ')}...`
+          ? `Rendering ${isWatchlist ? (watchlistPicks.length + 2) : (activeTheme.slides || 'multi')}-slide 4:5 carousel & publishing live to ${platforms.join(', ')}...`
           : `Publishing live to ${platforms.join(', ')}...`
     );
 
@@ -507,9 +548,10 @@ export default function InstantEditorialPublisher({ onPublished }) {
     }
   };
 
+  const isWatchlist = activeTheme.id === 'weekend_watchlist' || activeTheme.entity === 'watchlist' || activeTheme.entity === 'watchlist_3';
   const subjectReady =
-    activeTheme.entity === 'watchlist_3'
-      ? watchlistPicks.length === 3
+    isWatchlist
+      ? watchlistPicks.length >= 2 && watchlistPicks.length <= 8
       : Boolean(selectedCandidate);
 
   return (
@@ -587,8 +629,8 @@ export default function InstantEditorialPublisher({ onPublished }) {
               ? `Select ${activeTheme.id === 'behind_the_camera' ? 'Director / Crew Member' : 'Actor / Star'}`
               : activeTheme.entity === 'play'
                 ? 'Select Stage Play / Theatre Production'
-                : activeTheme.entity === 'watchlist_3'
-                  ? `Select 3 Films for Weekend Watchlist (${watchlistPicks.length}/3 chosen)`
+                : isWatchlist
+                  ? `Select 2 to 8 Films for Weekend Watchlist (${watchlistPicks.length}/8 chosen)`
                   : `Select Movie for ${activeTheme.shortName}`}
           </label>
           <span className="text-[10px] font-bold text-zinc-400">
@@ -614,7 +656,9 @@ export default function InstantEditorialPublisher({ onPublished }) {
                     ? 'Search actor or filmmaker by name, or pick from the recommended dropdown below...'
                     : activeTheme.entity === 'play'
                       ? 'Search stage play, or pick from the dropdown list...'
-                      : 'Search movie title, or pick from the recommended dropdown list...'
+                      : isWatchlist
+                        ? 'Search and add 2 to 8 movies for the Weekend Watchlist...'
+                        : 'Search movie title, or pick from the recommended dropdown list...'
                 }
                 className="h-11 w-full rounded-xl border border-white/15 bg-surface px-10 text-xs font-medium text-white outline-none focus:border-brand"
               />
@@ -639,16 +683,17 @@ export default function InstantEditorialPublisher({ onPublished }) {
           </div>
 
           {/* Selected pill(s) */}
-          {activeTheme.entity === 'watchlist_3' && watchlistPicks.length > 0 && (
+          {isWatchlist && watchlistPicks.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {watchlistPicks.map((pick, idx) => (
                 <div key={pick.id} className="flex items-center gap-2 rounded-xl border border-brand/40 bg-brand/15 px-3 py-1.5 text-xs font-bold text-white">
                   <span className="rounded-full bg-brand px-1.5 py-0.2 text-[10px] font-black">#{idx + 1}</span>
-                  <span>{pick.name}</span>
+                  <span>{pick.name || pick.title}</span>
                   <button
                     type="button"
-                    onClick={() => setWatchlistPicks(prev => prev.filter(p => p.id !== pick.id))}
+                    onClick={() => handleRemoveWatchlistPick(pick.id)}
                     className="text-zinc-300 hover:text-white"
+                    title="Remove from watchlist"
                   >
                     <Icon icon="solar:close-circle-bold" width="15" />
                   </button>
@@ -657,7 +702,7 @@ export default function InstantEditorialPublisher({ onPublished }) {
             </div>
           )}
 
-          {activeTheme.entity !== 'watchlist_3' && selectedCandidate && (
+          {!isWatchlist && selectedCandidate && (
             <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
               <div className="flex items-center gap-3 min-w-0">
                 {selectedCandidate.imageUrl ? (
@@ -688,7 +733,7 @@ export default function InstantEditorialPublisher({ onPublished }) {
           )}
 
           {/* Dropdown Candidate List */}
-          {(dropdownOpen || (!selectedCandidate && candidates.length > 0)) && (
+          {(dropdownOpen || (!selectedCandidate && !watchlistPicks.length && candidates.length > 0)) && (
             <div className="mt-2 max-h-64 overflow-y-auto rounded-2xl border border-white/15 bg-surface-2 p-2 shadow-2xl space-y-1">
               {loadingCandidates ? (
                 <div className="flex items-center justify-center gap-2 py-6 text-xs text-zinc-400">
@@ -702,7 +747,7 @@ export default function InstantEditorialPublisher({ onPublished }) {
               ) : (
                 candidates.map(item => {
                   const isChosen =
-                    activeTheme.entity === 'watchlist_3'
+                    isWatchlist
                       ? watchlistPicks.some(p => p.id === item.id)
                       : selectedCandidate?.id === item.id;
                   return (
@@ -731,7 +776,11 @@ export default function InstantEditorialPublisher({ onPublished }) {
                           </p>
                         </div>
                       </div>
-                      <span className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1 text-[10px] font-black text-white">
+                      <span className={`shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-black ${
+                        isChosen
+                          ? 'bg-brand text-white'
+                          : 'bg-white/10 text-white'
+                      }`}>
                         {isChosen ? 'Selected ✓' : 'Select'}
                       </span>
                     </button>

@@ -525,6 +525,43 @@ function theatreBody(snapshot: TheatrePlaySnapshot, platform: SocialPlatform = '
   return lines;
 }
 
+function weekendWatchlistBody(snapshot: UpcomingMovieSnapshot, platform: SocialPlatform = 'instagram'): string[] {
+  const picks = snapshot.watchlistPicks?.length ? snapshot.watchlistPicks : [snapshot];
+  const totalPicks = picks.length;
+
+  if (platform === 'threads') {
+    const threadLines: string[] = [];
+    threadLines.push(`🍿 WEEKEND WATCHLIST (${totalPicks} FILMS)`);
+    const quickList = picks.map((film, idx) => {
+      const dest = film.youtubeChannelName ? `YouTube (${film.youtubeChannelName})` : (film.watchAvailability || 'Streaming');
+      return `${idx + 1}. ${film.title}${film.year ? ` (${film.year})` : ''} — ${dest}`;
+    }).join('\n');
+    threadLines.push(quickList);
+    threadLines.push(`Which one are you streaming first this weekend? Let us know below! 👇`);
+    return threadLines;
+  }
+
+  const lines: string[] = [];
+  lines.push(`🍿 WEEKEND WATCHLIST | ${totalPicks} FILMS TO STREAM THIS WEEKEND`);
+  lines.push(`Looking for something great to watch? We've curated ${totalPicks} standout African cinema titles across streaming platforms and cinemas:`);
+
+  const filmBlocks = picks.map((film, idx) => {
+    const yearStr = film.year ? ` (${film.year})` : '';
+    const platformStr = film.youtubeChannelName 
+      ? `YouTube (${film.youtubeChannelName})` 
+      : (film.watchAvailability || 'Streaming platforms / Cinemas');
+    const hook = buildMovieHook(film.tagline, film.synopsis, film.title) || film.synopsis || 'A compelling African story to add to your watchlist.';
+    const cleanHook = hook.replace(/\s+/g, ' ').slice(0, 160).trim();
+    return `${idx + 1}️⃣ **${film.title.toUpperCase()}${yearStr}**\n📺 Available on: ${platformStr}\n💡 ${cleanHook}`;
+  });
+  lines.push(filmBlocks.join('\n\n'));
+
+  lines.push(`Which of these ${totalPicks} titles are you pressing play on first? Or what else are you watching this weekend? Drop your picks below! 👇`);
+  lines.push(`🔗 Explore full cast, crew, and verified credits on **muvidb.com**`);
+
+  return lines;
+}
+
 function baseHashtags(snapshot: SocialSourceSnapshot, contentType?: string | null): (string | null)[] {
   if (snapshot.kind === 'actor_spotlight' || snapshot.kind === 'birthday_spotlight') {
     return [
@@ -545,6 +582,18 @@ function baseHashtags(snapshot: SocialSourceSnapshot, contentType?: string | nul
       'NigerianTheatre',
       snapshot.city ? toHashtag(snapshot.city) : null,
       'Nollywood',
+    ];
+  }
+
+  if (contentType === 'weekend_watchlist') {
+    const picks = (snapshot as UpcomingMovieSnapshot).watchlistPicks || [];
+    return [
+      'MuviDB',
+      'WeekendWatchlist',
+      'AfricanCinema',
+      'Nollywood',
+      'WhatToWatch',
+      ...picks.slice(0, 4).map(p => toHashtag(p.title)),
     ];
   }
 
@@ -592,7 +641,9 @@ export function buildVariantContent(input: {
         ? actorBody(input.snapshot, input.contentType)
         : input.snapshot.kind === 'whats_on_stage'
           ? theatreBody(input.snapshot, input.platform)
-          : input.snapshot.kind === 'upcoming_movie' && input.contentType === 'audience_pulse'
+                    : input.snapshot.kind === 'upcoming_movie' && input.contentType === 'weekend_watchlist'
+            ? weekendWatchlistBody(input.snapshot, input.platform)
+            : input.snapshot.kind === 'upcoming_movie' && input.contentType === 'audience_pulse'
             ? audiencePulseBody(input.snapshot, input.platform)
             : input.snapshot.kind === 'upcoming_movie' && input.snapshot.criticReview
               ? criticsBody(input.snapshot)

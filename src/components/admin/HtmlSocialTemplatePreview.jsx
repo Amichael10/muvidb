@@ -32,11 +32,9 @@ function templateData(candidate, templateSlug) {
     return { title, description: synopsis || `${title} is on stage soon. Save the date and follow MuviDB for the theatre run details.`, venue, date: start && end && start !== end ? `${start} - ${end}` : start || end || (source.year ? String(source.year) : 'Date TBA'), time: source.performance_time || 'Time TBA', poster, posterAlt: title, handle: DEFAULT_HANDLE };
   }
   if (templateSlug === 'critics-say-v1') return { poster, review: source.tagline || synopsis || `The conversation around ${title} is heating up.`, criticImage: '', criticName: 'MuviDB Critics', criticRole: 'African cinema review desk', rating: 4, ratingMax: 5, handle: DEFAULT_HANDLE };
-  if (templateSlug === 'watchlist-this-week-v1') {
+  if (templateSlug === 'watchlist-this-week-v1' || templateSlug === 'weekend-watchlist-simple-v1') {
     const rawPicks = source.watchlistPicks || (source.picks ? source.picks : [source]);
-    const picksSource = [...rawPicks];
-    while (picksSource.length < 3) picksSource.push(picksSource[0]);
-    const picks = picksSource.slice(0, 3).map((film) => ({
+    const picks = (Array.isArray(rawPicks) ? rawPicks : [rawPicks]).slice(0, 8).map((film) => ({
       title: film.title || film.name || title,
       subtitle: film.year ? String(film.year) : '',
       poster: film.poster_url || film.posterUrl || film.backdrop_url || film.backdropUrl || poster,

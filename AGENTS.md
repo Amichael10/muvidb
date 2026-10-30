@@ -18,7 +18,7 @@ When performing local OCR (via `local_ocr_extractor.py`, `cast_extractor.py`, au
    - **Now Streaming** (`where_to_watch` / `streaming_alert`)
    - **New & Upcoming Release** (`upcoming_movie` / `new_release`)
 3. **Other Editorial Formats**:
-   - **Weekend Watchlist** (`weekend_watchlist`): Multi-slide 4:5 carousel (5 slides).
+   - **Weekend Watchlist** (`weekend_watchlist`): Dynamic Multi-slide 4:5 carousel (2 to 8 films, 4 to 10 slides: Cover + 2–8 film slides + Back cover).
    - **What The Critics Say** (`critics_say`): Multi-slide 4:5 carousel.
    - **What's On Stage & Theatre** (`whats_on_stage`): Verified 4:5 portrait poster (`poster-only`).
    - **Nollywood Debate & Conversation** (`film_conversation`): 4:5 debate graphic.
