@@ -18,23 +18,24 @@ export function classifyArtworkOrientation(width: number | null, height: number 
 }
 
 async function inspectArtwork(url: string | null): Promise<ArtworkInspection> {
-  if (!url) return { url: null, width: null, height: null, orientation: 'unknown' };
+  const cleanUrl = (url || '').trim().replace(/\s+/g, '');
+  if (!cleanUrl) return { url: null, width: null, height: null, orientation: 'unknown' };
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const response = await fetch(cleanUrl, { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const metadata = await sharp(Buffer.from(await response.arrayBuffer())).metadata();
     const width = metadata.width || null;
     const height = metadata.height || null;
-    return { url, width, height, orientation: classifyArtworkOrientation(width, height) };
+    return { url: cleanUrl, width, height, orientation: classifyArtworkOrientation(width, height) };
   } catch {
-    return { url, width: null, height: null, orientation: 'unknown' };
+    return { url: cleanUrl, width: null, height: null, orientation: 'unknown' };
   }
 }
 
 export async function preflightFilm(filmId: string) {
   const { data: film, error } = await supabase
     .from('films')
-    .select('id,title,poster_url,backdrop_url,synopsis,liked_percent,updated_at,credits(role,people(id,name))')
+    .select('id,title,poster_url,backdrop_url,synopsis,status,year,liked_percent,updated_at,credits(role,people(id,name))')
     .eq('id', filmId)
     .maybeSingle();
   if (error) throw error;
@@ -67,7 +68,11 @@ export async function preflightFilm(filmId: string) {
   else if (artwork.orientation === 'unknown') reasons.push('unreadable_poster');
   if (castCount < 1) reasons.push('missing_cast');
   if (crewCount < 1 && directorCount < 1) reasons.push('missing_director_or_crew');
-  if (film.liked_percent === null || film.liked_percent === undefined) reasons.push('missing_rating');
+  // Upcoming releases do not yet have audience ratings; do not block them with missing_rating.
+  const isUpcoming = film.status === 'upcoming' || (film.year && Number(film.year) >= new Date().getFullYear());
+  if (!isUpcoming && (film.liked_percent === null || film.liked_percent === undefined)) {
+    reasons.push('missing_rating');
+  }
 
   return {
     ready: reasons.length === 0,

@@ -3759,8 +3759,13 @@ export async function approveEditorialSlot(
   }
 
   // 4. Schedule the draft
+  // Recompute scheduledFor in case preceding async operations (like Reel rendering) took several minutes
+  const effectiveScheduledFor = targetMs <= Date.now()
+    ? new Date(Date.now() + 10_000).toISOString()
+    : new Date(targetMs).toISOString();
+
   const scheduledItem = await scheduleContentItem(
-    { contentItemId: draft.contentItem.id, scheduledFor },
+    { contentItemId: draft.contentItem.id, scheduledFor: effectiveScheduledFor },
     actor,
   );
 
