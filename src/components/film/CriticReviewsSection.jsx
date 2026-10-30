@@ -66,7 +66,7 @@ export default function CriticReviewsSection({ filmId, playId, user, filmSlug = 
     if (filter === 'featured') return rev.is_featured;
     if (filter === 'fresh') {
       const num = Number(rev.rating);
-      return !isNaN(num) && num >= 6;
+      return !isNaN(num) && num >= 3.0;
     }
     return true;
   });
@@ -160,7 +160,7 @@ export default function CriticReviewsSection({ filmId, playId, user, filmSlug = 
 
             const hasRating = rev.rating != null && rev.rating !== '' && !isNaN(Number(rev.rating));
             const ratingNum = hasRating ? Number(rev.rating) : null;
-            const isFresh = ratingNum != null ? ratingNum >= 6 : true;
+            const isFresh = ratingNum != null ? ratingNum >= 3.0 : true;
             const criticSlug = criticObj.slug;
             const isVerified = criticObj.is_verified || Boolean(rev.critic_id);
 
@@ -205,7 +205,7 @@ export default function CriticReviewsSection({ filmId, playId, user, filmSlug = 
                     {hasRating ? (
                       <div className="inline-flex items-center gap-1 text-amber-400 font-black text-xs">
                         <Icon icon="solar:star-bold" className="text-xs" />
-                        <span>{ratingNum} / 10</span>
+                        <span>{ratingNum} / 5</span>
                       </div>
                     ) : (
                       rev.is_featured && (

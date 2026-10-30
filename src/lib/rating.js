@@ -48,13 +48,15 @@ export function computeFilmRating(params = {}) {
   // 1. Critic Score
   const validCriticRatings = (criticReviews || [])
     .map((r) => (r.rating != null && r.rating !== '' ? Number(r.rating) : null))
-    .filter((n) => n !== null && !isNaN(n) && n > 0 && n <= 10);
+    .filter((n) => n !== null && !isNaN(n) && n > 0 && n <= 10)
+    .map((n) => (n > 5 ? n / 2 : n)); // ensure 1-5 scale
 
   const criticReviewsCount = validCriticRatings.length;
+  // Blend on the 0-10 scale by multiplying 5-star avg by 2
   const criticScore =
     criticReviewsCount > 0
       ? Math.round(
-          (validCriticRatings.reduce((a, b) => a + b, 0) / criticReviewsCount) * 10
+          ((validCriticRatings.reduce((a, b) => a + b, 0) / criticReviewsCount) * 2) * 10
         ) / 10
       : null;
 

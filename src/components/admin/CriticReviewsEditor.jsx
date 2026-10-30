@@ -434,7 +434,7 @@ export default function CriticReviewsEditor({ filmId, playId, onUpdated }) {
           {/* Rating (Optional) */}
           <div>
             <label className="block text-xs font-medium text-text-muted mb-1">
-              Star Rating / Score (Optional — Leave blank if unrated)
+              Star Rating (1–5 Stars · e.g. 3, 3.5, 4, 5 — scores over 5 auto-convert to /5)
             </label>
             <input
               type="number"
@@ -443,7 +443,7 @@ export default function CriticReviewsEditor({ filmId, playId, onUpdated }) {
               max="10"
               value={formData.rating}
               onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
-              placeholder="Leave blank for unrated quote"
+              placeholder="e.g. 3 or 3.5 (out of 5)"
               className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-text-primary focus:border-brand focus:outline-none"
             />
           </div>
@@ -566,7 +566,7 @@ export default function CriticReviewsEditor({ filmId, playId, onUpdated }) {
                         {rev.rating != null && String(rev.rating) !== '' && (
                           <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
                             <Icon icon="solar:star-bold" className="text-xs" />
-                            {rev.rating} / 10
+                            {rev.rating} / 5
                           </span>
                         )}
                         {rev.is_featured && (

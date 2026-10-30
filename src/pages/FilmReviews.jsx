@@ -32,14 +32,14 @@ const formatRelativeTime = (dateString) => {
 };
 
 // Render 5 yellow stars (Rotten Tomatoes style)
-function StarDisplay({ score10, maxStars = 5 }) {
-  if (score10 == null || isNaN(score10)) return null;
-  const score = Math.max(0, Math.min(10, Number(score10)));
-  // Map 0-10 scale to 0-5 stars
-  const starsCount = score / 2; // e.g. 8/10 -> 4 stars, 7/10 -> 3.5 stars
+function StarDisplay({ score, scale = 5, maxStars = 5 }) {
+  if (score == null || isNaN(score)) return null;
+  const num = Math.max(0, Math.min(scale, Number(score)));
+  // Map score to visual 5-star count
+  const starsCount = scale === 10 ? num / 2 : num;
   const fullStars = Math.floor(starsCount);
-  const hasHalf = starsCount - fullStars >= 0.3 && starsCount - fullStars <= 0.7;
-  const roundedStars = starsCount - fullStars > 0.7 ? fullStars + 1 : fullStars;
+  const hasHalf = starsCount - fullStars >= 0.25 && starsCount - fullStars <= 0.75;
+  const roundedStars = starsCount - fullStars > 0.75 ? fullStars + 1 : fullStars;
 
   return (
     <div className="flex items-center gap-1 text-[#FFB800]">
@@ -53,7 +53,7 @@ function StarDisplay({ score10, maxStars = 5 }) {
         return <Icon key={i} icon="solar:star-linear" className="text-base sm:text-lg text-white/20" />;
       })}
       <span className="text-xs font-bold text-white/50 ml-1.5 font-mono">
-        {score.toFixed(1)}/10
+        {num.toFixed(1)}/{scale}
       </span>
     </div>
   );
@@ -245,13 +245,15 @@ export default function FilmReviews() {
   const criticMetrics = useMemo(() => {
     const validRatings = criticsList
       .map((c) => (c.rating != null && c.rating !== '' ? Number(c.rating) : null))
-      .filter((n) => n !== null && !isNaN(n) && n > 0 && n <= 10);
+      .filter((n) => n !== null && !isNaN(n) && n > 0 && n <= 10)
+      .map((n) => (n > 5 ? n / 2 : n)); // ensure 1-5 scale
     const count = validRatings.length;
-    const avgScore = count > 0 ? (validRatings.reduce((a, b) => a + b, 0) / count).toFixed(1) : null;
-    const freshCount = validRatings.filter((n) => n >= 6).length;
+    const avgScore5 = count > 0 ? (validRatings.reduce((a, b) => a + b, 0) / count) : null;
+    const avgScore = avgScore5 != null ? (avgScore5 * 2).toFixed(1) : null;
+    const freshCount = validRatings.filter((n) => n >= 3.0).length;
     const freshPct = count > 0 ? Math.round((freshCount / count) * 100) : null;
     const topCritics = criticsList.filter((c) => c.is_featured || c.critic?.is_verified);
-    return { count, avgScore, freshPct, topCriticsCount: topCritics.length };
+    return { count, avgScore, avgScore5: avgScore5?.toFixed(1), freshPct, topCriticsCount: topCritics.length };
   }, [criticsList]);
 
   const audienceMetrics = useMemo(() => {
@@ -281,7 +283,8 @@ export default function FilmReviews() {
         avatar: c.critic?.avatar_url || null,
         isVerified: Boolean(c.critic?.is_verified || c.is_featured),
         isTop: Boolean(c.is_featured),
-        rating10: c.rating != null && c.rating !== '' ? Number(c.rating) : null,
+        rating: c.rating != null && c.rating !== '' ? (Number(c.rating) > 5 ? Number(c.rating) / 2 : Number(c.rating)) : null,
+        ratingScale: 5,
         body: c.body || c.quote || '',
         createdAt: c.created_at,
         url: c.review_url || null,
@@ -298,7 +301,8 @@ export default function FilmReviews() {
           avatar: c.critic?.avatar_url || null,
           isVerified: true,
           isTop: true,
-          rating10: c.rating != null && c.rating !== '' ? Number(c.rating) : null,
+          rating: c.rating != null && c.rating !== '' ? (Number(c.rating) > 5 ? Number(c.rating) / 2 : Number(c.rating)) : null,
+        ratingScale: 5,
           body: c.body || c.quote || '',
           createdAt: c.created_at,
           url: c.review_url || null,
@@ -314,7 +318,8 @@ export default function FilmReviews() {
           handle: r.users?.name ? `@${r.users.name.toLowerCase().replace(/\s+/g, '')}` : '@audience',
           avatar: r.users?.avatar_url || null,
           isVerified: true,
-          rating10: r.rating != null ? Number(r.rating) : null,
+          rating: r.rating != null ? Number(r.rating) : null,
+          ratingScale: 10,
           body: r.body || '',
           createdAt: r.created_at,
           source: 'user',
@@ -726,9 +731,9 @@ export default function FilmReviews() {
                       </div>
 
                       {/* Middle: 5 Yellow Stars (Rotten Tomatoes visual signature) */}
-                      {rev.rating10 != null && (
+                      {rev.rating != null && (
                         <div className="pt-0.5">
-                          <StarDisplay score10={rev.rating10} />
+                          <StarDisplay score={rev.rating} scale={rev.ratingScale || 5} />
                         </div>
                       )}
 

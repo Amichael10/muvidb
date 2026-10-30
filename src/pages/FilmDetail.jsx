@@ -344,7 +344,8 @@ export default function FilmDetail() {
       if (data && data.length > 0) {
         const valid = data
           .map((r) => (r.rating != null && r.rating !== '' ? Number(r.rating) : null))
-          .filter((n) => n !== null && !isNaN(n) && n > 0 && n <= 10);
+          .filter((n) => n !== null && !isNaN(n) && n > 0 && n <= 10)
+          .map((n) => (n > 5 ? n / 2 : n)); // ensure 1-5 scale
         
         const featured = data.find((r) => r.is_featured && r.quote) || data.find((r) => r.quote) || null;
         const featuredObj = featured ? {
@@ -353,8 +354,10 @@ export default function FilmDetail() {
           publication: featured.publication || featured.critic?.publication
         } : null;
 
-        const avg = valid.length > 0 ? Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10 : null;
-        setCriticSummary({ score: avg, count: valid.length, featuredQuote: featuredObj });
+        const avg5 = valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length) : null;
+        // Scale 5-star avg to 10 for RottenTomatoesScorecard (which multiplies by 10 to get percentage)
+        const avg10 = avg5 != null ? Math.round((avg5 * 2) * 10) / 10 : null;
+        setCriticSummary({ score: avg10, count: valid.length, featuredQuote: featuredObj });
       }
     } catch (e) {
       console.error('Error fetching critic summary:', e);
