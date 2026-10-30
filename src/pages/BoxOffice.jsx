@@ -108,10 +108,18 @@ export default function BoxOffice() {
                 box_office_domestic,
                 box_office_opening_weekend,
                 box_office_currency,
+                distributor,
                 streaming_links,
                 credits (
                   role,
                   person:people (
+                    id,
+                    name
+                  )
+                ),
+                film_companies (
+                  role,
+                  company:companies (
                     id,
                     name
                   )
@@ -686,10 +694,13 @@ export default function BoxOffice() {
                       const dom = Number(film.box_office_domestic || 0);
                       const opening = Number(film.box_office_opening_weekend || 0);
                       const isBillion = dom >= 1_000_000_000;
-                      const distributors = (film.film_companies || [])
-                        .filter((fc) => fc.role === 'distribution')
+                      const distCompanies = (film.film_companies || [])
+                        .filter((fc) => fc.role === 'distribution' || fc.role === 'distributor')
                         .map((fc) => fc.company?.name)
                         .filter(Boolean);
+                      const distributors = distCompanies.length > 0
+                        ? distCompanies
+                        : (film.distributor ? [film.distributor] : []);
 
                       const directorName = film.director || film.credits?.find((c) => c.role?.toLowerCase() === 'director')?.person?.name;
 
