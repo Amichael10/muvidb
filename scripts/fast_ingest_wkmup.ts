@@ -100,7 +100,13 @@ function extractRating(content: string, excerpt: string): number {
   return 7.0;
 }
 
-function extractQuote(excerpt: string, content: string): string {
+function extractQuote(excerpt: string, content: string, rawTitle?: string): string {
+  if (rawTitle) {
+    const titleMatch = rawTitle.match(/(?:Review|Stage Review|Movie Review|Film Review|Series Review)\s*[:\-—]\s*(.+)$/i);
+    if (titleMatch && titleMatch[1]?.trim() && !titleMatch[1].trim().toLowerCase().endsWith('review')) {
+      return titleMatch[1].replace(/\s*\((?:Documentary|Short Film|Animation)\)\s*$/i, '').replace(/\.$/, '').trim();
+    }
+  }
   let cleanExcerpt = stripHtml(excerpt);
   cleanExcerpt = cleanExcerpt.replace(/\[\s*&hellip;\s*\]/g, '...').replace(/\[\s*\.\.\.\s*\]/g, '...');
 

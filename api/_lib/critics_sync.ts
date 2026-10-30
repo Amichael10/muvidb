@@ -96,13 +96,20 @@ function parseRssItems(xml: string, sourceName: string): DiscoveredReview[] {
         const rawDesc = descMatch ? descMatch[1].replace(/<[^>]+>/g, '').trim() : '';
 
         if (/review/i.test(rawTitle) || /review/i.test(link) || /movie|film|cinema/i.test(entryXml)) {
-          const firstDescLine = rawDesc.split('\n').map(l => l.trim()).find(l => l.length > 20 && !l.startsWith('#')) || '';
+          let quote = '';
+          const titleVerdictMatch = rawTitle.match(/(?:Review|Stage Review|Movie Review|Film Review|Series Review)\s*[:\-—]\s*(.+)$/i);
+          if (titleVerdictMatch && titleVerdictMatch[1]?.trim() && !titleVerdictMatch[1].trim().toLowerCase().endsWith('review')) {
+            quote = titleVerdictMatch[1].replace(/\s*\((?:Documentary|Short Film|Animation)\)\s*$/i, '').replace(/\.$/, '').trim();
+          } else {
+            const firstDescLine = rawDesc.split('\n').map(l => l.trim()).find(l => l.length > 20 && !l.startsWith('#')) || '';
+            quote = firstDescLine || rawTitle;
+          }
           items.push({
             film_title: cleanMovieTitle(rawTitle),
             critic_name: author || sourceName,
             source_publication: sourceName,
             review_url: link,
-            quote: firstDescLine || rawTitle,
+            quote,
             published_date: pubDateMatch ? pubDateMatch[1] : undefined
           });
         }
@@ -130,12 +137,22 @@ function parseRssItems(xml: string, sourceName: string): DiscoveredReview[] {
 
       // Only include if it's a review or Nollywood movie review
       if (/review/i.test(rawTitle) || /review/i.test(link) || /movie|film|cinema/i.test(itemXml)) {
+        let quote = '';
+        const titleVerdictMatch = rawTitle.match(/(?:Review|Stage Review|Movie Review|Film Review|Series Review)\s*[:\-—]\s*(.+)$/i);
+        if (titleVerdictMatch && titleVerdictMatch[1]?.trim() && !titleVerdictMatch[1].trim().toLowerCase().endsWith('review')) {
+          quote = titleVerdictMatch[1].replace(/\s*\((?:Documentary|Short Film|Animation)\)\s*$/i, '').replace(/\.$/, '').trim();
+        } else if (rawDesc) {
+          quote = rawDesc.slice(0, 240) + '...';
+        } else {
+          quote = rawTitle;
+        }
+
         items.push({
           film_title: cleanMovieTitle(rawTitle),
           critic_name: author || sourceName,
           source_publication: sourceName,
           review_url: link,
-          quote: rawDesc ? rawDesc.slice(0, 240) + '...' : rawTitle,
+          quote,
           published_date: pubDateMatch ? pubDateMatch[1] : undefined
         });
       }
