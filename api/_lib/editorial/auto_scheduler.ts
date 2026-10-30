@@ -41,6 +41,36 @@ async function resolveEligibleCandidate(options: {
   const initialId = slot.subject_entity_id;
   const initialType = (slot.subject_entity_type as 'movie' | 'person' | 'play') || 'movie';
 
+  // 0. If the slot is locked by an admin or user, respect the choice unconditionally.
+  if (slot.selection_locked && initialId) {
+    if (initialType === 'movie') {
+      const preflight = await preflightFilm(initialId).catch(() => null);
+      return {
+        candidateId: initialId,
+        candidateType: 'movie',
+        candidateName: preflight?.title || initialId,
+        preflight: preflight || undefined,
+        wasReplaced: false,
+      };
+    }
+    return {
+      candidateId: initialId,
+      candidateType: initialType,
+      candidateName: initialId,
+      wasReplaced: false,
+    };
+  }
+
+  // If a play or person is already assigned to the slot, keep it.
+  if (initialId && (initialType === 'play' || initialType === 'person')) {
+    return {
+      candidateId: initialId,
+      candidateType: initialType,
+      candidateName: initialId,
+      wasReplaced: false,
+    };
+  }
+
   // 1. If subject is already set, validate it first
   if (initialId && !claimedCandidateIds.has(initialId)) {
     if (initialType === 'movie') {
@@ -174,18 +204,23 @@ async function resolveEligibleCandidate(options: {
  * directly into scheduled status so they publish without manual intervention.
  * If a candidate fails validation, it replaces it with the next qualified candidate.
  */
-export async function autoScheduleDueCalendarSlots(now = new Date()): Promise<{
+export async function autoScheduleDueCalendarSlots(now = new Date(), options: { maxLookaheadMinutes?: number; forceAll?: boolean } = {}): Promise<{
   processed: number;
   scheduled: string[];
   skipped: Array<{ slotId: string; reason: string }>;
 }> {
   const { dateStr, timeStr } = getLagosNow(now);
+  const nowMinutes = (() => {
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  })();
+  const maxMinutes = options.forceAll ? Infinity : nowMinutes + (options.maxLookaheadMinutes ?? 90);
 
-  // 1. Fetch unapproved slots for today up to 30 mins ahead in WAT
+  // 1. Fetch unapproved slots for today in WAT
   const { data: slots, error } = await supabase
     .from('social_calendar')
     .select(`
-      id, scheduled_date, scheduled_time, status, priority, subject_entity_type, subject_entity_id, planner_key,
+      id, scheduled_date, scheduled_time, status, priority, subject_entity_type, subject_entity_id, selection_locked, planner_key,
       social_content_series (id, name, slug)
     `)
     .eq('scheduled_date', dateStr)
@@ -200,8 +235,8 @@ export async function autoScheduleDueCalendarSlots(now = new Date()): Promise<{
   const scheduledSlots: string[] = [];
   const skippedSlots: Array<{ slotId: string; reason: string }> = [];
 
-  // Track claimed candidate IDs across recent days, within this batch, and all historically published entities
-  // to ensure already-published or scheduled entities are NEVER chosen again.
+  // Track claimed candidate IDs across recent past days, within this batch, and all historically published entities
+  // to ensure already-published or scheduled entities from earlier days are NEVER chosen again.
   const claimedCandidateIds = new Set<string>();
   const publishedIds = await getPublishedEntityIds().catch(() => new Set<string>());
   for (const id of publishedIds) {
@@ -213,14 +248,25 @@ export async function autoScheduleDueCalendarSlots(now = new Date()): Promise<{
     .from('social_calendar')
     .select('subject_entity_id')
     .gte('scheduled_date', recentCutoff)
+    .lt('scheduled_date', dateStr) // Only exclude items published or approved on past days
     .not('subject_entity_id', 'is', null)
-    .in('status', ['published', 'approved', 'draft_ready', 'subject_selected']);
+    .in('status', ['published', 'approved']);
 
   for (const row of recentSlots || []) {
     if (row.subject_entity_id) claimedCandidateIds.add(row.subject_entity_id);
   }
 
   for (const slot of slots || []) {
+    const slotMinutes = (() => {
+      const [h, m] = (slot.scheduled_time || '00:00:00').split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
+    })();
+
+    // Defer auto-drafting of far-future evening slots so they don't block immediate publications or time out crons
+    if (slotMinutes > maxMinutes) {
+      continue;
+    }
+
     try {
       const series = (slot as any).social_content_series;
       const seriesSlug = series?.slug || (slot.planner_key?.startsWith('release:') ? 'new_and_upcoming' : 'spotlight');

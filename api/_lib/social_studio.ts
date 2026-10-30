@@ -1325,15 +1325,6 @@ export async function runSocialPublisher(input: {
     }
   }
 
-  // 1c. Zero-Approval Auto-Schedule: Inspect un-drafted / unapproved calendar slots for today,
-  // validate portrait posters and credits, and auto-schedule them into variants.
-  try {
-    const { autoScheduleDueCalendarSlots } = await import('./editorial/auto_scheduler.js');
-    autoScheduleResult = await autoScheduleDueCalendarSlots(now);
-  } catch (autoSchedErr: any) {
-    console.warn('[social_studio] Auto-schedule due calendar slots warning:', autoSchedErr?.message || autoSchedErr);
-  }
-
   // 2. Auto-heal: ensure any scheduled variants with scheduled_for <= now have a queued publish job
   const { data: scheduledVariants } = await supabase
     .from('social_platform_variants')
@@ -1391,11 +1382,21 @@ export async function runSocialPublisher(input: {
 
   if (error) throw error;
 
-  // Publish each platform independently. A slow/asynchronous provider such as
-  // Threads must not block Instagram, Facebook, or TikTok in the same run.
+  // 3. Publish each due platform independently. Publishing ALREADY approved & due posts
+  // takes absolute precedence so crons never time out before due posts go live.
   const results = await Promise.all(
     (jobs || []).map(job => processJob(job, input.lockedBy || 'social-publisher', now)),
   );
+
+  // 4. Zero-Approval Auto-Schedule: Only AFTER due publications have cleared the queue,
+  // inspect un-drafted / unapproved calendar slots due soon for today, validate portrait
+  // posters and credits, and auto-schedule them into variants.
+  try {
+    const { autoScheduleDueCalendarSlots } = await import('./editorial/auto_scheduler.js');
+    autoScheduleResult = await autoScheduleDueCalendarSlots(now);
+  } catch (autoSchedErr: any) {
+    console.warn('[social_studio] Auto-schedule due calendar slots warning:', autoSchedErr?.message || autoSchedErr);
+  }
 
   return {
     skipped: false,

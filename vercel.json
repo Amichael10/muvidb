@@ -41,11 +41,11 @@
     },
     "api/social.ts": {
       "includeFiles": "{api/_lib/fonts/**,api/_lib/decor/**,api/_lib/social-html-templates/**,node_modules/@sparticuz/chromium/bin/**}",
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/cron/sync.ts": {
       "includeFiles": "{api/_lib/fonts/**,api/_lib/decor/**,api/_lib/social-html-templates/**,node_modules/@sparticuz/chromium/bin/**}",
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/ai.ts": {
       "maxDuration": 60
