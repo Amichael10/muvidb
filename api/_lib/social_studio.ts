@@ -3743,6 +3743,21 @@ export async function approveEditorialSlot(
     }
   }
 
+  // 3b. Editorial Rule: New & Upcoming and Now Streaming must ALWAYS be 9:16 Video Reels (+ trending audio)
+  if (contentType === 'upcoming_movie' || contentType === 'where_to_watch') {
+    try {
+      await generateAndAttachReelForContentItem(
+        {
+          contentItemId: draft.contentItem.id,
+          seriesLabel: contentType === 'upcoming_movie' ? 'New & Upcoming' : 'Now Streaming',
+        },
+        actor,
+      );
+    } catch (reelErr: any) {
+      console.warn(`[social_studio] Auto-generating 9:16 Reel for ${contentType} warning:`, reelErr?.message || reelErr);
+    }
+  }
+
   // 4. Schedule the draft
   const scheduledItem = await scheduleContentItem(
     { contentItemId: draft.contentItem.id, scheduledFor },
