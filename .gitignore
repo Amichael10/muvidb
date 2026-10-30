@@ -65,6 +65,7 @@ scripts/test-get-people.ts
 scripts/test-scraper.ts
 
 # Archive and backup files
+0.26.0
 project.tar.gz
 *.tar.gz
 *.zip
@@ -159,6 +160,7 @@ scripts/test-get-people.ts
 scripts/test-scraper.ts
 
 # Archive and backup files
+0.26.0
 project.tar.gz
 *.tar.gz
 *.zip

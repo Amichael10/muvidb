@@ -106,7 +106,9 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.6.0",
+    "react-is": "^19.3.1",
     "react-router-dom": "^7.18.1",
+    "recharts": "^3.10.1",
     "resend": "^6.18.1",
     "satori": "^0.29.0",
     "scrapegraph-js": "^2.1.0",
@@ -122,8 +124,13 @@
     "qs": "^6.15.4",
     "ajv": "^8.18.0",
     "@fastify/busboy": "^3.2.3",
-    "@vercel/node": { "path-to-regexp": "^6.3.0", "esbuild": "^0.28.1" },
-    "tsx": { "esbuild": "^0.28.1" }
+    "@vercel/node": {
+      "path-to-regexp": "^6.3.0",
+      "esbuild": "^0.28.1"
+    },
+    "tsx": {
+      "esbuild": "^0.28.1"
+    }
   },
   "devDependencies": {
     "@react-router/dev": "^7.18.1",
