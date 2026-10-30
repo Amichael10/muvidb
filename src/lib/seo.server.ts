@@ -194,23 +194,30 @@ export async function personSeo(slug: string, base: string) {
 
 // ------------------------------------------------------------------ film ----
 export async function filmSeo(slug: string, base: string) {
-  const { data } = await supabaseServer
-    .from('films')
-    // Superset of what the SEO head needs and what FilmDetail renders, so one
-    // round-trip serves both: film_genres(genre_id) and film_companies are for
-    // the page, credits(people) for the JSON-LD cast and SSR cast table.
-    .select(`
-      *,
-      film_genres(genre_id, genres(name)),
-      film_companies(companies(id, name, logo_url)),
-      credits(id, role, character_name, billing_order, people(id, name, photo_url, popularity_score, slug))
-    `)
-    .eq(keyFor(slug), slug)
-    // Kept deliberately: unpublished films stay out of the index. They simply
-    // don't get seeded, and FilmDetail falls back to its own client fetch (which
-    // has no such filter), so their behaviour is unchanged from today.
-    .eq('is_published', true)
-    .maybeSingle();
+  const col = keyFor(slug);
+  const runFilmSeoQuery = (value: string) =>
+    supabaseServer
+      .from('films')
+      // Superset of what the SEO head needs and what FilmDetail renders, so one
+      // round-trip serves both: film_genres(genre_id) and film_companies are for
+      // the page, credits(people) for the JSON-LD cast and SSR cast table.
+      .select(`
+        *,
+        film_genres(genre_id, genres(name)),
+        film_companies(role, companies(id, name, slug, logo_url)),
+        credits(id, role, character_name, billing_order, people(id, name, photo_url, popularity_score, slug))
+      `)
+      .eq(col, value)
+      // Kept deliberately: unpublished films stay out of the index. They simply
+      // don't get seeded, and FilmDetail falls back to its own client fetch (which
+      // has no such filter), so their behaviour is unchanged from today.
+      .eq('is_published', true)
+      .maybeSingle();
+
+  let { data } = await runFilmSeoQuery(slug);
+  if (!data && col === 'slug' && /-\d{4}$/.test(slug)) {
+    ({ data } = await runFilmSeoQuery(slug.replace(/-\d{4}$/, '')));
+  }
 
   if (!data) return { seo: notFound(base, 'Film', 'title'), status: 404, data: null };
 

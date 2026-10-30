@@ -406,19 +406,26 @@ export default function FilmDetail() {
         // Belt-and-suspenders with films RLS (is_published OR is_admin()).
         // Non-admins must only see published rows; admins can preview drafts.
         const isStaff = user?.role === 'admin' || user?.role === 'admin_limited';
-        let query = supabase
-          .from('films')
-          .select(`
-            *,
-            film_genres(genre_id, genres(name)),
-            film_companies(
-              companies(id, name, logo_url)
-            )
-          `)
-          .eq(col, val);
-        if (!isStaff) query = query.eq('is_published', true);
-        const { data, error } = await query.single();
-        if (error) throw error;
+        const runSingle = async (column, value) => {
+          let query = supabase
+            .from('films')
+            .select(`
+              *,
+              film_genres(genre_id, genres(name)),
+              film_companies(
+                role,
+                companies(id, name, slug, logo_url)
+              )
+            `)
+            .eq(column, value);
+          if (!isStaff) query = query.eq('is_published', true);
+          return query.maybeSingle();
+        };
+        let { data, error } = await runSingle(col, val);
+        if (!data && col === 'slug' && /-\d{4}$/.test(val)) {
+          ({ data, error } = await runSingle('slug', val.replace(/-\d{4}$/, '')));
+        }
+        if (error || !data) throw error || new Error('Film not found');
         return data;
       };
 

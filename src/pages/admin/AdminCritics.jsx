@@ -148,10 +148,12 @@ export default function AdminCritics() {
     if (filmSearchTimeout.current) clearTimeout(filmSearchTimeout.current);
     filmSearchTimeout.current = setTimeout(async () => {
       setIsSearchingFilms(true);
+      const safe = query.replace(/[,()*]/g, ' ').trim();
+      const slugQ = safe.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const { data } = await supabase
         .from('films')
         .select('id, title, year, poster_url')
-        .ilike('title', `%${query}%`)
+        .or([`title.ilike.%${safe}%`, `original_title.ilike.%${safe}%`, ...(slugQ ? [`slug.ilike.%${slugQ}%`] : [])].join(','))
         .limit(8);
       setFilmResults(data || []);
       setIsSearchingFilms(false);

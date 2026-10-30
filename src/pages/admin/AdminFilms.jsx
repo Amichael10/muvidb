@@ -431,11 +431,17 @@ export default function AdminFilms() {
         channelFilmIds = [...new Set((data || []).map(row => row.film_id).filter(Boolean))];
       }
 
+      const safeSearch = searchTerm ? searchTerm.toLowerCase().replace(/[,()*]/g, ' ').trim() : '';
+      const slugSearch = safeSearch ? safeSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+      const searchOrFilter = safeSearch
+        ? [`title.ilike.%${safeSearch}%`, `original_title.ilike.%${safeSearch}%`, ...(slugSearch ? [`slug.ilike.%${slugSearch}%`] : [])].join(',')
+        : '';
+
       // 1. Get total count
       let countQuery = supabase.from('films').select('*', { count: 'exact', head: true });
       if (actorFilmIds) countQuery = countQuery.in('id', actorFilmIds.length ? actorFilmIds : ['00000000-0000-0000-0000-000000000000']);
       if (channelFilmIds) countQuery = countQuery.in('id', channelFilmIds.length ? channelFilmIds : ['00000000-0000-0000-0000-000000000000']);
-      if (searchTerm) countQuery = countQuery.ilike('title', `%${searchTerm.toLowerCase()}%`);
+      if (searchOrFilter) countQuery = countQuery.or(searchOrFilter);
       if (statusFilter !== 'all') countQuery = countQuery.eq('status', statusFilter);
       if (yearFilter !== 'all') countQuery = countQuery.eq('year', parseInt(yearFilter));
       if (featuredFilter === 'featured') countQuery = countQuery.eq('is_featured', true);
@@ -475,7 +481,7 @@ export default function AdminFilms() {
       
       if (actorFilmIds) query = query.in('id', actorFilmIds.length ? actorFilmIds : ['00000000-0000-0000-0000-000000000000']);
       if (!duplicateFilter && channelFilmIds) query = query.in('id', channelFilmIds.length ? channelFilmIds : ['00000000-0000-0000-0000-000000000000']);
-      if (!duplicateFilter && searchTerm) query = query.ilike('title', `%${searchTerm.toLowerCase()}%`);
+      if (!duplicateFilter && searchOrFilter) query = query.or(searchOrFilter);
       if (statusFilter !== 'all') query = query.eq('status', statusFilter);
       if (yearFilter !== 'all') query = query.eq('year', parseInt(yearFilter));
       if (featuredFilter === 'featured') query = query.eq('is_featured', true);

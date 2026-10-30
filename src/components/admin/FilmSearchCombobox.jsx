@@ -107,7 +107,11 @@ export default function FilmSearchCombobox({
         if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) {
           queryBuilder = queryBuilder.ilike('youtube_watch_url', `%${trimmed}%`);
         } else {
-          queryBuilder = queryBuilder.ilike('title', `%${trimmed}%`);
+          const safe = trimmed.replace(/[,()*]/g, ' ').trim();
+          const slugQ = safe.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          queryBuilder = queryBuilder.or(
+            [`title.ilike.%${safe}%`, `original_title.ilike.%${safe}%`, ...(slugQ ? [`slug.ilike.%${slugQ}%`] : [])].join(',')
+          );
         }
 
         const { data, error } = await queryBuilder

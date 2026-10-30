@@ -41,19 +41,25 @@ export async function handleFilms(req: VercelRequest, res: VercelResponse) {
   // ── Single Film Detail ──────────────────────────────────────────────────────
   if (id && !Array.isArray(id)) {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-    const { data, error } = await supabase
-      .from('films')
-      .select(`
-        *,
-        film_genres(genre_id, genres(name)),
-        film_companies(companies(id, name, logo_url)),
-        film_watch_links(id, distributor, url)
-      `)
-      .eq(isUuid ? 'id' : 'slug', id)
-      // Service-role client bypasses the RLS publish gate, so filter here too:
-      // an unpublished film must 404 for the public just like it's hidden in lists.
-      .eq('is_published', true)
-      .single();
+    const runDetailQuery = (val: string) =>
+      supabase
+        .from('films')
+        .select(`
+          *,
+          film_genres(genre_id, genres(name)),
+          film_companies(role, companies(id, name, slug, logo_url)),
+          film_watch_links(id, distributor, url)
+        `)
+        .eq(isUuid ? 'id' : 'slug', val)
+        // Service-role client bypasses the RLS publish gate, so filter here too:
+        // an unpublished film must 404 for the public just like it's hidden in lists.
+        .eq('is_published', true)
+        .maybeSingle();
+
+    let { data, error } = await runDetailQuery(id);
+    if (!data && !isUuid && /-\d{4}$/.test(id)) {
+      ({ data, error } = await runDetailQuery(id.replace(/-\d{4}$/, '')));
+    }
 
     if (error?.code === 'PGRST116' || !data) return res.status(404).json({ error: 'Film not found' });
     if (error) return res.status(500).json({ error: 'Failed to fetch film' });

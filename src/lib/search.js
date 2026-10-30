@@ -61,24 +61,30 @@ function trigramSimilarity(a, b) {
   return inter / (A.size + B.size - inter);
 }
 
+function stripAccents(s) {
+  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 // Relevance score for a candidate's text against the query.
 function scoreText(text, fullQ, terms) {
-  const t = (text || '').toLowerCase();
+  const t = stripAccents(text || '').toLowerCase();
+  const qNorm = stripAccents(fullQ || '').toLowerCase();
+  const termsNorm = (terms || []).map((term) => stripAccents(term).toLowerCase());
   if (!t) return 0;
   let s = 0;
-  if (t === fullQ) s += 1000;            // exact
-  else if (t.includes(fullQ)) s += 300;  // full phrase appears
+  if (t === qNorm) s += 1000;            // exact
+  else if (t.includes(qNorm)) s += 300;  // full phrase appears
   // Name/surname in either order ("adekola odunlade" ↔ "odunlade adekola")
-  const qKey = sortedNameKey(fullQ);
+  const qKey = sortedNameKey(qNorm);
   const tKey = sortedNameKey(t);
   if (qKey && tKey && qKey === tKey) s += 700;
   let matched = 0;
-  for (const term of terms) if (t.includes(term)) { s += 60; matched++; }
-  if (matched === terms.length) s += 120; // every word present
-  if (t.startsWith(terms[0])) s += 25;    // prefix of first word
+  for (const term of termsNorm) if (t.includes(term)) { s += 60; matched++; }
+  if (matched === termsNorm.length) s += 120; // every word present
+  if (termsNorm[0] && t.startsWith(termsNorm[0])) s += 25;    // prefix of first word
   // Fuzzy closeness — the only signal that can rank a typo'd match, since a
   // misspelt term never substring-matches.
-  s += trigramSimilarity(fullQ, t) * 400;
+  s += trigramSimilarity(qNorm, t) * 400;
   s -= Math.min(t.length, 80) * 0.15;     // gently prefer tighter matches
   return s;
 }
@@ -125,10 +131,17 @@ export async function searchAll(query) {
   // confidentPersonMatch now only controls the fuzzy fallback (filmsFz below).
   const confidentPersonMatch = peopleRows
     .some((person) => scoreText(person.name, fullQ, terms) >= 180);
+  const safeFullQ = fullQ.replace(/[,()*]/g, ' ').trim();
+  const slugQ = stripAccents(safeFullQ).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const titleOrFilters = [
+    `title.ilike.%${safeFullQ}%`,
+    `original_title.ilike.%${safeFullQ}%`,
+    ...(slugQ ? [`slug.ilike.%${slugQ}%`] : []),
+  ].join(',');
   const titleFilmRes = await supabase
     .from('films')
     .select(FILM_FIELDS)
-    .ilike('title', `%${fullQ}%`)
+    .or(titleOrFilters)
     .limit(80);
 
   const peopleFz = peopleRows.length === 0
