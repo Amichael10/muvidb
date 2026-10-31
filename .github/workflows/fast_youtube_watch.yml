@@ -2,7 +2,7 @@ name: Fast YouTube Upload Watcher
 
 on:
   schedule:
-    # Run every 5 minutes (maximum frequency allowed by GitHub Actions)
+    # Run every 5 minutes directly on GitHub Actions (Zero Vercel compute)
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
@@ -17,16 +17,33 @@ jobs:
   watch-youtube:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    env:
-      BASE_URL: 'https://muvidb.com'
-      CRON_SECRET: ${{ secrets.CRON_SECRET }}
 
     steps:
-      - name: Trigger Fast YouTube Watch
-        shell: bash
-        run: |
-          echo "Triggering YouTube fast watch..."
-          response=$(curl --silent --show-error --max-time 120 \
-            -H "x-cron-secret: $CRON_SECRET" \
-            "$BASE_URL/api/cron/sync?task=youtube_watch")
-          echo "Response: $response"
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --omit=dev --ignore-scripts || npm install --omit=dev
+
+      - name: Run Fast YouTube Watch
+        run: npx tsx scripts/run-youtube-watch.ts
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY || secrets.YOUTUBE_API_KEY }}
+          VITE_YOUTUBE_API_KEY: ${{ secrets.VITE_YOUTUBE_API_KEY || secrets.YOUTUBE_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
