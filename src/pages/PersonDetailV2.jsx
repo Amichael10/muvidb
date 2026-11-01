@@ -182,7 +182,8 @@ export default function PersonDetailV2() {
   const [filmographySearch, setFilmographySearch] = useState('')
   const [filmographyView, setFilmographyView] = useState('grid') // 'grid' | 'list'
   const [filmographyMedium, setFilmographyMedium] = useState('screen') // 'screen' | 'stage'
-  const [visibleStageCount, setVisibleStageCount] = useState(6)
+  const [activeStageRole, setActiveStageRole] = useState('all')
+  const [visibleStageCount, setVisibleStageCount] = useState(24)
   const [passportOpen, setPassportOpen] = useState(false)
   const [whatsappOptInOpen, setWhatsappOptInOpen] = useState(false)
   const [showAddMedia, setShowAddMedia] = useState(false)
@@ -259,7 +260,8 @@ export default function PersonDetailV2() {
 
   useEffect(() => {
     setVisibleCreditsCount(24)
-  }, [activeRole, filmographySearch, filmographyView, filmographyMedium])
+    setVisibleStageCount(24)
+  }, [activeRole, activeStageRole, filmographySearch, filmographyView, filmographyMedium])
 
   // Handle click outside More Actions menu
   useEffect(() => {
@@ -663,9 +665,33 @@ export default function PersonDetailV2() {
     const order = c.billing_order ?? 99
     return (role === 'actor' && order <= 3) || ['producer', 'director'].includes(role)
   })
-  const totalBoxOffice = uniqueFilmCredits.reduce((acc, c) => acc + getCreditBoxOffice(c), 0)
-  const leadBoxOffice = leadCredits.reduce((acc, c) => acc + getCreditBoxOffice(c), 0)
-  // Display total reported theatrical gross across all verified productions
+
+  // Deduplicate stage credits by play so each production's box office is counted once per talent
+  const uniqueStageCredits = useMemo(() => {
+    const map = new Map()
+    for (const s of stageCredits) {
+      const pid = s.id || s.slug
+      if (!pid) continue
+      const gross = typeof s.box_office_domestic === 'number' ? s.box_office_domestic : parseFloat(s.box_office_domestic) || 0
+      if (!map.has(pid) || gross > (map.get(pid).box_office_domestic || 0)) {
+        map.set(pid, { ...s, box_office_domestic: gross })
+      }
+    }
+    return Array.from(map.values())
+  }, [stageCredits])
+
+  const filmBoxOffice = uniqueFilmCredits.reduce((acc, c) => acc + getCreditBoxOffice(c), 0)
+  const stageBoxOffice = uniqueStageCredits.reduce((acc, s) => acc + (s.box_office_domestic || 0), 0)
+  const totalBoxOffice = filmBoxOffice + stageBoxOffice
+
+  const leadStageCredits = uniqueStageCredits.filter(s => {
+    const role = canonicalizeRole(s.role) || String(s.role || '').toLowerCase()
+    return role === 'actor' || ['producer', 'director', 'playwright', 'writer'].includes(role)
+  })
+  const leadBoxOffice = leadCredits.reduce((acc, c) => acc + getCreditBoxOffice(c), 0) +
+    leadStageCredits.reduce((acc, s) => acc + (s.box_office_domestic || 0), 0)
+
+  // Display total reported theatrical gross across all verified productions (cinema + live stage)
   const displayBoxOffice = totalBoxOffice
 
   const totalYoutubeViews = allCredits.reduce((acc, c) => {
@@ -745,6 +771,52 @@ export default function PersonDetailV2() {
       .some((value) => String(value).toLowerCase().includes(filmographyQuery))
   })
   const visibleActiveCredits = filteredActiveCredits.slice(0, visibleCreditsCount)
+
+  // ── Stage & Theatre Roles & Filtering ──
+  const stageRoleCounts = useMemo(() => {
+    const counts = { all: stageCredits.length }
+    for (const s of stageCredits) {
+      const r = canonicalizeRole(s.role) || String(s.role || 'actor').toLowerCase()
+      counts[r] = (counts[r] || 0) + 1
+    }
+    return counts
+  }, [stageCredits])
+
+  const stageRoleList = useMemo(() => {
+    const keys = Object.keys(stageRoleCounts).filter(k => k !== 'all')
+    return ['all', ...keys]
+  }, [stageRoleCounts])
+
+  const filteredStageCredits = useMemo(() => {
+    const query = filmographySearch.trim().toLowerCase()
+    return stageCredits.filter((play) => {
+      if (activeStageRole !== 'all') {
+        const r = canonicalizeRole(play.role) || String(play.role || '').toLowerCase()
+        if (r !== activeStageRole && String(play.role || '').toLowerCase() !== activeStageRole) {
+          return false
+        }
+      }
+      if (query) {
+        const matches = [
+          play.title,
+          play.character_name,
+          play.role,
+          play.venue,
+          play.city,
+          play.genre,
+          play.year,
+          play.playwright,
+          play.director
+        ]
+          .filter(Boolean)
+          .some((val) => String(val).toLowerCase().includes(query))
+        if (!matches) return false
+      }
+      return true
+    })
+  }, [stageCredits, activeStageRole, filmographySearch])
+
+  const visibleFilteredStageCredits = filteredStageCredits.slice(0, visibleStageCount)
 
   // ── Aliases ──
   const cleanForCompare = (str) => {
@@ -1171,11 +1243,28 @@ export default function PersonDetailV2() {
                   <div className="border border-border rounded-2xl bg-surface/80 p-5 space-y-4 shadow-md backdrop-blur-sm">
                     {displayBoxOffice > 0 && (
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Reported Theatrical Gross</p>
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Reported Theatrical Gross</p>
+                          {stageBoxOffice > 0 && filmBoxOffice > 0 && (
+                            <span className="text-[9px] font-bold text-brand uppercase tracking-wider bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                              Cinema + Stage
+                            </span>
+                          )}
+                          {stageBoxOffice > 0 && filmBoxOffice === 0 && (
+                            <span className="text-[9px] font-bold text-purple-400 uppercase tracking-wider bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
+                              Live Stage
+                            </span>
+                          )}
+                        </div>
                         <p className="text-2xl font-black font-heading text-brand mt-0.5 tracking-tight">
                           <span className="hidden sm:inline">{fmtMoneyDesktop(displayBoxOffice)}</span>
                           <span className="inline sm:hidden">{fmtMoneyMobile(displayBoxOffice)}</span>
                         </p>
+                        {stageBoxOffice > 0 && filmBoxOffice > 0 && (
+                          <p className="text-[10px] text-text-muted/80 font-medium mt-0.5">
+                            Includes <span className="text-text-secondary font-bold">{fmtMoney(stageBoxOffice)}</span> from live theatre
+                          </p>
+                        )}
                         {leadBoxOffice > 0 && leadBoxOffice < totalBoxOffice && (
                           <p className="text-[10px] text-text-muted font-medium mt-0.5">
                             <span className="hidden sm:inline">{fmtMoneyDesktop(leadBoxOffice)} in lead roles</span>
@@ -1542,43 +1631,79 @@ export default function PersonDetailV2() {
       <section className="py-12 bg-bg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           
-          {/* Section Header with Medium Selector */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
-            <div>
-              <p className="text-brand text-[10px] font-black uppercase tracking-[0.25em]">Career Catalog</p>
-              <h2 className="text-3xl sm:text-4xl font-heading font-black text-text-primary tracking-tight">
-                Filmography & Theatre
-              </h2>
-            </div>
+          {/* Section Header */}
+          <div className="mb-6">
+            <p className="text-brand text-[10px] font-black uppercase tracking-[0.25em]">Career Catalog</p>
+            <h2 className="text-3xl sm:text-4xl font-heading font-black text-text-primary tracking-tight">
+              Filmography & Theatre
+            </h2>
+            <p className="text-xs text-text-muted mt-1.5">
+              {filmographyMedium === 'screen'
+                ? 'Verified screen credits across feature films, streaming originals, television & cinema.'
+                : 'Live stage plays, theatrical runs, musical productions & dramatic performances.'}
+            </p>
+          </div>
 
-            {/* Medium Selector (Screen vs Stage) */}
-            <div className="flex items-center gap-2">
+          {/* Primary Medium Tabs: Screen Filmography vs Stage & Theatre (High Prominence) */}
+          {stageCredits.length > 0 && (
+            <div className="w-full flex items-center border-b border-border mb-8 overflow-x-auto gap-2 sm:gap-6">
               <button
+                type="button"
                 onClick={() => setFilmographyMedium('screen')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`group relative pb-4 px-3 sm:px-6 flex items-center gap-2.5 text-sm sm:text-base font-black transition-all cursor-pointer whitespace-nowrap ${
                   filmographyMedium === 'screen'
-                    ? 'bg-brand text-white shadow'
-                    : 'bg-surface border border-border text-text-muted hover:text-text-primary'
+                    ? 'text-brand'
+                    : 'text-text-muted hover:text-text-primary'
                 }`}
               >
-                <Icon icon="solar:clapperboard-linear" width="16" />
-                Screen Films ({allCredits.length})
-              </button>
-              {stageCredits.length > 0 && (
-                <button
-                  onClick={() => setFilmographyMedium('stage')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    filmographyMedium === 'stage'
-                      ? 'bg-brand text-white shadow'
-                      : 'bg-surface border border-border text-text-muted hover:text-text-primary'
+                <Icon
+                  icon="solar:clapperboard-bold"
+                  className={`text-lg sm:text-xl transition-colors ${
+                    filmographyMedium === 'screen' ? 'text-brand' : 'text-text-muted group-hover:text-text-primary'
                   }`}
-                >
-                  <Icon icon="solar:masks-bold" width="16" />
-                  Stage & Theatre ({stageCredits.length})
-                </button>
-              )}
+                />
+                <span>Screen Filmography</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-black transition-colors ${
+                  filmographyMedium === 'screen'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'bg-surface-2 text-text-muted border border-border group-hover:text-text-primary'
+                }`}>
+                  {allCredits.length}
+                </span>
+                {filmographyMedium === 'screen' && (
+                  <span className="absolute bottom-0 left-0 right-0 h-1 bg-brand rounded-t-full shadow-lg" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilmographyMedium('stage')}
+                className={`group relative pb-4 px-3 sm:px-6 flex items-center gap-2.5 text-sm sm:text-base font-black transition-all cursor-pointer whitespace-nowrap ${
+                  filmographyMedium === 'stage'
+                    ? 'text-purple-400'
+                    : 'text-text-muted hover:text-text-primary'
+                }`}
+              >
+                <Icon
+                  icon="solar:masks-bold"
+                  className={`text-lg sm:text-xl transition-colors ${
+                    filmographyMedium === 'stage' ? 'text-purple-400' : 'text-text-muted group-hover:text-text-primary'
+                  }`}
+                />
+                <span>Stage & Theatre</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black transition-colors ${
+                  filmographyMedium === 'stage'
+                    ? 'bg-purple-500 text-white shadow-sm'
+                    : 'bg-purple-500/15 text-purple-300 border border-purple-500/30 group-hover:bg-purple-500/25'
+                }`}>
+                  {stageCredits.length}
+                </span>
+                {filmographyMedium === 'stage' && (
+                  <span className="absolute bottom-0 left-0 right-0 h-1 bg-purple-500 rounded-t-full shadow-lg" />
+                )}
+              </button>
             </div>
-          </div>
+          )}
 
           {filmographyMedium === 'screen' && (
             <>
@@ -1807,48 +1932,204 @@ export default function PersonDetailV2() {
 
           {/* Stage & Theatre Credits View */}
           {filmographyMedium === 'stage' && stageCredits.length > 0 && (
-            <div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {stageCredits.slice(0, visibleStageCount).map((play) => (
-                  <Link
-                    key={play.id}
-                    to={`/plays/${play.slug}`}
-                    className="group bg-surface border border-border hover:border-brand rounded-2xl p-4 flex gap-4 items-stretch transition duration-300"
-                  >
-                    <ImageWithFallback
-                      src={play.poster_url}
-                      alt={play.title}
-                      fallbackType="film"
-                      name={play.title}
-                      className="w-20 h-28 rounded-xl object-cover border border-border shrink-0"
+            <>
+              {/* Role Filter Pills & Search Bar & View Mode for Stage */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+                
+                {/* Stage Role Selector */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {stageRoleList.map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setActiveStageRole(role)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                        activeStageRole === role
+                          ? 'bg-brand text-white shadow-md'
+                          : 'bg-surface border border-border text-text-muted hover:text-text-primary hover:border-brand/40'
+                      }`}
+                    >
+                      {role === 'all' ? 'All Roles' : formatRole(role)} ({stageRoleCounts[role]})
+                    </button>
+                  ))}
+                </div>
+
+                {/* Search & Grid/List view Toggle */}
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" width="16" />
+                    <input
+                      type="search"
+                      value={filmographySearch}
+                      onChange={(e) => setFilmographySearch(e.target.value)}
+                      placeholder="Search title, venue, role..."
+                      className="h-10 pl-9 pr-4 rounded-xl border border-border bg-surface text-xs text-text-primary placeholder:text-text-muted focus:border-brand outline-none w-56 sm:w-64"
                     />
-                    <div className="min-w-0 flex flex-col justify-center">
-                      <h4 className="text-base font-bold text-white group-hover:text-brand transition line-clamp-2">
-                        {play.title}
-                      </h4>
-                      <span className="text-xs font-bold text-brand block mt-1">
-                        {play.role || 'Actor'} {play.character_name ? `as ${play.character_name}` : ''}
-                      </span>
-                      <p className="text-xs text-text-muted mt-2">
-                        📍 {play.venue || play.city || 'Theatre'} ({getPlayDateLabel(play, 'TBA')})
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                  </div>
+
+                  <div className="flex items-center border border-border rounded-xl overflow-hidden bg-surface">
+                    <button
+                      type="button"
+                      onClick={() => setFilmographyView('grid')}
+                      className={`h-10 px-3 flex items-center justify-center transition cursor-pointer ${filmographyView === 'grid' ? 'bg-brand text-white' : 'text-text-muted hover:text-text-primary'}`}
+                      title="Grid View"
+                    >
+                      <Icon icon="solar:widget-5-bold" width="16" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilmographyView('list')}
+                      className={`h-10 px-3 flex items-center justify-center transition cursor-pointer ${filmographyView === 'list' ? 'bg-brand text-white' : 'text-text-muted hover:text-text-primary'}`}
+                      title="List View"
+                    >
+                      <Icon icon="solar:list-bold" width="16" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {stageCredits.length > visibleStageCount && (
-                <div className="flex justify-center mt-10">
-                  <button
-                    onClick={() => setVisibleStageCount((c) => c + 6)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-xs font-bold text-white hover:border-brand transition shadow-sm"
-                  >
-                    <Icon icon="solar:add-circle-linear" width="18" />
-                    Show More ({stageCredits.length - visibleStageCount} remaining)
-                  </button>
+              {/* Stage Plays Display */}
+              {visibleFilteredStageCredits.length > 0 ? (
+                <>
+                  {filmographyView === 'grid' ? (
+                    /* ── STAGE POSTER GRID VIEW (Exact match to Film Card 2:3 vertical aspect ratio) ── */
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-6">
+                      {visibleFilteredStageCredits.map((play) => (
+                        <Link
+                          key={play.id}
+                          to={`/plays/${play.slug}`}
+                          className="group block"
+                        >
+                          <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-2 border border-border group-hover:border-brand/70 transition duration-300 shadow-sm">
+                            <ImageWithFallback
+                              src={play.poster_url}
+                              alt={play.title}
+                              fallbackType="film"
+                              name={play.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            {play.box_office_domestic > 0 && (
+                              <div className="absolute top-2 right-2 bg-amber-500/95 text-black text-[8px] font-black px-1.5 py-0.5 rounded shadow backdrop-blur-sm">
+                                🎟️ {fmtMoney(play.box_office_domestic)}
+                              </div>
+                            )}
+                            <div className="absolute top-2 left-2 bg-purple-950/85 text-purple-200 border border-purple-500/30 text-[8px] font-black px-1.5 py-0.5 rounded shadow backdrop-blur-sm flex items-center gap-1">
+                              <Icon icon="solar:masks-bold" width="10" />
+                              Stage
+                            </div>
+                          </div>
+
+                          <div className="mt-2.5 space-y-0.5">
+                            <h4 className="text-sm font-bold text-text-primary group-hover:text-brand transition line-clamp-1">
+                              {play.title}
+                            </h4>
+                            <p className="text-xs text-text-muted line-clamp-1">
+                              {[play.year || (play.run_start_date ? new Date(play.run_start_date).getFullYear() : null), play.character_name ? `as ${toTitleCase(play.character_name)}` : formatRole(play.role || 'Stage')]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                            {(play.venue || play.city) && (
+                              <p className="text-[11px] text-text-muted/75 line-clamp-1 flex items-center gap-1 mt-0.5">
+                                <Icon icon="solar:map-point-linear" width="11" className="shrink-0 text-brand/70" />
+                                <span className="truncate">{play.venue || play.city}</span>
+                              </p>
+                            )}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    /* ── STAGE CLASSIC TABLE / LIST VIEW ── */
+                    <div className="space-y-3">
+                      {visibleFilteredStageCredits.map((play) => (
+                        <Link
+                          key={play.id}
+                          to={`/plays/${play.slug}`}
+                          className="group flex items-center gap-4 rounded-xl border border-border bg-surface p-3 hover:border-brand transition-colors"
+                        >
+                          {/* Poster Thumbnail */}
+                          <div className="relative w-16 h-24 rounded-lg flex-shrink-0 overflow-hidden bg-surface-2 border border-border group-hover:border-brand/70 transition-all duration-300 shadow-sm">
+                            <ImageWithFallback
+                              src={play.poster_url}
+                              alt={play.title}
+                              fallbackType="film"
+                              name={play.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            {play.box_office_domestic > 0 && (
+                              <div className="absolute top-1.5 right-1.5 bg-amber-500/90 text-bg text-[7px] font-black px-1 py-0.5 rounded shadow">
+                                🎟️
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Details */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              {play.year && (
+                                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-text-muted">
+                                  {play.year}
+                                </span>
+                              )}
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded">
+                                <Icon icon="solar:masks-bold" width="11" />
+                                Stage & Theatre
+                              </span>
+                              {play.genre && (
+                                <span className="text-[10px] text-text-muted/70 hidden sm:inline">
+                                  • {play.genre}
+                                </span>
+                              )}
+                            </div>
+                            <h3 className="text-sm sm:text-base font-bold text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+                              {play.title}
+                            </h3>
+                            <p className="mt-1 text-xs text-text-muted line-clamp-1">
+                              {[formatRole(play.role || 'Stage'), play.character_name ? `as ${toTitleCase(play.character_name)}` : null]
+                                .filter(Boolean)
+                                .join(' / ')}
+                            </p>
+                            {(play.venue || play.city) && (
+                              <p className="text-[11px] text-text-muted/80 mt-1 flex items-center gap-1">
+                                <Icon icon="solar:map-point-linear" width="12" className="text-brand shrink-0" />
+                                <span className="truncate">{play.venue || play.city} ({getPlayDateLabel(play, 'TBA')})</span>
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Box Office badge */}
+                          {play.box_office_domestic > 0 && (
+                            <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[10px] font-black text-amber-300">
+                              🎟️ {fmtMoney(play.box_office_domestic)}
+                              {play.box_office_tickets_sold > 0 && ` (${play.box_office_tickets_sold} tix)`}
+                            </span>
+                          )}
+
+                          <Icon icon="solar:alt-arrow-right-linear" className="text-text-muted group-hover:text-brand shrink-0" width="18" />
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+
+                  {filteredStageCredits.length > visibleStageCount && (
+                    <div className="flex justify-center mt-10">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleStageCount((c) => c + 24)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-xs font-bold text-white hover:border-brand transition shadow-sm cursor-pointer"
+                      >
+                        <Icon icon="solar:add-circle-linear" width="18" />
+                        Show More ({filteredStageCredits.length - visibleStageCount} remaining)
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-16 border-2 border-dashed border-border rounded-2xl">
+                  <p className="text-sm font-bold text-text-muted">No stage productions match your filter criteria.</p>
                 </div>
               )}
-            </div>
+            </>
           )}
 
         </div>

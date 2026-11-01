@@ -583,6 +583,84 @@ export default defineConfig(({ mode, isSsrBuild }) => {
             return false;
           },
         },
+        '/api/actor-claims': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              let body = {};
+              if (req.method === 'POST') {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                const raw = Buffer.concat(chunks).toString('utf8');
+                body = raw ? JSON.parse(raw) : {};
+              }
+              const mod = await import('./api/_lib/actor_claims_handler.js');
+              const handler = mod.handleActorClaims || mod.default;
+              await handler(
+                { headers: req.headers, query: Object.fromEntries(url.searchParams), body, method: req.method, url: req.url },
+                {
+                  statusCode: 200,
+                  status: function (code) {
+                    this.statusCode = code;
+                    return this;
+                  },
+                  json: (data) => {
+                    res.statusCode = res.statusCode || 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(data));
+                  },
+                  setHeader: (k, v) => res.setHeader(k, v),
+                  end: () => res.end(),
+                }
+              );
+            } catch (err: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
+          },
+        },
+        '/api/person-media': {
+          target: 'http://localhost:3001',
+          bypass: async (req, res) => {
+            try {
+              const url = new URL(req.url, 'http://localhost:3001');
+              let body = {};
+              if (req.method === 'POST' || req.method === 'PUT') {
+                const chunks = [];
+                for await (const chunk of req) chunks.push(chunk);
+                const raw = Buffer.concat(chunks).toString('utf8');
+                body = raw ? JSON.parse(raw) : {};
+              }
+              const mod = await import('./api/_lib/person_media_handler.js');
+              const handler = mod.handlePersonMedia || mod.default;
+              await handler(
+                { headers: req.headers, query: Object.fromEntries(url.searchParams), body, method: req.method, url: req.url },
+                {
+                  statusCode: 200,
+                  status: function (code) {
+                    this.statusCode = code;
+                    return this;
+                  },
+                  json: (data) => {
+                    res.statusCode = res.statusCode || 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify(data));
+                  },
+                  setHeader: (k, v) => res.setHeader(k, v),
+                  end: () => res.end(),
+                }
+              );
+            } catch (err: any) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message }));
+            }
+            return false;
+          },
+        },
         '/api/ai': {
           target: 'http://localhost:3001',
           bypass: async (req, res) => {

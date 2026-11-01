@@ -78,7 +78,7 @@ export async function handleContent(req: VercelRequest, res: VercelResponse) {
       // the compare views in AdvancedSearch reuse this endpoint.
       const { data, error } = await supabase
         .from('credits')
-        .select('id, person_id, role, character_name, billing_order, people(id, name, photo_url, popularity_score, slug)')
+        .select('id, person_id, role, character_name, billing_order, people(id, name, photo_url, popularity_score, slug, awards)')
         .eq('film_id', filmId)
         .order('billing_order', { ascending: true });
       if (error) throw error;

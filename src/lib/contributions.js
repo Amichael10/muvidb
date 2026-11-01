@@ -436,6 +436,15 @@ async function submit({ type, target_table = null, target_id = null, payload = {
       if (image_path) summaryLines.push('- image attached: ' + image_path);
       const summary = summaryLines.join('\n');
 
+      let targetTitle = '';
+      if (target_table === 'films' && target_id) {
+        const { data: f } = await supabase.from('films').select('title, year').eq('id', target_id).maybeSingle();
+        if (f) targetTitle = `${f.title}${f.year ? ` (${f.year})` : ''}`;
+      } else if (target_table === 'people' && target_id) {
+        const { data: p } = await supabase.from('people').select('name').eq('id', target_id).maybeSingle();
+        if (p) targetTitle = p.name;
+      }
+
       const { authHeaders } = await import('./apiAuth');
       await fetch('/api/actor-claims', {
         method: 'POST',
@@ -445,6 +454,7 @@ async function submit({ type, target_table = null, target_id = null, payload = {
           type,
           targetTable: target_table,
           targetId: target_id,
+          targetTitle,
           summary: summary.slice(0, 1000),
           note,
           link: '/admin/contributions',

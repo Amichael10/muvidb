@@ -379,11 +379,29 @@ export default function ProDashboard() {
     });
   }, [credits]);
 
-  const reportedBoxOffice = uniqueCreditsForBo.reduce((sum, credit) => {
+  const cinemaBoxOffice = uniqueCreditsForBo.reduce((sum, credit) => {
     const film = credit.films || {};
     const bo = Number(film.streaming_links?.box_office?.domestic || film.box_office_domestic || film.box_office_worldwide) || 0;
-    return sum + bo;
+    return sum + (Number.isFinite(bo) ? bo : 0);
   }, 0);
+
+  const uniqueStageCreditsForBo = useMemo(() => {
+    const seen = new Set();
+    return (stageCredits || []).filter((c) => {
+      const pid = c.plays?.id || c.play_id;
+      if (!pid || seen.has(pid)) return false;
+      seen.add(pid);
+      return true;
+    });
+  }, [stageCredits]);
+
+  const stageBoxOffice = uniqueStageCreditsForBo.reduce((sum, credit) => {
+    const play = credit.plays || {};
+    const bo = Number(play.box_office_domestic || 0);
+    return sum + (Number.isFinite(bo) ? bo : 0);
+  }, 0);
+
+  const reportedBoxOffice = cinemaBoxOffice + stageBoxOffice;
 
   // Filtered & Sorted Credits
   const filteredCredits = useMemo(() => {
@@ -1002,8 +1020,21 @@ export default function ProDashboard() {
               </header>
 
               {/* High-Level Stat Cards */}
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <MetricCard icon="solar:clapperboard-play-bold" label="Total Filmography" value={credits.length} detail="Verified Nollywood & African credits" />
+              <div className={`grid gap-3 sm:grid-cols-2 ${reportedBoxOffice > 0 ? 'lg:grid-cols-3 xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
+                <MetricCard
+                  icon="solar:clapperboard-play-bold"
+                  label="Total Repertoire"
+                  value={credits.length + stageCredits.length}
+                  detail={stageCredits.length > 0 ? `${credits.length} screen · ${stageCredits.length} stage` : "Verified Nollywood credits"}
+                />
+                {reportedBoxOffice > 0 && (
+                  <MetricCard
+                    icon="solar:ticket-sale-bold"
+                    label="Theatrical Gross"
+                    value={reportedBoxOffice >= 1000000 ? `₦${(reportedBoxOffice / 1000000).toFixed(1)}M` : `₦${reportedBoxOffice.toLocaleString()}`}
+                    detail={stageBoxOffice > 0 ? `Cinema ₦${(cinemaBoxOffice/1000000).toFixed(1)}M · Stage ₦${(stageBoxOffice/1000000).toFixed(1)}M` : "Verified Box Office"}
+                  />
+                )}
                 <MetricCard icon="solar:gallery-wide-bold" label="Portfolio Media" value={highlights.length} detail={`${photosList.length} photos · ${videosList.length} video reels`} />
                 <MetricCard icon="solar:cup-star-bold" label="Industry Awards" value={awardsList.length} detail={`${awardsList.filter((a) => a.status === 'Winner').length} wins · ${awardsList.filter((a) => a.status !== 'Winner').length} nominations`} />
                 <MetricCard

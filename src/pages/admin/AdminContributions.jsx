@@ -409,10 +409,20 @@ function FieldEditor({ def, value, onChange }) {
   );
 }
 
+function parseYoutubeId(val) {
+  if (!val || typeof val !== 'string') return null;
+  const s = val.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+  const m = s.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
 /** One review row: tick it to apply, and correct it in place before you do. */
 function ReviewField({ def, original, value, selected, onToggle, onChange, onRevert, currentDbValue }) {
   const edited = !sameValue(value, original);
   const wide = def.kind === 'textarea' || def.kind === 'multiselect';
+  const [showPlayer, setShowPlayer] = useState(false);
+  const ytId = (def?.key === 'trailer_youtube_id' || def?.label?.toLowerCase().includes('trailer') || def?.label?.toLowerCase().includes('youtube')) ? parseYoutubeId(value) : null;
 
   return (
     <div
@@ -445,6 +455,66 @@ function ReviewField({ def, original, value, selected, onToggle, onChange, onRev
         )}
       </div>
       <FieldEditor def={def} value={value} onChange={onChange} />
+      
+      {/* YouTube Video Preview if value contains a video ID */}
+      {ytId && (
+        <div className="mt-2.5 p-2 rounded-lg bg-black/60 border border-white/10 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Icon icon="logos:youtube-icon" className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="text-[10px] font-bold text-white/90 truncate">Trailer Video ({ytId})</span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowPlayer(p => !p)}
+                className="text-[10px] font-bold text-amber-400 hover:text-amber-300 inline-flex items-center gap-1 cursor-pointer"
+              >
+                <Icon icon={showPlayer ? 'solar:eye-closed-bold' : 'solar:play-circle-bold'} className="w-3.5 h-3.5" />
+                {showPlayer ? 'Hide Player' : 'Play Preview'}
+              </button>
+              <a
+                href={`https://www.youtube.com/watch?v=${ytId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-text-muted hover:text-white inline-flex items-center gap-1 cursor-pointer"
+              >
+                <span>Open YouTube</span>
+                <Icon icon="solar:arrow-right-up-linear" className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+          {showPlayer ? (
+            <div className="aspect-video w-full rounded-md overflow-hidden bg-black border border-white/10">
+              <iframe
+                src={`https://www.youtube.com/embed/${ytId}?autoplay=1`}
+                title="YouTube Video Preview"
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          ) : (
+            <div
+              className="relative aspect-video w-full rounded-md overflow-hidden bg-black/40 group cursor-pointer border border-white/5"
+              onClick={() => setShowPlayer(true)}
+              title="Click to preview trailer"
+            >
+              <img
+                src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
+                alt="Trailer thumbnail"
+                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+                <div className="w-9 h-9 rounded-full bg-brand/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                  <Icon icon="solar:play-bold" className="w-4 h-4 ml-0.5" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {currentDbValue != null && String(currentDbValue).trim() !== '' && (
         <p className="text-[10px] text-text-muted/80 mt-1 truncate" title={displayValue(currentDbValue)}>
           <span className="font-semibold text-text-secondary">Current in DB: </span>
@@ -499,23 +569,28 @@ export default function AdminContributions() {
       );
       setSignedUrls(Object.fromEntries(entries.filter(([, url]) => url)));
 
-      // Fetch target entities (films, people, channels)
-      const filmIds = [...new Set((data || []).filter(d => d.target_table === 'films' && d.target_id).map(d => d.target_id))];
-      const peopleIds = [...new Set((data || []).filter(d => d.target_table === 'people' && d.target_id).map(d => d.target_id))];
+      // Fetch target entities (films, people, channels, plays)
+      const filmIds = [...new Set((data || []).filter(d => (d.target_table === 'films' || d.target_table === 'film') && d.target_id).map(d => d.target_id))];
+      const peopleIds = [...new Set((data || []).filter(d => (d.target_table === 'people' || d.target_table === 'person') && d.target_id).map(d => d.target_id))];
       const channelIds = [...new Set((data || []).filter(d => (d.target_table === 'channels' || d.target_table === 'youtube_channels') && d.target_id).map(d => d.target_id))];
+      const playIds = [...new Set((data || []).filter(d => (d.target_table === 'plays' || d.target_table === 'play') && d.target_id).map(d => d.target_id))];
 
-      const targetMap = { films: {}, people: {}, channels: {} };
+      const targetMap = { films: {}, people: {}, channels: {}, plays: {} };
       if (filmIds.length > 0) {
         const { data: films } = await supabase.from('films').select('id, title, year, poster_url, trailer_youtube_id, synopsis').in('id', filmIds);
-        (films || []).forEach(f => { targetMap.films[f.id] = f; });
+        (films || []).forEach(f => { targetMap.films[f.id] = f; targetMap[f.id] = f; });
       }
       if (peopleIds.length > 0) {
         const { data: people } = await supabase.from('people').select('id, name, photo_url, known_for_department, bio').in('id', peopleIds);
-        (people || []).forEach(p => { targetMap.people[p.id] = p; });
+        (people || []).forEach(p => { targetMap.people[p.id] = p; targetMap[p.id] = p; });
       }
       if (channelIds.length > 0) {
         const { data: channels } = await supabase.from('youtube_channels').select('id, title, channel_name, thumbnail_url').in('id', channelIds);
-        (channels || []).forEach(c => { targetMap.channels[c.id] = c; });
+        (channels || []).forEach(c => { targetMap.channels[c.id] = c; targetMap[c.id] = c; });
+      }
+      if (playIds.length > 0) {
+        const { data: plays } = await supabase.from('plays').select('id, title, year, poster_url, venue, city').in('id', playIds);
+        (plays || []).forEach(pl => { targetMap.plays[pl.id] = pl; targetMap[pl.id] = pl; });
       }
       setTargets(targetMap);
     } catch (e) {
@@ -911,7 +986,7 @@ export default function AdminContributions() {
               <div key={item.id} className="border border-border rounded-2xl p-6 bg-surface space-y-4">
                 {/* Target Entity Banner & Header */}
                 {(() => {
-                  const targetEntity = item.target_id ? targets[item.target_table]?.[item.target_id] : null;
+                  const targetEntity = item.target_id ? (targets[item.target_table]?.[item.target_id] || targets[item.target_id]) : null;
                   const targetTitle = targetEntity?.title || targetEntity?.name || targetEntity?.channel_name;
                   const targetPoster = targetEntity?.poster_url || targetEntity?.photo_url || targetEntity?.thumbnail_url;
                   const targetSub = targetEntity?.year ? `${targetEntity.year}` : (targetEntity?.known_for_department || null);
@@ -941,6 +1016,11 @@ export default function AdminContributions() {
                               {CONTRIBUTION_LABELS[item.type] || item.type}
                             </span>
                           </div>
+                          {targetEntity?.synopsis && (
+                            <p className="text-text-muted text-[11px] line-clamp-1 mt-0.5 italic">
+                              "{targetEntity.synopsis}"
+                            </p>
+                          )}
                           <p className="text-text-muted text-xs mt-1">
                             Submitted by <span className="font-bold text-text-primary">{item.users?.name || item.users?.email || 'Community Member'}</span> · {new Date(item.created_at).toLocaleDateString()}
                           </p>

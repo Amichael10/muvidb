@@ -301,7 +301,47 @@ export default function PlayDetail() {
 
 function PlayBoxOfficeModal({ play, playDateLabel, onClose, isAdmin = false }) {
   if (!play) return null;
-  const tiers = Array.isArray(play.box_office_metrics?.tier_breakdown) ? play.box_office_metrics.tier_breakdown : [];
+
+  const tiers = useMemo(() => {
+    if (!play) return [];
+    const raw = play.box_office_metrics?.tier_breakdown || play.box_office_metrics?.tier_pricing || play.ticket_pricing;
+    if (Array.isArray(raw)) {
+      return raw.map((item, i) => {
+        if (typeof item === 'string') return { name: item, price: 0, sold: 0, gross: 0 };
+        const name = item?.type || item?.name || item?.tier || item?.category || `Tier ${i + 1}`;
+        const sold = Number(item?.sold ?? item?.sold_tickets ?? item?.tickets ?? 0);
+        const price = Number(item?.priceNgn ?? item?.price ?? (typeof item?.amount === 'number' ? item.amount : 0));
+        const gross = Number(item?.grossNgn ?? item?.gross_revenue ?? item?.gross ?? (sold > 0 && price > 0 ? sold * price : 0));
+        return {
+          name: String(name).trim(),
+          sold: Number.isFinite(sold) ? sold : 0,
+          price: Number.isFinite(price) ? price : 0,
+          gross: Number.isFinite(gross) ? gross : 0,
+        };
+      }).filter(t => t && t.name);
+    }
+    if (raw && typeof raw === 'object') {
+      return Object.entries(raw).map(([k, v], i) => {
+        let price = 0;
+        let sold = 0;
+        let gross = 0;
+        if (typeof v === 'number') price = v;
+        else if (typeof v === 'string') price = Number(v.replace(/[^0-9]/g, '')) || 0;
+        else if (typeof v === 'object' && v !== null) {
+          sold = Number(v.sold ?? v.sold_tickets ?? v.tickets ?? 0);
+          price = Number(v.priceNgn ?? v.price ?? (typeof v.amount === 'number' ? v.amount : 0));
+          gross = Number(v.gross ?? v.grossNgn ?? v.gross_revenue ?? (sold > 0 && price > 0 ? sold * price : 0));
+        }
+        return {
+          name: String(k || `Tier ${i + 1}`).trim(),
+          sold: Number.isFinite(sold) ? sold : 0,
+          price: Number.isFinite(price) ? price : 0,
+          gross: Number.isFinite(gross) ? gross : 0,
+        };
+      }).filter(t => t && t.name);
+    }
+    return [];
+  }, [play]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
@@ -361,13 +401,13 @@ function PlayBoxOfficeModal({ play, playDateLabel, onClose, isAdmin = false }) {
               {tiers.map((tier, idx) => (
                 <div key={idx} className="p-3 flex items-center justify-between text-xs">
                   <div>
-                    <span className="font-bold text-text-primary block">{tier.type}</span>
-                    <span className="text-[11px] text-text-muted">₦{Number(tier.priceNgn || 0).toLocaleString()} per ticket</span>
+                    <span className="font-bold text-text-primary block">{tier.name}</span>
+                    <span className="text-[11px] text-text-muted">₦{tier.price.toLocaleString()} per ticket</span>
                   </div>
                   <div className="text-right">
-                    <span className="font-bold text-amber-400 block">{tier.sold || 0} sold</span>
+                    <span className="font-bold text-amber-400 block">{tier.sold.toLocaleString()} sold</span>
                     <span className="text-[10px] text-text-muted">
-                      ₦{(Number(tier.priceNgn || 0) * Number(tier.sold || 0)).toLocaleString()} total
+                      ₦{(tier.gross > 0 ? tier.gross : (tier.price * tier.sold)).toLocaleString()} total
                     </span>
                   </div>
                 </div>

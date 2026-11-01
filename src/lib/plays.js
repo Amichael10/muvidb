@@ -172,7 +172,12 @@ export async function fetchPersonStageCredits(personId) {
         performance_time,
         year,
         poster_url,
-        status
+        status,
+        box_office_domestic,
+        box_office_tickets_sold,
+        box_office_currency,
+        box_office_source,
+        genre
       )
     `)
     .eq('person_id', personId)

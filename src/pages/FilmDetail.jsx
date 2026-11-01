@@ -294,7 +294,7 @@ export default function FilmDetail() {
   const [showYouTubeBreakdownModal, setShowYouTubeBreakdownModal] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showAllCast, setShowAllCast] = useState(false);
-  const [awardsOpen, setAwardsOpen] = useState(false);
+  const [awardsOpen, setAwardsOpen] = useState(true);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [activeTab, setActiveTab] = useState('overview-section');
 
@@ -396,6 +396,42 @@ export default function FilmDetail() {
       
       if (dirName) {
         setFilm(prev => prev ? { ...prev, director: dirName } : null);
+      }
+
+      // Automatically inherit any awards won by cast/crew for this film
+      const personAwardsForFilm = [];
+      data.forEach(c => {
+        const person = Array.isArray(c.people) ? c.people[0] : c.people;
+        if (person && Array.isArray(person.awards)) {
+          person.awards.forEach(a => {
+            if (a && (a.film_id === uuid || (a.work && film?.title && a.work.trim().toLowerCase() === film.title.trim().toLowerCase()))) {
+              personAwardsForFilm.push({
+                ...a,
+                recipients: a.recipients?.length ? a.recipients : [person.name]
+              });
+            }
+          });
+        }
+      });
+
+      if (personAwardsForFilm.length > 0) {
+        setFilm(prev => {
+          if (!prev) return null;
+          const currentAwards = Array.isArray(prev.awards) ? [...prev.awards] : [];
+          let changed = false;
+          personAwardsForFilm.forEach(pa => {
+            const exists = currentAwards.some(ca => 
+              (ca.organization || '').trim().toLowerCase() === (pa.organization || '').trim().toLowerCase() &&
+              (ca.category || ca.title || '').trim().toLowerCase() === (pa.category || pa.title || '').trim().toLowerCase() &&
+              (!ca.year || !pa.year || Number(ca.year) === Number(pa.year))
+            );
+            if (!exists) {
+              currentAwards.push(pa);
+              changed = true;
+            }
+          });
+          return changed ? { ...prev, awards: currentAwards } : prev;
+        });
       }
     } catch (error) {
       console.error('Error fetching credits:', error);
@@ -782,15 +818,36 @@ export default function FilmDetail() {
                     <span>{heroLanguages.map(l => l.label).join(', ')}</span>
                   </>
                 )}
+                {Array.isArray(film.awards) && film.awards.length > 0 && (() => {
+                  const wins = film.awards.filter(a => a.won !== false).length;
+                  const noms = film.awards.filter(a => a.won === false).length;
+                  return (
+                    <>
+                      <span className="w-1 h-1 rounded-full bg-white/40"></span>
+                      <a
+                        href="#awards-section"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-400/40 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[11px] font-black transition-colors shadow-sm"
+                        title="Jump to awards and nominations"
+                      >
+                        <span className="text-xs">🏆</span>
+                        <span>
+                          {wins > 0 ? `${wins} ${wins === 1 ? 'Win' : 'Wins'}` : ''}
+                          {wins > 0 && noms > 0 ? ' · ' : ''}
+                          {noms > 0 ? `${noms} ${noms === 1 ? 'Nomination' : 'Nominations'}` : ''}
+                        </span>
+                      </a>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
 
           {/* MEDIA GRID (Poster on Left | Big Trailer Stage in Center | Quick Media Links on Right) */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-3 items-stretch md:h-[380px] lg:h-[420px] max-h-none md:max-h-[380px] lg:max-h-[420px]">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-3 items-stretch md:h-[360px] lg:h-[400px] max-h-[400px] overflow-hidden">
             
             {/* 1. Poster Column (md:col-span-4 lg:col-span-3) */}
-            <div className="md:col-span-4 lg:col-span-3 shrink-0 relative group rounded-xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl flex flex-col aspect-[2/3] max-w-[220px] sm:max-w-[260px] md:max-w-none mx-auto md:mx-0 w-full h-full max-h-[360px] sm:max-h-[380px] lg:max-h-[420px]">
+            <div className="md:col-span-4 lg:col-span-3 shrink-0 relative group rounded-xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl flex flex-col aspect-[2/3] max-w-[220px] sm:max-w-[240px] md:max-w-[270px] mx-auto md:mx-0 w-full h-full max-h-[320px] sm:max-h-[360px] lg:max-h-[400px]">
               <ImageWithFallback
                 src={getFilmPoster(film)}
                 alt={`${formatFilmTitle(film.title)} Poster`}
@@ -810,7 +867,7 @@ export default function FilmDetail() {
             </div>
 
             {/* 2. Center: Trailer / Stage Video Player (md:col-span-8 lg:col-span-7) */}
-            <div id="trailer-stage" className="md:col-span-8 lg:col-span-7 relative rounded-xl overflow-hidden bg-black border border-white/10 shadow-2xl aspect-video md:aspect-auto flex flex-col h-full w-full self-stretch min-h-[200px] sm:min-h-[280px] md:max-h-[380px] lg:max-h-[420px]">
+            <div id="trailer-stage" className="md:col-span-8 lg:col-span-7 relative rounded-xl overflow-hidden bg-black border border-white/10 shadow-2xl aspect-video md:aspect-auto flex flex-col h-full w-full self-stretch min-h-[190px] sm:min-h-[240px] max-h-[320px] sm:max-h-[360px] lg:max-h-[400px]">
               {trailerVideoId ? (
                 <div className="w-full h-full relative flex-1 min-h-0">
                   <iframe
@@ -837,7 +894,7 @@ export default function FilmDetail() {
                   <ImageWithFallback
                     src={getFilmBackdrop(film)}
                     alt={`${formatFilmTitle(film.title)} Backdrop`}
-                    className="w-full h-full object-contain relative z-0 opacity-90"
+                    className="w-full h-full object-cover md:object-contain relative z-0 opacity-90 max-h-[400px]"
                     fallbackType="film"
                     name={formatFilmTitle(film.title)}
                     width={1280}

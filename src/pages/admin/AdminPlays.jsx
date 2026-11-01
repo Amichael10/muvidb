@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
 import ImageField from '../../components/admin/ImageField';
 import Drawer from '../../components/admin/Drawer';
+import CriticReviewsEditor from '../../components/admin/CriticReviewsEditor';
 import SEO from '../../components/SEO';
 
 const BLANK_INSTAGRAM_IMPORT = {
@@ -403,6 +404,21 @@ export default function AdminPlays() {
       setTimeout(() => setCreditMsg(null), 3000);
     } catch (err) {
       setCreditMsg({ type: 'error', text: 'Failed to remove credit: ' + err.message });
+    }
+  }
+
+  async function updateSavedCredit(creditId, updates) {
+    try {
+      const { error } = await supabase
+        .from('stage_credits')
+        .update(updates)
+        .eq('id', creditId);
+      if (error) throw error;
+      setSavedCredits(prev => prev.map(c => c.id === creditId ? { ...c, ...updates } : c));
+      setCreditMsg({ type: 'success', text: 'Updated credit' });
+      setTimeout(() => setCreditMsg(null), 2500);
+    } catch (err) {
+      setCreditMsg({ type: 'error', text: 'Failed to update credit: ' + err.message });
     }
   }
 
@@ -1142,16 +1158,24 @@ export default function AdminPlays() {
                       <div className="flex flex-wrap gap-1.5">
                         {validList.map((tb, idx) => {
                           const tierName = tb.tier;
-                          const soldCount = tb.sold || 0;
-                          const grossAmount = tb.grossNgn || 0;
-                          const priceAmount = tb.priceNgn || 0;
+                          const soldCount = Number.isFinite(tb.sold) ? tb.sold : 0;
+                          const grossAmount = Number.isFinite(tb.grossNgn) ? tb.grossNgn : 0;
+                          const priceAmount = Number.isFinite(tb.priceNgn) ? tb.priceNgn : 0;
                           return (
                             <div key={idx} className="bg-surface/80 border border-amber-500/20 px-2 py-1 rounded text-[10px] text-text-primary">
                               <span className="font-bold">{tierName}: </span>
-                              <span className="text-amber-500 font-extrabold">{soldCount.toLocaleString()} tix</span>
-                              <span className="text-text-muted ml-1">
-                                (₦{grossAmount > 0 ? grossAmount.toLocaleString() : (priceAmount > 0 ? `${priceAmount.toLocaleString()} / seat` : '0')})
-                              </span>
+                              {soldCount > 0 ? (
+                                <>
+                                  <span className="text-amber-500 font-extrabold">{soldCount.toLocaleString()} tix</span>
+                                  <span className="text-text-muted ml-1">
+                                    (₦{grossAmount > 0 ? grossAmount.toLocaleString() : (priceAmount > 0 ? `${(soldCount * priceAmount).toLocaleString()}` : '0')})
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-amber-400 font-bold">
+                                  {priceAmount > 0 ? `₦${priceAmount.toLocaleString()} / seat` : 'Pricing unlisted'}
+                                </span>
+                              )}
                             </div>
                           );
                         })}
@@ -1356,28 +1380,91 @@ export default function AdminPlays() {
 
             {/* Saved credits */}
             {editingPlay && (
-              <div>
+              <div className="space-y-3">
                 {loadingCredits ? (
                   <div className="py-4 text-center">
                     <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
                   </div>
                 ) : savedCredits.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Saved Performers ({savedCredits.length})</p>
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                      Saved Cast & Creative Team ({savedCredits.length})
+                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {savedCredits.map(c => {
                         const person = c.person || {};
+                        const isCustom = c.isCustomRole || (!STAGE_PLAY_ROLES.includes(c.role) && c.role);
                         return (
-                          <div key={c.id} className="flex items-center justify-between gap-3 bg-surface-2 border border-border rounded-xl p-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-full bg-surface overflow-hidden border border-border flex-shrink-0">
-                                {person.photo_url && <img src={person.photo_url} alt="" className="w-full h-full object-cover" />}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-text-primary truncate">{person.name}</p>
-                                <p className="text-[10px] text-brand font-semibold">
-                                  {c.role === 'Actor' ? (c.character_name ? `Actor as ${c.character_name}` : 'Actor') : `${c.role}${c.character_name ? ` (${c.character_name})` : ''}`}
-                                </p>
+                          <div key={c.id} className="flex items-start gap-3 bg-surface-2 border border-border rounded-xl p-3">
+                            <div className="w-9 h-9 rounded-full bg-surface overflow-hidden border border-border flex-shrink-0 mt-0.5">
+                              {person.photo_url && <img src={person.photo_url} alt="" className="w-full h-full object-cover" />}
+                            </div>
+                            <div className="flex-1 space-y-2 min-w-0">
+                              <p className="text-xs font-bold text-text-primary truncate">{person.name}</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[9px] text-text-muted font-bold block mb-0.5">Role</label>
+                                  {isCustom ? (
+                                    <div className="relative flex items-center">
+                                      <input
+                                        type="text"
+                                        defaultValue={c.role || ''}
+                                        onBlur={e => {
+                                          if (e.target.value.trim() !== c.role) {
+                                            updateSavedCredit(c.id, { role: e.target.value.trim() || 'Actor' });
+                                          }
+                                        }}
+                                        placeholder="Enter role..."
+                                        className="w-full bg-bg border border-brand/50 rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-brand"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSavedCredits(prev => prev.map(item => item.id === c.id ? { ...item, isCustomRole: false } : item));
+                                          updateSavedCredit(c.id, { role: 'Actor' });
+                                        }}
+                                        className="absolute right-1 text-text-muted hover:text-text-primary p-0.5"
+                                        title="Back to standard roles"
+                                      >
+                                        <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <select
+                                      value={c.role || 'Actor'}
+                                      onChange={e => {
+                                        if (e.target.value === '__custom__') {
+                                          setSavedCredits(prev => prev.map(item => item.id === c.id ? { ...item, isCustomRole: true } : item));
+                                        } else {
+                                          updateSavedCredit(c.id, { role: e.target.value });
+                                        }
+                                      }}
+                                      className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-brand"
+                                    >
+                                      {STAGE_PLAY_ROLES.map(r => (
+                                        <option key={r} value={r}>{r}</option>
+                                      ))}
+                                      <option value="__custom__" className="text-brand font-bold">+ Add Custom Role...</option>
+                                    </select>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="text-[9px] text-text-muted font-bold block mb-0.5">
+                                    {isStageActingRole(c.role) ? 'Character / Performer' : 'Specific Function (Optional)'}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    defaultValue={c.character_name || ''}
+                                    onBlur={e => {
+                                      const val = e.target.value.trim() || null;
+                                      if (val !== c.character_name) {
+                                        updateSavedCredit(c.id, { character_name: val });
+                                      }
+                                    }}
+                                    placeholder={isStageActingRole(c.role) ? "e.g. Lead, Kike's Mother" : 'e.g. Folk Opera Adaptor'}
+                                    className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-brand"
+                                  />
+                                </div>
                               </div>
                             </div>
                             <button
@@ -1395,9 +1482,25 @@ export default function AdminPlays() {
                   </div>
                 ) : (
                   <p className="text-[11px] text-text-muted text-center py-4 border border-dashed border-border rounded-xl">
-                    No performers attached yet — search above to add cast credits.
+                    No credits attached yet — search above to add cast or creative credits.
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Critic Reviews & Press Quotes Section */}
+            {editingPlay?.id && (
+              <div className="pt-6 border-t border-border space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-2">
+                    <Icon icon="solar:chat-round-line-bold" className="text-brand w-4 h-4" />
+                    Critic Reviews & Press Quotes
+                  </h4>
+                  <span className="text-[10px] text-text-muted font-semibold">
+                    The Nigerian Stage Review & Media Quotes
+                  </span>
+                </div>
+                <CriticReviewsEditor playId={editingPlay.id} />
               </div>
             )}
 
