@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { Icon } from '@iconify/react';
+import toast from 'react-hot-toast';
 import { fetchPlayBySlug, getPlayDateLabel } from '../lib/plays';
 import { useAuth } from '../context/AuthContext';
 import SEO from '../components/SEO';
@@ -100,7 +101,7 @@ export default function PlayDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary pb-20">
+    <div className="min-h-screen bg-bg text-text-primary pb-28 md:pb-20">
       <SEO 
         title={`${play.title} (${playDateLabel}) - Stage Play | MuviDB`}
         description={play.synopsis || `Explore stage play production details, playwright ${play.playwright}, director ${play.director}, and ensemble cast on MuviDB.`}
@@ -231,14 +232,14 @@ export default function PlayDetail() {
               <p className="text-xs text-text-muted">Performers for this production will appear here as cast credits are added.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+            <div className="flex overflow-x-auto snap-x scrollbar-none gap-3.5 pb-2 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 sm:gap-5">
               {uniquePerformers.map((item) => {
                 const person = item.person || {};
                 return (
                   <Link
                     key={item.id}
                     to={`/people/${person.slug || person.id}`}
-                    className="group bg-surface/70 hover:bg-surface border border-border/80 hover:border-brand/60 rounded-2xl p-4 flex flex-col justify-between items-center text-center transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-brand/5 min-h-[210px]"
+                    className="group bg-surface/70 hover:bg-surface border border-border/80 hover:border-brand/60 rounded-2xl p-4 flex flex-col justify-between items-center text-center transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-brand/5 min-h-[210px] w-[150px] shrink-0 snap-start sm:w-auto"
                   >
                     <div className="flex flex-col items-center w-full">
                       <div className="relative mb-3">
@@ -437,6 +438,48 @@ function PlayBoxOfficeModal({ play, playDateLabel, onClose, isAdmin = false }) {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ── MOBILE STICKY BOTTOM ACTION DOCK (md:hidden) ── */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0B0D10]/95 backdrop-blur-xl border-t border-purple-500/25 px-4 py-2.5 flex items-center justify-between gap-3 md:hidden shadow-[0_-8px_25px_rgba(0,0,0,0.85)] pb-[max(0.625rem,env(safe-area-inset-bottom))]">
+        {play.source_url ? (
+          <a
+            href={play.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 min-h-[42px] px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-98 transition-all"
+          >
+            <Icon icon="solar:ticket-sale-bold" className="text-base" />
+            <span className="truncate">{tiers.length > 0 ? `Get Tickets · From ₦${Math.min(...tiers.map(t => t.price)).toLocaleString()}` : 'Get Tickets / Book'}</span>
+          </a>
+        ) : (
+          <div className="flex-1 flex items-center gap-2 text-xs font-bold text-white/90 truncate">
+            <Icon icon="solar:map-point-wave-bold" className="text-brand text-base shrink-0" />
+            <span className="truncate">{play.venue ? `${play.venue} (${play.city})` : play.city || 'Live Stage Production'}</span>
+          </div>
+        )}
+
+        {/* Share Button */}
+        <button
+          type="button"
+          onClick={() => {
+            if (navigator.share) {
+              navigator.share({
+                title: play.title,
+                text: `Experience "${play.title}" live on stage at ${play.venue || play.city}`,
+                url: window.location.href,
+              }).catch(() => {});
+            } else {
+              navigator.clipboard.writeText(window.location.href);
+              toast.success('Play link copied to clipboard!');
+            }
+          }}
+          className="w-11 h-11 shrink-0 rounded-xl bg-white/[0.08] border border-white/15 text-white/80 hover:text-white flex items-center justify-center transition-all active:scale-95"
+          title="Share Play"
+          aria-label="Share Stage Play"
+        >
+          <Icon icon="solar:share-linear" className="text-lg" />
+        </button>
       </div>
     </div>
   );

@@ -865,7 +865,152 @@ export default function PersonDetailV2() {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-10 items-start">
+          
+          {/* ── MOBILE TALENT HERO (md:hidden) ── */}
+          <div className="md:hidden flex flex-col space-y-4 mb-4">
+            {/* Top Identity Row: 80x80 Avatar + Name + Roles */}
+            <div className="flex items-start gap-3.5">
+              <div className="relative w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-black border border-border shadow-xl">
+                <ImageWithFallback
+                  src={person.photo_url || person.photo}
+                  alt={formatPersonName(person.name)}
+                  fallbackType="avatar"
+                  name={formatPersonName(person.name)}
+                  className="h-full w-full object-cover"
+                  loading="eager"
+                />
+                {person.is_verified && (
+                  <div className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white shadow-md">
+                    <Icon icon="solar:verified-check-bold" width="12" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h1 className="text-xl sm:text-2xl font-heading font-black tracking-tight text-text-primary">
+                    {formatPersonName(person.name)}
+                  </h1>
+                </div>
+
+                {/* Primary Roles */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {heroRoles.map((role) => (
+                    <span key={role} className="text-brand text-[10px] font-black uppercase tracking-wider bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md">
+                      {formatRole(role)}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Live Availability Status */}
+                {person.availability_status && (
+                  <div className="pt-1.5 flex items-center gap-1.5">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                      person.availability_status === 'on_set'
+                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                        : person.availability_status === 'booked'
+                        ? 'bg-orange-500/15 border-orange-500/30 text-orange-300'
+                        : person.availability_status === 'not_taking_offers'
+                        ? 'bg-zinc-500/15 border-zinc-500/30 text-zinc-400'
+                        : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        person.availability_status === 'on_set' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400 animate-pulse'
+                      }`} />
+                      <span>{person.availability_status === 'on_set' ? 'On Set' : 'Available for Bookings'}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 3-Up Metric Impact Bar (Box Office · Credits · Followers) */}
+            <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-surface/90 border border-border shadow-sm text-center">
+              <div>
+                <p className="text-base sm:text-lg font-black font-heading text-brand">
+                  {displayBoxOffice > 0 ? fmtMoneyMobile(displayBoxOffice) : `${totalFilms}`}
+                </p>
+                <p className="text-text-muted text-[9px] font-bold uppercase tracking-wider mt-0.5">
+                  {displayBoxOffice > 0 ? 'Theatrical Gross' : 'Total Credits'}
+                </p>
+              </div>
+              <div className="border-x border-border/70">
+                <p className="text-base sm:text-lg font-black font-heading text-text-primary">
+                  {totalFilms}
+                </p>
+                <p className="text-text-muted text-[9px] font-bold uppercase tracking-wider mt-0.5">
+                  Screen Credits
+                </p>
+              </div>
+              <div>
+                <p className="text-base sm:text-lg font-black font-heading text-text-primary">
+                  {followerCount.toLocaleString()}
+                </p>
+                <p className="text-text-muted text-[9px] font-bold uppercase tracking-wider mt-0.5">
+                  Followers
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Hero Actions Strip */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleFollow}
+                disabled={followLoading}
+                className={`flex-1 min-h-[38px] px-4 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm ${
+                  isFollowing
+                    ? 'bg-surface border border-brand text-brand'
+                    : 'bg-brand text-white hover:bg-brand/90'
+                }`}
+              >
+                <Icon icon={isFollowing ? 'solar:user-check-rounded-bold' : 'solar:user-plus-bold'} width="15" />
+                <span>{isFollowing ? 'Following' : 'Follow'}</span>
+              </button>
+
+              {(person.booking_email || person.booking_phone || person.booking_whatsapp || representations?.length > 0) && (
+                <button
+                  onClick={() => setBookingModalOpen(true)}
+                  className="flex-1 min-h-[38px] px-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs font-bold text-amber-400 flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Icon icon="solar:letter-bold" width="14" />
+                  <span>Book / Rep</span>
+                </button>
+              )}
+
+              <ShareAction
+                title={person.name}
+                text={`Check out ${person.name}'s profile on MuviDB`}
+                variant="icon"
+                className="!w-10 !h-[38px] !rounded-xl !border !border-border !bg-surface flex items-center justify-center text-text-muted shrink-0"
+              />
+            </div>
+
+            {/* Accolades Ribbon (if any) */}
+            {canonicalAwardEntries.length > 0 && (
+              <div
+                onClick={() => awardsRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                className="cursor-pointer flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs"
+              >
+                <Icon icon="solar:cup-star-bold" width="16" className="text-amber-400 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-heading font-black text-amber-300 text-xs truncate">
+                    {awardSummary || `${canonicalAwardEntries.length} Listed Honors`}
+                  </p>
+                </div>
+                <Icon icon="solar:alt-arrow-down-linear" width="14" className="text-amber-400 shrink-0" />
+              </div>
+            )}
+
+            {/* Editorial Bio */}
+            {(person.biography || person.bio) && (
+              <div className="pt-0.5">
+                <Biography text={toSentenceCase(person.biography || person.bio)} />
+              </div>
+            )}
+          </div>
+
+          {/* ── DESKTOP HERO (hidden md:grid) ── */}
+          <div className="hidden md:grid md:grid-cols-12 gap-8 lg:gap-10 items-start">
             
             {/* Left: Headshot Portrait with Seal & Quick Photo Trigger */}
             <div className="md:col-span-4 lg:col-span-3 flex flex-col items-center md:items-start">
@@ -1711,12 +1856,12 @@ export default function PersonDetailV2() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
                 
                 {/* ── CLEAN ROLE SELECTOR (Top 4 buttons + More dropdown) ── */}
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 max-w-full">
                   {primaryRoleButtons.map((role) => (
                     <button
                       key={role}
                       onClick={() => setActiveRole(role)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                      className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                         activeRole === role
                           ? 'bg-brand text-white shadow-md'
                           : 'bg-surface border border-border text-text-muted hover:text-text-primary hover:border-brand/40'
@@ -1728,7 +1873,7 @@ export default function PersonDetailV2() {
 
                   {/* Clean Dropdown for Additional Roles (Never overflows!) */}
                   {secondaryRoles.length > 0 && (
-                    <div className="relative">
+                    <div className="relative shrink-0">
                       <select
                         value={secondaryRoles.includes(activeRole) ? activeRole : ''}
                         onChange={(e) => e.target.value && setActiveRole(e.target.value)}

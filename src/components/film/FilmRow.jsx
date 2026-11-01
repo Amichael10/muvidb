@@ -44,11 +44,11 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
   };
 
   return (
-    <section className={`relative group/row ${noHeader ? '' : 'py-10'}`}>
+    <section className={`relative group/row ${noHeader ? '' : 'py-5 md:py-10'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header — editorial: kicker + display title + sliding ghost link */}
         {!noHeader && (
-          <div className="flex items-end justify-between gap-4 mb-7">
+          <div className="flex items-end justify-between gap-4 mb-4 md:mb-7">
             <div className="space-y-1.5">
               {subtitle && (
                 <p className="text-text-muted text-[10px] font-bold uppercase tracking-[0.25em]">{subtitle}</p>
@@ -98,11 +98,11 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
             ref={scrollRef}
             onScroll={checkScroll}
             data-lenis-prevent
-            className="flex overflow-x-auto gap-4 md:gap-6 py-4 md:py-16 md:-my-16 px-4 sm:px-0 scrollbar-hide overscroll-x-contain"
+            className="flex overflow-x-auto gap-3.5 md:gap-6 py-2.5 md:py-16 md:-my-16 px-4 sm:px-0 scrollbar-hide overscroll-x-contain snap-x snap-mandatory"
           >
             {isLoading ? (
               [...Array(6)].map((_, i) => (
-                <div key={i} className="shrink-0">
+                <div key={i} className="shrink-0 snap-start">
                   <SkeletonCard size="md" variant={cardVariant} />
                 </div>
               ))
@@ -112,7 +112,7 @@ export default function FilmRow({ title, subtitle, films, sortKey, isLoading = f
               </div>
             ) : (
               visibleFilms.map((film, index) => (
-                <div key={film.id} className="shrink-0">
+                <div key={film.id} className="shrink-0 snap-start">
                   {cardVariant === 'cinema' ? (
                     <CinemaCard film={film} />
                   ) : cardVariant === 'coming-soon' ? (
