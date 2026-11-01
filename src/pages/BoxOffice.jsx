@@ -13,19 +13,33 @@ import {
   parseRuntimeMinutes,
   USD_TO_NGN,
 } from '../lib/youtubeBoxOffice';
-import { formatPersonName, formatViews } from '../utils/format';
+import { formatPersonName, formatViews, formatNaira } from '../utils/format';
+import { RankBadge, FilterPill, EmptyState, StatCard } from '../components/ui';
 
-function formatNaira(amount) {
-  if (!amount || isNaN(amount)) return '—';
-  const num = Number(amount);
-  if (num >= 1_000_000_000) {
-    return `₦${(num / 1_000_000_000).toFixed(2)} Billion`;
-  }
-  if (num >= 1_000_000) {
-    return `₦${(num / 1_000_000).toFixed(1)} Million`;
-  }
-  return `₦${num.toLocaleString('en-NG')}`;
-}
+const CINEMA_TABS = [
+  { id: 'all', label: 'All-Time Highest Grossing' },
+  { id: 'billion', label: '₦1 Billion Club', icon: 'solar:crown-bold' },
+  { id: '2026', label: '2026 Releases' },
+  { id: '2025', label: '2025 Releases' },
+  { id: '2024', label: '2024 Releases' },
+  { id: '2023', label: '2023 Releases' },
+];
+
+const PLAYS_TABS = [
+  { id: 'all', label: 'All Stage Productions' },
+  { id: 'top-tier', label: '₦5M+ Grossing', icon: 'solar:star-bold' },
+  { id: '2026', label: '2026 Season' },
+  { id: '2025', label: '2025 Season' },
+];
+
+const YOUTUBE_TABS = [
+  { id: 'all', label: 'All-Time Most Viewed' },
+  { id: '10m', label: '10M+ Club', icon: 'solar:fire-bold' },
+  { id: '5m', label: '5M+ Club' },
+  { id: '2026', label: '2026 Releases' },
+  { id: '2025', label: '2025 Releases' },
+  { id: '2024', label: '2024 Releases' },
+];
 
 export default function BoxOffice() {
   const loaderData = useLoaderData();
@@ -406,90 +420,48 @@ export default function BoxOffice() {
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
               {activeSection === 'cinema' && (
                 <>
-                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[140px] flex-1 sm:flex-initial">
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Total Theatrical Gross</span>
-                    <span className="text-lg sm:text-xl font-black text-brand font-heading">
-                      {formatNaira(totalCinemaGross)}
-                    </span>
-                  </div>
-                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[120px] flex-1 sm:flex-initial">
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">₦1B Club Titles</span>
-                    <span className="text-lg sm:text-xl font-black text-text-primary font-heading flex items-center gap-1.5">
-                      <Icon icon="solar:crown-bold" className="text-brand" />
-                      {billionClubFilms.length}
-                    </span>
-                  </div>
+                  <StatCard label="Total Theatrical Gross" value={formatNaira(totalCinemaGross)} valueColor="text-brand" />
+                  <StatCard label="₦1B Club Titles" value={billionClubFilms.length} icon="solar:crown-bold" />
                   {topCinemaFilm && (
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[160px] col-span-2 sm:col-span-1">
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">#1 All-Time Cinema</span>
-                      <Link 
-                        to={`/films/${topCinemaFilm.slug || topCinemaFilm.id}/box-office`}
-                        className="text-xs sm:text-sm font-black text-text-primary hover:text-brand transition-colors truncate block max-w-[180px]"
-                        title={topCinemaFilm.title}
-                      >
-                        {topCinemaFilm.title}
-                      </Link>
-                    </div>
+                    <StatCard
+                      label="#1 All-Time Cinema"
+                      value={topCinemaFilm.title}
+                      to={`/films/${topCinemaFilm.slug || topCinemaFilm.id}/box-office`}
+                      valueColor="text-brand"
+                      className="col-span-2 sm:col-span-1"
+                    />
                   )}
                 </>
               )}
 
               {activeSection === 'plays' && (
                 <>
-                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[140px] flex-1 sm:flex-initial">
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Total Stage Gross</span>
-                    <span className="text-lg sm:text-xl font-black text-purple-400 font-heading">
-                      {formatNaira(totalPlaysGross)}
-                    </span>
-                  </div>
-                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[130px] flex-1 sm:flex-initial">
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Tracked Admissions</span>
-                    <span className="text-lg sm:text-xl font-black text-text-primary font-heading flex items-center gap-1.5">
-                      <Icon icon="solar:ticket-bold" className="text-purple-400" />
-                      {totalTicketsSold.toLocaleString()} tickets
-                    </span>
-                  </div>
+                  <StatCard label="Total Stage Gross" value={formatNaira(totalPlaysGross)} valueColor="text-purple-400" />
+                  <StatCard label="Tracked Admissions" value={`${totalTicketsSold.toLocaleString()} tickets`} icon="solar:ticket-bold" />
                   {topPlay && (
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[160px] col-span-2 sm:col-span-1">
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">#1 Stage Production</span>
-                      <Link 
-                        to={`/plays/${topPlay.slug || topPlay.id}/box-office`}
-                        className="text-xs sm:text-sm font-black text-text-primary hover:text-purple-400 transition-colors truncate block max-w-[180px]"
-                        title={topPlay.title}
-                      >
-                        {topPlay.title}
-                      </Link>
-                    </div>
+                    <StatCard
+                      label="#1 Stage Production"
+                      value={topPlay.title}
+                      to={`/plays/${topPlay.slug || topPlay.id}/box-office`}
+                      valueColor="text-purple-400"
+                      className="col-span-2 sm:col-span-1"
+                    />
                   )}
                 </>
               )}
 
               {activeSection === 'youtube' && (
                 <>
-                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[140px] flex-1 sm:flex-initial">
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Tracked Viewership</span>
-                    <span className="text-lg sm:text-xl font-black text-red-500 font-heading">
-                      {formatViews(totalYoutubeViews)}
-                    </span>
-                  </div>
-                  <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[130px] flex-1 sm:flex-initial">
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">10M+ Super-Hits</span>
-                    <span className="text-lg sm:text-xl font-black text-text-primary font-heading flex items-center gap-1.5">
-                      <Icon icon="solar:fire-bold" className="text-red-500" />
-                      {tenMillionClub.length} films
-                    </span>
-                  </div>
+                  <StatCard label="Tracked Viewership" value={formatViews(totalYoutubeViews)} valueColor="text-red-500" />
+                  <StatCard label="10M+ Super-Hits" value={`${tenMillionClub.length} films`} icon="solar:fire-bold" />
                   {topYoutubeFilm && (
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-surface border border-border min-w-0 sm:min-w-[160px] col-span-2 sm:col-span-1">
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">#1 Most-Viewed</span>
-                      <Link 
-                        to={`/films/${topYoutubeFilm.slug || topYoutubeFilm.id}`}
-                        className="text-xs sm:text-sm font-black text-text-primary hover:text-red-500 transition-colors truncate block max-w-[180px]"
-                        title={topYoutubeFilm.title}
-                      >
-                        {topYoutubeFilm.title}
-                      </Link>
-                    </div>
+                    <StatCard
+                      label="#1 Most-Viewed"
+                      value={topYoutubeFilm.title}
+                      to={`/films/${topYoutubeFilm.slug || topYoutubeFilm.id}`}
+                      valueColor="text-red-500"
+                      className="col-span-2 sm:col-span-1"
+                    />
                   )}
                 </>
               )}
@@ -565,75 +537,41 @@ export default function BoxOffice() {
           {/* Section Specific Sub-Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
             {activeSection === 'cinema' && (
-              [
-                { id: 'all', label: 'All-Time Highest Grossing' },
-                { id: 'billion', label: '₦1 Billion Club', icon: 'solar:crown-bold' },
-                { id: '2026', label: '2026 Releases' },
-                { id: '2025', label: '2025 Releases' },
-                { id: '2024', label: '2024 Releases' },
-                { id: '2023', label: '2023 Releases' },
-              ].map((tab) => (
-                <button
+              CINEMA_TABS.map((tab) => (
+                <FilterPill
                   key={tab.id}
-                  type="button"
+                  active={cinemaTab === tab.id}
                   onClick={() => setCinemaTab(tab.id)}
-                  className={`shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                    cinemaTab === tab.id
-                      ? 'bg-brand text-white shadow-xs font-bold'
-                      : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-2'
-                  }`}
-                >
-                  {tab.icon && <Icon icon={tab.icon} className={cinemaTab === tab.id ? 'text-white text-sm' : 'text-brand text-sm'} />}
-                  <span>{tab.label}</span>
-                </button>
+                  label={tab.label}
+                  icon={tab.icon}
+                  variant="brand"
+                />
               ))
             )}
 
             {activeSection === 'plays' && (
-              [
-                { id: 'all', label: 'All Stage Productions' },
-                { id: 'top-tier', label: '₦5M+ Grossing', icon: 'solar:star-bold' },
-                { id: '2026', label: '2026 Season' },
-                { id: '2025', label: '2025 Season' },
-              ].map((tab) => (
-                <button
+              PLAYS_TABS.map((tab) => (
+                <FilterPill
                   key={tab.id}
-                  type="button"
+                  active={playsTab === tab.id}
                   onClick={() => setPlaysTab(tab.id)}
-                  className={`shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                    playsTab === tab.id
-                      ? 'bg-purple-600 text-white shadow-xs font-bold'
-                      : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-2'
-                  }`}
-                >
-                  {tab.icon && <Icon icon={tab.icon} className="text-purple-300 text-sm" />}
-                  <span>{tab.label}</span>
-                </button>
+                  label={tab.label}
+                  icon={tab.icon}
+                  variant="purple"
+                />
               ))
             )}
 
             {activeSection === 'youtube' && (
-              [
-                { id: 'all', label: 'All-Time Most Viewed' },
-                { id: '10m', label: '10M+ Club', icon: 'solar:fire-bold' },
-                { id: '5m', label: '5M+ Club' },
-                { id: '2026', label: '2026 Releases' },
-                { id: '2025', label: '2025 Releases' },
-                { id: '2024', label: '2024 Releases' },
-              ].map((tab) => (
-                <button
+              YOUTUBE_TABS.map((tab) => (
+                <FilterPill
                   key={tab.id}
-                  type="button"
+                  active={youtubeTab === tab.id}
                   onClick={() => setYoutubeTab(tab.id)}
-                  className={`shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                    youtubeTab === tab.id
-                      ? 'bg-red-600 text-white shadow-xs font-bold'
-                      : 'bg-surface border border-border text-text-secondary hover:text-text-primary hover:bg-surface-2'
-                  }`}
-                >
-                  {tab.icon && <Icon icon={tab.icon} className="text-brand text-sm" />}
-                  <span>{tab.label}</span>
-                </button>
+                  label={tab.label}
+                  icon={tab.icon}
+                  variant="red"
+                />
               ))
             )}
           </div>
@@ -699,11 +637,11 @@ export default function BoxOffice() {
               ))}
             </div>
           ) : filteredFilms.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl bg-surface border border-border space-y-3">
-              <Icon icon="solar:ticket-sale-linear" className="text-4xl text-text-muted mx-auto opacity-40" />
-              <p className="text-sm font-semibold text-text-primary">No theatrical records match this filter</p>
-              <p className="text-xs text-text-muted">Try selecting "All-Time Highest Grossing" or clear your search query.</p>
-            </div>
+            <EmptyState
+              icon="solar:ticket-sale-linear"
+              title="No theatrical records match this filter"
+              description='Try selecting "All-Time Highest Grossing" or clear your search query.'
+            />
           ) : (
             <div className="rounded-2xl border border-border overflow-hidden bg-surface shadow-xs">
               {/* Mobile Card View (sm:hidden) */}
@@ -723,11 +661,7 @@ export default function BoxOffice() {
                   return (
                     <div key={film.id} className="p-3.5 space-y-3 hover:bg-surface-2/30 transition-colors">
                       <div className="flex items-start gap-3">
-                        <span className={`w-6 h-6 rounded-full font-black text-xs inline-flex items-center justify-center shrink-0 shadow-xs ${
-                          rank === 1 ? 'bg-brand text-white' : rank === 2 ? 'bg-slate-300 text-black' : rank === 3 ? 'bg-[#9A3412] text-white' : 'bg-surface-2 text-text-muted font-mono'
-                        }`}>
-                          {rank}
-                        </span>
+                        <RankBadge rank={rank} variant="brand" />
                         <Link to={`/films/${film.slug || film.id}`} className="shrink-0 w-11 h-15 rounded-lg overflow-hidden border border-border bg-surface-2">
                           <ImageWithFallback src={film.poster_url} alt={film.title} fallbackType="film" className="w-full h-full object-cover" />
                         </Link>
@@ -814,23 +748,7 @@ export default function BoxOffice() {
                         >
                           {/* Rank */}
                           <td className="py-3.5 pl-4 sm:pl-6 pr-2 text-center">
-                            {rank === 1 ? (
-                              <span className="w-6 h-6 rounded-full bg-brand text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
-                                1
-                              </span>
-                            ) : rank === 2 ? (
-                              <span className="w-6 h-6 rounded-full bg-slate-300 text-black font-black text-xs inline-flex items-center justify-center shadow-xs">
-                                2
-                              </span>
-                            ) : rank === 3 ? (
-                              <span className="w-6 h-6 rounded-full bg-[#9A3412] text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
-                                3
-                              </span>
-                            ) : (
-                              <span className="font-mono text-text-muted font-bold text-xs">
-                                #{rank}
-                              </span>
-                            )}
+                            <RankBadge rank={rank} variant="brand" />
                           </td>
 
                           {/* Film Details */}
@@ -924,11 +842,11 @@ export default function BoxOffice() {
               ))}
             </div>
           ) : filteredPlays.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl bg-surface border border-border space-y-3">
-              <Icon icon="solar:masks-linear" className="text-4xl text-text-muted mx-auto opacity-40" />
-              <p className="text-sm font-semibold text-text-primary">No stage play records match this filter</p>
-              <p className="text-xs text-text-muted">Try selecting "All Stage Productions" or clear your search query.</p>
-            </div>
+            <EmptyState
+              icon="solar:masks-linear"
+              title="No stage play records match this filter"
+              description='Try selecting "All Stage Productions" or clear your search query.'
+            />
           ) : (
             <div className="rounded-2xl border border-border overflow-hidden bg-surface shadow-xs">
               {/* Mobile Card View (sm:hidden) */}
@@ -941,11 +859,7 @@ export default function BoxOffice() {
                   return (
                     <div key={play.id} className="p-3.5 space-y-3 hover:bg-surface-2/30 transition-colors">
                       <div className="flex items-start gap-3">
-                        <span className={`w-6 h-6 rounded-full font-black text-xs inline-flex items-center justify-center shrink-0 shadow-xs ${
-                          rank === 1 ? 'bg-purple-500 text-white' : rank === 2 ? 'bg-slate-300 text-black' : rank === 3 ? 'bg-[#9A3412] text-white' : 'bg-surface-2 text-text-muted font-mono'
-                        }`}>
-                          {rank}
-                        </span>
+                        <RankBadge rank={rank} variant="purple" />
                         <Link to={`/plays/${play.slug || play.id}/box-office`} className="shrink-0 w-11 h-15 rounded-lg overflow-hidden border border-border bg-surface-2">
                           <ImageWithFallback src={play.poster_url || play.banner_url} alt={play.title} fallbackType="play" className="w-full h-full object-cover" />
                         </Link>
@@ -1013,23 +927,7 @@ export default function BoxOffice() {
                         >
                           {/* Rank */}
                           <td className="py-3.5 pl-4 sm:pl-6 pr-2 text-center">
-                            {rank === 1 ? (
-                              <span className="w-6 h-6 rounded-full bg-purple-500 text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
-                                1
-                              </span>
-                            ) : rank === 2 ? (
-                              <span className="w-6 h-6 rounded-full bg-slate-300 text-black font-black text-xs inline-flex items-center justify-center shadow-xs">
-                                2
-                              </span>
-                            ) : rank === 3 ? (
-                              <span className="w-6 h-6 rounded-full bg-[#9A3412] text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
-                                3
-                              </span>
-                            ) : (
-                              <span className="font-mono text-text-muted font-bold text-xs">
-                                #{rank}
-                              </span>
-                            )}
+                            <RankBadge rank={rank} variant="purple" />
                           </td>
 
                           {/* Play Details */}
@@ -1132,11 +1030,11 @@ export default function BoxOffice() {
               ))}
             </div>
           ) : filteredYoutube.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl bg-surface border border-border space-y-3">
-              <Icon icon="solar:play-circle-linear" className="text-4xl text-text-muted mx-auto opacity-40" />
-              <p className="text-sm font-semibold text-text-primary">No YouTube records match this filter</p>
-              <p className="text-xs text-text-muted">Try selecting "All-Time Most Viewed" or clear your search query.</p>
-            </div>
+            <EmptyState
+              icon="solar:play-circle-linear"
+              title="No YouTube records match this filter"
+              description='Try selecting "All-Time Most Viewed" or clear your search query.'
+            />
           ) : (
             <div className="rounded-2xl border border-border overflow-hidden bg-surface shadow-xs">
               {/* Mobile Card View (sm:hidden) */}
@@ -1163,11 +1061,7 @@ export default function BoxOffice() {
                   return (
                     <div key={film.id} className="p-3.5 space-y-3 hover:bg-surface-2/30 transition-colors">
                       <div className="flex items-start gap-3">
-                        <span className={`w-6 h-6 rounded-full font-black text-xs inline-flex items-center justify-center shrink-0 shadow-xs ${
-                          rank === 1 ? 'bg-brand text-white' : rank === 2 ? 'bg-slate-300 text-black' : rank === 3 ? 'bg-[#9A3412] text-white' : 'bg-surface-2 text-text-muted font-mono'
-                        }`}>
-                          {rank}
-                        </span>
+                        <RankBadge rank={rank} variant="brand" />
                         <Link to={`/films/${film.slug || film.id}`} className="shrink-0 w-11 h-15 rounded-lg overflow-hidden border border-border bg-surface-2">
                           <ImageWithFallback src={film.poster_url} alt={film.title} fallbackType="film" className="w-full h-full object-cover" />
                         </Link>
@@ -1280,23 +1174,7 @@ export default function BoxOffice() {
                         >
                           {/* Rank */}
                           <td className="py-3.5 pl-4 sm:pl-6 pr-2 text-center">
-                            {rank === 1 ? (
-                              <span className="w-6 h-6 rounded-full bg-brand text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
-                                1
-                              </span>
-                            ) : rank === 2 ? (
-                              <span className="w-6 h-6 rounded-full bg-slate-300 text-black font-black text-xs inline-flex items-center justify-center shadow-xs">
-                                2
-                              </span>
-                            ) : rank === 3 ? (
-                              <span className="w-6 h-6 rounded-full bg-[#9A3412] text-white font-black text-xs inline-flex items-center justify-center shadow-xs">
-                                3
-                              </span>
-                            ) : (
-                              <span className="font-mono text-text-muted font-bold text-xs">
-                                #{rank}
-                              </span>
-                            )}
+                            <RankBadge rank={rank} variant="brand" />
                           </td>
 
                           {/* Film Details */}
@@ -1328,11 +1206,6 @@ export default function BoxOffice() {
                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand bg-brand/10 px-1.5 py-0.2 rounded border border-brand/20">
                                       <Icon icon="solar:fire-bold" className="text-xs" />
                                       <span>10M+ Club</span>
-                                    </span>
-                                  )}
-                                  {film.source_video_id && (
-                                    <span className="hidden sm:inline-block font-mono text-[10px] text-text-muted">
-                                      ID: {film.source_video_id}
                                     </span>
                                   )}
                                 </div>

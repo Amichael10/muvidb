@@ -26,6 +26,7 @@ export const AWARD_LOGOS = {
   CFIF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/97c4c683-7aa2-4eb6-8ced-ab37f838e2b1.jpg',
   REFFA: 'https://reffaawards.com/wp-content/uploads/2020/01/cropped-REFFA-1-192x192.png',
   FILM_AFRICA: 'https://www.filmafrica.org/wp-content/uploads/2022/02/cropped-favicon_FA-192x192.png',
+  ENIFF: 'https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/lovp_63yzwegxh189stcshsa3sdenhv/44f6604b5084463ee722c5fd12fc97cb_1791215847407.png',
 };
 
 /**

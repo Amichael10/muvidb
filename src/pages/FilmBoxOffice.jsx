@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import SEO from '../components/SEO';
-import { formatFilmTitle, formatPersonName, formatViews } from '../utils/format';
+import { formatFilmTitle, formatPersonName, formatViews, formatNaira } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
 import {
   calculateYoutubeBoxOffice,
@@ -15,17 +15,7 @@ import {
 } from '../lib/youtubeBoxOffice';
 import YouTubeBoxOfficeChart from '../components/film/YouTubeBoxOfficeChart';
 
-function formatNaira(amount) {
-  if (!amount || isNaN(amount)) return '—';
-  const num = Number(amount);
-  if (num >= 1_000_000_000) {
-    return `₦${(num / 1_000_000_000).toFixed(2)} Billion`;
-  }
-  if (num >= 1_000_000) {
-    return `₦${(num / 1_000_000).toFixed(1)} Million`;
-  }
-  return `₦${num.toLocaleString('en-NG')}`;
-}
+
 
 export default function FilmBoxOffice() {
   const { slug } = useParams();

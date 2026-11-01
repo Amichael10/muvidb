@@ -1,4 +1,4 @@
-export const SOCIAL_PLATFORMS = ['instagram', 'facebook', 'threads', 'tiktok', 'x', 'youtube'] as const;
+export const SOCIAL_PLATFORMS = ['instagram', 'facebook', 'threads', 'tiktok', 'x', 'linkedin', 'youtube'] as const;
 
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
@@ -8,6 +8,7 @@ export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   threads: 'Threads',
   tiktok: 'TikTok',
   x: 'X (Twitter)',
+  linkedin: 'LinkedIn',
   youtube: 'YouTube',
 };
 
@@ -23,7 +24,8 @@ export const PLATFORM_PREFERRED_FORMAT: Record<SocialPlatform, 'portrait_4_5' | 
   facebook: 'portrait_4_5',
   threads: 'portrait_4_5',
   tiktok: 'vertical_9_16',
-  x: 'square_1_1',
+  x: 'landscape_16_9',
+  linkedin: 'landscape_16_9',
   youtube: 'vertical_9_16',
 };
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Icon } from '@iconify/react';
+import { formatNaira } from '../utils/format';
 import { supabase } from '../lib/supabase';
 import FilmCard from '../components/film/FilmCard';
 import PersonCard from '../components/person/PersonCard';
@@ -60,7 +61,7 @@ const COMPARE_PRESETS = [
   { f1: 'Anikulapo', f2: 'Jagun Jagun', label: 'Anikulapo vs Jagun Jagun' }
 ];
 
-function formatNaira(amount) {
+function formatCompactNaira(amount) {
   if (!amount || amount <= 0) return '—';
   if (amount >= 1_000_000_000) return `₦${(amount / 1_000_000_000).toFixed(2)}B`;
   if (amount >= 1_000_000) return `₦${(amount / 1_000_000).toFixed(1)}M`;
@@ -1324,7 +1325,7 @@ export default function AdvancedSearch() {
 
                   {minBoxOffice > 0 && (
                     <span className="px-2 py-0.5 rounded bg-surface-2 border border-border text-text-secondary flex items-center gap-1">
-                      Gross: {formatNaira(minBoxOffice)}+
+                      Gross: {formatCompactNaira(minBoxOffice)}+
                       <button onClick={() => setMinBoxOffice(0)} className="hover:text-text-primary"><Icon icon="solar:close-circle-bold" /></button>
                     </span>
                   )}
@@ -1442,7 +1443,7 @@ export default function AdvancedSearch() {
 
                           {film.box_office_gross > 0 && (
                             <div className="text-[11px] font-mono text-emerald-500">
-                              Box Office: {formatNaira(film.box_office_gross)}
+                              Box Office: {formatCompactNaira(film.box_office_gross)}
                             </div>
                           )}
                         </div>
@@ -1609,7 +1610,7 @@ export default function AdvancedSearch() {
                         <div className="text-right">
                           <span className="text-[11px] font-mono text-text-muted uppercase">Combined Box Office</span>
                           <div className="text-xl font-bold font-mono text-emerald-500">
-                            {formatNaira(collabResults.totalGross)}
+                            {formatCompactNaira(collabResults.totalGross)}
                           </div>
                         </div>
                       )}
@@ -1642,7 +1643,7 @@ export default function AdvancedSearch() {
                                 </Link>
                                 <div className="text-[11px] text-text-muted font-mono mt-0.5">
                                   {film.runtime_minutes ? `${film.runtime_minutes} mins` : ''}
-                                  {film.box_office_gross > 0 && ` • ${formatNaira(film.box_office_gross)}`}
+                                  {film.box_office_gross > 0 && ` • ${formatCompactNaira(film.box_office_gross)}`}
                                 </div>
                               </div>
 
@@ -1777,10 +1778,10 @@ export default function AdvancedSearch() {
                           <tr>
                             <td className="p-4 font-mono text-text-muted">Box Office Gross</td>
                             <td className="p-4 font-mono font-bold text-emerald-500 text-sm">
-                              {formatNaira(compareResults.film1.box_office_gross)}
+                              {formatCompactNaira(compareResults.film1.box_office_gross)}
                             </td>
                             <td className="p-4 font-mono font-bold text-emerald-500 text-sm">
-                              {formatNaira(compareResults.film2.box_office_gross)}
+                              {formatCompactNaira(compareResults.film2.box_office_gross)}
                             </td>
                           </tr>
 

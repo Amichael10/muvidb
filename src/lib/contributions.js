@@ -425,6 +425,36 @@ async function submit({ type, target_table = null, target_id = null, payload = {
     console.error('Contribution submit failed:', error);
     return { ok: false, error };
   }
+
+  // Alert admin on Telegram asynchronously
+  (async () => {
+    try {
+      const fieldsObj = payload?.fields || payload || {};
+      const summaryLines = Object.entries(fieldsObj)
+        .filter(([_, v]) => v != null && v !== '')
+        .map(([k, v]) => `- ${k.replace(/_/g, ' ')}: ${typeof v === 'object' ? JSON.stringify(v) : String(v).slice(0, 80)}`);
+      if (image_path) summaryLines.push('- image attached: ' + image_path);
+      const summary = summaryLines.join('\n');
+
+      const { authHeaders } = await import('./apiAuth');
+      await fetch('/api/actor-claims', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          action: 'notify-contribution',
+          type,
+          targetTable: target_table,
+          targetId: target_id,
+          summary: summary.slice(0, 1000),
+          note,
+          link: '/admin/contributions',
+        }),
+      });
+    } catch (notifyErr) {
+      console.warn('Failed to notify admin on Telegram for contribution:', notifyErr);
+    }
+  })();
+
   return { ok: true };
 }
 

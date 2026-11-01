@@ -10,6 +10,8 @@ import { ThreadsPlatformAdapter } from './social-studio/platforms/threads-adapte
 import { InstagramPlatformAdapter } from './social-studio/platforms/instagram-adapter.js';
 import { FacebookPlatformAdapter } from './social-studio/platforms/facebook-adapter.js';
 import { TikTokPlatformAdapter } from './social-studio/platforms/tiktok-adapter.js';
+import { XPlatformAdapter } from './social-studio/platforms/x-adapter.js';
+import { LinkedInPlatformAdapter } from './social-studio/platforms/linkedin-adapter.js';
 import { SocialPlatformError } from './social-studio/platforms/platform-errors.js';
 import type { SocialPlatformAdapter } from './social-studio/platforms/social-platform-adapter.js';
 import { getThreadsPublishingCredentials, getPlatformPublishingCredentials, isThreadsLivePublishingEnabled } from './threads_oauth.js';
@@ -1019,6 +1021,21 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       adapter = new TikTokPlatformAdapter({
         accessToken,
         openId: connection.external_account_id,
+      });
+    } else if (publishMode === 'live' && variant.platform === 'x') {
+      const { connection, accessToken } = await getPlatformPublishingCredentials('x', variant.connection_id);
+      const meta = (connection.connection_metadata && typeof connection.connection_metadata === 'object') ? connection.connection_metadata : {};
+      adapter = new XPlatformAdapter({
+        accessToken,
+        accessTokenSecret: (meta.token_secret as string) || process.env.X_ACCESS_TOKEN_SECRET,
+        apiKey: process.env.X_API_KEY,
+        apiSecret: process.env.X_API_KEY_SECRET,
+      });
+    } else if (publishMode === 'live' && variant.platform === 'linkedin') {
+      const { connection, accessToken } = await getPlatformPublishingCredentials('linkedin', variant.connection_id);
+      adapter = new LinkedInPlatformAdapter({
+        accessToken,
+        authorUrn: connection.external_account_id,
       });
     } else {
       throw new SocialPlatformError({

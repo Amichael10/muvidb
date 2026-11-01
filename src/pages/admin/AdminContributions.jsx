@@ -410,14 +410,14 @@ function FieldEditor({ def, value, onChange }) {
 }
 
 /** One review row: tick it to apply, and correct it in place before you do. */
-function ReviewField({ def, original, value, selected, onToggle, onChange, onRevert }) {
+function ReviewField({ def, original, value, selected, onToggle, onChange, onRevert, currentDbValue }) {
   const edited = !sameValue(value, original);
   const wide = def.kind === 'textarea' || def.kind === 'multiselect';
 
   return (
     <div
       className={`rounded-xl p-3 border transition-colors ${wide ? 'sm:col-span-2' : ''} ${
-        edited ? 'bg-surface-2 border-brand/40' : 'bg-surface-2 border-transparent'
+        edited ? 'bg-surface-2 border-brand/40' : 'bg-surface-2 border-border/40'
       } ${selected ? '' : 'opacity-50'}`}
     >
       <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -445,9 +445,16 @@ function ReviewField({ def, original, value, selected, onToggle, onChange, onRev
         )}
       </div>
       <FieldEditor def={def} value={value} onChange={onChange} />
+      {currentDbValue != null && String(currentDbValue).trim() !== '' && (
+        <p className="text-[10px] text-text-muted/80 mt-1 truncate" title={displayValue(currentDbValue)}>
+          <span className="font-semibold text-text-secondary">Current in DB: </span>
+          {displayValue(currentDbValue)}
+        </p>
+      )}
       {edited && (
-        <p className="text-text-muted text-[10px] mt-1.5 truncate" title={displayValue(original)}>
-          Submitted: {displayValue(original) || '—'}
+        <p className="text-amber-400/90 text-[10px] mt-1 truncate" title={displayValue(original)}>
+          <span className="font-bold">Original: </span>
+          {displayValue(original) || '—'}
         </p>
       )}
     </div>
@@ -458,6 +465,7 @@ export default function AdminContributions() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [signedUrls, setSignedUrls] = useState({}); // contribution id -> preview URL
+  const [targets, setTargets] = useState({ films: {}, people: {}, channels: {} });
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
@@ -490,6 +498,26 @@ export default function AdminContributions() {
         withImg.map(async (d) => [d.id, await signedContributionUrl(d.image_path)])
       );
       setSignedUrls(Object.fromEntries(entries.filter(([, url]) => url)));
+
+      // Fetch target entities (films, people, channels)
+      const filmIds = [...new Set((data || []).filter(d => d.target_table === 'films' && d.target_id).map(d => d.target_id))];
+      const peopleIds = [...new Set((data || []).filter(d => d.target_table === 'people' && d.target_id).map(d => d.target_id))];
+      const channelIds = [...new Set((data || []).filter(d => (d.target_table === 'channels' || d.target_table === 'youtube_channels') && d.target_id).map(d => d.target_id))];
+
+      const targetMap = { films: {}, people: {}, channels: {} };
+      if (filmIds.length > 0) {
+        const { data: films } = await supabase.from('films').select('id, title, year, poster_url, trailer_youtube_id, synopsis').in('id', filmIds);
+        (films || []).forEach(f => { targetMap.films[f.id] = f; });
+      }
+      if (peopleIds.length > 0) {
+        const { data: people } = await supabase.from('people').select('id, name, photo_url, known_for_department, bio').in('id', peopleIds);
+        (people || []).forEach(p => { targetMap.people[p.id] = p; });
+      }
+      if (channelIds.length > 0) {
+        const { data: channels } = await supabase.from('youtube_channels').select('id, title, channel_name, thumbnail_url').in('id', channelIds);
+        (channels || []).forEach(c => { targetMap.channels[c.id] = c; });
+      }
+      setTargets(targetMap);
     } catch (e) {
       console.error('Error fetching contributions:', e);
       toast.error('Failed to load the queue');
@@ -881,25 +909,57 @@ export default function AdminContributions() {
 
             return (
               <div key={item.id} className="border border-border rounded-2xl p-6 bg-surface space-y-4">
-                {/* Header row */}
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${style.bg} ${style.color}`}>
-                      <Icon icon={style.icon} width="18" />
-                    </span>
-                    <div>
-                      <p className="text-text-primary font-bold text-sm">{CONTRIBUTION_LABELS[item.type] || item.type}</p>
-                      <p className="text-text-muted text-[11px]">
-                        by {item.users?.name || item.users?.email || 'Unknown'} · {new Date(item.created_at).toLocaleDateString()}
-                      </p>
+                {/* Target Entity Banner & Header */}
+                {(() => {
+                  const targetEntity = item.target_id ? targets[item.target_table]?.[item.target_id] : null;
+                  const targetTitle = targetEntity?.title || targetEntity?.name || targetEntity?.channel_name;
+                  const targetPoster = targetEntity?.poster_url || targetEntity?.photo_url || targetEntity?.thumbnail_url;
+                  const targetSub = targetEntity?.year ? `${targetEntity.year}` : (targetEntity?.known_for_department || null);
+                  return (
+                    <div className="flex items-start justify-between gap-4 flex-wrap bg-surface-2/60 border border-border/60 rounded-xl p-3.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {targetPoster ? (
+                          <img
+                            src={targetPoster}
+                            alt=""
+                            className="w-12 h-16 object-cover rounded-lg border border-border flex-shrink-0 shadow-sm"
+                          />
+                        ) : (
+                          <span className={`w-12 h-16 rounded-lg flex items-center justify-center ${style.bg} ${style.color} border border-border flex-shrink-0`}>
+                            <Icon icon={style.icon} width="24" />
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-text-primary font-extrabold text-base tracking-tight truncate">
+                              {targetTitle || CONTRIBUTION_LABELS[item.type] || item.type}
+                            </h3>
+                            {targetSub && (
+                              <span className="text-xs font-semibold text-text-muted">({targetSub})</span>
+                            )}
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${style.bg} ${style.color}`}>
+                              {CONTRIBUTION_LABELS[item.type] || item.type}
+                            </span>
+                          </div>
+                          <p className="text-text-muted text-xs mt-1">
+                            Submitted by <span className="font-bold text-text-primary">{item.users?.name || item.users?.email || 'Community Member'}</span> · {new Date(item.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      {link && (
+                        <Link
+                          to={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-border text-brand text-xs font-bold hover:bg-surface-2 transition-colors flex-shrink-0 shadow-sm"
+                        >
+                          <span>Open Live Page</span>
+                          <Icon icon="solar:arrow-right-up-linear" className="w-3.5 h-3.5" />
+                        </Link>
+                      )}
                     </div>
-                  </div>
-                  {link && (
-                    <Link to={link} target="_blank" rel="noopener noreferrer" className="text-brand text-xs font-bold hover:underline">
-                      View record →
-                    </Link>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* Structured field picker — tick what to apply, fix it in place */}
                 {(isEdit || isNew) && (isStructured || isNew) ? (
@@ -929,44 +989,96 @@ export default function AdminContributions() {
                       </div>
                     </div>
 
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {hasImage && (
+                    {/* Interactive YouTube Trailer Preview (if trailer_youtube_id is in entries) */}
+                    {(() => {
+                      const ytEntry = entries.find(([k]) => k === 'trailer_youtube_id');
+                      if (!ytEntry) return null;
+                      const ytId = currentValue(editRow, 'trailer_youtube_id', ytEntry[1]);
+                      if (!ytId || typeof ytId !== 'string' || ytId.trim().length < 5) return null;
+                      const cleanId = ytId.trim();
+                      return (
+                        <div className="p-3.5 rounded-xl bg-black/60 border border-amber-500/30 space-y-2">
+                          <div className="flex items-center justify-between text-xs font-bold text-amber-400">
+                            <span className="flex items-center gap-2">
+                              <Icon icon="solar:videocamera-record-bold" className="text-base" />
+                              Interactive Trailer Player Preview
+                            </span>
+                            <span className="font-mono text-text-muted text-[11px]">YouTube ID: {cleanId}</span>
+                          </div>
+                          <div className="aspect-video w-full max-w-xl mx-auto rounded-lg overflow-hidden bg-black border border-white/10 shadow-lg">
+                            <iframe
+                              src={`https://www.youtube-nocookie.com/embed/${cleanId}?rel=0`}
+                              title="Trailer Preview"
+                              className="w-full h-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Side-by-side Artwork Comparison */}
+                    {hasImage && (() => {
+                      const targetEntity = item.target_id ? targets[item.target_table]?.[item.target_id] : null;
+                      const currentArt = targetEntity?.poster_url || targetEntity?.photo_url || targetEntity?.thumbnail_url;
+                      return (
                         <div
-                          className={`sm:col-span-2 flex items-start gap-3 bg-surface-2 rounded-xl p-3 border border-transparent ${
+                          className={`flex flex-col sm:flex-row items-center justify-between gap-4 bg-surface-2/80 rounded-xl p-4 border border-border/80 ${
                             sel.__image ? '' : 'opacity-50'
                           }`}
                         >
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={!!sel.__image}
-                              onChange={() => toggleField(item.id, '__image')}
-                              className="accent-[var(--color-brand,#e11d48)]"
-                            />
-                            <span className="text-text-muted text-[10px] font-bold uppercase tracking-wide">
-                              {imageLabel(item.type)}
-                            </span>
-                          </label>
-                          {signedUrls[item.id] && (
-                            <a href={signedUrls[item.id]} target="_blank" rel="noopener noreferrer" className="ml-auto">
-                              <img src={signedUrls[item.id]} alt="" className="w-16 h-16 object-cover rounded-lg border border-border" />
-                            </a>
-                          )}
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={!!sel.__image}
+                                onChange={() => toggleField(item.id, '__image')}
+                                className="accent-[var(--color-brand,#e11d48)]"
+                              />
+                              <span className="text-text-muted text-xs font-bold uppercase tracking-wide">
+                                Apply Proposed {imageLabel(item.type)}
+                              </span>
+                            </label>
+                          </div>
+                          <div className="flex items-center gap-6">
+                            {currentArt && (
+                              <div className="text-center">
+                                <span className="block text-[10px] uppercase font-bold text-text-muted mb-1">Current in DB</span>
+                                <img src={currentArt} alt="Current" className="w-20 h-28 object-cover rounded-lg border border-border shadow-sm" />
+                              </div>
+                            )}
+                            {signedUrls[item.id] && (
+                              <div className="text-center">
+                                <span className="block text-[10px] uppercase font-bold text-amber-400 mb-1">Proposed Upload</span>
+                                <a href={signedUrls[item.id]} target="_blank" rel="noopener noreferrer">
+                                  <img src={signedUrls[item.id]} alt="Proposed" className="w-20 h-28 object-cover rounded-lg border border-amber-500/50 shadow-md ring-2 ring-amber-500/20" />
+                                </a>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
+                      );
+                    })()}
 
-                      {entries.map(([k, original]) => (
-                        <ReviewField
-                          key={k}
-                          def={fieldDef(item.type, k)}
-                          original={original}
-                          value={currentValue(editRow, k, original)}
-                          selected={!!sel[k]}
-                          onToggle={() => toggleField(item.id, k)}
-                          onChange={(v) => setFieldValue(item.id, k, v)}
-                          onRevert={() => revertField(item.id, k)}
-                        />
-                      ))}
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {entries.map(([k, original]) => {
+                        const targetEntity = item.target_id ? targets[item.target_table]?.[item.target_id] : null;
+                        const currentDbVal = targetEntity ? targetEntity[k] : null;
+                        return (
+                          <ReviewField
+                            key={k}
+                            def={fieldDef(item.type, k)}
+                            original={original}
+                            value={currentValue(editRow, k, original)}
+                            selected={!!sel[k]}
+                            onToggle={() => toggleField(item.id, k)}
+                            onChange={(v) => setFieldValue(item.id, k, v)}
+                            onRevert={() => revertField(item.id, k)}
+                            currentDbValue={currentDbVal}
+                          />
+                        );
+                      })}
                     </div>
 
                     {legacyNote && isEdit && (

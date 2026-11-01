@@ -1,17 +1,9 @@
 import React, { useState } from 'react';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
+import { formatNaira } from '../../utils/format';
 
-function formatNaira(amount) {
-  if (!amount || isNaN(amount)) return '—';
-  if (amount >= 1_000_000_000) {
-    return `₦${(amount / 1_000_000_000).toFixed(2)} Billion`;
-  }
-  if (amount >= 1_000_000) {
-    return `₦${(amount / 1_000_000).toFixed(1)} Million`;
-  }
-  return `₦${Number(amount).toLocaleString('en-NG')}`;
-}
+
 
 export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIsAdmin = false }) {
   if (!film) return null;

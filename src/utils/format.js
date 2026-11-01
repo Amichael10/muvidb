@@ -104,3 +104,30 @@ export function formatViews(count) {
   }
   return num.toLocaleString('en-US') + ' Views';
 }
+
+/**
+ * Formats a monetary amount in Nigerian Naira (₦).
+ * 
+ * @param {number|string} amount - The amount to format.
+ * @param {Object} [options] - Optional formatting config.
+ * @param {boolean} [options.compact=false] - Whether to use compact symbols (e.g. ₦1.5B, ₦20M, ₦50K).
+ * @returns {string} Formatted Naira string or '—'.
+ */
+export function formatNaira(amount, { compact = false } = {}) {
+  if (!amount || isNaN(amount)) return '—';
+  const num = Number(amount);
+  if (num <= 0) return '—';
+  if (compact) {
+    if (num >= 1_000_000_000) return `₦${(num / 1_000_000_000).toFixed(2)}B`;
+    if (num >= 1_000_000) return `₦${(num / 1_000_000).toFixed(1)}M`;
+    if (num >= 1_000) return `₦${(num / 1_000).toFixed(0)}K`;
+    return `₦${num.toLocaleString('en-NG')}`;
+  }
+  if (num >= 1_000_000_000) {
+    return `₦${(num / 1_000_000_000).toFixed(2)} Billion`;
+  }
+  if (num >= 1_000_000) {
+    return `₦${(num / 1_000_000).toFixed(1)} Million`;
+  }
+  return `₦${num.toLocaleString('en-NG')}`;
+}

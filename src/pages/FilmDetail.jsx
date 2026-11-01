@@ -787,10 +787,10 @@ export default function FilmDetail() {
           </div>
 
           {/* MEDIA GRID (Poster on Left | Big Trailer Stage in Center | Quick Media Links on Right) */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-3 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-3 items-stretch md:h-[380px] lg:h-[420px] max-h-none md:max-h-[380px] lg:max-h-[420px]">
             
             {/* 1. Poster Column (md:col-span-4 lg:col-span-3) */}
-            <div className="md:col-span-4 lg:col-span-3 shrink-0 relative group rounded-xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl flex flex-col aspect-[2/3] max-w-[220px] sm:max-w-[260px] md:max-w-none mx-auto md:mx-0 w-full">
+            <div className="md:col-span-4 lg:col-span-3 shrink-0 relative group rounded-xl overflow-hidden bg-black/60 border border-white/10 shadow-2xl flex flex-col aspect-[2/3] max-w-[220px] sm:max-w-[260px] md:max-w-none mx-auto md:mx-0 w-full h-full max-h-[360px] sm:max-h-[380px] lg:max-h-[420px]">
               <ImageWithFallback
                 src={getFilmPoster(film)}
                 alt={`${formatFilmTitle(film.title)} Poster`}
@@ -810,7 +810,7 @@ export default function FilmDetail() {
             </div>
 
             {/* 2. Center: Trailer / Stage Video Player (md:col-span-8 lg:col-span-7) */}
-            <div id="trailer-stage" className="md:col-span-8 lg:col-span-7 relative rounded-xl overflow-hidden bg-black border border-white/10 shadow-2xl aspect-video md:aspect-auto flex flex-col h-full w-full self-stretch min-h-[200px] sm:min-h-[280px]">
+            <div id="trailer-stage" className="md:col-span-8 lg:col-span-7 relative rounded-xl overflow-hidden bg-black border border-white/10 shadow-2xl aspect-video md:aspect-auto flex flex-col h-full w-full self-stretch min-h-[200px] sm:min-h-[280px] md:max-h-[380px] lg:max-h-[420px]">
               {trailerVideoId ? (
                 <div className="w-full h-full relative flex-1 min-h-0">
                   <iframe
@@ -822,18 +822,29 @@ export default function FilmDetail() {
                   />
                 </div>
               ) : getFilmBackdrop(film) ? (
-                <div className="w-full h-full relative flex-1 min-h-0">
+                <div className="w-full h-full relative flex-1 min-h-0 overflow-hidden">
+                  {/* Ambient backdrop blur behind artwork */}
+                  <ImageWithFallback
+                    src={getFilmBackdrop(film)}
+                    alt=""
+                    aria-hidden="true"
+                    className="w-full h-full object-cover blur-2xl scale-110 opacity-35 absolute inset-0 pointer-events-none"
+                    fallbackType="film"
+                    name={formatFilmTitle(film.title)}
+                    width={1280}
+                    quality={60}
+                  />
                   <ImageWithFallback
                     src={getFilmBackdrop(film)}
                     alt={`${formatFilmTitle(film.title)} Backdrop`}
-                    className="w-full h-full object-cover opacity-80"
+                    className="w-full h-full object-contain relative z-0 opacity-90"
                     fallbackType="film"
                     name={formatFilmTitle(film.title)}
                     width={1280}
                     quality={85}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-6">
-                    <span className="text-[11px] uppercase tracking-widest font-black text-brand mb-1">Official Backdrop</span>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-6 z-10">
+                    <span className="text-[11px] uppercase tracking-widest font-black text-brand mb-1">Official Visual</span>
                     <h3 className="text-lg sm:text-xl font-bold text-white drop-shadow">Trailer not published yet</h3>
                   </div>
                 </div>

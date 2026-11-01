@@ -32,8 +32,29 @@ export default function PendingMediaReview() {
     <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{items.map(item => <article key={item.id} className="rounded-lg border border-border p-3">
       <p className="text-xs font-bold text-text-primary">{item.people?.name}: {item.title}</p>
       <p className="mt-1 text-[10px] text-text-muted">{item.media_type} · {item.category?.replaceAll('_', ' ')}</p>
-      {item.media_type === 'photo' && <img src={item.url} alt={item.title} loading="lazy" className="mt-2 h-32 w-full rounded object-contain" />}
-      <a href={item.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-brand underline">Open private preview</a>
+      {item.media_type === 'photo' && (
+        <img src={item.url} alt={item.title} loading="lazy" className="mt-2 h-40 w-full rounded-lg object-contain bg-black/40 border border-border" />
+      )}
+      {item.media_type === 'video' && (
+        <div className="mt-2 rounded-lg overflow-hidden border border-border bg-black">
+          <video
+            src={item.url}
+            controls
+            preload="metadata"
+            className="w-full max-h-48 object-contain"
+          />
+        </div>
+      )}
+      <div className="mt-2 flex items-center justify-between text-xs">
+        <a href={item.url} target="_blank" rel="noreferrer" className="text-brand underline inline-flex items-center gap-1">
+          Open in new tab ↗
+        </a>
+        {item.category && (
+          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-surface-2 text-text-muted">
+            {item.category.replaceAll('_', ' ')}
+          </span>
+        )}
+      </div>
       <div className="mt-3 flex gap-2">
         <button type="button" disabled={busy === item.id} onClick={() => review(item, 'approved')} className="rounded bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">{busy === item.id ? 'Saving…' : 'Approve'}</button>
         <button type="button" disabled={busy === item.id} onClick={() => review(item, 'rejected')} className="rounded bg-red-800 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Reject</button>

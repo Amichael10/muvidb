@@ -173,6 +173,66 @@ export async function handleActorClaims(req: VercelRequest, res: VercelResponse)
       return res.status(200).json({ success: true, notification: sent });
     }
 
+    if (action === 'notify-contribution') {
+      if (!user) return res.status(403).json({ error: 'Authentication required' });
+      const contributionType = String(req.body?.type || 'edit_film').trim();
+      const targetTable = String(req.body?.targetTable || '').trim();
+      const targetId = String(req.body?.targetId || '').trim();
+      let targetTitle = String(req.body?.targetTitle || '').trim();
+      const summary = String(req.body?.summary || '').trim();
+      const note = String(req.body?.note || '').trim();
+      const link = String(req.body?.link || '/admin/contributions').trim();
+
+      if (!targetTitle && targetTable && targetId) {
+        try {
+          if (targetTable === 'films') {
+            const { data: f } = await supabase.from('films').select('title, year').eq('id', targetId).single();
+            if (f) targetTitle = `${f.title}${f.year ? ` (${f.year})` : ''}`;
+          } else if (targetTable === 'people') {
+            const { data: p } = await supabase.from('people').select('name').eq('id', targetId).single();
+            if (p) targetTitle = p.name;
+          }
+        } catch {
+          // ignore lookup errors
+        }
+      }
+
+      const typeLabels: Record<string, string> = {
+        new_person: 'New Person Suggestion',
+        new_film: 'New Film Submission',
+        new_channel: 'New YouTube Channel',
+        edit_person: 'Person Edit Proposal',
+        edit_film: 'Film Edit Proposal',
+        report_link: 'Broken / Pirate Link Report',
+        report_channel: 'Channel Report',
+      };
+
+      const configured = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || '').trim();
+      const base = configured || 'https://muvidb.com';
+      const reviewUrl = link.startsWith('http') ? link : `${base.replace(/\/$/, '')}${link.startsWith('/') ? link : `/${link}`}`;
+
+      const message = [
+        '💡 New Community Contribution (Pending Admin Review)',
+        `Type: ${typeLabels[contributionType] || contributionType}`,
+        targetTitle ? `Target: ${targetTitle}` : null,
+        summary ? `Proposed Changes:\n${summary}` : null,
+        note ? `Submitter Note: ${note}` : null,
+        `Submitted by: ${user.email || user.id}`,
+        `Time: ${new Date().toISOString()}`,
+      ].filter(Boolean).join('\n');
+
+      const sent = await sendTelegramMessage({
+        text: message,
+        replyMarkup: {
+          inline_keyboard: [
+            [{ text: 'Review in Admin Queue', url: reviewUrl }],
+          ],
+        },
+      });
+
+      return res.status(200).json({ success: true, notification: sent });
+    }
+
     if (!id && action !== 'notify-pending-claims') {
       return res.status(400).json({ error: 'Request id is required' });
     }

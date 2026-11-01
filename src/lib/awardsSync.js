@@ -285,6 +285,26 @@ export const KNOWN_CATEGORIES_BY_ORG = {
     'Best Feature Film',
     'Best Actor',
     'Best Indigenous Film'
+  ],
+  AFRIFF: [
+    'Official Selection (Opening Film)',
+    'Official Selection (Closing Film)',
+    'Official Selection (Feature Film)',
+    'Official Selection (Short Film)',
+    'Official Selection (Documentary)',
+    'Official Selection (Animation)',
+    'Official Selection (Student Short)',
+    'Best Feature Film',
+    'Best Director',
+    'Best Screenplay',
+    'Best Male Performance',
+    'Best Female Performance',
+    'Best Documentary',
+    'Best Short Film',
+    'Best Animation',
+    'Best Student Short',
+    'Special Jury Prize',
+    'Audience Choice Award'
   ]
 };
 

@@ -18,6 +18,7 @@ export const PLATFORM_CAPTION_LIMITS: Record<string, PlatformCaptionLimits> = {
   tiktok: { captionLimit: 2200, hashtagLimit: 8, usesTitle: true },
   x: { captionLimit: 280, hashtagLimit: 3, usesTitle: false },
   twitter: { captionLimit: 280, hashtagLimit: 3, usesTitle: false },
+  linkedin: { captionLimit: 3000, hashtagLimit: 5, usesTitle: false },
   youtube: { captionLimit: 5000, hashtagLimit: 15, usesTitle: true },
 };
 

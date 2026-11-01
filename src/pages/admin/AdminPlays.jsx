@@ -44,6 +44,44 @@ const ALL_PLAY_GENRES = [
   'Satire', 'Folklore', 'Dance Drama', 'Opera', 'Experimental'
 ];
 
+const STAGE_PLAY_ROLES = [
+  'Actor',
+  'Lead Actor',
+  'Lead Actress',
+  'Performer',
+  'Ensemble',
+  'Director',
+  'Co-Director',
+  'Assistant Director',
+  'Playwright',
+  'Writer',
+  'Adaptor',
+  'Producer',
+  'Executive Producer',
+  'Associate Producer',
+  'Production Manager',
+  'Stage Manager',
+  'Assistant Stage Manager',
+  'Technical Director',
+  'Choreographer',
+  'Musical Director',
+  'Composer',
+  'Lighting Designer',
+  'Set Designer',
+  'Sound Designer',
+  'Costume Designer',
+  'Makeup & Hair Designer',
+  'Props Master',
+  'Dramaturg',
+  'Voice / Narrator',
+  'Special Thanks',
+];
+
+function isStageActingRole(role = '') {
+  const r = String(role || '').trim().toLowerCase();
+  return ['actor', 'lead actor', 'lead actress', 'performer', 'ensemble', 'cast', 'storyteller', 'storytellers', 'singer', 'dancer', 'narrator', 'voice / narrator'].includes(r);
+}
+
 export default function AdminPlays() {
   const [plays, setPlays] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -318,11 +356,17 @@ export default function AdminPlays() {
       setTimeout(() => setCreditMsg(null), 3000);
       return;
     }
+    const dept = (person.known_for_department || '').toLowerCase();
+    const defaultRole = dept.includes('direct') ? 'Director'
+      : dept.includes('writ') ? 'Playwright'
+      : dept.includes('produc') ? 'Producer'
+      : 'Actor';
+
     setCredits(prev => [...prev, {
       person_id: person.id,
       name: person.name,
       photo_url: person.photo_url || null,
-      role: 'Actor',
+      role: defaultRole,
       character_name: '',
       billing_order: savedCredits.length + prev.length + 1,
     }]);
@@ -1048,20 +1092,73 @@ export default function AdminPlays() {
                   />
                 </div>
 
-                {formData.box_office_metrics?.tier_breakdown && formData.box_office_metrics.tier_breakdown.length > 0 && (
-                  <div className="pt-2 border-t border-amber-500/10 space-y-1.5">
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-amber-400/80">Tracked Tier Breakdown</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {formData.box_office_metrics.tier_breakdown.map((tb, idx) => (
-                        <div key={idx} className="bg-surface/80 border border-amber-500/20 px-2 py-1 rounded text-[10px] text-text-primary">
-                          <span className="font-bold">{tb.tier}: </span>
-                          <span className="text-amber-500 font-extrabold">{Number(tb.sold_tickets).toLocaleString()} tix</span>
-                          <span className="text-text-muted ml-1">(₦{Number(tb.gross_revenue).toLocaleString()})</span>
-                        </div>
-                      ))}
+                {(() => {
+                  const metrics = formData.box_office_metrics;
+                  if (!metrics) return null;
+                  const raw = metrics.tier_breakdown || metrics.tier_pricing || metrics.ticket_tiers;
+                  if (!raw) return null;
+                  const list = Array.isArray(raw)
+                    ? raw.map((item, i) => {
+                        if (typeof item === 'string') return { tier: item, sold: 0, grossNgn: 0, priceNgn: 0 };
+                        const name = item?.tier || item?.type || item?.name || item?.category || `Tier ${i + 1}`;
+                        const sold = Number(item?.sold ?? item?.sold_tickets ?? item?.tickets ?? 0);
+                        const price = Number(item?.priceNgn ?? item?.price ?? 0);
+                        const gross = Number(item?.grossNgn ?? item?.gross_revenue ?? item?.gross ?? (sold > 0 && price > 0 ? sold * price : 0));
+                        return {
+                          tier: String(name || `Tier ${i + 1}`).trim(),
+                          sold: Number.isFinite(sold) ? sold : 0,
+                          priceNgn: Number.isFinite(price) ? price : 0,
+                          grossNgn: Number.isFinite(gross) ? gross : 0,
+                        };
+                      })
+                    : typeof raw === 'object'
+                    ? Object.entries(raw).map(([k, v], i) => {
+                        let price = 0;
+                        let sold = 0;
+                        let gross = 0;
+                        if (typeof v === 'number') {
+                          price = v;
+                        } else if (typeof v === 'string') {
+                          price = Number(v.replace(/[^0-9]/g, '')) || 0;
+                        } else if (typeof v === 'object' && v !== null) {
+                          sold = Number(v.sold ?? v.sold_tickets ?? v.tickets ?? 0);
+                          price = Number(v.priceNgn ?? v.price ?? (typeof v.amount === 'number' ? v.amount : 0));
+                          gross = Number(v.gross ?? v.grossNgn ?? v.gross_revenue ?? (sold > 0 && price > 0 ? sold * price : 0));
+                        }
+                        return {
+                          tier: String(k || `Tier ${i + 1}`).trim(),
+                          sold: Number.isFinite(sold) ? sold : 0,
+                          priceNgn: Number.isFinite(price) ? price : 0,
+                          grossNgn: Number.isFinite(gross) ? gross : 0,
+                        };
+                      })
+                    : [];
+
+                  const validList = list.filter(tb => tb && tb.tier && String(tb.tier).trim() !== '');
+                  if (validList.length === 0) return null;
+                  return (
+                    <div className="pt-2 border-t border-amber-500/10 space-y-1.5">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-amber-400/80">Tracked Tier Breakdown</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {validList.map((tb, idx) => {
+                          const tierName = tb.tier;
+                          const soldCount = tb.sold || 0;
+                          const grossAmount = tb.grossNgn || 0;
+                          const priceAmount = tb.priceNgn || 0;
+                          return (
+                            <div key={idx} className="bg-surface/80 border border-amber-500/20 px-2 py-1 rounded text-[10px] text-text-primary">
+                              <span className="font-bold">{tierName}: </span>
+                              <span className="text-amber-500 font-extrabold">{soldCount.toLocaleString()} tix</span>
+                              <span className="text-text-muted ml-1">
+                                (₦{grossAmount > 0 ? grossAmount.toLocaleString() : (priceAmount > 0 ? `${priceAmount.toLocaleString()} / seat` : '0')})
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </section>
           </div>
@@ -1171,23 +1268,65 @@ export default function AdminPlays() {
                         <p className="text-xs font-bold text-text-primary truncate">{c.name}</p>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="text-[9px] text-text-muted font-bold block mb-0.5">Role</label>
-                            <input
-                              type="text"
-                              value={c.role}
-                              onChange={e => setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, role: e.target.value } : cr))}
-                              placeholder="Actor"
-                              className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-xs text-text-primary outline-none"
-                            />
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className="text-[9px] text-text-muted font-bold block">Role</label>
+                              {c.isCustomRole && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, role: 'Actor', isCustomRole: false } : cr))}
+                                  className="text-[9px] text-brand hover:underline font-bold"
+                                >
+                                  Standard
+                                </button>
+                              )}
+                            </div>
+                            {c.isCustomRole || (!STAGE_PLAY_ROLES.includes(c.role) && c.role) ? (
+                              <div className="relative flex items-center">
+                                <input
+                                  type="text"
+                                  value={c.role}
+                                  onChange={e => setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, role: e.target.value } : cr))}
+                                  placeholder="Enter custom role..."
+                                  className="w-full bg-bg border border-brand/50 rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-brand"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, role: 'Actor', isCustomRole: false } : cr))}
+                                  className="absolute right-1 text-text-muted hover:text-text-primary p-0.5"
+                                  title="Back to standard roles"
+                                >
+                                  <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <select
+                                value={c.role || 'Actor'}
+                                onChange={e => {
+                                  if (e.target.value === '__custom__') {
+                                    setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, role: '', isCustomRole: true } : cr));
+                                  } else {
+                                    setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, role: e.target.value, isCustomRole: false } : cr));
+                                  }
+                                }}
+                                className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-brand"
+                              >
+                                {STAGE_PLAY_ROLES.map(r => (
+                                  <option key={r} value={r}>{r}</option>
+                                ))}
+                                <option value="__custom__" className="text-brand font-bold">+ Add Custom Role...</option>
+                              </select>
+                            )}
                           </div>
                           <div>
-                            <label className="text-[9px] text-text-muted font-bold block mb-0.5">Character Name</label>
+                            <label className="text-[9px] text-text-muted font-bold block mb-0.5">
+                              {isStageActingRole(c.role) ? 'Character / Performer Name' : 'Specific Function / Detail (Optional)'}
+                            </label>
                             <input
                               type="text"
-                              value={c.character_name}
+                              value={c.character_name || ''}
                               onChange={e => setCredits(prev => prev.map((cr, i) => i === idx ? { ...cr, character_name: e.target.value } : cr))}
-                              placeholder="e.g. Lead"
-                              className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-xs text-text-primary outline-none"
+                              placeholder={isStageActingRole(c.role) ? "e.g. Lead, Kike's Mother, Brother Jero" : 'e.g. Folk Opera Adaptor, Co-Director'}
+                              className="w-full bg-bg border border-border rounded-lg px-2 py-1 text-xs text-text-primary outline-none focus:border-brand"
                             />
                           </div>
                         </div>
@@ -1237,7 +1376,7 @@ export default function AdminPlays() {
                               <div className="min-w-0">
                                 <p className="text-xs font-bold text-text-primary truncate">{person.name}</p>
                                 <p className="text-[10px] text-brand font-semibold">
-                                  {c.role}{c.character_name ? ` as ${c.character_name}` : ''}
+                                  {c.role === 'Actor' ? (c.character_name ? `Actor as ${c.character_name}` : 'Actor') : `${c.role}${c.character_name ? ` (${c.character_name})` : ''}`}
                                 </p>
                               </div>
                             </div>

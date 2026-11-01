@@ -4,6 +4,7 @@ import { supabase } from './supabase.js';
 import { handleCors } from './cors.js';
 import { requireRequestQuota } from './request_quota.js';
 import { createPendingMediaUpload, discardPendingMedia, mediaError, privateMediaPreview, resolveMediaSubmissionUrl } from './person_media_uploads.js';
+import { sendTelegramMessage } from './telegram.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CATEGORIES = ['showreel', 'monologue', 'scene_clip', 'interview', 'headshot', 'production_still', 'red_carpet', 'behind_the_scenes'];
@@ -115,6 +116,31 @@ export async function handlePersonMedia(req: VercelRequest, res: VercelResponse)
         const { error: photoError } = await supabase.from('people').update({ photo_url: url }).eq('id', personId);
         if (photoError) throw mediaError('Media approved; unable to update the main portrait', 503);
       }
+    }
+    if (status === 'pending') {
+      (async () => {
+        try {
+          const { data: person } = await supabase.from('people').select('name, slug').eq('id', personId).single();
+          const configured = (process.env.VITE_PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || '').trim();
+          const base = configured || 'https://muvidb.com';
+          await sendTelegramMessage({
+            text: [
+              '📸 New Actor Media Awaiting Review',
+              `Actor: ${person?.name || 'Verified Pro'}`,
+              `Type: ${mediaType.toUpperCase()} (${category.replace(/_/g, ' ')})`,
+              `Title: ${title}`,
+              `Time: ${new Date().toISOString()}`,
+            ].join('\n'),
+            replyMarkup: {
+              inline_keyboard: [
+                [{ text: 'Review Pending Media', url: `${base.replace(/\/$/, '')}/admin/contributions` }],
+              ],
+            },
+          });
+        } catch (tgErr) {
+          console.warn('[person-media] telegram alert error:', tgErr);
+        }
+      })();
     }
     if (status === 'rejected') { await discardPendingMedia(url); await discardPendingMedia(thumbnail); }
     return res.status(200).json({ data });

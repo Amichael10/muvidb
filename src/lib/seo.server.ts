@@ -223,7 +223,7 @@ export async function filmSeo(slug: string, base: string) {
 
   const movieTitle = clean(data.title);
   const canonical = `${base}/films/${data.slug || data.id}`;
-  const image = data.poster_url || data.backdrop_url || `${base}/filmhouse.png`;
+  const image = data.backdrop_url || data.poster_url || `${base}/filmhouse.png`;
   const description =
     clean(data.synopsis).slice(0, 155) ||
     `Where to watch ${movieTitle} in Nigeria — streaming links, cast and details on MuviDB.`;

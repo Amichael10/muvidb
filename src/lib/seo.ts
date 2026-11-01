@@ -43,6 +43,7 @@ export function toMeta(seo?: Seo) {
     { property: 'og:image', content: seo.image },
     { property: 'og:url', content: seo.canonical },
     { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:image', content: seo.image },
     ...seo.jsonLd.map((block) => ({ 'script:ld+json': block })),
   ];
 }
