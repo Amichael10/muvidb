@@ -339,8 +339,12 @@ export async function resetSocialStudioData(actor: SocialActor) {
   await supabase.from('social_publish_jobs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('social_platform_variants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('social_assets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('content_channel_approvals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('social_content_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('social_content_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('social_drafts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('social_calendar').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('content_engine_activity_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   return { success: true, message: 'Social Studio data reset to clean slate' };
 }
 
