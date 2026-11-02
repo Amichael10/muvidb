@@ -420,7 +420,12 @@ export default function BoxOffice() {
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
               {activeSection === 'cinema' && (
                 <>
-                  <StatCard label="Total Theatrical Gross" value={formatNaira(totalCinemaGross)} valueColor="text-brand" />
+                  <StatCard
+                    label="Total Theatrical Gross"
+                    value={formatNaira(totalCinemaGross + totalPlaysGross)}
+                    detail={totalPlaysGross > 0 ? `₦${(totalCinemaGross / 1_000_000_000).toFixed(2)}B Cinema + ₦${(totalPlaysGross / 1_000_000).toFixed(1)}M Stage` : 'Verified Nollywood Box Office'}
+                    valueColor="text-brand"
+                  />
                   <StatCard label="₦1B Club Titles" value={billionClubFilms.length} icon="solar:crown-bold" />
                   {topCinemaFilm && (
                     <StatCard

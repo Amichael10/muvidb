@@ -755,6 +755,23 @@ export default function PersonDetailV2() {
     )
   }
 
+  // ── Safeguard against crew role names leaked into character_name ──
+  const CREW_TITLES = new Set([
+    'director', 'directors', 'writer', 'writers', 'producer', 'producers',
+    'executive producer', 'executive producers', 'cinematographer', 'dop',
+    'editor', 'sound', 'sound recordist', 'composer', 'music', 'crew', 'creator',
+    'screenplay', 'scriptwriter', 'costume designer', 'production designer', 'colorist'
+  ])
+
+  const formatCreditRoleLine = (credit) => {
+    const rawChar = String(credit.character_name || '').trim()
+    const isCrewChar = CREW_TITLES.has(rawChar.toLowerCase())
+    if (!isCrewChar && rawChar) {
+      return `as ${toTitleCase(rawChar)}`
+    }
+    return formatRole(credit.role || 'Credit')
+  }
+
   // ── Filtered Filmography Credits ──
   const activeCredits = creditsByRole(activeRole)
   const filmographyQuery = filmographySearch.trim().toLowerCase()
@@ -1789,64 +1806,70 @@ export default function PersonDetailV2() {
             </p>
           </div>
 
-          {/* Primary Medium Tabs: Screen Filmography vs Stage & Theatre (High Prominence) */}
+          {/* Primary Medium Tabs: Screen Filmography vs Stage & Theatre (Unmistakable Segmented Switcher) */}
           {stageCredits.length > 0 && (
-            <div className="w-full flex items-center border-b border-border mb-8 overflow-x-auto gap-2 sm:gap-6">
-              <button
-                type="button"
-                onClick={() => setFilmographyMedium('screen')}
-                className={`group relative pb-4 px-3 sm:px-6 flex items-center gap-2.5 text-sm sm:text-base font-black transition-all cursor-pointer whitespace-nowrap ${
-                  filmographyMedium === 'screen'
-                    ? 'text-brand'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-              >
-                <Icon
-                  icon="solar:clapperboard-bold"
-                  className={`text-lg sm:text-xl transition-colors ${
-                    filmographyMedium === 'screen' ? 'text-brand' : 'text-text-muted group-hover:text-text-primary'
+            <div className="mb-8 space-y-3">
+              <div className="inline-flex p-1.5 bg-surface-2/95 border-2 border-border/80 rounded-2xl shadow-xl backdrop-blur-md w-full sm:w-auto gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setFilmographyMedium('screen')}
+                  className={`group relative flex items-center justify-center gap-2.5 px-5 sm:px-7 py-3.5 rounded-xl font-heading font-black text-sm sm:text-base transition-all duration-300 cursor-pointer flex-1 sm:flex-initial ${
+                    filmographyMedium === 'screen'
+                      ? 'bg-gradient-to-r from-brand via-brand to-brand-600 text-white shadow-lg shadow-brand/30 ring-1 ring-white/20'
+                      : 'text-text-muted hover:text-text-primary hover:bg-surface/60'
                   }`}
-                />
-                <span>Screen Filmography</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-black transition-colors ${
-                  filmographyMedium === 'screen'
-                    ? 'bg-brand text-white shadow-sm'
-                    : 'bg-surface-2 text-text-muted border border-border group-hover:text-text-primary'
-                }`}>
-                  {allCredits.length}
-                </span>
-                {filmographyMedium === 'screen' && (
-                  <span className="absolute bottom-0 left-0 right-0 h-1 bg-brand rounded-t-full shadow-lg" />
-                )}
-              </button>
+                >
+                  <Icon
+                    icon="solar:clapperboard-bold"
+                    className={`text-xl transition-transform duration-300 ${
+                      filmographyMedium === 'screen' ? 'scale-110 text-white' : 'text-text-muted group-hover:text-text-primary'
+                    }`}
+                  />
+                  <span>Screen Filmography</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-black transition-colors ${
+                    filmographyMedium === 'screen'
+                      ? 'bg-white/25 text-white shadow-xs'
+                      : 'bg-surface text-text-muted border border-border group-hover:text-text-primary'
+                  }`}>
+                    {allCredits.length}
+                  </span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setFilmographyMedium('stage')}
-                className={`group relative pb-4 px-3 sm:px-6 flex items-center gap-2.5 text-sm sm:text-base font-black transition-all cursor-pointer whitespace-nowrap ${
-                  filmographyMedium === 'stage'
-                    ? 'text-purple-400'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-              >
-                <Icon
-                  icon="solar:masks-bold"
-                  className={`text-lg sm:text-xl transition-colors ${
-                    filmographyMedium === 'stage' ? 'text-purple-400' : 'text-text-muted group-hover:text-text-primary'
+                <button
+                  type="button"
+                  onClick={() => setFilmographyMedium('stage')}
+                  className={`group relative flex items-center justify-center gap-2.5 px-5 sm:px-7 py-3.5 rounded-xl font-heading font-black text-sm sm:text-base transition-all duration-300 cursor-pointer flex-1 sm:flex-initial ${
+                    filmographyMedium === 'stage'
+                      ? 'bg-gradient-to-r from-purple-600 via-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30 ring-1 ring-white/20'
+                      : 'text-text-muted hover:text-text-primary hover:bg-surface/60'
                   }`}
-                />
-                <span>Stage & Theatre</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black transition-colors ${
-                  filmographyMedium === 'stage'
-                    ? 'bg-purple-500 text-white shadow-sm'
-                    : 'bg-purple-500/15 text-purple-300 border border-purple-500/30 group-hover:bg-purple-500/25'
-                }`}>
-                  {stageCredits.length}
+                >
+                  <Icon
+                    icon="solar:masks-bold"
+                    className={`text-xl transition-transform duration-300 ${
+                      filmographyMedium === 'stage' ? 'scale-110 text-white' : 'text-purple-400 group-hover:text-purple-300'
+                    }`}
+                  />
+                  <span>Stage & Theatre</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-black transition-colors ${
+                    filmographyMedium === 'stage'
+                      ? 'bg-white/25 text-white shadow-xs'
+                      : 'bg-purple-500/15 text-purple-300 border border-purple-500/30 group-hover:bg-purple-500/25'
+                  }`}>
+                    {stageCredits.length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Informative Switch Indicator */}
+              <div className="flex items-center gap-2 text-xs font-semibold text-text-muted px-1">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${filmographyMedium === 'screen' ? 'bg-brand animate-pulse' : 'bg-purple-400 animate-pulse'}`} />
+                <span>
+                  {filmographyMedium === 'screen'
+                    ? `Showing ${allCredits.length} verified screen credits across feature films, streaming originals & television`
+                    : `Showing ${stageCredits.length} live stage theatre runs, musicals, dramatic plays & stage box office`}
                 </span>
-                {filmographyMedium === 'stage' && (
-                  <span className="absolute bottom-0 left-0 right-0 h-1 bg-purple-500 rounded-t-full shadow-lg" />
-                )}
-              </button>
+              </div>
             </div>
           )}
 
@@ -1963,7 +1986,7 @@ export default function PersonDetailV2() {
                                 {formatFilmTitle(film.title)}
                               </h4>
                               <p className="text-xs text-text-muted line-clamp-1">
-                                {[film.year, credit.character_name ? `as ${toTitleCase(credit.character_name)}` : formatRole(credit.role)]
+                                {[film.year, formatCreditRoleLine(credit)]
                                   .filter(Boolean)
                                   .join(' · ')}
                               </p>
@@ -2035,9 +2058,7 @@ export default function PersonDetailV2() {
                                 {formatFilmTitle(title)}
                               </h3>
                               <p className="mt-1 text-xs text-text-muted line-clamp-1">
-                                {[formatRole(credit.role), credit.character_name ? `as ${toTitleCase(credit.character_name)}` : null]
-                                  .filter(Boolean)
-                                  .join(' / ')}
+                                {formatCreditRoleLine(credit)}
                               </p>
                             </div>
 
@@ -2082,16 +2103,16 @@ export default function PersonDetailV2() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
                 
                 {/* Stage Role Selector */}
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 max-w-full">
                   {stageRoleList.map((role) => (
                     <button
                       key={role}
                       type="button"
                       onClick={() => setActiveStageRole(role)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
                         activeStageRole === role
-                          ? 'bg-brand text-white shadow-md'
-                          : 'bg-surface border border-border text-text-muted hover:text-text-primary hover:border-brand/40'
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/25 ring-1 ring-white/20'
+                          : 'bg-surface border border-border text-text-muted hover:text-text-primary hover:border-purple-500/40'
                       }`}
                     >
                       {role === 'all' ? 'All Roles' : formatRole(role)} ({stageRoleCounts[role]})
