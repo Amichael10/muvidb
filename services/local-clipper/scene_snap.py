@@ -107,18 +107,30 @@ def build_proxy(
     end: float,
     destination: Path,
     height: int = 180,
+    headers: str = "",
 ) -> bool:
     """Shrink the surrounding seconds to a small proxy; detection needs no detail."""
     if not shutil.which("ffmpeg"):
         return False
     command = [
-        "ffmpeg", "-y", "-loglevel", "error",
-        "-ss", str(max(0.0, start)), "-to", str(end),
+        "ffmpeg", "-y", "-nostdin", "-loglevel", "error",
+    ]
+    if headers:
+        command.extend(["-headers", headers])
+    duration = max(1.0, end - start)
+    command.extend([
+        "-timeout", "10000000",
         "-i", str(source),
+        "-ss", str(max(0.0, start)),
+        "-t", str(duration),
         "-an",
         "-vf", f"scale=-2:{height}",
         "-r", "15",
         str(destination),
-    ]
-    result = subprocess.run(command, capture_output=True, text=True)
-    return result.returncode == 0 and destination.exists() and destination.stat().st_size > 0
+    ])
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=20, stdin=subprocess.DEVNULL)
+        return result.returncode == 0 and destination.exists() and destination.stat().st_size > 0
+    except Exception as exc:
+        print(f"[Clipper] Proxy build timed out or failed: {exc}")
+        return False

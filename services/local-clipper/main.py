@@ -31,6 +31,29 @@ import sys as _sys
 if str(Path(__file__).resolve().parent) not in _sys.path:
     _sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+def ensure_ffmpeg_in_path() -> None:
+    if shutil.which("ffmpeg") and shutil.which("ffprobe"):
+        return
+    local_app = os.environ.get("LOCALAPPDATA", "")
+    candidates = [
+        Path(local_app) / "Microsoft" / "WinGet" / "Links",
+        Path("C:/ffmpeg/bin"),
+        Path(os.environ.get("ProgramFiles", "")) / "ffmpeg" / "bin",
+        Path(os.environ.get("ProgramData", "")) / "chocolatey" / "bin",
+    ]
+    for c in candidates:
+        if (c / "ffmpeg.exe").is_file():
+            os.environ["PATH"] = str(c) + os.pathsep + os.environ.get("PATH", "")
+            return
+
+    winget_packages = Path(local_app) / "Microsoft" / "WinGet" / "Packages"
+    if winget_packages.is_dir():
+        for match in winget_packages.rglob("ffmpeg.exe"):
+            os.environ["PATH"] = str(match.parent) + os.pathsep + os.environ.get("PATH", "")
+            return
+
+ensure_ffmpeg_in_path()
+
 import caption_quality
 import moment_score
 import scene_snap
@@ -118,7 +141,7 @@ class ClipRequest(BaseModel):
     title: str = "clip"
     engine: Literal["auto", "filmcraft", "ffmpeg"] = "auto"
     # Nudge both ends onto the nearest real shot change before rendering.
-    snap_to_scene: bool = True
+    snap_to_scene: bool = False
 
 
 def get_filmcraft_path() -> Path | None:
@@ -461,13 +484,18 @@ def download_audio_for_transcription(url: str, workdir: Path) -> Path | None:
     return candidates[0] if candidates else None
 
 
-def resolve_lowres_stream_url(url: str) -> str | None:
-    """A small video-only stream URL. Scene detection needs motion, not detail."""
+def resolve_lowres_stream_url(url: str) -> tuple[str | None, str]:
+    """A small video stream URL and headers. Scene detection needs motion, not detail."""
     opts = {
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        "format": "worstvideo[height>=144]/worstvideo/worst",
+        "format": "18/worstvideo[protocol^=http][height>=144]/worstvideo/worst",
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web", "web_embedded"]
+            }
+        },
         **cookie_options(),
     }
     try:
@@ -475,13 +503,27 @@ def resolve_lowres_stream_url(url: str) -> str | None:
             info = downloader.extract_info(url, download=False)
     except Exception as exc:
         print(f"[Clipper] Could not resolve a proxy stream: {exc}")
-        return None
-    if info.get("url"):
-        return info["url"]
-    for fmt in info.get("formats") or []:
-        if fmt.get("url") and fmt.get("vcodec") not in (None, "none"):
-            return fmt["url"]
-    return None
+        return None, ""
+    
+    stream_url = None
+    headers_dict = info.get("http_headers") or {}
+    
+    # Prefer progressive format (fmt 18)
+    prog = next((f for f in (info.get("formats") or []) if f.get("format_id") == "18" and f.get("url")), None)
+    if prog:
+        stream_url = prog["url"]
+        headers_dict = prog.get("http_headers") or headers_dict
+    elif info.get("url"):
+        stream_url = info["url"]
+    else:
+        for fmt in info.get("formats") or []:
+            if fmt.get("url") and fmt.get("vcodec") not in (None, "none") and not str(fmt.get("url")).endswith(".m3u8"):
+                stream_url = fmt["url"]
+                headers_dict = fmt.get("http_headers") or headers_dict
+                break
+
+    header_str = "".join(f"{k}: {v}\r\n" for k, v in headers_dict.items() if k.lower() != "content-length") if headers_dict else ""
+    return stream_url, header_str
 
 
 def snap_clip_range(url: str, start: float, end: float, max_shift: float) -> tuple[float, float, dict]:
@@ -492,13 +534,17 @@ def snap_clip_range(url: str, start: float, end: float, max_shift: float) -> tup
     padding = scene_snap.DEFAULT_PROXY_PADDING
     proxy_start = max(0.0, start - padding)
     proxy_end = end + padding
-    source = url if not ("youtube.com" in url or "youtu.be" in url) else resolve_lowres_stream_url(url)
+    is_yt = "youtube.com" in url or "youtu.be" in url
+    source = url
+    headers = ""
+    if is_yt:
+        source, headers = resolve_lowres_stream_url(url)
     if not source:
         return start, end, {"snapped_start": False, "snapped_end": False, "reason": "no_proxy_stream"}
 
     with tempfile.TemporaryDirectory(prefix="muvidb-snap-") as scratch:
         proxy = Path(scratch) / "proxy.mp4"
-        if not scene_snap.build_proxy(source, proxy_start, proxy_end, proxy):
+        if not scene_snap.build_proxy(source, proxy_start, proxy_end, proxy, headers=headers):
             return start, end, {"snapped_start": False, "snapped_end": False, "reason": "proxy_build_failed"}
         cuts = scene_snap.detect_cuts(proxy, offset=proxy_start)
 
@@ -607,31 +653,33 @@ def render_filmcraft_clip(start: float, end: float, aspect_ratio: str, final_pat
 
 def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: Path) -> None:
     """Fast stream-based slicing and rendering in sub-30s with master segment sharing."""
-    start = float(payload.start_time)
-    end = float(payload.end_time)
-    require_dependencies()
-    url = str(payload.url)
-
-    # Land both ends on real shot changes so the clip opens and closes cleanly
-    # instead of part-way through a shot. Failure here is never fatal: the
-    # originally chosen range is kept.
-    if payload.snap_to_scene:
-        try:
-            CLIP_JOBS[token].update({"message": "Finding the nearest shot changes…", "progress": 8})
-            snapped_start, snapped_end, report = snap_clip_range(
-                url, start, end, scene_snap.DEFAULT_MAX_SHIFT
-            )
-            if report.get("snapped_start") or report.get("snapped_end"):
-                print(f"[Clipper] Snapped {start:.2f}-{end:.2f} to {snapped_start:.2f}-{snapped_end:.2f} ({report})")
-                start, end = snapped_start, snapped_end
-                CLIP_JOBS[token]["scene_snap"] = report
-            else:
-                print(f"[Clipper] Left range unsnapped: {report.get('reason', 'no nearby cut')}")
-        except Exception as exc:
-            print(f"[Clipper] Scene snapping skipped: {exc}")
-
-    duration = end - start
     try:
+        ensure_ffmpeg_in_path()
+        require_dependencies()
+        start = float(payload.start_time)
+        end = float(payload.end_time)
+        url = str(payload.url)
+
+        # Land both ends on real shot changes so the clip opens and closes cleanly
+        # instead of part-way through a shot. Failure here is never fatal: the
+        # originally chosen range is kept.
+        if payload.snap_to_scene:
+            try:
+                CLIP_JOBS[token].update({"message": "Finding the nearest shot changes…", "progress": 8})
+                snapped_start, snapped_end, report = snap_clip_range(
+                    url, start, end, scene_snap.DEFAULT_MAX_SHIFT
+                )
+                if report.get("snapped_start") or report.get("snapped_end"):
+                    print(f"[Clipper] Snapped {start:.2f}-{end:.2f} to {snapped_start:.2f}-{snapped_end:.2f} ({report})")
+                    start, end = snapped_start, snapped_end
+                    CLIP_JOBS[token]["scene_snap"] = report
+                else:
+                    print(f"[Clipper] Left range unsnapped: {report.get('reason', 'no nearby cut')}")
+            except Exception as exc:
+                print(f"[Clipper] Scene snapping skipped: {exc}")
+
+        duration = end - start
+
         # Check if FilmCraft engine is requested or if it's the FilmCraft demo URL
         if payload.engine == "filmcraft" or "filmcraft" in url.lower():
             CLIP_JOBS[token].update({"message": f"Rendering {payload.aspect_ratio} with FilmCraft GPU Compositor…", "progress": 40})
@@ -667,7 +715,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
         if master_segment.exists() and master_segment.stat().st_size > 100_000:
             CLIP_JOBS[token].update({"message": f"Cropping {payload.aspect_ratio} from cached scene…", "progress": 70})
             cmd = [
-                "ffmpeg", "-y", "-i", str(master_segment),
+                "ffmpeg", "-y", "-nostdin", "-i", str(master_segment),
                 "-t", str(duration),
                 "-sn",
                 "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
@@ -676,7 +724,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 "-c:a", "aac", "-b:a", "192k",
                 "-movflags", "+faststart", str(final_path),
             ]
-            subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            subprocess.run(cmd, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
             if final_path.exists() and final_path.stat().st_size > 50_000 and has_video_stream(final_path):
                 CLIP_JOBS[token].update({
                     "status": "complete",
@@ -700,50 +748,72 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 return
 
         CLIP_JOBS[token].update({"message": "Extracting fast stream info…", "progress": 15})
-        
-        # Prioritize 1080p/720p H.264 and HLS streams (which slice instantly by chunk) over AV1
-        opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "writesubtitles": False,
-            "writeautomaticsub": False,
-            "allsubtitles": False,
-            "embedsubtitles": False,
-            "format": "270+234/232+234/231+234/230+233/bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["visionos", "ios", "web_safari", "web_embedded", "android", "web"]
-                }
-            },
-            "socket_timeout": 30,
-            **cookie_options(),
-        }
 
         is_youtube = "youtube.com" in url or "youtu.be" in url
         direct_stream_url = None
         direct_audio_url = None
         direct_stream_headers = {}
+
         if not is_youtube:
             direct_stream_url = url
+        else:
+            opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+                "writesubtitles": False,
+                "writeautomaticsub": False,
+                "allsubtitles": False,
+                "embedsubtitles": False,
+                "format": "22/18/bestvideo[height<=720][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best",
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["android", "web", "web_embedded", "ios"]
+                    }
+                },
+                "socket_timeout": 20,
+                **cookie_options(),
+            }
+            try:
+                with yt_dlp.YoutubeDL(opts) as downloader:
+                    info = downloader.extract_info(url, download=False)
+                    # Check for progressive formats (video + audio in one stream, e.g. fmt 18/22)
+                    prog_formats = [
+                        f for f in (info.get("formats") or [])
+                        if f.get("url") and f.get("vcodec") not in (None, "none") and f.get("acodec") not in (None, "none")
+                    ]
+                    if prog_formats:
+                        best_prog = sorted(prog_formats, key=lambda f: int(f.get("height") or 0), reverse=True)[0]
+                        direct_stream_url = best_prog.get("url")
+                        direct_stream_headers = best_prog.get("http_headers") or info.get("http_headers") or {}
+                    else:
+                        rf = info.get("requested_formats")
+                        if rf and len(rf) >= 2:
+                            direct_stream_url = rf[0].get("url")
+                            direct_audio_url = rf[1].get("url")
+                            direct_stream_headers = rf[0].get("http_headers") or info.get("http_headers") or {}
+                        elif info.get("url"):
+                            direct_stream_url = info.get("url")
+                            direct_stream_headers = info.get("http_headers") or {}
+            except Exception as e:
+                print(f"[Clipper] Direct stream extraction failed: {e}")
 
         CLIP_JOBS[token].update({"message": f"Slicing & rendering {payload.aspect_ratio} with FFmpeg…", "progress": 40})
-        
+
         if direct_stream_url:
-            # Trailing \r\n required by FFmpeg -headers option
-            header_str = "".join(f"{key}: {value}\r\n" for key, value in direct_stream_headers.items()) if direct_stream_headers else ""
-            command = ["ffmpeg", "-y"]
+            header_str = "".join(f"{key}: {value}\r\n" for key, value in direct_stream_headers.items() if key.lower() != "content-length") if direct_stream_headers else ""
+            command = ["ffmpeg", "-y", "-nostdin"]
             if header_str:
                 command.extend(["-headers", header_str])
-            command.extend(["-timeout", "15000000", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
-            command.extend(["-ss", str(start), "-i", direct_stream_url])
+            command.extend(["-timeout", "15000000"])
+            command.extend(["-i", direct_stream_url])
             if direct_audio_url:
                 if header_str:
                     command.extend(["-headers", header_str])
-                command.extend(["-timeout", "15000000", "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"])
-                command.extend(["-ss", str(start), "-i", direct_audio_url])
+                command.extend(["-timeout", "15000000", "-i", direct_audio_url])
                 command.extend(["-map", "0:v:0", "-map", "1:a:0?"])
             command.extend([
+                "-ss", str(start),
                 "-t", str(duration),
                 "-sn",
                 "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
@@ -753,9 +823,8 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 "-movflags", "+faststart", str(final_path)
             ])
             try:
-                # Dynamic timeout based on clip duration (never hardcoded 35s)
-                stream_timeout = max(90, int(duration * 2) + 30)
-                rendered = subprocess.run(command, capture_output=True, text=True, timeout=stream_timeout)
+                stream_timeout = max(60, int(duration * 2) + 30)
+                rendered = subprocess.run(command, capture_output=True, text=True, timeout=stream_timeout, stdin=subprocess.DEVNULL)
             except subprocess.TimeoutExpired:
                 rendered = None
                 print("[Clipper] Direct stream timed out; falling back to range download.")
@@ -776,18 +845,18 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "writeautomaticsub": False,
                     "allsubtitles": False,
                     "embedsubtitles": False,
-                    "format": "270+234/232+234/231+234/230+233/bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best",
+                    "format": "18/22/bestvideo[height<=720]+bestaudio/best",
                     "download_ranges": yt_dlp.utils.download_range_func(None, [(start, end)]),
                     "force_keyframes_at_cuts": False,
                     "extractor_args": {
                         "youtube": {
-                            "player_client": ["visionos", "ios", "web_safari", "web_embedded", "android", "web"]
+                            "player_client": ["android", "web", "web_embedded"]
                         }
                     },
                     "outtmpl": raw_template,
                     "merge_output_format": "mp4",
-                    "retries": 3,
-                    "socket_timeout": 30,
+                    "retries": 2,
+                    "socket_timeout": 20,
                     **cookie_options(),
                 }
                 try:
@@ -817,12 +886,11 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
 
                 source_video = sorted(video_candidates, key=lambda f: f.stat().st_size, reverse=True)[0]
 
-                # Check if downloaded file is the full video or pre-cut
                 seek_start = 0
                 try:
                     probe_res = subprocess.run(
                         ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(source_video)],
-                        capture_output=True, text=True, timeout=10
+                        capture_output=True, text=True, timeout=10, stdin=subprocess.DEVNULL
                     )
                     src_dur = float(probe_res.stdout.strip())
                     if src_dur > duration + 15:
@@ -831,7 +899,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     pass
 
                 CLIP_JOBS[token].update({"message": f"Cropping to {payload.aspect_ratio}…", "progress": 80})
-                cmd = ["ffmpeg", "-y"]
+                cmd = ["ffmpeg", "-y", "-nostdin"]
                 if seek_start > 0:
                     cmd.extend(["-ss", str(seek_start)])
                 cmd.extend([
@@ -844,7 +912,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "-c:a", "aac", "-b:a", "192k",
                     "-movflags", "+faststart", str(final_path),
                 ])
-                subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+                subprocess.run(cmd, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
 
         if not final_path.exists() or final_path.stat().st_size == 0 or not has_video_stream(final_path):
             final_path.unlink(missing_ok=True)
@@ -872,6 +940,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
     except Exception as exc:
         final_path.unlink(missing_ok=True)
         message = str(exc)
+        print(f"[Clipper] Job {token} failed: {message}")
         CLIP_JOBS[token].update({"status": "failed", "message": message[:240], "progress": 0})
 
 
