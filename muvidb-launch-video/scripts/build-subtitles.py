@@ -25,14 +25,14 @@ OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "out")
 # Frame numbers mirror T in src/actor-alert/compositions/ActorAlertFilm.tsx.
 # (start_frame, end_frame, text)
 NARRATION = [
-    (10, 112, "What if you never missed a new movie\nfrom your favourite actor?"),
-    (126, 262, "On MuviDB, just find the actor you love\nand hit Follow."),
-    (276, 384, "Add your WhatsApp number once,\nand that's it."),
-    (400, 560, "When a new movie featuring them\nbecomes available, you get an alert\nstraight to WhatsApp."),
-    (600, 830, "With the poster, the title,\nand where to watch it."),
-    (880, 1046, "One tap takes you to the film page —\nand on to Netflix."),
-    (1068, 1156, "MuviDB. Follow the stars."),
-    (1158, 1246, "Never miss their stories."),
+    (10, 100, "What if you never missed a new movie\nfrom your favourite actor?"),
+    (126, 220, "On MuviDB, just find the actor you love\nand hit Follow."),
+    (276, 343, "Add your WhatsApp number once,\nand that's it."),
+    (400, 535, "When a new movie featuring them\nbecomes available, you get an alert\nstraight to WhatsApp."),
+    (600, 670, "With the poster, the title,\nand where to watch it."),
+    (880, 964, "One tap takes you to the film page —\nand on to Netflix."),
+    (1068, 1129, "MuviDB. Follow the stars."),
+    (1158, 1201, "Never miss their stories."),
 ]
 
 # The captions actually burned into the frame, from script in demoContent.ts.

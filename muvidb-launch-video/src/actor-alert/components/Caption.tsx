@@ -40,7 +40,7 @@ export const Caption: React.FC<{
   bottom,
   align = "center",
   size = 58,
-  color = brand.white,
+  color = "#2A1F17",
   display = false,
   style,
   maxWidth = 860,
@@ -79,7 +79,9 @@ export const Caption: React.FC<{
           letterSpacing: display ? 1.2 : -0.5,
           lineHeight: display ? 1.0 : 1.22,
           color,
-          textShadow: "0 3px 28px rgba(0,0,0,0.85), 0 1px 4px rgba(0,0,0,0.6)",
+          // Light paper background: a glow would smear. A tight warm shadow
+          // lifts the ink off the texture without looking like a drop shadow.
+          textShadow: "0 2px 0 rgba(255,245,232,0.55), 0 6px 18px rgba(90,58,34,0.16)",
         }}
       >
         {text}

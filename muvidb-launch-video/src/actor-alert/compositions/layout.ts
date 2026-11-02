@@ -46,9 +46,9 @@ export const LAYOUTS: Record<LayoutName, LayoutSpec> = {
   vertical: {
     width: 1080,
     height: 1920,
-    phoneScale: 1.42,
+    phoneScale: 1.18,
     phoneX: 0,
-    phoneY: 56,
+    phoneY: 40,
     brandScale: 1,
     caption: {
       hookSize: 104,
@@ -66,8 +66,8 @@ export const LAYOUTS: Record<LayoutName, LayoutSpec> = {
   landscape: {
     width: 1920,
     height: 1080,
-    phoneScale: 1.08,
-    phoneX: -480,
+    phoneScale: 0.98,
+    phoneX: -440,
     phoneY: 0,
     brandScale: 0.92,
     caption: {
@@ -86,9 +86,9 @@ export const LAYOUTS: Record<LayoutName, LayoutSpec> = {
   square: {
     width: 1080,
     height: 1080,
-    phoneScale: 0.95,
+    phoneScale: 0.84,
     phoneX: 0,
-    phoneY: -46,
+    phoneY: -30,
     brandScale: 0.8,
     caption: {
       hookSize: 76,

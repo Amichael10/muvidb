@@ -147,12 +147,91 @@ If a future cut does simulate something unshipped, mark it: there is a
 
 ---
 
+## Motion
+
+The film is **one continuous take**. There are no transitions in it at all —
+no dissolves, no wipes, not even liquid ones. A wipe still reads as "screen A
+is replaced by screen B", which is the thing that makes a product demo feel
+like a slideshow.
+
+Instead every join is a **scale-through match cut**
+(`effects/ScaleThrough.tsx`): the camera pushes *into* one element until it
+fills the frame, and pulls back out of a matching element in the next scene.
+Because the same shape and colour fill the frame on both sides of the join,
+there is nothing to perceive as a cut.
+
+| Join | Flies into | Comes out of | Match |
+|---|---|---|---|
+| Opt-in → lock screen | The sheet | The waking screen | Black — the phone sleeping, time passing |
+| Notification → WhatsApp | The banner | The thread body | Same dark chat tone |
+| Message → film page | **The poster** | **The same poster** | Literally the same image file |
+| Watch button → Netflix | The red button | Netflix | Netflix red |
+
+The poster join is the one to protect if you edit anything: the matched
+element is the identical asset on both sides, so the camera appears to fly
+straight through it.
+
+### Working on a join
+
+Each join is a `from`/`to` pair of focus points in phone CSS px plus a zoom.
+Two things bite:
+
+- **Do not combine `transform-origin` with a compensating translate.** The
+  origin already pins the focus point, so an offset applies it twice and the
+  camera flies into empty space. `focusTransform()` keeps the origin at `0 0`
+  and solves the translation directly.
+- **Measure focus points, do not guess them.** The film-page poster sits at
+  `(76, 346)` with a ~6x zoom; an earlier guess of `(92, 156)` pulled the
+  camera out of blank chrome. Measure off
+  `public/captures/alert/film-page-scroll.png`, remembering it is a 3x
+  capture so divide by three.
+
+Aim joins away from the status bar and dynamic island. Pulling out of the
+chat *header* at 7x put a giant black pill on screen; aiming at the thread
+body instead fixed it.
+
+### Flying into the screen
+
+`PhoneMockup` takes a `bezel` prop. Dropping it fades the device frame,
+shadow and highlight while leaving the screen untouched, so the camera can
+enter the display and the UI becomes the whole frame. The phone returns for
+the opening and the brand reveal, which is what keeps it reading as a product
+demo rather than an abstract animation.
+
+### Physics
+
+`lib/motion.ts` holds the vocabulary. Nothing eases on a plain bezier:
+
+- `SPRINGS` — `snappy`, `pop`, `rubber`, `heavy`, `firm`, consumed through
+  `sp()`. The notification banner uses `rubber` plus `squashStretch()`, so it
+  falls, overshoots, compresses on impact and wobbles out.
+- `momentumScroll()` — scrolls overshoot and rubber-band back, like a thumb.
+- `KineticText` — words arrive on a stagger with per-word springs and a blur
+  that resolves, revealed by a clipping edge rather than opacity.
+- `TapShockwave` — a ring fires out of each press, so cause and effect are
+  visibly linked.
+
+### GSAP
+
+GSAP is installed and used for **easing curves only**, via `gsap.parseEase()`,
+which returns a pure `(t) => number`.
+
+**Never put a `gsap.timeline()` in a composition.** GSAP timelines are driven
+by `requestAnimationFrame`; Remotion renders frames out of order and in
+parallel, so an rAF-driven timeline produces different output on every pass
+and the render stops being reproducible. The same applies to `anime.js` and
+any other wall-clock animation library.
+
+---
+
 ## Audio
 
 `scripts/build-audio.py` synthesises the whole track from scratch — UI taps, a
 follow confirmation, the notification bell, and an ambient bed — and writes a
-pre-mixed `public/assets/audio/mix-full.wav`. The composition plays that one
-file, so cues can never drift out of sync with the edit.
+single pre-mixed `public/assets/audio/mix-full.wav`. The composition plays that
+one file, so cues can never drift out of sync with the edit. The individual
+cues and the bare bed are not written to disk; they are intermediates and
+re-running the script regenerates them in a second.
 
 ```bash
 python scripts/build-audio.py
@@ -172,11 +251,21 @@ closing chord the two loudest moments. An earlier mix had the taps at ~1.0x,
 i.e. completely masked. If you retune anything here, re-measure rather than
 trusting your ears on laptop speakers.
 
-**The music bed is a scratch bed, not a scored track.** It is a competent
-ambient pad and it is mixed low, but a brand launch film deserves a real
-cue. To replace it, drop a licensed track at
-`public/assets/audio/music-bed.wav` and re-run the mix, or point the `<Audio>`
-tag in `ActorAlertFilm.tsx` straight at it.
+**The music bed is a stand-in, not a scored track.** It is a competent ambient
+pad and it is mixed low, but a brand launch film deserves a real cue.
+
+To swap it, drop a licensed instrumental at:
+
+```
+public/assets/audio/music-bed-licensed.wav
+```
+
+then re-run `python scripts/build-audio.py`. It is picked up automatically and
+mixed under the UI cues. Any sample rate, mono or stereo, 8/16/32-bit PCM — it
+is resampled and trimmed to the film's length, and warns if it is too short.
+
+That filename is deliberately **not** one the script ever writes, so a re-run
+can never overwrite your licensed track.
 
 The brief for a generated track, if you want to commission or generate one:
 
@@ -191,11 +280,67 @@ The brief for a generated track, if you want to commission or generate one:
 
 ### Voiceover
 
-Not recorded. The script is in §7 of the brief and is already timed in
-`out/muvidb-actor-alert-subtitles.srt`, so a VO can be cut straight to it.
-The film is built to work silent — every beat is carried by on-screen copy —
-which is why the muted cut is a first-class deliverable rather than a
-fallback.
+Generated locally with **YarnGPT2** — a Nigerian-accented English TTS model
+(Apache-2.0, so commercially usable). That accent is the point: this is a
+Nigerian film platform, and a neutral American voice would undercut it. The
+hosted voice tools on the connected Freepik/Magnific account are also capped
+on the free plan, which local generation sidesteps entirely.
+
+```bash
+python scripts/build-voiceover.py   # writes public/assets/audio/vo/line-NN.wav
+python scripts/build-audio.py       # mixes them in and ducks the bed
+```
+
+Each line is generated separately and placed at the exact frame its caption
+appears on, so the narration is locked to the UI rather than drifting. The
+frame list in `build-voiceover.py` mirrors `NARRATION` in
+`build-subtitles.py`, which mirrors `T` in `ActorAlertFilm.tsx` — change a
+beat and all three need the same edit. The script prints a warning if a line
+runs longer than the gap before the next one.
+
+`build-audio.py` ducks the bed and the UI cues by 55% under speech, with a
+120ms attack and 350ms release. Without that the pad sits in the same
+midrange as the voice and the narration stops being intelligible on a phone
+speaker.
+
+#### Setting up the models
+
+One-time, ~2.4 GB:
+
+| What | From | Size |
+|---|---|---|
+| `models/yarngpt/YarnGPT2` | `saheedniyi/YarnGPT2` on HF | 698 MB |
+| `models/yarngpt/wavtokenizer` | `novateur/WavTokenizer-medium-speech-75token` on HF | 1.75 GB |
+| `models/yarngpt/yarngpt-src` | `github.com/saheedniyi02/yarngpt` | 5 MB |
+
+The upstream model card fetches the WavTokenizer checkpoint from a Google
+Drive file id. It is on Hugging Face instead, which is what the commands above
+use — same file, verifiable provenance.
+
+**Prefer a virtualenv.** Installing `outetts` globally drags in
+`descript-audiotools`, which pins `protobuf<3.20`; pip will happily downgrade
+protobuf system-wide and break any `grpcio`/`google-*` packages needing
+>=5.26.1. That pin turns out to be over-restrictive — the WavTokenizer decoder
+imports fine on protobuf 5.29, so if it has already been downgraded, just put
+it back:
+
+```bash
+pip install "protobuf>=5.26.1,<6"
+```
+
+pip will warn about `descript-audiotools` and the warning can be ignored.
+Isolating it avoids the whole dance:
+
+```bash
+python -m venv .venv-tts && .venv-tts/Scripts/activate
+pip install torch torchaudio transformers outetts uroman inflect
+```
+
+On Windows, `outetts` fails to import because its `__init__` pulls in MeCab
+(Japanese tokenisation) whose native DLL is absent. `build-voiceover.py`
+installs a stub for it — the WavTokenizer decoder never calls MeCab.
+
+Once the WAVs exist, none of this is needed again; the mix reads the files.
 
 ---
 
@@ -231,10 +376,10 @@ bottom bar. If you move a caption, check it against those numbers.
 src/actor-alert/
   data/demoContent.ts        all swappable facts — start here
   styles/brand.ts            colours, fonts, safe areas
-  lib/ease.ts                the house easing curve and tap/caption helpers
+  lib/motion.ts              springs, easing curves, momentum scroll
   lib/fonts.ts               Bebas Neue, Barlow Condensed, Host Grotesk
   components/
-    PhoneMockup.tsx          device shell, status bar, home indicator
+    PhoneMockup.tsx          device shell + `bezel` (fly-into-screen)
     MuviDBChrome.tsx         top bar, bottom nav, logo mark
     ActorProfile.tsx         the person page
     FollowButton.tsx         Follow -> Following
@@ -244,8 +389,13 @@ src/actor-alert/
     StreamingDestination.tsx film page (captured) -> Netflix (drawn)
     BrandReveal.tsx          closing card
     Caption.tsx              on-screen copy, touch ring, preview badge
+    KineticText.tsx          staggered per-word text
+    effects/
+      ScaleThrough.tsx       the match cut — the whole transition system
+      TapShockwave.tsx       ring fired by a press
+      LightSweep.tsx         specular sweep across the glass
   compositions/
-    ActorAlertFilm.tsx       the master timeline — all beats live in `T`
+    ActorAlertFilm.tsx       the master timeline — beats live in `T`
     layout.ts                per-aspect-ratio adaptation
     CoverThumbnail.tsx       the Reels/TikTok cover
 scripts/
@@ -253,4 +403,9 @@ scripts/
   capture-film-page-full.cjs re-capture the scrollable film page
   build-audio.py             synthesise the track
   build-subtitles.py         write the SRTs
+public/
+  assets/audio/              mix-full.wav (played) + bed and cues
+  assets/posters|actors/     the verified poster and actor photo
+  captures/alert/            actor-profile-top.png (design reference)
+                             film-page-scroll.png (rendered in Scene 6)
 ```

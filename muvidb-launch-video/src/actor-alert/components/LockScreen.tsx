@@ -1,9 +1,10 @@
-import { Img } from "remotion";
+import { Img, useVideoConfig } from "remotion";
 import { brand } from "../styles/brand";
 import { fontFamilies } from "../lib/fonts";
 import { film, whatsappTemplate } from "../data/demoContent";
 import { StatusBar, HomeIndicator, Island } from "./PhoneMockup";
-import { progress, tap } from "../lib/ease";
+import { tap } from "../lib/ease";
+import { sp, squashStretch, ease } from "../lib/motion";
 
 /**
  * A quiet lock screen that receives one notification.
@@ -28,11 +29,17 @@ export const LockScreen: React.FC<{
   time = "21:04",
   dateLabel = "Friday, 26 July",
 }) => {
-  const arrive = progress(frame, { from: notifyAt, duration: 26 });
+  const { fps } = useVideoConfig();
+  // The banner is thrown onto the screen rather than faded in: it falls,
+  // overshoots, squashes on impact and wobbles out. That weight is what makes
+  // the alert feel like a physical event instead of a layer appearing.
+  const drop = sp(frame, fps, notifyAt, "rubber", 34);
+  const arrive = Math.min(1, Math.max(0, drop));
+  const squash = squashStretch(frame, fps, notifyAt + 7, 0.2);
   const press = tapAt === null ? null : tap(frame, tapAt);
 
-  // The clock lifts slightly to make room, the way iOS does.
-  const clockShift = arrive * 10;
+  // The clock gets out of the way, easing rather than tracking the bounce.
+  const clockShift = ease.expoOut(Math.min(1, Math.max(0, (frame - notifyAt) / 22))) * 14;
 
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
@@ -104,11 +111,13 @@ export const LockScreen: React.FC<{
           left: 12,
           right: 12,
           top: 266,
-          opacity: arrive,
+          opacity: Math.min(1, arrive * 2.2),
           transform: [
-            `translateY(${(1 - arrive) * -34}px)`,
-            `scale(${(0.93 + arrive * 0.07) * (press ? press.scale : 1)})`,
+            `translateY(${(1 - drop) * -120}px)`,
+            `scaleX(${squash.scaleX * (press ? press.scale : 1)})`,
+            `scaleY(${squash.scaleY * (press ? press.scale : 1)})`,
           ].join(" "),
+          transformOrigin: "center top",
         }}
       >
         <NotificationBanner rippleOpacity={press ? press.rippleOpacity : 0} />

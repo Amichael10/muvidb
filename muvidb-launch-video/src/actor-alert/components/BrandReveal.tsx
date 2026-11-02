@@ -1,15 +1,18 @@
-import { Img, staticFile } from "remotion";
+import { Img, staticFile, useVideoConfig, random } from "remotion";
 import { brand } from "../styles/brand";
 import { fontFamilies } from "../lib/fonts";
 import { script } from "../data/demoContent";
-import { progress, riseIn } from "../lib/ease";
+import { sp, curve, t01, ease, pulse } from "../lib/motion";
+import { WipeHeadline } from "./KineticText";
 
 /**
  * Closing frame.
  *
  * The logo is the shipped asset (public/brand/orange-logo.svg) used as-is --
- * no tagline is added beneath it and no alternate lockup is invented. The
- * orange underline grows under the URL to park the eye there for the hold.
+ * no tagline is added beneath it and no alternate lockup is invented. What is
+ * added is motion: the logo lands with a spring and a brief chromatic split,
+ * a ring of light expands out of it, and the headlines wipe in word by word
+ * behind a travelling orange edge rather than fading up as a block.
  */
 export const BrandReveal: React.FC<{
   frame: number;
@@ -18,14 +21,27 @@ export const BrandReveal: React.FC<{
   /** Scale factor for non-vertical layouts. */
   scale?: number;
 }> = ({ frame, startAt = 0, scale = 1 }) => {
+  const { fps } = useVideoConfig();
   const f = frame - startAt;
 
-  const logo = progress(f, { from: 0, duration: 26 });
-  const underline = progress(f, { from: 86, duration: 30 });
+  const logo = sp(f, fps, 0, "pop", 30);
+  const logoClamped = Math.min(1, Math.max(0, logo));
 
-  // A slow push-in across the whole hold keeps the final card from feeling
-  // frozen while the viewer reads the URL.
-  const push = 1 + progress(f, { from: 0, duration: 200 }) * 0.035;
+  // A soft orange flare behind the mark as it lands. Deliberately NOT a
+  // chromatic split on the logo itself: the brand guidance forbids alternate
+  // logo treatments, and an RGB fringe is exactly that. The energy comes from
+  // behind the mark instead of being applied to it.
+  const flare = pulse(f, 0, 26, 0.3);
+
+  // Light ring firing out of the mark.
+  const ringT = t01(f, 6, 40);
+  const ringR = ease.expoOut(ringT) * 760;
+
+  const underline = curve(f, 88, 30, "expoOut");
+  const cta = sp(f, fps, 84, "snappy", 26);
+
+  // A slow push across the hold so the card is never frozen.
+  const push = 1 + curve(f, 0, 200, "power2InOut") * 0.04;
 
   return (
     <div
@@ -37,20 +53,61 @@ export const BrandReveal: React.FC<{
         alignItems: "center",
         justifyContent: "center",
         background: brand.black,
+        overflow: "hidden",
       }}
     >
-      {/* A soft orange bloom so the card is not flat black. */}
+      {/* Bloom behind the mark. */}
       <div
         style={{
           position: "absolute",
-          width: 1400,
-          height: 1400,
+          width: 1500,
+          height: 1500,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(255,90,31,0.14) 0%, rgba(255,90,31,0.04) 42%, transparent 68%)",
-          opacity: logo,
+            "radial-gradient(circle, rgba(255,90,31,0.16) 0%, rgba(255,90,31,0.05) 42%, transparent 68%)",
+          opacity: logoClamped,
+          transform: `scale(${0.7 + logoClamped * 0.3})`,
         }}
       />
+
+      {/* Expanding light ring. */}
+      {ringT > 0 && ringT < 1 ? (
+        <div
+          style={{
+            position: "absolute",
+            width: ringR * 2,
+            height: ringR * 2,
+            marginTop: -220,
+            borderRadius: "50%",
+            border: `${Math.max(1, 5 * (1 - ringT))}px solid ${brand.orange}`,
+            opacity: (1 - ringT) ** 1.8 * 0.5,
+          }}
+        />
+      ) : null}
+
+      {/* Drifting embers, so the black is never dead. */}
+      {Array.from({ length: 14 }).map((_, i) => {
+        const x = random(`ex-${i}`) * 100;
+        const speed = 0.3 + random(`es-${i}`) * 0.7;
+        const y = 100 - ((f * speed * 0.35 + random(`ey-${i}`) * 100) % 130);
+        const size = 1.5 + random(`ez-${i}`) * 3;
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: `${x}%`,
+              top: `${y}%`,
+              width: size,
+              height: size,
+              borderRadius: "50%",
+              background: brand.orange,
+              opacity: logoClamped * 0.28 * (1 - Math.abs(y - 50) / 70),
+              filter: "blur(1px)",
+            }}
+          />
+        );
+      })}
 
       <div
         style={{
@@ -61,43 +118,54 @@ export const BrandReveal: React.FC<{
           transform: `scale(${scale * push})`,
         }}
       >
-        <Img
-          src={staticFile("brand/orange-logo.svg")}
-          style={{
-            width: 460,
-            height: "auto",
-            opacity: logo,
-            transform: `translateY(${(1 - logo) * 18}px) scale(${0.96 + logo * 0.04})`,
-          }}
-        />
+        <div style={{ position: "relative" }}>
+          {flare > 0.01 ? (
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: "50%",
+                width: 560,
+                height: 560,
+                marginLeft: -280,
+                marginTop: -280,
+                borderRadius: "50%",
+                background:
+                  "radial-gradient(circle, rgba(255,90,31,0.55) 0%, transparent 62%)",
+                opacity: flare * 0.9,
+                filter: "blur(22px)",
+              }}
+            />
+          ) : null}
+          <Img
+            src={staticFile("brand/orange-logo.svg")}
+            style={{
+              width: 460,
+              height: "auto",
+              opacity: logoClamped,
+              transform: `translateY(${(1 - logo) * 34}px) scale(${
+                0.86 + logo * 0.14
+              })`,
+            }}
+          />
+        </div>
 
-        <div
-          style={{
-            fontFamily: fontFamilies.title,
-            fontSize: 96,
-            lineHeight: 0.98,
-            color: brand.white,
-            letterSpacing: 1.5,
-            marginTop: 54,
-            textAlign: "center",
-            ...riseIn(f, 28, 22, 30),
-          }}
-        >
-          {script.brand1}
+        <div style={{ marginTop: 54 }}>
+          <WipeHeadline
+            frame={frame}
+            text={script.brand1}
+            from={startAt + 26}
+            size={96}
+            color={brand.white}
+          />
         </div>
-        <div
-          style={{
-            fontFamily: fontFamilies.title,
-            fontSize: 96,
-            lineHeight: 0.98,
-            color: brand.orange,
-            letterSpacing: 1.5,
-            textAlign: "center",
-            ...riseIn(f, 44, 22, 30),
-          }}
-        >
-          {script.brand2}
-        </div>
+        <WipeHeadline
+          frame={frame}
+          text={script.brand2}
+          from={startAt + 44}
+          size={96}
+          color={brand.orange}
+        />
 
         <div
           style={{
@@ -107,7 +175,8 @@ export const BrandReveal: React.FC<{
             color: brand.textMuted,
             marginTop: 40,
             textAlign: "center",
-            ...riseIn(f, 66, 20, 22),
+            opacity: curve(f, 68, 20, "power2Out"),
+            transform: `translateY(${(1 - curve(f, 68, 20, "expoOut")) * 20}px)`,
           }}
         >
           Follow your favourite actors on MuviDB.
@@ -118,7 +187,10 @@ export const BrandReveal: React.FC<{
           style={{
             position: "relative",
             marginTop: 44,
-            ...riseIn(f, 84, 20, 20),
+            opacity: Math.min(1, Math.max(0, cta) * 2),
+            transform: `translateY(${(1 - cta) * 26}px) scale(${
+              0.95 + Math.min(1, Math.max(0, cta)) * 0.05
+            })`,
           }}
         >
           <div

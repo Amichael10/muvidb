@@ -31,6 +31,16 @@ OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "public", "assets", "aud
 # How far the ambient bed sits under the interaction cues.
 BED_LEVEL = 0.45
 
+# Voiceover, generated separately by build-voiceover.py.
+VO_DIR = os.path.join(OUT_DIR, "vo")
+VO_LEVEL = 0.92
+# How far the bed and cues drop while the narrator is speaking, and how
+# quickly that duck opens and closes. Without this the pad fights the voice in
+# the same midrange and the narration stops being intelligible on a phone.
+DUCK_DEPTH = 0.55
+DUCK_ATTACK_S = 0.12
+DUCK_RELEASE_S = 0.35
+
 
 # ---------------------------------------------------------------- primitives
 
@@ -249,6 +259,113 @@ def write_wav(path: str, data: np.ndarray, stereo: bool = True) -> None:
         w.writeframes(pcm.tobytes())
 
 
+def load_voiceover(n: int) -> "tuple[np.ndarray, np.ndarray] | None":
+    """
+    Lays the generated voiceover lines onto the timeline.
+
+    Returns (voice, duck) where `duck` is a 0..1 gain envelope that is 1 in
+    silence and drops to (1 - DUCK_DEPTH) under speech, so the caller can push
+    the music out of the way.
+
+    Each line is placed at the frame recorded in build-voiceover.py, so the
+    narration tracks the UI rather than drifting against it.
+    """
+    if not os.path.isdir(VO_DIR):
+        return None
+    files = sorted(f for f in os.listdir(VO_DIR) if f.startswith("line-") and f.endswith(".wav"))
+    if not files:
+        return None
+
+    # Frames must match LINES in build-voiceover.py.
+    frames = [10, 126, 276, 400, 600, 880, 1068, 1158]
+    voice = np.zeros(n)
+    speaking = np.zeros(n)
+
+    for path_name, frame in zip(files, frames):
+        with wave.open(os.path.join(VO_DIR, path_name), "rb") as w:
+            rate, ch = w.getframerate(), w.getnchannels()
+            d = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2").astype(np.float64) / 32768.0
+        if ch > 1:
+            d = d.reshape(-1, ch).mean(axis=1)
+        if rate != SR:
+            src = np.linspace(0.0, 1.0, len(d), endpoint=False)
+            dst = np.linspace(0.0, 1.0, int(len(d) * SR / rate), endpoint=False)
+            d = np.interp(dst, src, d)
+        d = fade_edges(d, 12.0)
+
+        start = int(SR * frame / FPS)
+        end = min(n, start + len(d))
+        if end <= start:
+            continue
+        voice[start:end] += d[: end - start]
+        speaking[start:end] = 1.0
+
+    # Smooth the gate into an envelope with separate attack and release.
+    atk = max(1, int(SR * DUCK_ATTACK_S))
+    rel = max(1, int(SR * DUCK_RELEASE_S))
+    env = np.zeros(n)
+    level = 0.0
+    a_c = 1.0 / atk
+    r_c = 1.0 / rel
+    for i in range(n):
+        target = speaking[i]
+        level += (target - level) * (a_c if target > level else r_c)
+        env[i] = level
+    duck = 1.0 - DUCK_DEPTH * env
+
+    peak = float(np.max(np.abs(voice)))
+    if peak > 0:
+        voice *= VO_LEVEL / peak
+    return voice, duck
+
+
+def load_licensed_bed(n: int) -> "np.ndarray | None":
+    """
+    Use a real music track if one has been dropped in.
+
+    The synthesised bed is a stand-in. Drop a licensed instrumental at
+    public/assets/audio/music-bed-licensed.wav and it is used instead --
+    deliberately a different filename from anything this script writes, so a
+    re-run can never overwrite the licensed track.
+
+    Accepts 8/16/32-bit PCM, mono or stereo, any sample rate. Trimmed or
+    zero-padded to the exact length of the film.
+    """
+    path = os.path.join(OUT_DIR, "music-bed-licensed.wav")
+    if not os.path.exists(path):
+        return None
+
+    with wave.open(path, "rb") as w:
+        ch, width, rate, frames = (
+            w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
+        )
+        raw = w.readframes(frames)
+
+    dtype = {1: np.uint8, 2: "<i2", 4: "<i4"}.get(width)
+    if dtype is None:
+        print(f"  ! {os.path.basename(path)}: unsupported {width * 8}-bit width, ignoring")
+        return None
+
+    data = np.frombuffer(raw, dtype=dtype).astype(np.float64)
+    data = (data - 128.0) / 128.0 if width == 1 else data / float(2 ** (width * 8 - 1))
+    if ch > 1:
+        data = data.reshape(-1, ch).mean(axis=1)
+
+    if rate != SR:
+        # Linear resample is plenty for a background bed.
+        src = np.linspace(0.0, 1.0, len(data), endpoint=False)
+        dst = np.linspace(0.0, 1.0, int(len(data) * SR / rate), endpoint=False)
+        data = np.interp(dst, src, data)
+
+    out = np.zeros(n)
+    take = min(n, len(data))
+    out[:take] = data[:take]
+    if take < n:
+        print(f"  ! licensed bed is {take / SR:.1f}s, short of {n / SR:.1f}s -- padded")
+    # Fade both ends so a trimmed track cannot click.
+    return fade_edges(out, 120.0)
+
+
 def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     n = int(SR * DURATION_S)
@@ -261,12 +378,9 @@ def main() -> None:
         "brand": brand_cue(),
     }
 
-    # Individual cues, so an editor can re-time them by hand if needed.
-    for name, buf in shots.items():
-        write_wav(os.path.join(OUT_DIR, f"sfx-{name}.wav"), buf)
-
-    bed = music_bed()
-    write_wav(os.path.join(OUT_DIR, "music-bed.wav"), bed)
+    licensed = load_licensed_bed(n)
+    bed = licensed if licensed is not None else music_bed()
+    print("  bed:", "licensed track" if licensed is not None else "synthesised stand-in")
 
     # Full pre-mixed track: bed plus every cue at its frame. The bed sits well
     # under the cues -- it is atmosphere, and the taps are the thing the
@@ -279,13 +393,21 @@ def main() -> None:
         if e > s:
             mix[s:e] += buf[: e - s]
 
+    vo = load_voiceover(n)
+    if vo is not None:
+        voice, duck = vo
+        mix = mix * duck + voice
+        print(f"  voiceover: mixed in, bed ducked {DUCK_DEPTH:.0%} under speech")
+    else:
+        print("  voiceover: none found (run scripts/build-voiceover.py)")
+
     mix = soft_clip(mix)
     peak = float(np.max(np.abs(mix))) or 1.0
     # Leave ~1.5 dB of headroom rather than normalising to full scale.
     mix *= 0.84 / peak
     write_wav(os.path.join(OUT_DIR, "mix-full.wav"), mix)
 
-    print(f"wrote {len(shots)} cues + bed + mix to {os.path.normpath(OUT_DIR)}")
+    print(f"wrote mix-full.wav ({len(shots)} cues over the bed) to {os.path.normpath(OUT_DIR)}")
     print(f"mix length: {len(mix) / SR:.2f}s ({DURATION_FRAMES} frames @ {FPS}fps)")
 
 

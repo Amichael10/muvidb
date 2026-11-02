@@ -28,6 +28,12 @@ export const PhoneMockup: React.FC<{
   /** Dim the whole device, used when a scene pushes it into the background. */
   dim?: number;
   shadow?: boolean;
+  /**
+   * Opacity of the physical device around the screen. Dropping this lets the
+   * camera fly "into" the display: the bezel, shadow and highlight dissolve
+   * and the UI becomes the whole frame, while the screen itself is untouched.
+   */
+  bezel?: number;
 }> = ({
   children,
   scale = 1,
@@ -38,6 +44,7 @@ export const PhoneMockup: React.FC<{
   style,
   dim = 0,
   shadow = true,
+  bezel = 1,
 }) => {
   const outerWidth = PHONE_VIEWPORT.width + BEZEL * 2;
   const outerHeight = PHONE_VIEWPORT.height + BEZEL * 2;
@@ -63,7 +70,7 @@ export const PhoneMockup: React.FC<{
       }}
     >
       {/* Contact shadow. Sits behind the device and scales with it. */}
-      {shadow ? (
+      {shadow && bezel > 0.02 ? (
         <div
           style={{
             position: "absolute",
@@ -71,6 +78,7 @@ export const PhoneMockup: React.FC<{
             borderRadius: RADIUS + 10,
             boxShadow:
               "0 60px 120px rgba(0,0,0,0.72), 0 18px 48px rgba(0,0,0,0.5)",
+            opacity: bezel,
           }}
         />
       ) : null}
@@ -81,11 +89,28 @@ export const PhoneMockup: React.FC<{
           position: "absolute",
           inset: 0,
           borderRadius: RADIUS,
-          background: "linear-gradient(160deg, #2A2A30 0%, #0B0B0D 38%, #141418 100%)",
           padding: BEZEL,
           boxSizing: "border-box",
         }}
       >
+        {/*
+          The frame's colour lives on its own layer behind the screen.
+          Putting the opacity on the padding wrapper instead fades the screen
+          with it, because the screen is its child -- which turned the whole
+          device translucent and let the background show through the UI. Only
+          this layer may fade.
+        */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: RADIUS,
+            background:
+              "linear-gradient(160deg, #2A2A30 0%, #0B0B0D 38%, #141418 100%)",
+            opacity: bezel,
+          }}
+        />
+
         {/* Screen */}
         <div
           style={{
@@ -96,6 +121,7 @@ export const PhoneMockup: React.FC<{
             overflow: "hidden",
             background: brand.black,
             isolation: "isolate",
+            zIndex: 1,
           }}
         >
           {children}
@@ -120,6 +146,7 @@ export const PhoneMockup: React.FC<{
           borderRadius: RADIUS,
           border: "1px solid rgba(255,255,255,0.10)",
           pointerEvents: "none",
+          opacity: bezel,
         }}
       />
     </div>
