@@ -28,6 +28,9 @@ DURATION_S = DURATION_FRAMES / FPS
 
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "public", "assets", "audio")
 
+# How far the ambient bed sits under the interaction cues.
+BED_LEVEL = 0.45
+
 
 # ---------------------------------------------------------------- primitives
 
@@ -229,8 +232,8 @@ CUES = [
     ("notification", 468, "notify"),
     ("notification_tap", 546, "tap"),
     ("alert_link_tap", 838, "tap_bright"),
-    ("netflix_tap", 1002, "tap_bright"),
-    ("brand", 1052, "brand"),
+    ("netflix_tap", 990, "tap_bright"),
+    ("brand", 1058, "brand"),
 ]
 
 
@@ -251,9 +254,9 @@ def main() -> None:
     n = int(SR * DURATION_S)
 
     shots = {
-        "tap": ui_tap(1.0, 0.34),
-        "tap_bright": ui_tap(1.22, 0.38),
-        "confirm": follow_confirm(),
+        "tap": ui_tap(1.0, 0.62),
+        "tap_bright": ui_tap(1.22, 0.68),
+        "confirm": follow_confirm(0.62),
         "notify": notification(),
         "brand": brand_cue(),
     }
@@ -265,8 +268,10 @@ def main() -> None:
     bed = music_bed()
     write_wav(os.path.join(OUT_DIR, "music-bed.wav"), bed)
 
-    # Full pre-mixed track: bed plus every cue at its frame.
-    mix = bed.copy()
+    # Full pre-mixed track: bed plus every cue at its frame. The bed sits well
+    # under the cues -- it is atmosphere, and the taps are the thing the
+    # viewer should register.
+    mix = bed * BED_LEVEL
     for label, frame, kind in CUES:
         buf = shots[kind]
         s = int(SR * frame / FPS)

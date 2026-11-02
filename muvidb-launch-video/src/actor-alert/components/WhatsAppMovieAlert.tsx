@@ -26,6 +26,12 @@ import { TouchIndicator } from "./Caption";
  *    synopsis in particular is absent here on purpose -- it arrives on the
  *    film page in the next scene.
  */
+/** Bottom edge of the chat header; the thread is clipped to below it. */
+const HEADER_BOTTOM = 116;
+
+/** Height reserved for the composer, which the thread must never run under. */
+const COMPOSER_HEIGHT = 74;
+
 /** Incoming-bubble width, and where its URL button centres from the bottom. */
 const BUBBLE_WIDTH = 318;
 const BUTTON_CENTRE_FROM_BOTTOM = 20;
@@ -58,11 +64,25 @@ export const WhatsAppMovieAlert: React.FC<{
       <Island />
       <ChatHeader />
 
-      {/* Thread */}
+      {/*
+        Thread. The scrolling content is clipped to the area below the chat
+        header -- without this, scrolled-up messages (the day divider in
+        particular) slide out past the header and float in the status bar.
+      */}
       <div
         style={{
           position: "absolute",
-          top: 162,
+          top: HEADER_BOTTOM,
+          left: 0,
+          right: 0,
+          bottom: COMPOSER_HEIGHT,
+          overflow: "hidden",
+        }}
+      >
+      <div
+        style={{
+          position: "absolute",
+          top: 162 - HEADER_BOTTOM,
           left: 0,
           right: 0,
           padding: "0 9px",
@@ -107,6 +127,7 @@ export const WhatsAppMovieAlert: React.FC<{
             )}
           </div>
         </div>
+      </div>
       </div>
 
       <Composer />

@@ -53,17 +53,17 @@ export const T = {
   s5: 570,
   bubbleLand: 586,
   alertCaption: 606,
-  alertScrollStart: 672,
+  alertScrollStart: 596,
   alertLinkTap: 838,
   // Scene 6 - the handoff to the streaming destination
   s6: 870,
   filmPageArrive: 874,
   watchCaption: 886,
-  filmPageScroll: 918,
-  netflixTap: 1002,
-  netflixArrive: 1016,
+  filmPageScroll: 908,
+  netflixTap: 990,
+  netflixArrive: 1004,
   // Scene 7 - brand reveal
-  s7: 1050,
+  s7: 1056,
   end: 1260,
 } as const;
 
@@ -126,7 +126,14 @@ export const ActorAlertFilm: React.FC<{
    * the muted export tells the same story through its captions alone.
    */
   muted?: boolean;
-}> = ({ layout = "vertical", muted = false }) => {
+  /**
+   * Drops the burned-in copy, leaving a clean plate for platforms that add
+   * their own captions from the sidecar SRT, or for re-versioning into
+   * another language. Defaults on, because the burned-in copy is what makes
+   * the sound-off cut work.
+   */
+  captions?: boolean;
+}> = ({ layout = "vertical", muted = false, captions = true }) => {
   const frame = useCurrentFrame();
   const L = LAYOUTS[layout];
   const screens = useScreenStack(frame);
@@ -141,7 +148,7 @@ export const ActorAlertFilm: React.FC<{
     (1 - progress(frame, { from: T.s4, duration: 22 }));
 
   // The brand card replaces the device entirely.
-  const brandIn = progress(frame, { from: T.s7 - 16, duration: 22 });
+  const brandIn = progress(frame, { from: T.s7, duration: 20 });
 
   // Scrolls
   const profileScroll = animate(frame, {
@@ -151,7 +158,7 @@ export const ActorAlertFilm: React.FC<{
   });
   const chatScroll = animate(frame, {
     from: T.alertScrollStart,
-    duration: 110,
+    duration: 120,
     to: [0, 150],
   });
   const filmScroll = animate(frame, {
@@ -213,7 +220,7 @@ export const ActorAlertFilm: React.FC<{
               <TouchIndicator
                 frame={frame}
                 at={T.optInSubmit}
-                x={296}
+                x={261}
                 y={585}
                 size={58}
               />
@@ -273,7 +280,7 @@ export const ActorAlertFilm: React.FC<{
       </AbsoluteFill>
 
       {/* Captions */}
-      <Captions frame={frame} layout={layout} />
+      {captions ? <Captions frame={frame} layout={layout} /> : null}
 
       {/* Scene 7 */}
       {brandIn > 0.001 ? (
@@ -291,7 +298,7 @@ export const ActorAlertFilm: React.FC<{
  */
 const Backdrop: React.FC<{ frame: number }> = ({ frame }) => {
   const drift = (frame / T.end) * 40;
-  const fade = 1 - progress(frame, { from: T.s7 - 20, duration: 26 });
+  const fade = 1 - progress(frame, { from: T.s7 - 4, duration: 20 });
   return (
     <AbsoluteFill style={{ opacity: fade }}>
       <Img

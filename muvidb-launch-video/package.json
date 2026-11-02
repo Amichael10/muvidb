@@ -27,7 +27,17 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
+    "lint": "eslint src && tsc",
+    "alert:audio": "python scripts/build-audio.py",
+    "alert:subs": "python scripts/build-subtitles.py",
+    "alert:capture": "node scripts/capture-alert-ui.cjs && node scripts/capture-film-page-full.cjs",
+    "alert:vertical": "remotion render ActorAlertVertical out/muvidb-actor-alert-vertical.mp4 --codec=h264",
+    "alert:landscape": "remotion render ActorAlertLandscape out/muvidb-actor-alert-landscape.mp4 --codec=h264",
+    "alert:square": "remotion render ActorAlertSquare out/muvidb-actor-alert-square.mp4 --codec=h264",
+    "alert:muted": "remotion render ActorAlertVerticalMuted out/muvidb-actor-alert-muted.mp4 --codec=h264",
+    "alert:cover": "remotion still ActorAlertCover out/muvidb-actor-alert-cover.png",
+    "alert:all": "npm run alert:audio && npm run alert:subs && npm run alert:vertical && npm run alert:landscape && npm run alert:square && npm run alert:muted && npm run alert:clean && npm run alert:cover",
+    "alert:clean": "remotion render ActorAlertVerticalClean out/muvidb-actor-alert-vertical-clean.mp4 --codec=h264"
   },
   "sideEffects": [
     "*.css"

@@ -86,9 +86,9 @@ export const LAYOUTS: Record<LayoutName, LayoutSpec> = {
   square: {
     width: 1080,
     height: 1080,
-    phoneScale: 0.86,
+    phoneScale: 0.95,
     phoneX: 0,
-    phoneY: -34,
+    phoneY: -46,
     brandScale: 0.8,
     caption: {
       hookSize: 76,

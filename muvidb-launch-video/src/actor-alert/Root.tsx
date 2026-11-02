@@ -51,6 +51,15 @@ export const ActorAlertCompositions: React.FC = () => (
       height={LAYOUTS.vertical.height}
       defaultProps={{ layout: "vertical" as const, muted: true }}
     />
+    <Composition
+      id="ActorAlertVerticalClean"
+      component={ActorAlertFilm}
+      durationInFrames={DURATION_IN_FRAMES}
+      fps={FPS}
+      width={LAYOUTS.vertical.width}
+      height={LAYOUTS.vertical.height}
+      defaultProps={{ layout: "vertical" as const, captions: false }}
+    />
     <Still
       id="ActorAlertCover"
       component={CoverThumbnail}

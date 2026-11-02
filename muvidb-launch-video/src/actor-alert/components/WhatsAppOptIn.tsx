@@ -209,7 +209,8 @@ export const WhatsAppOptIn: React.FC<{
               fontSize: 12,
               fontWeight: 600,
               color: brand.textMuted,
-              padding: "10px 14px",
+              padding: "10px 12px",
+              whiteSpace: "nowrap",
             }}
           >
             Just follow on site
@@ -220,9 +221,10 @@ export const WhatsAppOptIn: React.FC<{
               display: "flex",
               alignItems: "center",
               gap: 8,
-              padding: "11px 18px",
+              padding: "11px 15px",
               borderRadius: 13,
               background: brand.whatsapp.green,
+              whiteSpace: "nowrap",
               transform: `scale(${press.scale})`,
               boxShadow: "0 10px 26px rgba(37,211,102,0.3)",
               overflow: "hidden",

@@ -884,45 +884,77 @@ export default function PersonDetailV2() {
         <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
           
           {/* ── MOBILE TALENT HERO (md:hidden) ── */}
-          <div className="md:hidden flex flex-col space-y-4 mb-4">
-            {/* Top Identity Row: 80x80 Avatar + Name + Roles */}
-            <div className="flex items-start gap-3.5">
-              <div className="relative w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-black border border-border shadow-xl">
-                <ImageWithFallback
-                  src={person.photo_url || person.photo}
-                  alt={formatPersonName(person.name)}
-                  fallbackType="avatar"
-                  name={formatPersonName(person.name)}
-                  className="h-full w-full object-cover"
-                  loading="eager"
-                />
-                {person.is_verified && (
-                  <div className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white shadow-md">
-                    <Icon icon="solar:verified-check-bold" width="12" />
-                  </div>
-                )}
+          <div className="md:hidden flex flex-col space-y-4 mb-4 relative">
+            {/* Ambient Actor Backdrop Halo */}
+            <div className="absolute -top-6 -left-4 -right-4 h-52 overflow-hidden pointer-events-none opacity-25 blur-3xl">
+              <ImageWithFallback
+                src={person.photo_url || person.photo}
+                alt=""
+                fallbackType="avatar"
+                className="w-full h-full object-cover scale-150"
+              />
+            </div>
+
+            {/* Top Identity Row: 3:4 High-Resolution Headshot Portrait + Star Details */}
+            <div className="flex items-start gap-4 relative z-10">
+              <div 
+                className={`group/portrait relative w-32 xs:w-36 sm:w-40 aspect-[3/4] shrink-0 rounded-2xl overflow-hidden bg-surface-2 border-2 border-border/80 shadow-2xl p-1 transition-all duration-300 ${
+                  photos.length > 0 ? 'cursor-pointer hover:border-brand/70 active:scale-95' : ''
+                }`}
+                onClick={() => {
+                  if (photos.length > 0) setActiveLightboxIndex(0)
+                }}
+              >
+                <div className="relative w-full h-full rounded-xl overflow-hidden bg-black">
+                  <ImageWithFallback
+                    src={person.photo_url || person.photo}
+                    alt={formatPersonName(person.name)}
+                    fallbackType="avatar"
+                    name={formatPersonName(person.name)}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover/portrait:scale-105"
+                    loading="eager"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
+
+                  {/* Verified Icon Seal */}
+                  {person.is_verified && (
+                    <div className="absolute bottom-2 left-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-white/40 bg-white/95 p-0.5 backdrop-blur-md shadow-lg">
+                      <img src="/images/muvidb-icon-watermark.png" alt="" className="h-full w-full object-contain" />
+                    </div>
+                  )}
+
+                  {/* Photo Gallery Trigger Pill */}
+                  {photos.length > 0 && (
+                    <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1 rounded-full bg-black/80 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white backdrop-blur-md border border-white/20">
+                      <Icon icon="solar:camera-bold" width="11" />
+                      <span>{photos.length}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h1 className="text-xl sm:text-2xl font-heading font-black tracking-tight text-text-primary">
-                    {formatPersonName(person.name)}
-                  </h1>
-                </div>
+              <div className="flex-1 min-w-0 pt-0.5 space-y-2">
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h1 className="text-xl sm:text-2xl font-heading font-black tracking-tight text-text-primary leading-tight">
+                      {formatPersonName(person.name)}
+                    </h1>
+                  </div>
 
-                {/* Primary Roles */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  {heroRoles.map((role) => (
-                    <span key={role} className="text-brand text-[10px] font-black uppercase tracking-wider bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md">
-                      {formatRole(role)}
-                    </span>
-                  ))}
+                  {/* Primary Roles */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+                    {heroRoles.map((role) => (
+                      <span key={role} className="text-brand text-[10px] font-black uppercase tracking-wider bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-md">
+                        {formatRole(role)}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Live Availability Status */}
                 {person.availability_status && (
-                  <div className="pt-1.5 flex items-center gap-1.5">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
                       person.availability_status === 'on_set'
                         ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
                         : person.availability_status === 'booked'
@@ -937,6 +969,21 @@ export default function PersonDetailV2() {
                       <span>{person.availability_status === 'on_set' ? 'On Set' : 'Available for Bookings'}</span>
                     </span>
                   </div>
+                )}
+
+                {/* Birth Place / Origin */}
+                {(person.place_of_birth || person.nationality) && (
+                  <p className="text-[11px] text-text-muted flex items-center gap-1 line-clamp-1">
+                    <Icon icon="solar:map-point-linear" width="12" className="text-brand/80 shrink-0" />
+                    <span className="truncate">{person.place_of_birth || person.nationality}</span>
+                  </p>
+                )}
+
+                {/* Known For Department */}
+                {person.known_for_department && (
+                  <p className="text-[10px] font-mono text-text-muted/80 uppercase tracking-wider">
+                    {person.known_for_department} Department
+                  </p>
                 )}
               </div>
             </div>

@@ -117,19 +117,28 @@ export const NetflixDestination: React.FC<{
       }}
     >
       {/* Key art */}
-      <Img
-        src={film.poster}
+      <div
         style={{
           position: "absolute",
           top: 0,
           left: 0,
-          width: "100%",
+          right: 0,
           height: 560,
-          objectFit: "cover",
-          objectPosition: "center 18%",
-          transform: `scale(${1.04 + arrive * 0.03})`,
+          overflow: "hidden",
         }}
-      />
+      >
+        <Img
+          src={film.poster}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: "-40%",
+            width: "180%",
+            transform: `scale(${1.02 + arrive * 0.03})`,
+            transformOrigin: "center top",
+          }}
+        />
+      </div>
       <div
         style={{
           position: "absolute",
