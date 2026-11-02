@@ -2,7 +2,6 @@ import {
   AbsoluteFill,
   useCurrentFrame,
   useVideoConfig,
-  Img,
   Audio,
   staticFile,
 } from "remotion";
@@ -23,7 +22,7 @@ import { BrandReveal } from "../components/BrandReveal";
 import { TouchIndicator } from "../components/Caption";
 import { KineticText } from "../components/KineticText";
 import { TapShockwave } from "../components/effects/TapShockwave";
-import { Stage, DeskShadow } from "../components/Stage";
+import { CinematicStage, LensFringe } from "../components/CinematicStage";
 import { ScaleThrough } from "../components/effects/ScaleThrough";
 import { LightSweep } from "../components/effects/LightSweep";
 import { sp, curve, momentumScroll, pulse } from "../lib/motion";
@@ -159,9 +158,13 @@ export const ActorAlertFilm: React.FC<{
   );
   const bezelFade = 1 - immerse * 0.22;
 
-  // The desk drifts gently against the phone so the frame reads as a real
-  // surface rather than a flat backing plate.
-  const stageDrift = (frame / T.end) * 10;
+  // How much light the screen is throwing into the room. It lifts when the
+  // camera dives into the display and when the alert lands, so the whole
+  // frame breathes with the story instead of the phone brightening alone.
+  const screenGlow = Math.min(
+    1,
+    0.55 + immerse * 0.35 + pulse(frame, T.notifyArrive, 90, 0.3),
+  );
 
   // The brand card replaces the device entirely.
   const brandIn = curve(frame, T.s7, 22, "expoInOut");
@@ -363,15 +366,19 @@ export const ActorAlertFilm: React.FC<{
   })();
 
   return (
-    <AbsoluteFill style={{ background: "#EFD9C2", overflow: "hidden" }}>
+    <AbsoluteFill style={{ background: "#04060A", overflow: "hidden" }}>
       {muted ? null : <Audio src={staticFile("assets/audio/mix-full.wav")} />}
 
-      <Stage frame={frame} fade={1 - brandIn} drift={stageDrift} />
+      <CinematicStage
+        frame={frame}
+        fade={1 - brandIn}
+        screenGlow={screenGlow}
+        deviceY={translateY + breathe}
+        deviceScale={scale}
+      />
 
       <AbsoluteFill style={{ opacity: 1 - brandIn, perspective: 1900 }}>
-        <DeskShadow scale={scale} translateY={translateY + breathe} opacity={bezelFade} />
         <PhoneMockup
-          shadow={false}
           scale={scale}
           tiltY={tiltY}
           tiltX={tiltX}
@@ -384,6 +391,8 @@ export const ActorAlertFilm: React.FC<{
           <LightSweep progress={sweep} intensity={0.42} />
         </PhoneMockup>
       </AbsoluteFill>
+
+      {brandIn < 0.5 ? <LensFringe /> : null}
 
       {captions ? <Captions frame={frame} layout={layout} /> : null}
 
