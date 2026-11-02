@@ -712,7 +712,7 @@ export default function AdminSocialStudio() {
   const fetchCalendar = async (offset = shuffleOffset) => {
     setLoadingCalendar(true);
     try {
-      const res = await fetchWithLocalClipperAuth(`/api/social?task=calendar_plan&days=30&offset=${offset}&startDate=${calendarStartDate}`, { headers: await authHeaders() });
+      const res = await fetchWithLocalClipperAuth(`/api/social?task=calendar_plan&days=7&offset=${offset}&startDate=${calendarStartDate}`, { headers: await authHeaders() });
       const data = await res.json().catch(() => ([]));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setCalendarSlots(Array.isArray(data) ? data : []);
@@ -726,19 +726,19 @@ export default function AdminSocialStudio() {
   const handleShuffleAllCandidates = () => {
     const nextOffset = shuffleOffset + 1;
     setShuffleOffset(nextOffset);
-    toast.success('🎲 Shuffled all candidates across the 30-day plan!');
+    toast.success('🎲 Shuffled all candidates across the 7-day weekly plan!');
     fetchCalendar(nextOffset);
   };
 
   const seedCalendar = async () => {
     setSeedingCalendar(true);
     try {
-      // 1. Instant seed of 30 days of calendar slots (09:00, 12:00, 15:30 WAT)
+      // 1. Instant seed of weekly (7 days) calendar slots (09:00, 12:00, 15:30 WAT)
       const res = await fetchWithLocalClipperAuth('/api/social?task=seed_calendar', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          daysAhead: 30,
+          daysAhead: 7,
           startDate: calendarStartDate,
           postsPerDay,
           clearExistingPlanned: true,
@@ -746,20 +746,20 @@ export default function AdminSocialStudio() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      const count = data.seeded ?? (postsPerDay * 30);
-      toast.success(`✨ Generated ${count} calendar slots starting ${calendarStartDate} (09:00, 12:00, 15:30 WAT)!`);
+      const count = data.seeded ?? (postsPerDay * 7);
+      toast.success(`✨ Generated ${count} weekly calendar slots starting ${calendarStartDate}!`);
 
-      // 2. Pre-seed lightweight drafts for immediate upcoming days (09:00, 12:00, 15:30 WAT)
-      if (postsPerDay === 3) {
-        fetchWithLocalClipperAuth('/api/social?task=seed_calendar_drafts', {
-          method: 'POST',
-          headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            daysAhead: 3,
-            startDate: calendarStartDate,
-          }),
-        }).catch(err => console.warn('Background draft generation warning:', err));
-      }
+      // 2. Pre-seed and queue drafts in Social Studio for the weekly schedule
+      fetchWithLocalClipperAuth('/api/social?task=seed_calendar_drafts', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          daysAhead: 7,
+          startDate: calendarStartDate,
+        }),
+      })
+        .then(() => fetchDrafts(true))
+        .catch(err => console.warn('Background draft generation warning:', err));
 
       await fetchCalendar(shuffleOffset);
       await fetchDrafts(true);
@@ -2372,7 +2372,7 @@ export default function AdminSocialStudio() {
                   onClick={handleShuffleAllCandidates}
                   disabled={loadingCalendar}
                   className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-white/10 bg-surface-2 px-3.5 text-xs font-bold text-text-primary hover:border-brand/40 hover:text-brand disabled:opacity-50 transition-all shadow-sm"
-                  title="Shuffle candidate actors, crew, and movies across the 30-day plan"
+                  title="Shuffle candidate actors, crew, and movies across the 7-day weekly plan"
                 >
                   <Icon icon="solar:shuffle-bold" width="15" />
                   <span>Shuffle</span>
@@ -2386,7 +2386,7 @@ export default function AdminSocialStudio() {
                   className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-brand px-4 text-xs font-black text-white hover:bg-brand-hover shadow-lg shadow-brand/20 active:scale-95 disabled:opacity-50 transition-all"
                 >
                   <Icon icon={seedingCalendar ? 'solar:spinner-linear' : 'solar:magic-stick-3-bold'} className={seedingCalendar ? 'animate-spin' : ''} width="15" />
-                  <span>{seedingCalendar ? 'Generating…' : '⚡ Generate Schedule'}</span>
+                  <span>{seedingCalendar ? 'Generating…' : '⚡ Generate Weekly Schedule'}</span>
                 </button>
               </div>
             </div>
@@ -2395,7 +2395,7 @@ export default function AdminSocialStudio() {
           {loadingCalendar ? (
             <div className="rounded-2xl border border-white/10 bg-surface p-16 text-center shadow-xl">
               <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-brand" width="36" />
-              <p className="mt-3 text-sm font-bold text-white">Loading 30-day schedule & verified Nollywood stars…</p>
+              <p className="mt-3 text-sm font-bold text-white">Loading 7-day weekly schedule & verified Nollywood stars…</p>
               <p className="mt-1 text-xs text-text-muted">Fetching editorial series, movies, reviews, and streaming availability.</p>
             </div>
           ) : calendarSlots.length === 0 ? (
@@ -2403,9 +2403,9 @@ export default function AdminSocialStudio() {
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand border border-brand/20">
                 <Icon icon="solar:calendar-mark-bold" width="28" />
               </div>
-              <h3 className="mt-4 text-base font-black text-white">No Calendar Slots Generated Yet</h3>
+              <h3 className="mt-4 text-base font-black text-white">No Weekly Schedule Generated Yet</h3>
               <p className="mx-auto mt-1 max-w-md text-xs text-text-muted">
-                Click <strong>"⚡ Generate Schedule"</strong> above to automatically populate 30 days of curated Nollywood content matched to each day’s editorial theme.
+                Click <strong>"⚡ Generate Weekly Schedule"</strong> above to populate 7 days of curated content queued in Social Studio. Keeps schedule fresh and leaves breathing room for breaking & urgent news without collision.
               </p>
               <button
                 type="button"
@@ -2414,7 +2414,7 @@ export default function AdminSocialStudio() {
                 className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black text-white hover:bg-brand-hover shadow-lg shadow-brand/20"
               >
                 <Icon icon="solar:magic-stick-3-bold" width="16" />
-                <span>Generate 30-Day Auto-Pilot Plan</span>
+                <span>Generate 7-Day Weekly Plan</span>
               </button>
             </div>
           ) : calendarViewMode === 'month' ? (

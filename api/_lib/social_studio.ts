@@ -3405,7 +3405,7 @@ export async function reorderCarouselAssets(
   return { success: true, ...result };
 }
 
-export async function getEditorialCalendar(days = 30, shuffleOffset = 0, startDate?: string) {
+export async function getEditorialCalendar(days = 7, shuffleOffset = 0, startDate?: string) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
   const today = startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)
     ? startDate
@@ -3815,12 +3815,127 @@ export async function approveEditorialSlot(
  * rolling planner in `editorial/monthly_planner.ts` now owns slot selection,
  * including the same-day rule for new releases.
  */
-export async function seedEditorialCalendarSlots(options: any = 30) {
+export async function seedEditorialCalendarSlots(options: any = 7) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
   const { planRollingSocialCalendar } = await import('./editorial/monthly_planner.js');
-  const days = typeof options === 'number' ? options : Number(options?.dryRun ? 30 : options?.days) || 30;
-  const result = await planRollingSocialCalendar({ days, dryRun: Boolean(options?.dryRun) });
+  const days = typeof options === 'number' ? options : Number(options?.dryRun ? 7 : (options?.daysAhead || options?.days)) || 7;
+  const startDate = options?.startDate ? new Date(options.startDate) : undefined;
+  const clearExistingPlanned = options?.clearExistingPlanned !== false;
+  const result = await planRollingSocialCalendar({
+    start: startDate,
+    days,
+    dryRun: Boolean(options?.dryRun),
+    clearExistingPlanned,
+  });
   return { seeded: result.totalSlots, planner: result };
+}
+
+/**
+ * Automatically resolves top eligible candidates and prepares drafts for the upcoming
+ * weekly calendar slots, queuing them directly in Social Studio for review & publishing.
+ */
+export async function queueWeeklyEditorialDrafts(
+  options: { daysAhead?: number; startDate?: string } = {},
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+  const days = Math.max(1, Number(options.daysAhead || 7));
+  const today = options.startDate && /^\d{4}-\d{2}-\d{2}$/.test(options.startDate)
+    ? options.startDate
+    : new Date().toISOString().split('T')[0];
+  const startObj = new Date(`${today}T00:00:00Z`);
+  const endDate = new Date(startObj.getTime() + (days - 1) * 86_400_000).toISOString().split('T')[0];
+
+  // Fetch slots for this weekly window that do not have a draft attached yet
+  const { data: slots, error } = await supabase
+    .from('social_calendar')
+    .select(`
+      id, scheduled_date, scheduled_time, status, priority, subject_entity_type, subject_entity_id, selection_locked, planner_key, draft_id,
+      social_content_series (id, name, slug)
+    `)
+    .gte('scheduled_date', today)
+    .lte('scheduled_date', endDate)
+    .is('draft_id', null)
+    .in('status', ['planned', 'subject_selected'])
+    .order('scheduled_date', { ascending: true })
+    .order('scheduled_time', { ascending: true })
+    .limit(Math.min(50, Number((options as any)?.limit || 15)));
+
+  if (error) throw error;
+  if (!slots || slots.length === 0) {
+    return { queued: 0, message: 'All weekly slots already have drafts attached' };
+  }
+
+  const { fetchSeriesCandidates } = await import('./editorial/candidate_service.js');
+  const { rankEditorialCandidates } = await import('./editorial/editorial_selection_engine.js');
+  const candidateCache = new Map<string, any[]>();
+  const queuedItems: string[] = [];
+
+  for (const slot of slots) {
+    try {
+      const series = (slot as any).social_content_series;
+      const seriesSlug = series?.slug || (slot.planner_key?.startsWith('release:') ? 'new_and_upcoming' : 'filmography');
+      let candidateId = slot.subject_entity_id;
+      let candidateType = (slot.subject_entity_type as 'person' | 'movie' | 'play') || 'movie';
+
+      // If no candidate pre-assigned, resolve the top candidate
+      if (!candidateId) {
+        if (!candidateCache.has(seriesSlug)) {
+          const pool = await fetchSeriesCandidates(seriesSlug, 30).catch(() => []);
+          candidateCache.set(seriesSlug, pool);
+        }
+        const pool = candidateCache.get(seriesSlug) || [];
+        const referenceDate = new Date(`${slot.scheduled_date}T12:00:00Z`);
+        const ranked = rankEditorialCandidates(pool, seriesSlug, { referenceDate });
+        if (ranked.length > 0 && ranked[0].candidate?.id) {
+          candidateId = ranked[0].candidate.id;
+          candidateType = ranked[0].candidate.type as any;
+        }
+      }
+
+      if (!candidateId) continue;
+
+      const isStagePlay = candidateType === 'play' || seriesSlug === 'whats_on_stage';
+      const contentType = defaultContentTypeForSeries(seriesSlug, candidateType);
+      const templateSlug = isStagePlay ? 'poster-only' : defaultTemplateSlugForSeries(seriesSlug, candidateType);
+      const platforms = defaultPlatformsFor('graphic');
+
+      // Create draft with skipAssets: true so generation is instant, responsive, and doesn't time out
+      const draft = await generateSocialDraft(
+        {
+          contentType,
+          sourceEntityId: candidateId,
+          templateSlug,
+          platforms,
+          isAdHoc: false,
+          skipAssets: true,
+        },
+        actor,
+      );
+
+      // Link slot to draft in social_calendar
+      await supabase
+        .from('social_calendar')
+        .update({
+          draft_id: draft.contentItem.id,
+          status: 'draft_ready',
+          subject_entity_id: candidateId,
+          subject_entity_type: candidateType,
+          notes: `Weekly draft queued in Social Studio (${slot.scheduled_date} ${slot.scheduled_time})`,
+        })
+        .eq('id', slot.id);
+
+      queuedItems.push(draft.contentItem.id);
+    } catch (err: any) {
+      console.warn(`[social_studio] Could not pre-seed draft for slot ${slot.id}:`, err?.message || err);
+    }
+  }
+
+  return {
+    queued: queuedItems.length,
+    draftIds: queuedItems,
+    message: `Queued ${queuedItems.length} drafts in Social Studio for the weekly schedule`,
+  };
 }
 
 /**

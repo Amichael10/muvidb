@@ -1,7 +1,7 @@
 import { supabase } from '../supabase.js';
 
 const DAY_MS = 86_400_000;
-const DEFAULT_DAYS = 30;
+const DEFAULT_DAYS = 7; // Weekly rolling schedule (7 days ahead)
 const BASE_TIMES = ['09:00:00', '12:00:00', '15:00:00', '18:00:00', '20:30:00'];
 const RELEASE_TIMES = ['08:00:00', '11:00:00', '16:30:00', '21:00:00'];
 
@@ -69,7 +69,12 @@ function releaseTime(index: number): string {
   return `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}:00`;
 }
 
-export async function planRollingSocialCalendar(options: { start?: Date; days?: number; dryRun?: boolean } = {}) {
+export async function planRollingSocialCalendar(options: {
+  start?: Date;
+  days?: number;
+  dryRun?: boolean;
+  clearExistingPlanned?: boolean;
+} = {}) {
   const start = options.start || new Date();
   const startDay = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
   const days = Math.max(1, options.days || DEFAULT_DAYS);
@@ -77,6 +82,29 @@ export async function planRollingSocialCalendar(options: { start?: Date; days?: 
   const startDate = dateOnly(startDay);
   const releaseCatchupDate = dateOnly(new Date(startDay.getTime() - DAY_MS));
   const endDate = dateOnly(endDay);
+
+  if (!options.dryRun) {
+    // 1. Automatically prune stale unapproved slots from past dates so the schedule stays fresh
+    await supabase
+      .from('social_calendar')
+      .update({
+        status: 'skipped',
+        notes: 'Expired unapproved slot from past date (pruned to prevent stale schedule)',
+      })
+      .lt('scheduled_date', startDate)
+      .in('status', ['planned', 'subject_selected', 'draft_ready']);
+
+    // 2. Clear unlocked planned slots in this weekly window if requested
+    if (options.clearExistingPlanned) {
+      await supabase
+        .from('social_calendar')
+        .delete()
+        .gte('scheduled_date', startDate)
+        .lte('scheduled_date', endDate)
+        .in('status', ['planned', 'subject_selected'])
+        .eq('selection_locked', false);
+    }
+  }
 
   const [
     { data: series, error: seriesError },

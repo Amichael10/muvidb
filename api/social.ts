@@ -399,7 +399,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
       if (task === 'calendar_plan') {
-        const days = Number(req.query?.days || 30);
+        const days = Number(req.query?.days || 7);
         const offset = Number(req.query?.offset || req.query?.shuffleOffset || 0);
         const startDate = typeof req.query?.startDate === 'string' ? req.query.startDate : undefined;
         return res.status(200).json(await getEditorialCalendar(days, offset, startDate));
@@ -588,7 +588,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (task === 'seed_calendar') {
         await requireSocialStudioAdmin(req);
-        return res.status(200).json(await seedEditorialCalendarSlots(req.body || { days: 30 }));
+        return res.status(200).json(await seedEditorialCalendarSlots(req.body || { days: 7 }));
+      }
+
+      if (task === 'seed_calendar_drafts' || task === 'queue_weekly_drafts') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { queueWeeklyEditorialDrafts } = await import('./_lib/social_studio.js');
+        return res.status(200).json(await queueWeeklyEditorialDrafts(req.body || {}, actor));
       }
 
       if (task === 'disconnect_platform') {

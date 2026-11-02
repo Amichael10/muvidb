@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { name: 'theatre_status_sweep', fn: sweepAndUpdatePlayStatuses },
         ...(isSunday ? [{ name: 'critics', fn: runCriticsSync }] : []),
         { name: 'ai_maintenance', fn: runAIMaintenance },
-        { name: 'social_plan', fn: () => planRollingSocialCalendar({ days: 30 }) }
+        { name: 'social_plan', fn: () => planRollingSocialCalendar({ days: 7 }) }
       ];
 
       for (const t of tasks) {
@@ -189,7 +189,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // dispatched. calendar_service was retired in 274e71b, so both names now
       // run the rolling planner.
       case 'daily_social_schedule':
-      case 'social_schedule':       result = await planRollingSocialCalendar({ days: 30 }); break;
+      case 'social_schedule':       result = await planRollingSocialCalendar({ days: 7 }); break;
       case 'social_preflight':      result = await runSocialPreflight(); break;
       case 'social_publish':        result = await runSocialPublisher({ lockedBy: 'cron-sync' }); break;
       case 'social_prune_assets':   result = await pruneSocialAssets(); break;

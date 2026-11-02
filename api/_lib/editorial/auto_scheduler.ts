@@ -256,7 +256,14 @@ export async function autoScheduleDueCalendarSlots(now = new Date(), options: { 
     if (row.subject_entity_id) claimedCandidateIds.add(row.subject_entity_id);
   }
 
-  for (const slot of slots || []) {
+  // Prioritize urgent slots over routine slots so breaking news / new releases never wait
+  const sortedSlots = [...(slots || [])].sort((a, b) => {
+    if (a.priority === 'urgent' && b.priority !== 'urgent') return -1;
+    if (b.priority === 'urgent' && a.priority !== 'urgent') return 1;
+    return String(a.scheduled_time || '').localeCompare(String(b.scheduled_time || ''));
+  });
+
+  for (const slot of sortedSlots) {
     const slotMinutes = (() => {
       const [h, m] = (slot.scheduled_time || '00:00:00').split(':').map(Number);
       return (h || 0) * 60 + (m || 0);
