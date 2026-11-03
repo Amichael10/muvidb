@@ -9,7 +9,7 @@ const SYSTEM_ACTOR = {
   role: 'admin' as const,
 };
 
-export async function preRenderUpcomingReels(daysAhead: number = 7, startTomorrow: boolean = true) {
+export async function preRenderUpcomingReels(daysAhead: number = 7, startTomorrow: boolean = false) {
   const now = new Date();
   const startDate = startTomorrow
     ? new Date(now.getTime() + 24 * 3600 * 1000)
