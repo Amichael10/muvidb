@@ -6,6 +6,7 @@ import PageHeader from '../components/ui/PageHeader'
 import { Icon } from '@iconify/react'
 import { toTitleCase, toSentenceCase, formatPersonName } from '../utils/format'
 import { getZonedClock, isPublicCinemaShowtime } from '../utils/showtimes'
+import MobileCinemasView from '../components/cinemas/mobile/MobileCinemasView'
 
 // Extract chain name from the cinema's display name
 function extractChain(name = '') {
@@ -196,6 +197,25 @@ const Cinemas = () => {
 
   return (
     <div className="min-h-screen bg-bg">
+
+      {/* Mobile-First Cinemas View (< md) */}
+      <MobileCinemasView
+        cinemas={filtered}
+        showCounts={showCounts}
+        loading={loading}
+        selectedCity={selectedCity}
+        setSelectedCity={setSelectedCity}
+        selectedChain={selectedChain}
+        setSelectedChain={setSelectedChain}
+        search={search}
+        setSearch={setSearch}
+        cities={cities}
+        CHAINS={CHAINS}
+        groupedByCity={groupedByCity}
+      />
+
+      {/* Desktop Cinemas View (>= md) */}
+      <div className="hidden md:block">
       <PageHeader
         icon="solar:city-bold"
         eyebrow="Exhibition"
@@ -275,6 +295,7 @@ const Cinemas = () => {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   )
