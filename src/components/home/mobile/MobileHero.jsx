@@ -20,8 +20,6 @@ function getRating(film) {
 
 export default function MobileHero({ featuredFilms = [], isLoading = false }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const navigate = useNavigate();
-  const { user } = useAuth();
 
   const films = (featuredFilms || []).filter(Boolean);
   const currentFilm = films[currentIndex] || films[0];
@@ -69,7 +67,6 @@ export default function MobileHero({ featuredFilms = [], isLoading = false }) {
           fallbackType="film"
           name={currentFilm.title}
           className="w-full h-full object-cover object-center transform scale-105"
-          priority
         />
 
         {/* Ambient Cinema Lighting & Gradient Scrims */}

@@ -40,7 +40,6 @@ export default function MobilePlayDetailView({
           name={play.title}
           className="w-full h-full object-cover transform scale-105"
           sizes="100vw"
-          priority
         />
 
         {/* Ambient Gradient Scrims */}
