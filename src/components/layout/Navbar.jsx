@@ -12,7 +12,7 @@ export default function Navbar() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [recentSearches, setRecentSearches] = useState(['King of Boys', 'Funke Akindele', 'Anikulapo']);
+  const [recentSearches, setRecentSearches] = useState(['King of Boys', 'Funke Akindele', 'Anikulapo', 'Wole Soyinka']);
   const [unreadNotifications, setUnreadNotifications] = useState(false);
   const [isMotionEnabled, setIsMotionEnabled] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -34,6 +34,25 @@ export default function Navbar() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Global keyboard shortcuts (Cmd+K / Ctrl+K and / to trigger search)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+      if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+      if (e.key === 'Escape' && isSearchOpen) {
+        setIsSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSearchOpen]);
 
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
@@ -83,272 +102,320 @@ export default function Navbar() {
     }
   };
 
-  // Keep the pill short — extras live in More (same idea as mobile drawer).
+  // Primary desktop navigation links (Stage Plays promoted to first-class navigation)
   const primaryLinks = [
     { name: 'Movies', path: '/browse' },
     { name: 'TV Shows', path: '/tv-shows' },
     { name: 'Showtimes', path: '/showtimes' },
+    { name: 'Stage', path: '/plays' },
     { name: 'People', path: '/people' },
   ];
 
-  const moreLinks = [
-    { name: 'Box Office Tracker', path: '/box-office', icon: 'solar:ticket-bold' },
-    { name: 'Advanced Search', path: '/advanced-search', icon: 'solar:tuning-square-2-linear' },
-    { name: 'Cinemas', path: '/cinemas', icon: 'solar:videocamera-linear' },
-    { name: 'Channels', path: '/channels', icon: 'solar:tv-linear' },
-    { name: 'Awards', path: '/awards', icon: 'solar:cup-star-linear' },
-    { name: 'Critics', path: '/critics', icon: 'solar:pen-new-square-linear' },
-    { name: 'Theatre Plays', path: '/plays', icon: 'solar:masks-linear' },
-    { name: 'Companies', path: '/companies', icon: 'solar:case-linear' },
+  // Grouped secondary links for the enhanced More mega-dropdown
+  const moreCategories = [
+    {
+      title: 'Industry & Box Office',
+      items: [
+        { name: 'Box Office Tracker', path: '/box-office', icon: 'solar:ticket-bold', desc: 'Weekend & historical grosses' },
+        { name: 'Awards Hub', path: '/awards', icon: 'solar:cup-star-linear', desc: 'AMVCA, AMAA & major honours' },
+        { name: 'Critics Lounge', path: '/critics', icon: 'solar:pen-new-square-linear', desc: 'Verified reviews & scorecards' },
+      ],
+    },
+    {
+      title: 'Directory & Ecosystem',
+      items: [
+        { name: 'Cinema Venues', path: '/cinemas', icon: 'solar:videocamera-linear', desc: 'Multiplexes & indie screens' },
+        { name: 'Channels & Networks', path: '/channels', icon: 'solar:tv-linear', desc: 'Broadcasters & streaming platforms' },
+        { name: 'Production Companies', path: '/companies', icon: 'solar:case-linear', desc: 'Studios & distributors' },
+      ],
+    },
+    {
+      title: 'Tools & Intelligence',
+      items: [
+        { name: 'Advanced Search', path: '/advanced-search', icon: 'solar:tuning-square-2-linear', desc: 'Deep filters & talent discovery' },
+      ],
+    },
   ];
 
-  const isMoreActive = moreLinks.some(
+  const allMoreLinks = moreCategories.flatMap((c) => c.items);
+  const isMoreActive = allMoreLinks.some(
     (link) => location.pathname === link.path || location.pathname.startsWith(`${link.path}/`)
   );
 
   return (
     <>
       <nav 
-        className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 border-b border-transparent
-          ${isScrolled ? 'bg-surface/85 backdrop-blur-xl border-border h-14' : 'bg-transparent h-16'}
+        className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 border-b
+          ${isScrolled 
+            ? 'bg-surface/90 backdrop-blur-xl border-border/80 shadow-sm h-14' 
+            : 'bg-gradient-to-b from-bg/90 via-bg/40 to-transparent border-transparent h-16'}
         `}
       >
         <div className="max-w-[1440px] mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Left: Logo */}
-        <Link to="/" className="flex items-center group shrink-0">
-          <img 
-            src={theme === 'light' ? "/images/MuviDB Brand/Wordmark.svg" : "/images/MuviDB Brand/White Wordmark.svg"}
-            alt="MuviDB" 
-            className="h-7 sm:h-7.5 object-contain group-hover:scale-105 transition-all duration-300" 
-          />
-        </Link>
+          {/* Left: Brand Logo */}
+          <Link to="/" className="flex items-center group shrink-0 select-none">
+            <img 
+              src={theme === 'light' ? "/images/MuviDB Brand/Wordmark.svg" : "/images/MuviDB Brand/White Wordmark.svg"}
+              alt="MuviDB" 
+              className="h-7 sm:h-7.5 object-contain group-hover:scale-105 transition-all duration-300" 
+            />
+          </Link>
 
-        {/* Center: primary links + More (desktop) */}
-        <div className="hidden lg:flex items-center gap-1 bg-surface-2/60 backdrop-blur-md border border-border/70 p-1 rounded-full shadow-xs">
-          {primaryLinks.map((link) => {
-            const isActive =
-              location.pathname === link.path ||
-              (link.path !== '/' && location.pathname.startsWith(`${link.path}/`));
-            return (
-              <Link
-                key={link.name}
-                to={link.path}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap
-                  ${isActive 
-                    ? 'bg-brand text-white shadow-xs' 
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/60'
+          {/* Center: Primary Links + More Pill (desktop lg+) */}
+          <div className="hidden lg:flex items-center gap-1 bg-surface-2/70 backdrop-blur-md border border-border/70 p-1 rounded-full shadow-xs">
+            {primaryLinks.map((link) => {
+              const isActive =
+                location.pathname === link.path ||
+                (link.path !== '/' && location.pathname.startsWith(`${link.path}/`));
+              return (
+                <Link
+                  key={link.name}
+                  to={link.path}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap select-none
+                    ${isActive 
+                      ? 'bg-brand text-white shadow-xs scale-[1.02]' 
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/70'
+                    }
+                  `}
+                >
+                  {link.name}
+                </Link>
+              );
+            })}
+
+            {/* More Mega-Menu Trigger */}
+            <div className="relative" ref={moreMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsMoreOpen((open) => !open)}
+                aria-expanded={isMoreOpen}
+                aria-haspopup="menu"
+                className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap cursor-pointer select-none
+                  ${isMoreOpen || isMoreActive
+                    ? 'bg-brand text-white shadow-xs'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/70'
                   }
                 `}
               >
-                {link.name}
-              </Link>
-            );
-          })}
-
-          <div className="relative" ref={moreMenuRef}>
-            <button
-              type="button"
-              onClick={() => setIsMoreOpen((open) => !open)}
-              aria-expanded={isMoreOpen}
-              aria-haspopup="menu"
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 whitespace-nowrap cursor-pointer
-                ${isMoreOpen || isMoreActive
-                  ? 'bg-brand text-white shadow-xs'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/60'
-                }
-              `}
-            >
-              More
-              <Icon
-                icon="solar:alt-arrow-down-linear"
-                width="13"
-                height="13"
-                className={`transition-transform duration-200 ${isMoreOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-
-            {isMoreOpen && (
-              <div
-                role="menu"
-                className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-56 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]"
-              >
-                <div className="px-4 py-3 border-b border-border bg-surface-2/40">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted">
-                    Explore
-                  </p>
-                </div>
-                <div className="p-2">
-                  {moreLinks.map((link) => {
-                    const isActive =
-                      location.pathname === link.path ||
-                      location.pathname.startsWith(`${link.path}/`);
-                    return (
-                      <Link
-                        key={link.name}
-                        to={link.path}
-                        role="menuitem"
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'bg-brand/10 text-brand'
-                            : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
-                        }`}
-                      >
-                        <Icon icon={link.icon} width="18" height="18" />
-                        {link.name}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          {/* Search Button */}
-          <button 
-            onClick={() => setIsSearchOpen(true)}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
-            aria-label="Search"
-          >
-            <Icon icon="solar:magnifer-linear" width="19" height="19" />
-          </button>
-
-          {/* Theme Toggle */}
-          <button 
-            onClick={toggleTheme}
-            className="w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
-            aria-label="Toggle theme"
-          >
-            <Icon icon={theme === 'dark' ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="19" height="19" />
-          </button>
-
-          {isHome && (
-            <button
-              onClick={() => setIsMotionEnabled((enabled) => !enabled)}
-              className={`w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all active:scale-90 ${
-                isMotionEnabled
-                  ? 'bg-brand/10 text-brand hover:bg-brand/15'
-                  : 'text-text-muted hover:text-brand hover:bg-brand/10'
-              }`}
-              aria-label={isMotionEnabled ? 'Turn off homepage animations' : 'Turn on homepage animations'}
-              aria-pressed={isMotionEnabled}
-              title={isMotionEnabled ? 'Turn off homepage animations' : 'Turn on homepage animations'}
-            >
-              <span
-                className={`muvi-motion-toggle-kernel ${
-                  isMotionEnabled ? '' : 'muvi-motion-toggle-kernel--off'
-                }`}
-                aria-hidden="true"
-              />
-            </button>
-          )}
-
-          {isAuthenticated ? (
-            <div className="flex items-center gap-2 md:gap-3">
-              {/* Notification Bell */}
-              <button className="relative w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90">
-                <Icon icon="solar:bell-linear" width="19" height="19" />
-                {unreadNotifications && (
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
-                )}
+                <span>More</span>
+                <Icon
+                  icon="solar:alt-arrow-down-linear"
+                  width="13"
+                  height="13"
+                  className={`transition-transform duration-200 ${isMoreOpen ? 'rotate-180' : ''}`}
+                />
               </button>
 
-              {/* User Avatar & Dropdown */}
-              <div className="relative group/user">
-                <button
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  aria-label="Account menu"
-                  className="w-8.5 h-8.5 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs overflow-hidden transition-all active:scale-95 hover:ring-2 hover:ring-brand/40"
+              {/* Enhanced More Dropdown */}
+              {isMoreOpen && (
+                <div
+                  role="menu"
+                  className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-80 bg-surface border border-border/90 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]"
                 >
-                  {user.avatar_url ? (
-                    <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    user.name?.charAt(0) || 'U'
+                  <div className="p-3 divide-y divide-border/40 space-y-3">
+                    {moreCategories.map((cat, idx) => (
+                      <div key={cat.title} className={idx > 0 ? 'pt-3' : ''}>
+                        <p className="px-2.5 pb-1 text-[9px] font-black uppercase tracking-[0.2em] text-text-muted">
+                          {cat.title}
+                        </p>
+                        <div className="space-y-0.5">
+                          {cat.items.map((item) => {
+                            const isActive =
+                              location.pathname === item.path ||
+                              location.pathname.startsWith(`${item.path}/`);
+                            return (
+                              <Link
+                                key={item.name}
+                                to={item.path}
+                                role="menuitem"
+                                className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-all ${
+                                  isActive
+                                    ? 'bg-brand/10 text-brand'
+                                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
+                                }`}
+                              >
+                                <Icon icon={item.icon} width="17" height="17" className="mt-0.5 shrink-0 text-brand" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold leading-tight">{item.name}</p>
+                                  <p className="text-[10px] text-text-muted leading-tight mt-0.5 truncate">{item.desc}</p>
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Quick Search + Theme + Motion + User Actions */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Desktop Command/Search Trigger */}
+            <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-surface-2/70 hover:bg-surface-2 border border-border/80 hover:border-brand/40 text-text-muted hover:text-text-primary text-xs transition-all shadow-xs group cursor-pointer select-none"
+              aria-label="Search"
+              title="Search database (Press ⌘K or /)"
+            >
+              <Icon icon="solar:magnifer-linear" className="text-sm group-hover:text-brand transition-colors" />
+              <span className="text-[11px] font-medium text-text-muted group-hover:text-text-primary transition-colors">
+                Search films, plays, talent...
+              </span>
+              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-mono font-bold text-text-muted bg-surface border border-border/70 rounded">
+                <span>⌘</span>K
+              </kbd>
+            </button>
+
+            {/* Mobile Search Icon Only */}
+            <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="md:hidden w-8.5 h-8.5 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
+              aria-label="Search"
+            >
+              <Icon icon="solar:magnifer-linear" width="19" height="19" />
+            </button>
+
+            {/* Theme Toggle */}
+            <button 
+              onClick={toggleTheme}
+              className="w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90 cursor-pointer"
+              aria-label="Toggle theme"
+            >
+              <Icon icon={theme === 'dark' ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="19" height="19" />
+            </button>
+
+            {/* Motion toggle on Home */}
+            {isHome && (
+              <button
+                onClick={() => setIsMotionEnabled((enabled) => !enabled)}
+                className={`w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all active:scale-90 cursor-pointer ${
+                  isMotionEnabled
+                    ? 'bg-brand/10 text-brand hover:bg-brand/15'
+                    : 'text-text-muted hover:text-brand hover:bg-brand/10'
+                }`}
+                aria-label={isMotionEnabled ? 'Turn off homepage animations' : 'Turn on homepage animations'}
+                aria-pressed={isMotionEnabled}
+                title={isMotionEnabled ? 'Turn off homepage animations' : 'Turn on homepage animations'}
+              >
+                <span
+                  className={`muvi-motion-toggle-kernel ${
+                    isMotionEnabled ? '' : 'muvi-motion-toggle-kernel--off'
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
+            )}
+
+            {/* User Session */}
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2 md:gap-3">
+                {/* Notification Bell */}
+                <button className="relative w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90 cursor-pointer">
+                  <Icon icon="solar:bell-linear" width="19" height="19" />
+                  {unreadNotifications && (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
                   )}
                 </button>
 
-                {/* Hover tooltip */}
-                {!isUserMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 px-3 py-1.5 rounded-xl bg-surface border border-border shadow-xl whitespace-nowrap opacity-0 translate-y-1 pointer-events-none group-hover/user:opacity-100 group-hover/user:translate-y-0 transition-all duration-200 z-[105]">
-                    <p className="text-xs font-bold text-text-primary">{user.name}</p>
-                    <p className="text-[10px] font-bold text-brand tracking-wide">
-                      {user.role === 'user' ? 'Member'
-                        : user.role === 'professional' ? 'Pro'
-                        : user.role === 'admin' ? 'Admin'
-                        : user.role === 'admin_limited' ? 'Sub-Admin'
-                        : user.role}
-                    </p>
-                  </div>
-                )}
+                {/* User Avatar & Dropdown */}
+                <div className="relative group/user">
+                  <button
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    aria-label="Account menu"
+                    className="w-8.5 h-8.5 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs overflow-hidden transition-all active:scale-95 hover:ring-2 hover:ring-brand/40 cursor-pointer"
+                  >
+                    {user.avatar_url ? (
+                      <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      user.name?.charAt(0) || 'U'
+                    )}
+                  </button>
 
-                {/* User Dropdown Menu */}
-                {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-3 w-56 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]">
-                    <div className="p-4 border-b border-border bg-surface-2/50">
-                      <p className="text-sm font-bold text-text-primary line-clamp-1">{user.name}</p>
-                      <p className="text-xs text-text-muted line-clamp-1">{user.email}</p>
-                      {(user.role === 'admin' || user.role === 'admin_limited') && (
-                        <span className="mt-2 inline-block px-2 py-0.5 bg-brand/10 text-brand text-[10px] font-bold rounded tracking-wide">
-                          {user.role === 'admin' ? 'Admin' : 'Sub-Admin'}
-                        </span>
-                      )}
+                  {/* Hover tooltip */}
+                  {!isUserMenuOpen && (
+                    <div className="absolute right-0 top-full mt-2 px-3 py-1.5 rounded-xl bg-surface border border-border shadow-xl whitespace-nowrap opacity-0 translate-y-1 pointer-events-none group-hover/user:opacity-100 group-hover/user:translate-y-0 transition-all duration-200 z-[105]">
+                      <p className="text-xs font-bold text-text-primary">{user.name}</p>
+                      <p className="text-[10px] font-bold text-brand tracking-wide">
+                        {user.role === 'user' ? 'Member'
+                          : user.role === 'professional' ? 'Pro'
+                          : user.role === 'admin' ? 'Admin'
+                          : user.role === 'admin_limited' ? 'Sub-Admin'
+                          : user.role}
+                      </p>
                     </div>
-                    <div className="p-2">
-                      <Link 
-                        to={(user.role === 'admin' || user.role === 'admin_limited') ? "/admin" : (user.role === 'professional' ? "/pro-dashboard" : "/dashboard")} 
-                        className="flex items-center gap-3 px-3 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors"
-                      >
-                        <Icon icon="solar:user-linear" width="16" height="16" />
-                        Your Profile
-                      </Link>
-                      {(user.role === 'admin' || user.role === 'admin_limited') && (
-                        <Link to="/admin" className="flex items-center gap-3 px-3 py-2 text-xs font-semibold text-brand hover:bg-brand/5 rounded-lg transition-colors">
-                          <Icon icon="solar:clapperboard-play-linear" width="16" height="16" />
-                          Admin Panel
+                  )}
+
+                  {/* User Dropdown Menu */}
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 mt-3 w-56 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]">
+                      <div className="p-4 border-b border-border bg-surface-2/50">
+                        <p className="text-sm font-bold text-text-primary line-clamp-1">{user.name}</p>
+                        <p className="text-xs text-text-muted line-clamp-1">{user.email}</p>
+                        {(user.role === 'admin' || user.role === 'admin_limited') && (
+                          <span className="mt-2 inline-block px-2 py-0.5 bg-brand/10 text-brand text-[10px] font-bold rounded tracking-wide">
+                            {user.role === 'admin' ? 'Admin' : 'Sub-Admin'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-2 space-y-0.5">
+                        <Link 
+                          to={(user.role === 'admin' || user.role === 'admin_limited') ? "/admin" : (user.role === 'professional' ? "/pro-dashboard" : "/dashboard")} 
+                          className="flex items-center gap-3 px-3 py-2 text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors"
+                        >
+                          <Icon icon="solar:user-linear" width="16" height="16" />
+                          <span>Your Profile</span>
                         </Link>
-                      )}
-                      <button 
-                        onClick={logout}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-text-muted hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors mt-1"
-                      >
-                        <Icon icon="solar:logout-linear" width="16" height="16" />
-                        Logout
-                      </button>
+                        {(user.role === 'admin' || user.role === 'admin_limited') && (
+                          <Link to="/admin" className="flex items-center gap-3 px-3 py-2 text-xs font-semibold text-brand hover:bg-brand/5 rounded-lg transition-colors">
+                            <Icon icon="solar:clapperboard-play-linear" width="16" height="16" />
+                            <span>Admin Panel</span>
+                          </Link>
+                        )}
+                        <button 
+                          onClick={logout}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-text-muted hover:text-text-primary hover:bg-white/5 rounded-lg transition-colors mt-1 cursor-pointer"
+                        >
+                          <Icon icon="solar:logout-linear" width="16" height="16" />
+                          <span>Logout</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          ) : (
-            <Link 
-              to="/login"
-              className="px-3.5 sm:px-4 py-1 border border-brand text-brand hover:bg-brand hover:text-white rounded-full font-medium text-xs transition-all shadow-xs"
-            >
-              Sign In
-            </Link>
-          )}
+            ) : (
+              <Link 
+                to="/login"
+                className="px-3.5 sm:px-4 py-1 border border-brand text-brand hover:bg-brand hover:text-white rounded-full font-semibold text-xs transition-all shadow-xs"
+              >
+                Sign In
+              </Link>
+            )}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
 
-      {/* Search Overlay */}
+      {/* Global Search Overlay */}
       {isSearchOpen && (
         <div className="fixed inset-0 z-[150] flex flex-col pt-[64px] animate-in fade-in duration-300">
-          {/* Backdrop */}
           <div 
             className="absolute inset-0 bg-black/90 backdrop-blur-md"
             onClick={() => setIsSearchOpen(false)}
-          ></div>
+          />
           
-          {/* Content */}
           <div className="relative w-full max-w-4xl mx-auto px-4 mt-12 md:mt-24">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="font-heading text-2xl md:text-3xl text-text-primary">Search</h2>
+              <div>
+                <h2 className="font-heading text-2xl md:text-3xl text-text-primary">Search MuviDB</h2>
+                <p className="text-xs text-text-muted mt-1">Films, stage plays, talent, cinemas &amp; industry intelligence</p>
+              </div>
               <button 
                 onClick={() => setIsSearchOpen(false)}
-                className="w-12 h-12 flex items-center justify-center text-text-muted hover:text-text-primary bg-white/5 hover:bg-white/10 rounded-full transition-all"
+                className="w-12 h-12 flex items-center justify-center text-text-muted hover:text-text-primary bg-white/5 hover:bg-white/10 rounded-full transition-all cursor-pointer"
+                aria-label="Close search"
               >
                 <Icon icon="solar:close-circle-linear" width="28" height="28" />
               </button>
@@ -361,7 +428,7 @@ export default function Navbar() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search films, actors, directors..."
+                placeholder="Search films, plays, directors, venues, actors..."
                 className="w-full bg-white/5 border-2 border-white/10 focus:border-brand rounded-3xl py-6 pl-16 pr-6 text-xl md:text-2xl text-text-primary placeholder-text-muted outline-none transition-all shadow-2xl"
               />
             </form>
@@ -377,7 +444,7 @@ export default function Navbar() {
                       navigate(`/search?q=${encodeURIComponent(term)}`);
                       setIsSearchOpen(false);
                     }}
-                    className="px-5 py-2.5 bg-white/5 hover:bg-brand hover:text-white border border-white/10 rounded-xl text-sm text-text-secondary transition-all active:scale-95"
+                    className="px-5 py-2.5 bg-white/5 hover:bg-brand hover:text-white border border-white/10 rounded-xl text-sm text-text-secondary transition-all active:scale-95 cursor-pointer"
                   >
                     {term}
                   </button>
@@ -386,17 +453,17 @@ export default function Navbar() {
             </div>
 
             <div className="mt-8 pt-6 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs text-text-muted">Looking for complex multi-criteria, box office, or collaborations?</span>
+              <span className="text-xs text-text-muted">Looking for multi-criteria filters or box office benchmarks?</span>
               <button
                 type="button"
                 onClick={() => {
                   setIsSearchOpen(false);
                   navigate('/advanced-search');
                 }}
-                className="text-xs font-bold text-brand hover:underline flex items-center gap-1.5"
+                className="text-xs font-bold text-brand hover:underline flex items-center gap-1.5 cursor-pointer"
               >
                 <Icon icon="solar:tuning-square-2-bold" />
-                <span>Open Advanced Search &amp; Collaborations &rarr;</span>
+                <span>Open Advanced Search &rarr;</span>
               </button>
             </div>
           </div>
