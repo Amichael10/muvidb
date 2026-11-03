@@ -8,6 +8,7 @@ import SEO from '../components/SEO';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import CriticReviewsSection from '../components/film/CriticReviewsSection';
 import ReviewSection from '../components/film/ReviewSection';
+import MobilePlayDetailView from '../components/plays/mobile/MobilePlayDetailView';
 
 export default function PlayDetail() {
   const { slug } = useParams();
@@ -107,6 +108,15 @@ export default function PlayDetail() {
         description={play.synopsis || `Explore stage play production details, playwright ${play.playwright}, director ${play.director}, and ensemble cast on MuviDB.`}
       />
 
+      {/* Mobile-First Stage Experience (< md) */}
+      <MobilePlayDetailView
+        play={play}
+        playDateLabel={playDateLabel}
+        uniquePerformers={uniquePerformers}
+      />
+
+      {/* Desktop Stage Experience (>= md) */}
+      <div className="hidden md:block">
       {/* Play Hero Header */}
       <section className="relative border-b border-border bg-surface/40 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
@@ -285,6 +295,7 @@ export default function PlayDetail() {
 
         {/* Audience Reviews & Reactions */}
         <ReviewSection playId={play.id} currentUser={user} filmTitle={play.title} />
+      </div>
       </div>
 
       {/* Theatrical Box Office Breakdown Modal */}

@@ -6,6 +6,7 @@ import PopcornField from '../components/ui/PopcornField'
 import PageHeader from '../components/ui/PageHeader'
 import { Icon } from '@iconify/react'
 import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isPublicCinemaShowtime } from '../utils/showtimes'
+import MobileShowtimesView from '../components/showtimes/mobile/MobileShowtimesView'
 
 const formatTime = (timeStr) => {
     if (!timeStr) return ''
@@ -265,6 +266,27 @@ const Showtimes = () => {
     return (
         <div className="min-h-screen bg-bg relative">
             <PopcornField />
+
+            {/* Mobile-First Showtimes (< md) */}
+            <MobileShowtimesView
+                groupedByFilm={groupedByFilm}
+                loading={loading}
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                selectedCity={selectedCity}
+                setSelectedCity={setSelectedCity}
+                selectedCinema={selectedCinema}
+                setSelectedCinema={setSelectedCinema}
+                selectedFormat={selectedFormat}
+                setSelectedFormat={setSelectedFormat}
+                next7Days={next7Days}
+                cities={cities}
+                cinemas={cinemas}
+                formats={formats}
+            />
+
+            {/* Desktop Showtimes (>= md) */}
+            <div className="hidden md:block">
             <PageHeader
                 icon="solar:ticket-bold"
                 eyebrow="In theatres"
@@ -418,6 +440,7 @@ const Showtimes = () => {
                     </div>
                 </div>
 
+            </div>
             </div>
         </div>
     )

@@ -5,6 +5,7 @@ import { Icon } from '@iconify/react';
 import { fetchPlays, getPlayDateLabel } from '../lib/plays';
 import SEO from '../components/SEO';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
+import MobilePlaysListView from '../components/plays/mobile/MobilePlaysListView';
 
 function PlayCard({ play }) {
   const isRunning = play.status === 'currently_running';
@@ -198,8 +199,26 @@ export default function PlaysList() {
         description="Explore Nigerian and African stage plays, theatrical productions, musicals, and live performances worldwide. Track actor stage credits, upcoming runs, and theatre archives."
       />
 
-      {/* Hero Header */}
-      <section className="relative overflow-hidden border-b border-border bg-bg px-4 sm:px-6 lg:px-8">
+      {/* Mobile-First Repertoire View (< md) */}
+      <MobilePlaysListView
+        plays={plays}
+        loading={loading}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        selectedCity={selectedCity}
+        setSelectedCity={setSelectedCity}
+        search={search}
+        setSearch={setSearch}
+        counts={counts}
+        popularCities={popularCities}
+        filtered={filtered}
+        featuredPlay={featuredPlay}
+      />
+
+      {/* Desktop Repertoire View (>= md) */}
+      <div className="hidden md:block">
+        {/* Hero Header */}
+        <section className="relative overflow-hidden border-b border-border bg-bg px-4 sm:px-6 lg:px-8">
         <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none" />
         <div className="max-w-7xl mx-auto py-12 md:py-16 relative z-10">
           <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-12 items-center">
@@ -519,6 +538,7 @@ export default function PlaysList() {
             </section>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
