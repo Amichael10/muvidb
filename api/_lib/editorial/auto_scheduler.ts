@@ -25,7 +25,7 @@ const SYSTEM_ACTOR = {
  * it searches candidate pools and upcoming films for the next latest eligible movie
  * so that no slot is ever wasted.
  */
-async function resolveEligibleCandidate(options: {
+export async function resolveEligibleCandidate(options: {
   slot: any;
   seriesSlug: string;
   claimedCandidateIds: Set<string>;

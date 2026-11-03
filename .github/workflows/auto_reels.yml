@@ -1,0 +1,61 @@
+name: Autonomous Editorial Reels Pre-Renderer
+
+on:
+  schedule:
+    # 23:30 WAT (UTC+1) = 22:30 UTC every night
+    # Runs 30 mins after daily_social_schedule plans the rolling calendar
+    - cron: '30 22 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Number of days ahead to pre-render reels for'
+        required: false
+        default: '3'
+
+concurrency:
+  group: auto-reels-renderer
+  cancel-in-progress: false
+
+jobs:
+  pre-render-reels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install System Dependencies (FFmpeg)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install NPM Dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Pre-Render Rolling Editorial Reels
+        run: |
+          DAYS="${{ github.event.inputs.days || '3' }}"
+          echo "Pre-rendering editorial reels for next $DAYS days..."
+          npx tsx scripts/auto_render_editorial_reels.ts "$DAYS"

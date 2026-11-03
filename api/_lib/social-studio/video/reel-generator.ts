@@ -8,6 +8,7 @@ import os from 'node:os';
 import { supabase } from '../../supabase.js';
 import { uploadToR2 } from '../../r2.js';
 import type { UpcomingMovieSnapshot } from '../content/snapshots.js';
+import { recommendInstagramAudioForContent, type InstagramAudioTrack } from '../platforms/instagram-audio.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -51,6 +52,7 @@ export type RenderedReelResult = {
   height: number;
   durationSec: number;
   fileSizeBytes: number;
+  audioTrack?: InstagramAudioTrack | null;
 };
 
 function buildReelHtml(params: {
@@ -379,6 +381,26 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
   const totalFrames = durationSec * fps;
   const snap = options.snapshot;
 
+  let audioStreamUrl = options.audioStreamUrl;
+  let recommendedAudio: InstagramAudioTrack | null = null;
+  if (!audioStreamUrl) {
+    try {
+      const rec = await recommendInstagramAudioForContent({
+        title: snap.title,
+        genres: snap.genres,
+        synopsis: snap.overview,
+        contentType: options.seriesLabel === 'Now Streaming' ? 'where_to_watch' : 'upcoming_movie',
+      });
+      if (rec.recommended?.previewUrl) {
+        audioStreamUrl = rec.recommended.previewUrl;
+        recommendedAudio = rec.recommended;
+        console.log(`[reel-generator] Selected trending audio for "${snap.title}": "${rec.recommended.title}" by ${rec.recommended.artist}`);
+      }
+    } catch (audioErr: any) {
+      console.warn(`[reel-generator] Audio recommendation warning for "${snap.title}":`, audioErr?.message);
+    }
+  }
+
   const posterUrl = (snap.posterUrl || snap.backdropUrl || '').trim();
   if (!posterUrl) {
     throw new Error(`Film "${snap.title}" does not have a poster URL for Reel generation.`);
@@ -399,8 +421,6 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
     const possibleLogoPaths = [
       path.join(process.cwd(), 'public', 'brand', 'White Logo.png'),
       path.join(process.cwd(), 'api', '_lib', 'decor', 'White Logo.png'),
-      path.join(__dirname, '..', '..', 'decor', 'White Logo.png'),
-      path.join(__dirname, '..', 'decor', 'White Logo.png'),
     ];
     for (const lp of possibleLogoPaths) {
       try {
@@ -469,9 +489,9 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
     }
 
     let audioFilePath: string | null = null;
-    if (options.audioStreamUrl && !options.audioStreamUrl.includes('instagram.com/reels/audio')) {
+    if (audioStreamUrl && !audioStreamUrl.includes('instagram.com/reels/audio')) {
       try {
-        const aRes = await fetch(options.audioStreamUrl, { signal: AbortSignal.timeout(8000) });
+        const aRes = await fetch(audioStreamUrl, { signal: AbortSignal.timeout(15000) });
         if (aRes.ok) {
           const aBuf = Buffer.from(await aRes.arrayBuffer());
           audioFilePath = path.join(workDir, 'track.m4a');
@@ -513,7 +533,7 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
         '-framerate', String(fps),
         '-i', framePattern,
         '-f', 'lavfi',
-        '-i', `aevalsrc=0.025*sin(2*PI*110*t)+0.018*sin(2*PI*164.81*t)+0.012*sin(2*PI*220*t):s=44100:d=${durationSec}`,
+        '-i', 'anullsrc=r=44100:cl=stereo',
         '-filter_complex', `[1:a]afade=t=in:st=0:d=0.6,afade=t=out:st=${durationSec - 1.0}:d=1.0[aout]`,
         '-map', '0:v:0',
         '-map', '[aout]',
@@ -550,13 +570,19 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
 
     let coverImageUrl: string | null = null;
     if (coverPngBuf) {
-      const coverBucket = process.env.SOCIAL_ASSET_BUCKET || 'social-published-assets';
+      try {
+        const covR2 = await uploadToR2(`social/covers/${options.contentItemId}-${Date.now()}.jpg`, coverPngBuf, 'image/jpeg');
+        coverImageUrl = covR2.url;
+      } catch {}
+      if (!coverImageUrl) {
+        const coverBucket = process.env.SOCIAL_ASSET_BUCKET || 'social-published-assets';
       const coverPath = `${options.contentItemId}/reel-cover-${Date.now()}.jpg`;
       const { error: covErr } = await supabase.storage
         .from(coverBucket)
         .upload(coverPath, coverPngBuf, { contentType: 'image/jpeg', upsert: true });
       if (!covErr) {
         coverImageUrl = supabase.storage.from(coverBucket).getPublicUrl(coverPath).data.publicUrl;
+      }
       }
     }
 
@@ -590,6 +616,7 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
       height: 1920,
       durationSec,
       fileSizeBytes: mp4Bytes.length,
+      audioTrack: recommendedAudio,
     };
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});

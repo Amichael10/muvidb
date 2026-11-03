@@ -363,6 +363,29 @@ export async function getPlatformPublishingCredentials(platform: string, connect
       connection = fallback.data;
       error = fallback.error;
     }
+  } else if (platform === 'facebook') {
+    // Primary Facebook page is Muvidb Africa
+    const res = await supabase
+      .from('social_connections')
+      .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at,connection_metadata,token_ciphertext,token_iv,token_auth_tag')
+      .eq('platform', 'facebook')
+      .ilike('display_name', '%muvidb%')
+      .in('status', ['connected', 'expired'])
+      .maybeSingle();
+    connection = res.data;
+    error = res.error;
+    if (!connection && !error) {
+      const fallback = await supabase
+        .from('social_connections')
+        .select('id,platform,display_name,username,external_account_id,profile_image_url,status,granted_scopes,token_expires_at,last_verified_at,connection_metadata,token_ciphertext,token_iv,token_auth_tag')
+        .eq('platform', 'facebook')
+        .in('status', ['connected', 'expired'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      connection = fallback.data;
+      error = fallback.error;
+    }
   } else {
     const res = await supabase
       .from('social_connections')

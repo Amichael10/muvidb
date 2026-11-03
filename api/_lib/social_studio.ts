@@ -948,7 +948,29 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       )
     : [];
 
-  if (variant.selected_asset_id) {
+  const isVideoVariant =
+    variant.platform_options?.asset_format === 'video_vertical_9_16' ||
+    Boolean(variant.platform_options?.video_url);
+
+  if (isVideoVariant) {
+    if (variant.platform_options?.video_url) {
+      assetUrl = variant.platform_options.video_url;
+    } else {
+      const { data: verticalAsset } = await supabase
+        .from('social_assets')
+        .select('id, public_url')
+        .eq('content_item_id', contentItem.id)
+        .in('format', ['video_vertical_9_16', 'vertical_9_16'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (verticalAsset?.public_url) {
+        assetUrl = verticalAsset.public_url;
+      }
+    }
+  }
+
+  if (!assetUrl && variant.selected_asset_id) {
     const { data: asset, error: assetError } = await supabase
       .from('social_assets')
       .select('public_url')
@@ -956,19 +978,6 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       .maybeSingle();
     if (assetError) throw assetError;
     assetUrl = asset?.public_url || null;
-  }
-
-  // If TikTok or YouTube and there is a vertical 9:16 asset in the content item, prefer it
-  if (['tiktok', 'youtube'].includes(variant.platform) && contentItem.id) {
-    const { data: verticalAsset } = await supabase
-      .from('social_assets')
-      .select('id, public_url')
-      .eq('content_item_id', contentItem.id)
-      .in('format', ['video_vertical_9_16', 'vertical_9_16'])
-      .maybeSingle();
-    if (verticalAsset?.public_url) {
-      assetUrl = verticalAsset.public_url;
-    }
   }
 
   if (!assetUrl) {
@@ -1666,10 +1675,12 @@ export async function syncContentItemWithSource(
     .from('social_platform_variants')
     .select('platform_options')
     .eq('content_item_id', contentItemId);
-  const isCustomCarousel = (existingVariants || []).some(
-    v => (v.platform_options as any)?.post_format === 'carousel'
+  const isProtectedFormat = (existingVariants || []).some(
+    v => (v.platform_options as any)?.post_format === 'carousel' ||
+         (v.platform_options as any)?.asset_format === 'video_vertical_9_16' ||
+         Boolean((v.platform_options as any)?.video_url)
   );
-  if (isCustomCarousel && !options.force) {
+  if (isProtectedFormat && !options.force) {
     return { updated: false, changes: [] };
   }
 
@@ -1860,7 +1871,7 @@ export async function syncContentItemWithSource(
       hashtags: freshContent.hashtags,
     };
 
-    if (newAssetId) {
+    if (newAssetId && (variant.platform_options as any)?.asset_format !== 'video_vertical_9_16' && !(variant.platform_options as any)?.video_url) {
       variantUpdates.selected_asset_id = newAssetId;
       variantUpdates.platform_options = {
         ...(variant.platform_options || {}),
@@ -4004,8 +4015,19 @@ export async function generateAndAttachReelForContentItem(
       video_url: renderedReel.publicUrl,
       cover_url: renderedReel.coverImageUrl || (variant.platform_options as any)?.cover_url || null,
     };
-    if (variant.platform === 'instagram' && input.instagramAudio) {
-      nextOptions.instagram_audio = input.instagramAudio;
+    const effectiveInstagramAudio =
+      input.instagramAudio ||
+      (renderedReel.audioTrack
+        ? {
+            audio_id: renderedReel.audioTrack.id,
+            title: renderedReel.audioTrack.title,
+            artist: renderedReel.audioTrack.artist,
+            audio_volume: 100,
+            video_volume: 0,
+          }
+        : null);
+    if (variant.platform === 'instagram' && effectiveInstagramAudio) {
+      nextOptions.instagram_audio = effectiveInstagramAudio;
     }
     await supabase
       .from('social_platform_variants')

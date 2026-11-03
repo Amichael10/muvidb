@@ -16,6 +16,7 @@ import ImageWithFallback from '../components/ui/ImageWithFallback';
 import HomeIntroSection from '../components/film/HomeIntroSection';
 import { collapseSeriesFilms } from '../utils/series';
 import { fetchPlays, getPlayDateLabel } from '../lib/plays';
+import MobileHomeFeed from '../components/home/mobile/MobileHomeFeed';
 
 // Below-fold sections — keep them out of the critical homepage JS chunk.
 const TopTenSection = lazy(() => import('../components/film/TopTenSection'));
@@ -904,7 +905,25 @@ export default function Home() {
     <div className="muvi-landing w-full pb-20 min-h-screen bg-[#0B0D10] text-[#E0E2E6]">
       <h1 className="sr-only">MuviDB | The Ultimate African Film & Entertainment Database</h1>
 
-      {/* 1. HERO (Progressive Above-the-Fold Loading) */}
+      {/* Mobile-First Experience (< md) */}
+      <MobileHomeFeed
+        featuredFilms={featuredFilms}
+        isHeroLoading={isHeroLoading}
+        inCinemas={inCinemas}
+        isCinemaLoading={isCinemaLoading}
+        newReleases={newReleases}
+        newToStream={newToStream}
+        youtubeFeed={youtubeFeed}
+        upcomingPlays={upcomingPlays}
+        isTheatreLoading={isTheatreLoading}
+        top10Films={top10Films}
+        comingSoon={comingSoon}
+        isLoadingPriority={isPriorityLoading}
+      />
+
+      {/* Desktop Experience (>= md) */}
+      <div className="hidden md:block">
+        {/* 1. HERO (Progressive Above-the-Fold Loading) */}
       <HeroSection
         featuredFilms={featuredFilms}
         isLoading={isHeroLoading}
@@ -1755,6 +1774,7 @@ export default function Home() {
           </div>
         )}
 
+      </div>
       </div>
 
       {/* 12. EXTERNAL LINK WARNING DIALOG MODAL (Issue 19) */}
