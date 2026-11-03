@@ -138,8 +138,15 @@ function simpleSpec(variant: SimpleEditorialVariant): HtmlTemplateSpec {
 }
 
 function getLibDir(): string {
+  if (typeof __dirname !== 'undefined' && existsSync(path.join(__dirname, 'social-html-templates'))) {
+    return __dirname;
+  }
+  const candidate = path.join(process.cwd(), 'api', '_lib');
+  if (existsSync(path.join(candidate, 'social-html-templates'))) {
+    return candidate;
+  }
   if (typeof __dirname !== 'undefined') return __dirname;
-  return path.join(process.cwd(), 'api', '_lib');
+  return candidate;
 }
 
 export function isHtmlSocialTemplate(slug: string | null | undefined): slug is keyof typeof HTML_SOCIAL_TEMPLATES {
@@ -481,20 +488,20 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
       }
     case 'critics_say':
       {
-        const review = film?.criticReview;
+        const review = film?.criticReview || (stage as any)?.criticReview;
         const destination = review?.socialHandle || review?.publication || review?.criticName || 'ORIGINAL REVIEW';
         const fullReview = String(destination).startsWith('@') ? destination : String(destination).toUpperCase();
         return {
           ...base,
           series: 'The Critic’s Take',
-          badge: 'CRITICISM',
+          badge: isPlay ? 'THEATRE CRITICISM' : 'CRITICISM',
           variant: 'critic-quote',
-          image: film?.posterUrl || image,
+          image: film?.posterUrl || (stage as any)?.posterUrl || image,
           imagePosition: 'center top',
           criticAvatar: review?.avatarUrl || '',
           title,
           quote: review?.quote || '',
-          status: review?.criticName || 'Film critic',
+          status: review?.criticName || (isPlay ? 'Theatre critic' : 'Film critic'),
           detail: review?.publication || review?.criticTitle || '',
           support: `FULL REVIEW → ${fullReview}`,
         };

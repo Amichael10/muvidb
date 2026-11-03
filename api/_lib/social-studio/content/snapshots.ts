@@ -140,6 +140,7 @@ export type TheatrePlaySnapshot = {
   year: number | null;
   topCast?: SnapshotCastMember[];
   creditedPeople?: SnapshotCreditedPerson[];
+  criticReview?: SnapshotCriticReview | null;
 };
 
 /**
@@ -612,6 +613,7 @@ export function buildTheatrePlaySnapshot(input: {
   play: Record<string, any>;
   credits?: Record<string, any>[];
   capturedAt: string;
+  criticReview?: SnapshotCriticReview | null;
 }): TheatrePlaySnapshot {
   const rawCredits = Array.isArray(input.credits) ? input.credits : [];
   const topCast: SnapshotCastMember[] = rawCredits
@@ -659,6 +661,7 @@ export function buildTheatrePlaySnapshot(input: {
     year: yearFrom(input.play),
     topCast,
     creditedPeople,
+    criticReview: input.criticReview || null,
   };
 }
 

@@ -1601,7 +1601,27 @@ async function loadPlaySource(playId: string, capturedAt: string) {
     .eq('play_id', playId)
     .order('billing_order', { ascending: true, nullsFirst: false });
 
-  return buildTheatrePlaySnapshot({ play, credits: credits || [], capturedAt });
+  const { data: review } = await supabase
+    .from('critic_reviews')
+    .select('id,quote,rating,critic_name,critic_title,avatar_url,publication,social_handle,review_url')
+    .eq('play_id', playId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const criticReview = review ? {
+    id: review.id,
+    quote: review.quote,
+    rating: review.rating === null ? null : Number(review.rating),
+    criticName: review.critic_name,
+    criticTitle: review.critic_title,
+    avatarUrl: review.avatar_url,
+    publication: review.publication,
+    socialHandle: review.social_handle,
+    reviewUrl: review.review_url,
+  } : null;
+
+  return buildTheatrePlaySnapshot({ play, credits: credits || [], capturedAt, criticReview });
 }
 
 function getAssetBucket(): string {
@@ -1998,10 +2018,10 @@ export async function refreshStreamingPoster(contentItemId: string, refresh: boo
 }
 
 export function defaultContentTypeForSeries(seriesSlug: string, candidateType: string): SocialContentType {
+  if (seriesSlug === 'critics_say' || seriesSlug === 'the_critic' || seriesSlug === 'one_film_two_takes') return 'critics_say';
   if (candidateType === 'play' || seriesSlug === 'whats_on_stage') return 'whats_on_stage';
   if (seriesSlug === 'audience_pulse') return 'audience_pulse';
   if (candidateType === 'person') return 'actor_spotlight';
-  if (seriesSlug === 'critics_say' || seriesSlug === 'the_critic' || seriesSlug === 'one_film_two_takes') return 'critics_say';
   if (seriesSlug === 'where_to_watch') return 'where_to_watch';
   if (seriesSlug === 'weekend_watchlist') return 'weekend_watchlist';
   if (seriesSlug === 'film_conversation' || seriesSlug === 'by_the_numbers' || seriesSlug === 'muvidb_by_the_numbers') return 'film_conversation';
@@ -2010,6 +2030,7 @@ export function defaultContentTypeForSeries(seriesSlug: string, candidateType: s
 }
 
 export function defaultTemplateSlugForSeries(seriesSlug: string, candidateType: string): string {
+  if (seriesSlug === 'critics_say' || seriesSlug === 'the_critic' || seriesSlug === 'one_film_two_takes') return 'critics-say-simple-v1';
   if (candidateType === 'play' || seriesSlug === 'whats_on_stage') return 'poster-only';
   const aliases: Record<string, string> = {
     behind_the_camera: 'behind-camera-simple-v1',
@@ -2121,6 +2142,7 @@ export async function generateSocialDraft(
   input: {
     contentType: SocialContentType;
     sourceEntityId: string;
+    sourceEntityType?: 'person' | 'film' | 'play';
     sourceEntityIds?: string[];
     criticReviewId?: string | null;
     templateSlug: string;
@@ -2133,13 +2155,13 @@ export async function generateSocialDraft(
 ) {
   if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
 
-  const sourceEntityType = SOURCE_ENTITY_TYPES[input.contentType];
+  const sourceEntityType = input.sourceEntityType || SOURCE_ENTITY_TYPES[input.contentType];
   const capturedAt = new Date().toISOString();
 
   // For stage plays alone, strictly bypass template designs and post using the poster alone with copy
   const isStagePlay =
-    sourceEntityType === 'play' ||
-    input.contentType === 'whats_on_stage';
+    (sourceEntityType === 'play' ||
+    input.contentType === 'whats_on_stage') && input.contentType !== 'critics_say';
 
   const requestedTemplateSlug = isStagePlay ? 'poster-only' : input.templateSlug;
 
@@ -3742,14 +3764,14 @@ export async function approveEditorialSlot(
       contentType = 'where_to_watch';
     }
   }
-  const isStagePlay = input.candidateType === 'play' || (contentType as string) === 'theatre_spotlight' || (contentType as string) === 'whats_on_stage';
+  const isStagePlay = (input.candidateType === 'play' || (contentType as string) === 'theatre_spotlight' || (contentType as string) === 'whats_on_stage') && seriesSlug !== 'critics_say';
   const templateSlug = isStagePlay ? 'poster-only' : (input.templateSlug || defaultTemplateSlugForSeries(seriesSlug, input.candidateType));
   // Editorial slots are rendered graphics, so TikTok is not a default
   // destination. An explicit `input.platforms` still wins.
   const platforms = input.platforms && input.platforms.length ? input.platforms : defaultPlatformsFor('graphic');
 
-  // Validate live theatre productions: reject archived / passed stage plays
-  if (input.candidateType === 'play' || (contentType as string) === 'theatre_spotlight' || (contentType as string) === 'whats_on_stage') {
+  // Validate live theatre productions: reject archived / passed stage plays for upcoming listings
+  if (isStagePlay) {
     const { data: play } = await supabase
       .from('plays')
       .select('id, title, status, run_start_date, run_end_date, year')
@@ -3816,6 +3838,7 @@ export async function approveEditorialSlot(
     {
       contentType,
       sourceEntityId: input.candidateId,
+      sourceEntityType: input.candidateType === 'play' ? 'play' : input.candidateType === 'person' ? 'person' : 'film',
       templateSlug,
       platforms,
       isAdHoc: true,

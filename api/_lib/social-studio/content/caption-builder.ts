@@ -484,6 +484,13 @@ function theatreBody(snapshot: TheatrePlaySnapshot, platform: SocialPlatform = '
   dateParts.push(`📍 Venue: ${location}`);
   lines.push(dateParts.join('\n'));
 
+  // 2b. Verified Critic Review (if available)
+  if (snapshot.criticReview?.quote) {
+    const critic = snapshot.criticReview.criticName || snapshot.criticReview.publication || 'The critics';
+    const stars = snapshot.criticReview.rating ? ` (${snapshot.criticReview.rating}/5 ⭐)` : '';
+    lines.push(`💬 What the critics are saying:\n"${snapshot.criticReview.quote.trim()}" — ${critic}${stars}`);
+  }
+
   // 3. Punchy Viral Stage Hook
   const { hookText, debateQuestion } = buildViralNarrative(null, snapshot.synopsis, snapshot.title, true);
   if (hookText) {
