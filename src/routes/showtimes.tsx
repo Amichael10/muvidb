@@ -21,6 +21,7 @@ export async function loader() {
           id, slug, title, year, poster_url,
           backdrop_url, average_rating, liked_percent,
           status, coming_soon, is_in_cinemas,
+          runtime_minutes, trailer_youtube_id,
           film_genres(genres(name))
         ),
         cinemas(

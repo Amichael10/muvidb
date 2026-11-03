@@ -1,164 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useLoaderData } from 'react-router-dom'
+import { useLoaderData } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Skeleton } from '../components/ui/Skeleton'
 import PopcornField from '../components/ui/PopcornField'
 import PageHeader from '../components/ui/PageHeader'
-import { Icon } from '@iconify/react'
-import { CINEMA_TIME_ZONE, getNext7Dates, getNextDate, getZonedClock, isPublicCinemaShowtime } from '../utils/showtimes'
+import { getNext7Dates, getZonedClock, isPublicCinemaShowtime } from '../utils/showtimes'
 import MobileShowtimesView from '../components/showtimes/mobile/MobileShowtimesView'
-
-const formatTime = (timeStr) => {
-    if (!timeStr) return ''
-    const [hours, minutes] = timeStr.split(':')
-    const h = parseInt(hours)
-    const ampm = h >= 12 ? 'PM' : 'AM'
-    const hour12 = h % 12 || 12
-    return `${hour12}:${minutes} ${ampm}`
-}
-
-const formatDate = (dateStr) => {
-    const date = new Date(`${dateStr}T00:00:00Z`)
-    const today = getZonedClock().date
-    const tomorrow = getNextDate(today)
-
-    if (dateStr === today) {
-        return 'Today'
-    }
-    if (dateStr === tomorrow) {
-        return 'Tomorrow'
-    }
-    return date.toLocaleDateString('en-NG', {
-        timeZone: CINEMA_TIME_ZONE,
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short'
-    })
-}
-
-const ShowtimeSkeleton = () => (
-    <div className="bg-surface rounded-xl overflow-hidden border border-border">
-        <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-border">
-            <div className="sm:w-48 lg:w-80 h-48 bg-surface-2/20 animate-pulse" />
-            <div className="flex-1 p-6 sm:p-8 space-y-4">
-                <Skeleton className="h-6 w-1/3" />
-                <Skeleton className="h-3 w-1/4" />
-                <div className="flex gap-2">
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-4 w-16" />
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                </div>
-            </div>
-        </div>
-    </div>
-)
-
-const ShowtimeGrid = ({ times }) => {
-    const [isExpanded, setIsExpanded] = useState(false)
-    const displayTimes = isExpanded ? times : times.slice(0, 4)
-    const hasMore = times.length > 4
-
-    return (
-        <div className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                {displayTimes.map(showtime => (
-                    <a
-                        key={showtime.id}
-                        href={showtime.ticket_url || '#'}
-                        target={showtime.ticket_url ? "_blank" : "_self"}
-                        rel="noopener noreferrer"
-                        className={`flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all text-center ${
-                            showtime.format !== 'Standard'
-                                ? 'bg-brand/10 border-brand/30 text-brand hover:bg-brand hover:text-white'
-                                : 'bg-surface border-border text-text-primary hover:border-brand hover:text-brand'
-                        } ${!showtime.ticket_url && 'cursor-default opacity-80'}`}
-                    >
-                        <span className="text-[10px] font-black tracking-tight">
-                            {formatTime(showtime.show_time)}
-                        </span>
-                        <span className="text-[8px] font-black uppercase tracking-widest mt-0.5 opacity-60">
-                            {showtime.format}
-                        </span>
-                    </a>
-                ))}
-            </div>
-            {hasMore && (
-                <button
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-surface-2/30 hover:bg-surface-2 border border-border hover:border-brand rounded-lg text-[9px] font-black uppercase tracking-[0.2em] text-text-muted hover:text-brand transition-all flex items-center justify-center gap-3 group shadow-sm"
-                >
-                    {isExpanded ? (
-                        <>
-                            <span>COLLAPSE TIMES</span>
-                            <span className="text-xs group-hover:-translate-y-0.5 transition-transform">↑</span>
-                        </>
-                    ) : (
-                        <>
-                            <span>+ {times.length - 4} MORE SHOWINGS</span>
-                            <span className="text-xs group-hover:translate-y-0.5 transition-transform">↓</span>
-                        </>
-                    )}
-                </button>
-            )}
-        </div>
-    )
-}
-
-const CinemaList = ({ filmCinemas }) => {
-    const [isExpanded, setIsExpanded] = useState(false)
-    const cinemasArray = Object.values(filmCinemas)
-    const displayCinemas = isExpanded ? cinemasArray : cinemasArray.slice(0, 3)
-    const hasMore = cinemasArray.length > 3
-
-    return (
-        <div className="space-y-6 mt-8">
-            {displayCinemas.map(({ cinema, times }) => (
-                <div key={cinema?.id} className="pt-6 border-t border-border/50 first:border-0 first:pt-0">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <Link to={`/cinemas/${cinema?.id}`} className="text-text-primary font-bold text-xs uppercase tracking-tight hover:text-brand transition-colors">
-                                {cinema?.name}
-                            </Link>
-                            <p className="text-text-muted text-[9px] font-black uppercase tracking-widest mt-0.5 flex items-center gap-1.5 opacity-60">
-                                <Icon icon="solar:map-point-linear" className="text-brand" width="10" />
-                                {cinema?.city} {cinema?.address && ` · ${cinema.address}`}
-                            </p>
-                        </div>
-                        {cinema?.google_maps_url && (
-                            <a href={cinema.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-brand text-[9px] font-black uppercase tracking-widest hover:underline">
-                                DIRECTIONS →
-                            </a>
-                        )}
-                    </div>
-
-                    <ShowtimeGrid times={times} />
-                </div>
-            ))}
-
-            {hasMore && (
-                <button
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    className="w-full py-4 border-2 border-dashed border-border rounded-xl text-[10px] font-black uppercase tracking-[0.2em] text-text-muted hover:text-brand hover:border-brand transition-all bg-surface-2/5 flex items-center justify-center gap-3 group mt-4"
-                >
-                    {isExpanded ? (
-                        <>
-                            <span>COLLAPSE CINEMA LIST</span>
-                            <span className="text-xs group-hover:-translate-y-0.5 transition-transform">↑</span>
-                        </>
-                    ) : (
-                        <>
-                            <span>+ {cinemasArray.length - 3} MORE CINEMAS SHOWING THIS</span>
-                            <span className="text-xs group-hover:translate-y-0.5 transition-transform">↓</span>
-                        </>
-                    )}
-                </button>
-            )}
-        </div>
-    )
-}
+import DesktopShowtimesView from '../components/showtimes/desktop/DesktopShowtimesView'
 
 const Showtimes = () => {
     const loaderData = useLoaderData()
@@ -172,11 +19,14 @@ const Showtimes = () => {
     )
     const [selectedCinema, setSelectedCinema] = useState('All')
     const [selectedFormat, setSelectedFormat] = useState('All')
+    const [selectedChain, setSelectedChain] = useState('All')
+    const [searchQuery, setSearchQuery] = useState('')
     const [cinemas, setCinemas] = useState(loaderData?.cinemas ?? [])
     const skipInitialFetch = useRef(seeded)
 
     const cities = ['All', 'Lagos', 'Abuja', 'Port Harcourt']
     const formats = ['All', 'Standard', 'IMAX', '3D', '4DX', 'Dolby']
+    const chains = ['All', 'Filmhouse', 'Genesis', 'Silverbird', 'Ozone', 'Blu Star', 'Kada', 'Viva']
     const cinemaClock = getZonedClock(currentTime)
     const next7Days = getNext7Dates(currentTime)
 
@@ -216,6 +66,7 @@ const Showtimes = () => {
           id, slug, title, year, poster_url,
           backdrop_url, average_rating, liked_percent,
           status, coming_soon, is_in_cinemas,
+          runtime_minutes, trailer_youtube_id,
           film_genres(genres(name))
         ),
         cinemas(
@@ -240,8 +91,18 @@ const Showtimes = () => {
             s.cinema_id === selectedCinema
         const matchFormat = selectedFormat === 'All' ||
             s.format === selectedFormat
+        const matchChain = selectedChain === 'All' ||
+            (s.cinemas?.name && s.cinemas.name.toLowerCase().includes(selectedChain.toLowerCase())) ||
+            (s.cinemas?.chain && s.cinemas.chain.toLowerCase().includes(selectedChain.toLowerCase()))
+
+        const q = searchQuery.trim().toLowerCase()
+        const matchQuery = !q ||
+            (s.films?.title && s.films.title.toLowerCase().includes(q)) ||
+            (s.cinemas?.name && s.cinemas.name.toLowerCase().includes(q)) ||
+            (s.cinemas?.city && s.cinemas.city.toLowerCase().includes(q))
+
         const isUpcoming = isPublicCinemaShowtime(s, cinemaClock)
-        return matchCity && matchDate && matchCinema && matchFormat && isUpcoming
+        return matchCity && matchDate && matchCinema && matchFormat && matchChain && matchQuery && isUpcoming
     })
 
     const groupedByFilm = filtered.reduce((acc, showtime) => {
@@ -260,6 +121,25 @@ const Showtimes = () => {
             }
         }
         acc[filmId].cinemas[cinemaId].times.push(showtime)
+        return acc
+    }, {})
+
+    const groupedByCinema = filtered.reduce((acc, showtime) => {
+        const cinemaId = showtime.cinema_id
+        if (!acc[cinemaId]) {
+            acc[cinemaId] = {
+                cinema: showtime.cinemas,
+                films: {}
+            }
+        }
+        const filmId = showtime.film_id
+        if (!acc[cinemaId].films[filmId]) {
+            acc[cinemaId].films[filmId] = {
+                film: showtime.films,
+                times: []
+            }
+        }
+        acc[cinemaId].films[filmId].times.push(showtime)
         return acc
     }, {})
 
@@ -287,160 +167,37 @@ const Showtimes = () => {
 
             {/* Desktop Showtimes (>= md) */}
             <div className="hidden md:block">
-            <PageHeader
-                icon="solar:ticket-bold"
-                eyebrow="In theatres"
-                title="Showtimes"
-                description="Experience Nollywood as it was meant to be seen. Real-time showtimes across all major cinema chains in Nigeria."
-            />
+                <PageHeader
+                    icon="solar:ticket-bold"
+                    eyebrow="In theatres"
+                    title="Showtimes"
+                    description="Experience Nollywood as it was meant to be seen. Real-time showtimes across all major cinema chains in Nigeria."
+                />
 
-            <div className="max-w-7xl mx-auto border-x border-border min-h-[600px] pb-20">
-                {/* Controls Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-border border-b border-border">
-                    {/* Date Sidebar */}
-                    <div className="lg:col-span-1 p-8 space-y-8 bg-surface-2/5">
-                        <div>
-                            <h3 className="text-text-muted text-[10px] font-black uppercase tracking-[0.2em] mb-4">SELECT DATE</h3>
-                            <div className="flex flex-row overflow-x-auto lg:flex-col gap-2 pb-2 scrollbar-hide shrink-0">
-                                {next7Days.map(date => (
-                                    <button
-                                        key={date}
-                                        onClick={() => setSelectedDate(date)}
-                                        className={`w-auto shrink-0 lg:w-full flex items-center justify-between gap-4 p-4 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                                            selectedDate === date
-                                                ? 'bg-brand text-white shadow-lg shadow-brand/20'
-                                                : 'bg-surface border border-border text-text-muted hover:text-text-primary'
-                                        }`}
-                                    >
-                                        <span>{formatDate(date)}</span>
-                                        {selectedDate === date && <span className="animate-pulse hidden lg:inline">→</span>}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Main Filters & Content */}
-                    <div className="lg:col-span-3">
-                        <div className="p-8 border-b border-border bg-surface-2/5">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {/* City filter */}
-                                <div className="space-y-2">
-                                    <label className="text-text-muted text-[9px] font-black uppercase tracking-widest pl-1">CITY</label>
-                                    <select
-                                        value={selectedCity}
-                                        onChange={e => setSelectedCity(e.target.value)}
-                                        className="w-full bg-surface border border-border text-text-primary rounded-lg px-4 py-3 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none transition-all"
-                                    >
-                                        {cities.map(city => (
-                                            <option key={city} value={city}>{city.toUpperCase()}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Cinema filter */}
-                                <div className="space-y-2">
-                                    <label className="text-text-muted text-[9px] font-black uppercase tracking-widest pl-1">CINEMA</label>
-                                    <select
-                                        value={selectedCinema}
-                                        onChange={e => setSelectedCinema(e.target.value)}
-                                        className="w-full bg-surface border border-border text-text-primary rounded-lg px-4 py-3 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none transition-all"
-                                    >
-                                        <option value="All">ALL CINEMAS</option>
-                                        {cinemas
-                                            .filter(c => selectedCity === 'All' || c.city === selectedCity)
-                                            .map(c => (
-                                                <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>
-                                            ))
-                                        }
-                                    </select>
-                                </div>
-
-                                {/* Format filter */}
-                                <div className="space-y-2">
-                                    <label className="text-text-muted text-[9px] font-black uppercase tracking-widest pl-1">EXPERIENCE</label>
-                                    <select
-                                        value={selectedFormat}
-                                        onChange={e => setSelectedFormat(e.target.value)}
-                                        className="w-full bg-surface border border-border text-text-primary rounded-lg px-4 py-3 text-[10px] font-black tracking-widest focus:border-brand focus:outline-none transition-all"
-                                    >
-                                        {formats.map(f => (
-                                            <option key={f} value={f}>{f.toUpperCase()}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="p-8 md:p-12">
-                            {/* Loading */}
-                            {loading ? (
-                                <div className="space-y-8">
-                                    {[1, 2, 3].map(i => <ShowtimeSkeleton key={i} />)}
-                                </div>
-                            ) : Object.keys(groupedByFilm).length === 0 ? (
-                                <div className="text-center py-32 bg-surface-2/10 rounded-xl border-2 border-dashed border-border">
-                                    <Icon icon="solar:masks-linear" className="text-4xl mx-auto mb-4 opacity-20 text-brand" />
-                                    <h3 className="text-text-muted font-black uppercase tracking-widest text-xs">No screenings archived for this search</h3>
-                                </div>
-                            ) : (
-                                <div className="space-y-12">
-                                    {Object.values(groupedByFilm).map(({ film, cinemas: filmCinemas }) => (
-                                        <div
-                                            key={film?.id}
-                                            className="group bg-surface rounded-xl overflow-hidden border border-border hover:border-brand transition-all shadow-sm"
-                                        >
-                                            {/* Film Header */}
-                                            <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x divide-border">
-                                                <Link
-                                                    to={`/films/${film?.slug || film?.id}`}
-                                                    className="sm:w-48 lg:w-80 flex-shrink-0 relative overflow-hidden"
-                                                >
-                                                    {film?.poster_url ? (
-                                                        <img
-                                                            src={film.poster_url}
-                                                            alt={film.title}
-                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full h-48 sm:h-full bg-surface-2 flex items-center justify-center">
-                                                            <Icon icon="solar:clapperboard-play-linear" className="text-4xl text-brand/30" />
-                                                        </div>
-                                                    )}
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-bg/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                </Link>
-
-                                                <div className="flex-1 p-6 sm:p-8">
-                                                    <div className="flex items-start justify-between gap-4 mb-4">
-                                                        <div>
-                                                            <Link
-                                                                to={`/films/${film?.slug || film?.id}`}
-                                                                className="text-text-primary font-bold text-xl uppercase tracking-tighter group-hover:text-brand transition-colors"
-                                                            >
-                                                                {film?.title}
-                                                            </Link>
-                                                            <p className="text-text-muted text-[10px] font-black uppercase tracking-widest mt-1">
-                                                                RELEASED: {film?.year}{film?.liked_percent != null ? ` • ${film.liked_percent}% LIKED` : ''}
-                                                            </p>
-                                                        </div>
-                                                        <span className="bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded border border-brand/30">
-                                                            IN CINEMAS
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Cinemas & Times */}
-                                                    <CinemaList filmCinemas={filmCinemas} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-x border-border min-h-[600px] pb-20">
+                    <DesktopShowtimesView
+                        groupedByFilm={groupedByFilm}
+                        groupedByCinema={groupedByCinema}
+                        loading={loading}
+                        selectedDate={selectedDate}
+                        setSelectedDate={setSelectedDate}
+                        selectedCity={selectedCity}
+                        setSelectedCity={setSelectedCity}
+                        selectedCinema={selectedCinema}
+                        setSelectedCinema={setSelectedCinema}
+                        selectedFormat={selectedFormat}
+                        setSelectedFormat={setSelectedFormat}
+                        selectedChain={selectedChain}
+                        setSelectedChain={setSelectedChain}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        next7Days={next7Days}
+                        cities={cities}
+                        cinemas={cinemas}
+                        formats={formats}
+                        CHAINS={chains}
+                    />
                 </div>
-
-            </div>
             </div>
         </div>
     )
