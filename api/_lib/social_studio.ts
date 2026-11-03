@@ -3688,14 +3688,14 @@ export async function cancelDraftAndJobs(contentItemId: string) {
 
       await supabase
         .from('social_platform_variants')
-        .update({ status: 'cancelled' })
+        .update({ status: 'skipped' })
         .in('id', variantIds)
         .neq('status', 'published');
     }
 
     await supabase
       .from('social_content_items')
-      .update({ status: 'cancelled' })
+      .update({ status: 'archived' })
       .eq('id', contentItemId)
       .neq('status', 'published');
   } catch (err: any) {
