@@ -145,24 +145,24 @@ export default function Navbar() {
   return (
     <>
       <nav 
-        className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 border-b
+        className={`fixed top-0 left-0 right-0 z-[100] h-[72px] transition-all duration-300 border-b
           ${isScrolled 
-            ? 'bg-surface/95 backdrop-blur-xl border-border shadow-md h-16 md:h-18' 
-            : 'bg-gradient-to-b from-bg/95 via-bg/60 to-transparent border-transparent h-18 md:h-20'}
+            ? 'bg-surface/95 backdrop-blur-xl border-border shadow-[0_8px_24px_rgba(0,0,0,0.25)]' 
+            : 'bg-gradient-to-b from-bg via-bg/80 to-bg/0 border-transparent'}
         `}
       >
-        <div className="max-w-[1440px] mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Left: Brand Logo (Crisp, generous scale) */}
-          <Link to="/" className="flex items-center group shrink-0 select-none mr-4">
+        <div className="max-w-[1440px] mx-auto h-full flex items-center gap-8 px-4 sm:px-6 lg:px-8">
+          {/* Left: Brand Logo */}
+          <Link to="/" className="flex items-center group shrink-0 select-none">
             <img 
               src={theme === 'light' ? "/images/MuviDB Brand/Wordmark.svg" : "/images/MuviDB Brand/White Wordmark.svg"}
               alt="MuviDB" 
-              className="h-8 sm:h-9 md:h-9.5 object-contain group-hover:scale-105 transition-all duration-300" 
+              className="h-8 sm:h-9 object-contain group-hover:opacity-90 transition-opacity duration-300" 
             />
           </Link>
 
-          {/* Center: Primary Links + More Pill (desktop lg+) */}
-          <div className="hidden lg:flex items-center gap-1.5 bg-surface-2/80 backdrop-blur-md border border-border/80 p-1.5 rounded-full shadow-sm">
+          {/* Left-aligned primary links with underline indicator (desktop lg+) */}
+          <div className="hidden lg:flex items-stretch h-full gap-1">
             {primaryLinks.map((link) => {
               const isActive =
                 location.pathname === link.path ||
@@ -171,32 +171,34 @@ export default function Navbar() {
                 <Link
                   key={link.name}
                   to={link.path}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap select-none
-                    ${isActive 
-                      ? 'bg-brand text-white shadow-sm scale-[1.02]' 
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/80'
-                    }
+                  className={`relative flex items-center px-3.5 text-[15px] font-semibold transition-colors duration-200 whitespace-nowrap select-none
+                    ${isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}
                   `}
                 >
                   {link.name}
+                  <span
+                    className={`absolute left-3.5 right-3.5 bottom-0 h-[3px] rounded-t-full bg-brand transition-all duration-300 origin-center
+                      ${isActive ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-50'}
+                    `}
+                  />
                 </Link>
               );
             })}
 
             {/* More Menu Trigger */}
-            <div className="relative" ref={moreMenuRef}>
+            <div className="relative flex items-stretch" ref={moreMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsMoreOpen((open) => !open)}
                 aria-expanded={isMoreOpen}
                 aria-haspopup="menu"
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap cursor-pointer select-none
-                  ${isMoreOpen || isMoreActive
-                    ? 'bg-brand text-white shadow-sm'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/80'
-                  }
+                className={`relative inline-flex items-center gap-1.5 px-3.5 text-[15px] font-semibold transition-colors duration-200 whitespace-nowrap cursor-pointer select-none
+                  ${isMoreOpen || isMoreActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}
                 `}
               >
+                {(isMoreOpen || isMoreActive) && (
+                  <span className="absolute left-3.5 right-3.5 bottom-0 h-[3px] rounded-t-full bg-brand" />
+                )}
                 <span>More</span>
                 <Icon
                   icon="solar:alt-arrow-down-linear"
@@ -210,7 +212,7 @@ export default function Navbar() {
               {isMoreOpen && (
                 <div
                   role="menu"
-                  className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-80 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]"
+                  className="absolute left-0 top-full mt-1 w-80 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]"
                 >
                   <div className="p-3 divide-y divide-border/40 space-y-3">
                     {moreCategories.map((cat, idx) => (
@@ -251,20 +253,20 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Right: Search Bar + Theme + Motion + User Actions */}
-          <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
-            {/* Desktop Command/Search Trigger */}
+          {/* Right: Search Field + Theme + Motion + User Actions */}
+          <div className="ml-auto flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Desktop search field (looks like an input, opens the search overlay) */}
             <button 
               onClick={() => setIsSearchOpen(true)}
-              className="hidden md:flex items-center gap-3 h-10 px-4 rounded-full bg-surface-2/80 hover:bg-surface-2 border border-border/80 hover:border-brand/50 text-text-muted hover:text-text-primary text-xs sm:text-sm font-medium transition-all shadow-xs group cursor-pointer select-none"
+              className="hidden md:flex items-center gap-3 h-11 w-64 xl:w-80 pl-4 pr-2 rounded-xl bg-surface-2/80 hover:bg-surface-2 border border-border hover:border-brand/50 text-text-muted hover:text-text-primary transition-all group cursor-text select-none"
               aria-label="Search"
               title="Search database (Press ⌘K or /)"
             >
-              <Icon icon="solar:magnifer-linear" className="text-base group-hover:text-brand transition-colors" />
-              <span className="text-xs text-text-muted group-hover:text-text-secondary transition-colors">
+              <Icon icon="solar:magnifer-linear" className="text-lg shrink-0 group-hover:text-brand transition-colors" />
+              <span className="flex-1 text-left text-sm text-text-muted truncate">
                 Search films, plays, talent...
               </span>
-              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono font-bold text-text-muted bg-surface border border-border/80 rounded">
+              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-2 py-1 text-[10px] font-mono font-bold text-text-muted bg-surface border border-border rounded-md">
                 <span>⌘</span>K
               </kbd>
             </button>
@@ -375,7 +377,7 @@ export default function Navbar() {
             ) : (
               <Link 
                 to="/login"
-                className="px-5 py-2 border border-brand text-brand hover:bg-brand hover:text-white rounded-full font-bold text-sm transition-all shadow-xs"
+                className="px-5 h-11 inline-flex items-center bg-brand hover:bg-brand/90 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-brand/20"
               >
                 Sign In
               </Link>

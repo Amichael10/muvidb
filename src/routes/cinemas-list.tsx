@@ -12,7 +12,7 @@ export { default } from '../pages/Cinemas';
 export async function loader() {
   const { data: cinemas, error } = await supabaseServer
     .from('cinemas')
-    .select('id, name, city, address, state, is_active, booking_url')
+    .select('id, name, city, address, state, is_active, booking_url, google_maps_url')
     .eq('is_active', true)
     .order('city')
     .order('name');
