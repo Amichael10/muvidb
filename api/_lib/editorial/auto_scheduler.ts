@@ -61,8 +61,8 @@ export async function resolveEligibleCandidate(options: {
     };
   }
 
-  // If a play or person is already assigned to the slot, keep it.
-  if (initialId && (initialType === 'play' || initialType === 'person')) {
+  // If a play or person is already assigned to the slot and NOT claimed, keep it.
+  if (initialId && !claimedCandidateIds.has(initialId) && (initialType === 'play' || initialType === 'person')) {
     return {
       candidateId: initialId,
       candidateType: initialType,
@@ -248,12 +248,25 @@ export async function autoScheduleDueCalendarSlots(now = new Date(), options: { 
     .from('social_calendar')
     .select('subject_entity_id')
     .gte('scheduled_date', recentCutoff)
-    .lt('scheduled_date', dateStr) // Only exclude items published or approved on past days
+    .lte('scheduled_date', dateStr) // Exclude items published or approved on past days and today
     .not('subject_entity_id', 'is', null)
     .in('status', ['published', 'approved']);
 
   for (const row of recentSlots || []) {
     if (row.subject_entity_id) claimedCandidateIds.add(row.subject_entity_id);
+  }
+
+  // Also query active/scheduled/published content items to prevent duplicate posts across series
+  const recentItemsCutoff = new Date(now.getTime() - 14 * 86_400_000).toISOString();
+  const { data: activeContentRows } = await supabase
+    .from('social_content_items')
+    .select('source_entity_id')
+    .gte('created_at', recentItemsCutoff)
+    .in('status', ['published', 'publishing', 'scheduled', 'approved', 'draft_ready'])
+    .not('source_entity_id', 'is', null);
+
+  for (const r of activeContentRows || []) {
+    if (r.source_entity_id) claimedCandidateIds.add(r.source_entity_id);
   }
 
   // Prioritize urgent slots over routine slots so breaking news / new releases never wait
@@ -272,6 +285,23 @@ export async function autoScheduleDueCalendarSlots(now = new Date(), options: { 
     // Defer auto-drafting of far-future evening slots so they don't block immediate publications or time out crons
     if (slotMinutes > maxMinutes) {
       continue;
+    }
+
+    // Zero-Duplicate Guarantee: If slot already has an approved/scheduled draft, do not regenerate
+    if (slot.draft_id) {
+      const { data: existingDraft } = await supabase
+        .from('social_content_items')
+        .select('id, status, source_entity_id')
+        .eq('id', slot.draft_id)
+        .maybeSingle();
+
+      if (existingDraft && ['approved', 'scheduled', 'publishing', 'published'].includes(existingDraft.status)) {
+        console.log(`[auto_scheduler] Slot ${slot.id} already has active draft ${existingDraft.id} (${existingDraft.status}). Marking slot approved.`);
+        await supabase.from('social_calendar').update({ status: 'approved' }).eq('id', slot.id);
+        if (existingDraft.source_entity_id) claimedCandidateIds.add(existingDraft.source_entity_id);
+        scheduledSlots.push(slot.id);
+        continue;
+      }
     }
 
     try {

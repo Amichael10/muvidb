@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { supabase } from '../api/_lib/supabase.js';
 import { resolveEligibleCandidate } from '../api/_lib/editorial/auto_scheduler.js';
-import { approveEditorialSlot } from '../api/_lib/social_studio.js';
+import { approveEditorialSlot, generateAndAttachReelForContentItem, scheduleContentItem } from '../api/_lib/social_studio.js';
 
 const SYSTEM_ACTOR = {
   id: '6e985a31-ca3b-42f2-80cc-faa2b7d3fb37',
@@ -66,6 +66,44 @@ export async function preRenderUpcomingReels(daysAhead: number = 7, startTomorro
         if (slot.subject_entity_id) claimedCandidateIds.add(slot.subject_entity_id);
         continue;
       }
+
+      // Draft exists but needs a reel attached and scheduled!
+      console.log(`Slot ${slot.id} has existing draft ${slot.draft_id} awaiting video reel render.`);
+      const seriesLabel = seriesSlug === 'new_and_upcoming' ? 'New & Upcoming' : 'Now Streaming';
+      try {
+        await generateAndAttachReelForContentItem(
+          {
+            contentItemId: slot.draft_id,
+            seriesLabel,
+          },
+          SYSTEM_ACTOR,
+        );
+
+        const targetMs = new Date(`${slot.scheduled_date}T${slot.scheduled_time || '11:00:00'}+01:00`).getTime();
+        const effectiveScheduledFor = targetMs <= Date.now()
+          ? new Date(Date.now() + 10_000).toISOString()
+          : new Date(targetMs).toISOString();
+
+        await scheduleContentItem(
+          { contentItemId: slot.draft_id, scheduledFor: effectiveScheduledFor },
+          SYSTEM_ACTOR,
+        );
+
+        await supabase
+          .from('social_calendar')
+          .update({
+            status: 'approved',
+            notes: `Attached 9:16 Reel and scheduled for ${slot.scheduled_date}`,
+          })
+          .eq('id', slot.id);
+
+        if (slot.subject_entity_id) claimedCandidateIds.add(slot.subject_entity_id);
+        console.log(`[auto_render_reels] Successfully attached reel and scheduled existing draft ${slot.draft_id}`);
+        continue;
+      } catch (attachErr: any) {
+        console.error(`[auto_render_reels] Failed to attach reel to existing draft ${slot.draft_id}:`, attachErr?.message || attachErr);
+        // Continue to resolve/re-draft below if attach failed
+      }
     }
 
     // Resolve eligible candidate
@@ -111,7 +149,8 @@ export async function preRenderUpcomingReels(daysAhead: number = 7, startTomorro
       SYSTEM_ACTOR,
     );
 
-    console.log(`[auto_render_reels] Successfully approved and rendered reel for "${candidateName}"! Draft ID: ${approvalResult.draft.contentItem.id}`);
+    const draftId = approvalResult.draft?.contentItem?.id || approvalResult.contentItem?.id;
+    console.log(`[auto_render_reels] Successfully approved and rendered reel for "${candidateName}"! Draft ID: ${draftId}`);
     claimedCandidateIds.add(candidateId);
   }
 

@@ -1303,8 +1303,8 @@ export async function runSocialPublisher(input: {
   const limit = Math.min(Math.max(input.limit || 10, 1), 25);
   let autoScheduleResult: Awaited<ReturnType<typeof import('./editorial/auto_scheduler.js')['autoScheduleDueCalendarSlots']>> | null = null;
 
-  // 1. Recover stale processing locks (e.g. jobs stuck in processing for > 2 mins from crashed runs)
-  const staleThreshold = new Date(now.getTime() - 2 * 60 * 1000).toISOString();
+  // 1. Recover stale processing locks (e.g. jobs stuck in processing for > 10 mins from crashed runs)
+  const staleThreshold = new Date(now.getTime() - 10 * 60 * 1000).toISOString();
   const { data: staleJobs } = await supabase
     .from('social_publish_jobs')
     .select('id,platform_variant_id')
@@ -1421,11 +1421,17 @@ export async function runSocialPublisher(input: {
   // 4. Zero-Approval Auto-Schedule: Only AFTER due publications have cleared the queue,
   // inspect un-drafted / unapproved calendar slots due soon for today, validate portrait
   // posters and credits, and auto-schedule them into variants.
-  try {
-    const { autoScheduleDueCalendarSlots } = await import('./editorial/auto_scheduler.js');
-    autoScheduleResult = await autoScheduleDueCalendarSlots(now);
-  } catch (autoSchedErr: any) {
-    console.warn('[social_studio] Auto-schedule due calendar slots warning:', autoSchedErr?.message || autoSchedErr);
+  const elapsedMs = Date.now() - now.getTime();
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+  if (!isServerless || elapsedMs < 25_000) {
+    try {
+      const { autoScheduleDueCalendarSlots } = await import('./editorial/auto_scheduler.js');
+      autoScheduleResult = await autoScheduleDueCalendarSlots(now);
+    } catch (autoSchedErr: any) {
+      console.warn('[social_studio] Auto-schedule due calendar slots warning:', autoSchedErr?.message || autoSchedErr);
+    }
+  } else {
+    console.log(`[social_studio] Serverless execution budget guard: skipping auto-schedule due slots (elapsed: ${elapsedMs}ms) to ensure clean 200 response.`);
   }
 
   return {
@@ -1871,7 +1877,10 @@ export async function syncContentItemWithSource(
       hashtags: freshContent.hashtags,
     };
 
-    if (newAssetId && (variant.platform_options as any)?.asset_format !== 'video_vertical_9_16' && !(variant.platform_options as any)?.video_url) {
+    // Strict Project Rule: Under NO condition set poster_only: true for films!
+    // poster_only is strictly reserved for stage plays (whats_on_stage).
+    const isStagePlayKind = item.content_type === 'whats_on_stage' || item.source_entity_type === 'play';
+    if (newAssetId && isStagePlayKind && (variant.platform_options as any)?.asset_format !== 'video_vertical_9_16' && !(variant.platform_options as any)?.video_url) {
       variantUpdates.selected_asset_id = newAssetId;
       variantUpdates.platform_options = {
         ...(variant.platform_options || {}),
@@ -3657,6 +3666,43 @@ export async function updateEditorialCalendarSlot(input: {
   return { success: true, slot: data };
 }
 
+export async function cancelDraftAndJobs(contentItemId: string) {
+  try {
+    const { data: variants } = await supabase
+      .from('social_platform_variants')
+      .select('id')
+      .eq('content_item_id', contentItemId);
+
+    const variantIds = (variants || []).map(v => v.id);
+    if (variantIds.length) {
+      await supabase
+        .from('social_publish_jobs')
+        .update({
+          status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          last_error_code: 'superseded_by_new_draft',
+          last_error_message: 'Superseded by a newer editorial draft for this slot.',
+        })
+        .in('platform_variant_id', variantIds)
+        .in('status', ['queued', 'retrying', 'processing']);
+
+      await supabase
+        .from('social_platform_variants')
+        .update({ status: 'cancelled' })
+        .in('id', variantIds)
+        .neq('status', 'published');
+    }
+
+    await supabase
+      .from('social_content_items')
+      .update({ status: 'cancelled' })
+      .eq('id', contentItemId)
+      .neq('status', 'published');
+  } catch (err: any) {
+    console.warn(`[cancelDraftAndJobs] Warning while cancelling draft ${contentItemId}:`, err?.message || err);
+  }
+}
+
 export async function approveEditorialSlot(
   input: {
     slotId: string;
@@ -3719,6 +3765,52 @@ export async function approveEditorialSlot(
     }
   }
 
+  // Zero-Duplicate Movie & Person Guarantee:
+  // If an active or published content item already exists for this candidate entity within the past 24 hours,
+  // do NOT generate a competing duplicate. Link the slot to the existing item and return.
+  const oneDayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const { data: existingActiveItems } = await supabase
+    .from('social_content_items')
+    .select('id, title, status, created_at, content_type')
+    .eq('source_entity_id', input.candidateId)
+    .in('status', ['published', 'publishing', 'scheduled', 'approved', 'draft_ready'])
+    .gte('created_at', oneDayAgo)
+    .order('created_at', { ascending: false });
+
+  if (existingActiveItems && existingActiveItems.length > 0) {
+    const existing = existingActiveItems[0];
+    console.log(`[approveEditorialSlot] Entity ${input.candidateId} already has active/published item ${existing.id} (${existing.status}). Re-using existing item to enforce Zero-Duplicate Rule.`);
+    if (input.slotId) {
+      await supabase
+        .from('social_calendar')
+        .update({
+          status: existing.status === 'published' ? 'published' : 'approved',
+          draft_id: existing.id,
+          notes: `Linked to existing active item ${existing.title} (${existing.status})`,
+        })
+        .eq('id', input.slotId);
+    }
+    return {
+      success: true,
+      contentItem: existing,
+      draft: null,
+      alreadyExisted: true,
+    };
+  }
+
+  // If replacing a previously drafted item on this slot, cancel the old draft and jobs
+  if (input.slotId) {
+    const { data: currentSlot } = await supabase
+      .from('social_calendar')
+      .select('draft_id')
+      .eq('id', input.slotId)
+      .maybeSingle();
+
+    if (currentSlot?.draft_id) {
+      await cancelDraftAndJobs(currentSlot.draft_id);
+    }
+  }
+
   // 1. Generate the draft (isAdHoc: true automatically marks content and variants approved)
   const draft = await generateSocialDraft(
     {
@@ -3777,30 +3869,46 @@ export async function approveEditorialSlot(
   }
 
   // 3b. Editorial Rule: New & Upcoming and Now Streaming must ALWAYS be 9:16 Video Reels (+ trending audio)
-  if (contentType === 'upcoming_movie' || contentType === 'where_to_watch') {
-    try {
-      await generateAndAttachReelForContentItem(
-        {
-          contentItemId: draft.contentItem.id,
-          seriesLabel: contentType === 'upcoming_movie' ? 'New & Upcoming' : 'Now Streaming',
-        },
-        actor,
-      );
-    } catch (reelErr: any) {
-      console.warn(`[social_studio] Auto-generating 9:16 Reel for ${contentType} warning:`, reelErr?.message || reelErr);
+  const isReelRequiredSeries = contentType === 'upcoming_movie' || contentType === 'where_to_watch';
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+  let hasVideoAsset = false;
+  if (isReelRequiredSeries) {
+    if (!isServerless) {
+      try {
+        await generateAndAttachReelForContentItem(
+          {
+            contentItemId: draft.contentItem.id,
+            seriesLabel: contentType === 'upcoming_movie' ? 'New & Upcoming' : 'Now Streaming',
+          },
+          actor,
+        );
+        hasVideoAsset = true;
+      } catch (reelErr: any) {
+        console.warn(`[social_studio] Auto-generating 9:16 Reel for ${contentType} warning:`, reelErr?.message || reelErr);
+      }
+    } else {
+      console.log(`[social_studio] Running on Vercel/serverless: skipping heavy 9:16 Reel render in approveEditorialSlot for ${draft.contentItem.id}. Will be rendered by external reel worker / GitHub Actions.`);
     }
   }
 
   // 4. Schedule the draft
-  // Recompute scheduledFor in case preceding async operations (like Reel rendering) took several minutes
-  const effectiveScheduledFor = targetMs <= Date.now()
-    ? new Date(Date.now() + 10_000).toISOString()
-    : new Date(targetMs).toISOString();
+  // CRITICAL RULE: If this is a reel-required series (upcoming_movie / where_to_watch),
+  // NEVER schedule it as a static image or poster! Wait until the 9:16 Reel is rendered by the background worker.
+  let scheduledItem = draft.contentItem;
+  if (isReelRequiredSeries && !hasVideoAsset) {
+    console.log(`[social_studio] Draft ${draft.contentItem.id} requires 9:16 Reel. Keeping in 'approved' status awaiting background reel rendering; NOT scheduling static image.`);
+  } else {
+    // Recompute scheduledFor in case preceding async operations (like Reel rendering) took several minutes
+    const effectiveScheduledFor = targetMs <= Date.now()
+      ? new Date(Date.now() + 10_000).toISOString()
+      : new Date(targetMs).toISOString();
 
-  const scheduledItem = await scheduleContentItem(
-    { contentItemId: draft.contentItem.id, scheduledFor: effectiveScheduledFor },
-    actor,
-  );
+    scheduledItem = await scheduleContentItem(
+      { contentItemId: draft.contentItem.id, scheduledFor: effectiveScheduledFor },
+      actor,
+    );
+  }
 
   // 5. Link to calendar slot
   if (input.slotId) {
@@ -3809,7 +3917,9 @@ export async function approveEditorialSlot(
       .update({
         status: 'approved',
         draft_id: draft.contentItem.id,
-        notes: `Scheduled ${draft.contentItem.title} for ${input.scheduledDate}`,
+        notes: isReelRequiredSeries && !hasVideoAsset
+          ? `Prepared draft awaiting 9:16 Reel: ${draft.contentItem.title} for ${input.scheduledDate}`
+          : `Scheduled ${draft.contentItem.title} for ${input.scheduledDate}`,
       })
       .eq('id', input.slotId);
   }
