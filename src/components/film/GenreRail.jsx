@@ -27,6 +27,7 @@ const GENRES = [
   { name: 'Biography', icon: 'solar:user-id-bold', color: 'from-emerald-500/20 to-emerald-600/5' },
   { name: 'Documentary', icon: 'solar:videocamera-record-bold', color: 'from-cyan-500/20 to-cyan-600/5' },
   { name: 'Animation', icon: 'solar:ghost-bold', color: 'from-lime-500/20 to-lime-600/5' },
+  { name: 'AI', icon: 'solar:cpu-bold', color: 'from-cyan-500/20 to-blue-600/5' },
 ];
 
 export default function GenreRail({ variant = 'grid' }) {

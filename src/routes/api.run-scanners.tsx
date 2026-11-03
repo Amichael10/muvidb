@@ -6,7 +6,7 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
 
 const ALLOWED_GENRES = [
   'Drama', 'Romance', 'Action', 'Comedy', 'Horror',
-  'Nollywood Epic', 'Thriller', 'Family', 'Crime', 'Sci-Fi', 'Documentary'
+  'Nollywood Epic', 'Thriller', 'Family', 'Crime', 'Sci-Fi', 'AI', 'Documentary'
 ];
 
 const ALLOWED_RATINGS = ['18+', '16+', '13+', 'PG', 'G'];
@@ -25,7 +25,7 @@ STRICT RULES:
 1. SYNOPSIS: Write a clean, high-quality, professional 2-4 sentence synopsis summarizing plot and central conflict.
    - Do NOT include hashtags, promotional text, YouTube URLs, channel names, actor lists, or 'subscribe' messages.
    - If you have NO plot information or context and cannot provide a factual summary, leave synopsis as an empty string "". DO NOT FABRICATE OR GUESS.
-2. GENRE: Choose the single best match from [Drama, Romance, Action, Comedy, Horror, Nollywood Epic, Thriller, Family, Crime, Sci-Fi, Documentary].
+2. GENRE: Choose the single best match from [Drama, Romance, Action, Comedy, Horror, Nollywood Epic, Thriller, Family, Crime, Sci-Fi, AI, Documentary].
 3. AGE RATING: Choose from [18+, 16+, 13+, PG, G].
 
 FILM DATA:

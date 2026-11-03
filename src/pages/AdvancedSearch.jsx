@@ -12,7 +12,7 @@ import { formatFilmTitle, toTitleCase } from '../utils/format';
 import { AFRICAN_COUNTRY_NAMES } from '../utils/africanCountries';
 
 const GENRE_OPTIONS = [
-  'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary',
+  'Action', 'Adventure', 'AI', 'Animation', 'Comedy', 'Crime', 'Documentary',
   'Drama', 'Epic', 'Family', 'Fantasy', 'History', 'Horror',
   'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'Traditional'
 ];

@@ -140,7 +140,7 @@ export const CONTENT_TYPE_OPTIONS = [
  * `optionsSource` on the field — and fall back to this.
  */
 export const GENRE_OPTIONS = [
-  'Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime',
+  'Action', 'Adventure', 'AI', 'Animation', 'Biography', 'Comedy', 'Crime',
   'Documentary', 'Drama', 'Epic', 'Faith', 'Family', 'Fantasy', 'Horror',
   'Juju & Supernatural', 'Melodrama', 'Musical', 'Mystery', 'Romance',
   'RomCom', 'Sci-Fi', 'Social Issue', 'Thriller', 'Urban',

@@ -15,6 +15,7 @@ export const ALLOWED_GENRES = [
   'Family',
   'Crime',
   'Sci-Fi',
+  'AI',
   'Documentary',
   'Adventure',
   'Fantasy',
@@ -107,7 +108,7 @@ RULES FOR SYNOPSIS:
 - Focus on the plot, main conflict, and themes of the movie.
 
 ALLOWED GENRES (Choose the single best one):
-Drama, Romance, Action, Comedy, Horror, Nollywood Epic, Thriller, Family, Crime, Sci-Fi, Documentary
+Drama, Romance, Action, Comedy, Horror, Nollywood Epic, Thriller, Family, Crime, Sci-Fi, AI, Documentary
 
 ALLOWED AGE RATINGS (Choose the single best one):
 18+, 16+, 13+, PG, G

@@ -48,7 +48,7 @@ For each item output an object with:
 - "title": the actual movie or episode title ONLY. NEVER output an actor's name as the movie title! (For example, in "OMO ALAAPA - Latest Yoruba Movie 2026, Itele | Ibrahim chatta", the movie title is "Omo Alaapa", NOT "Ibrahim Chatta"). Remove cast names, channel names, release years, and buzzwords ("Latest Yoruba Movie 2026", "Full Movie", "Nollywood", "HD", pipes/brackets, etc). PRESERVE episode/part/season numbers if present (e.g. "Si Olorun Episode 5"). Use Proper Case.
 - "cast": array of FULL actor names that appear in the title or description and are actually in this film. Proper Case. Use [] if none are clearly identifiable. Do NOT include the channel name or the uploader.
 - "director": the director's full name ONLY if explicitly credited (e.g. "Directed by …", "A film by …"). Otherwise null. Do NOT put the director in "cast".
-- "genres": array of genres mentioned or evident in the description or title (e.g. explicit "Genre: Drama, Epic", "A Yoruba Romantic Comedy", "Action Thriller"). Choose ONLY from standard genres: ["Drama", "Comedy", "Romance", "Action", "Thriller", "Horror", "Epic", "Crime", "Family", "Adventure", "Fantasy", "Mystery", "Sci-Fi", "Documentary"]. Return [] if none are identifiable.
+- "genres": array of genres mentioned or evident in the description or title (e.g. explicit "Genre: Drama, Epic", "A Yoruba Romantic Comedy", "Action Thriller"). Choose ONLY from standard genres: ["Drama", "Comedy", "Romance", "Action", "Thriller", "Horror", "Epic", "Crime", "Family", "Adventure", "Fantasy", "Mystery", "Sci-Fi", "AI", "Documentary"]. Return [] if none are identifiable.
 - "synopsis": a clean 1-3 sentence plot summary built ONLY from real plot information in the description. Strip hashtags, emojis, links, "subscribe"/channel promos, and keyword-stuffed name lists. Do NOT invent or guess a plot — if the description has no genuine plot description, return null.
 
 Example: "Premium Queen: YOU Will NOT Regret Watching This Mindblowing Mercy Kenneth 2026 New-nigerian Movies" becomes title "Premium Queen" with cast ["Mercy Kenneth"] and genres ["Drama"].
@@ -212,6 +212,7 @@ export async function attachGenresBatch(
         else if (/horror/i.test(clean)) match = genreMap.get('horror');
         else if (/crime/i.test(clean)) match = genreMap.get('crime');
         else if (/family/i.test(clean)) match = genreMap.get('family');
+        else if (/artificial intelligence|\bai\b/i.test(clean)) match = genreMap.get('ai');
       }
 
       if (match) {
