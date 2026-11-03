@@ -29,7 +29,7 @@ export default function Navbar() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+      setIsScrolled(window.scrollY > 15);
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
@@ -102,7 +102,7 @@ export default function Navbar() {
     }
   };
 
-  // Primary desktop navigation links (Stage Plays promoted to first-class navigation)
+  // Primary desktop navigation links
   const primaryLinks = [
     { name: 'Movies', path: '/browse' },
     { name: 'TV Shows', path: '/tv-shows' },
@@ -111,7 +111,7 @@ export default function Navbar() {
     { name: 'People', path: '/people' },
   ];
 
-  // Grouped secondary links for the enhanced More mega-dropdown
+  // Grouped secondary links for the More dropdown
   const moreCategories = [
     {
       title: 'Industry & Box Office',
@@ -147,22 +147,22 @@ export default function Navbar() {
       <nav 
         className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 border-b
           ${isScrolled 
-            ? 'bg-surface/90 backdrop-blur-xl border-border/80 shadow-sm h-14' 
-            : 'bg-gradient-to-b from-bg/90 via-bg/40 to-transparent border-transparent h-16'}
+            ? 'bg-surface/95 backdrop-blur-xl border-border shadow-md h-16 md:h-18' 
+            : 'bg-gradient-to-b from-bg/95 via-bg/60 to-transparent border-transparent h-18 md:h-20'}
         `}
       >
         <div className="max-w-[1440px] mx-auto h-full flex items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Left: Brand Logo */}
-          <Link to="/" className="flex items-center group shrink-0 select-none">
+          {/* Left: Brand Logo (Crisp, generous scale) */}
+          <Link to="/" className="flex items-center group shrink-0 select-none mr-4">
             <img 
               src={theme === 'light' ? "/images/MuviDB Brand/Wordmark.svg" : "/images/MuviDB Brand/White Wordmark.svg"}
               alt="MuviDB" 
-              className="h-7 sm:h-7.5 object-contain group-hover:scale-105 transition-all duration-300" 
+              className="h-8 sm:h-9 md:h-9.5 object-contain group-hover:scale-105 transition-all duration-300" 
             />
           </Link>
 
           {/* Center: Primary Links + More Pill (desktop lg+) */}
-          <div className="hidden lg:flex items-center gap-1 bg-surface-2/70 backdrop-blur-md border border-border/70 p-1 rounded-full shadow-xs">
+          <div className="hidden lg:flex items-center gap-1.5 bg-surface-2/80 backdrop-blur-md border border-border/80 p-1.5 rounded-full shadow-sm">
             {primaryLinks.map((link) => {
               const isActive =
                 location.pathname === link.path ||
@@ -171,10 +171,10 @@ export default function Navbar() {
                 <Link
                   key={link.name}
                   to={link.path}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap select-none
+                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap select-none
                     ${isActive 
-                      ? 'bg-brand text-white shadow-xs scale-[1.02]' 
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/70'
+                      ? 'bg-brand text-white shadow-sm scale-[1.02]' 
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/80'
                     }
                   `}
                 >
@@ -183,39 +183,39 @@ export default function Navbar() {
               );
             })}
 
-            {/* More Mega-Menu Trigger */}
+            {/* More Menu Trigger */}
             <div className="relative" ref={moreMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsMoreOpen((open) => !open)}
                 aria-expanded={isMoreOpen}
                 aria-haspopup="menu"
-                className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap cursor-pointer select-none
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 whitespace-nowrap cursor-pointer select-none
                   ${isMoreOpen || isMoreActive
-                    ? 'bg-brand text-white shadow-xs'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/70'
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-3/80'
                   }
                 `}
               >
                 <span>More</span>
                 <Icon
                   icon="solar:alt-arrow-down-linear"
-                  width="13"
-                  height="13"
+                  width="14"
+                  height="14"
                   className={`transition-transform duration-200 ${isMoreOpen ? 'rotate-180' : ''}`}
                 />
               </button>
 
-              {/* Enhanced More Dropdown */}
+              {/* More Dropdown */}
               {isMoreOpen && (
                 <div
                   role="menu"
-                  className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-80 bg-surface border border-border/90 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]"
+                  className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-80 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]"
                 >
                   <div className="p-3 divide-y divide-border/40 space-y-3">
                     {moreCategories.map((cat, idx) => (
                       <div key={cat.title} className={idx > 0 ? 'pt-3' : ''}>
-                        <p className="px-2.5 pb-1 text-[9px] font-black uppercase tracking-[0.2em] text-text-muted">
+                        <p className="px-2.5 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
                           {cat.title}
                         </p>
                         <div className="space-y-0.5">
@@ -228,16 +228,16 @@ export default function Navbar() {
                                 key={item.name}
                                 to={item.path}
                                 role="menuitem"
-                                className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-all ${
+                                className={`flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all ${
                                   isActive
                                     ? 'bg-brand/10 text-brand'
                                     : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
                                 }`}
                               >
-                                <Icon icon={item.icon} width="17" height="17" className="mt-0.5 shrink-0 text-brand" />
+                                <Icon icon={item.icon} width="18" height="18" className="mt-0.5 shrink-0 text-brand" />
                                 <div className="min-w-0">
                                   <p className="text-xs font-bold leading-tight">{item.name}</p>
-                                  <p className="text-[10px] text-text-muted leading-tight mt-0.5 truncate">{item.desc}</p>
+                                  <p className="text-[11px] text-text-muted leading-tight mt-0.5 truncate">{item.desc}</p>
                                 </div>
                               </Link>
                             );
@@ -251,47 +251,47 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Right: Quick Search + Theme + Motion + User Actions */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Right: Search Bar + Theme + Motion + User Actions */}
+          <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
             {/* Desktop Command/Search Trigger */}
             <button 
               onClick={() => setIsSearchOpen(true)}
-              className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-surface-2/70 hover:bg-surface-2 border border-border/80 hover:border-brand/40 text-text-muted hover:text-text-primary text-xs transition-all shadow-xs group cursor-pointer select-none"
+              className="hidden md:flex items-center gap-3 h-10 px-4 rounded-full bg-surface-2/80 hover:bg-surface-2 border border-border/80 hover:border-brand/50 text-text-muted hover:text-text-primary text-xs sm:text-sm font-medium transition-all shadow-xs group cursor-pointer select-none"
               aria-label="Search"
               title="Search database (Press ⌘K or /)"
             >
-              <Icon icon="solar:magnifer-linear" className="text-sm group-hover:text-brand transition-colors" />
-              <span className="text-[11px] font-medium text-text-muted group-hover:text-text-primary transition-colors">
+              <Icon icon="solar:magnifer-linear" className="text-base group-hover:text-brand transition-colors" />
+              <span className="text-xs text-text-muted group-hover:text-text-secondary transition-colors">
                 Search films, plays, talent...
               </span>
-              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-mono font-bold text-text-muted bg-surface border border-border/70 rounded">
+              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono font-bold text-text-muted bg-surface border border-border/80 rounded">
                 <span>⌘</span>K
               </kbd>
             </button>
 
-            {/* Mobile Search Icon Only */}
+            {/* Mobile Search Icon */}
             <button 
               onClick={() => setIsSearchOpen(true)}
-              className="md:hidden w-8.5 h-8.5 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
+              className="md:hidden w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90"
               aria-label="Search"
             >
-              <Icon icon="solar:magnifer-linear" width="19" height="19" />
+              <Icon icon="solar:magnifer-linear" width="21" height="21" />
             </button>
 
             {/* Theme Toggle */}
             <button 
               onClick={toggleTheme}
-              className="w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90 cursor-pointer"
+              className="w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90 cursor-pointer"
               aria-label="Toggle theme"
             >
-              <Icon icon={theme === 'dark' ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="19" height="19" />
+              <Icon icon={theme === 'dark' ? 'solar:sun-2-linear' : 'solar:moon-linear'} width="21" height="21" />
             </button>
 
-            {/* Motion toggle on Home */}
+            {/* Motion Toggle on Home */}
             {isHome && (
               <button
                 onClick={() => setIsMotionEnabled((enabled) => !enabled)}
-                className={`w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all active:scale-90 cursor-pointer ${
+                className={`w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-90 cursor-pointer ${
                   isMotionEnabled
                     ? 'bg-brand/10 text-brand hover:bg-brand/15'
                     : 'text-text-muted hover:text-brand hover:bg-brand/10'
@@ -311,12 +311,12 @@ export default function Navbar() {
 
             {/* User Session */}
             {isAuthenticated ? (
-              <div className="flex items-center gap-2 md:gap-3">
+              <div className="flex items-center gap-2.5">
                 {/* Notification Bell */}
-                <button className="relative w-8.5 h-8.5 sm:w-9 sm:h-9 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90 cursor-pointer">
-                  <Icon icon="solar:bell-linear" width="19" height="19" />
+                <button className="relative w-10 h-10 flex items-center justify-center text-text-secondary hover:text-brand hover:bg-brand/10 rounded-full transition-all active:scale-90 cursor-pointer">
+                  <Icon icon="solar:bell-linear" width="21" height="21" />
                   {unreadNotifications && (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
+                    <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand rounded-full border-2 border-surface"></span>
                   )}
                 </button>
 
@@ -325,7 +325,7 @@ export default function Navbar() {
                   <button
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                     aria-label="Account menu"
-                    className="w-8.5 h-8.5 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs overflow-hidden transition-all active:scale-95 hover:ring-2 hover:ring-brand/40 cursor-pointer"
+                    className="w-10 h-10 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-sm overflow-hidden transition-all active:scale-95 hover:ring-2 hover:ring-brand/40 cursor-pointer"
                   >
                     {user.avatar_url ? (
                       <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -333,20 +333,6 @@ export default function Navbar() {
                       user.name?.charAt(0) || 'U'
                     )}
                   </button>
-
-                  {/* Hover tooltip */}
-                  {!isUserMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 px-3 py-1.5 rounded-xl bg-surface border border-border shadow-xl whitespace-nowrap opacity-0 translate-y-1 pointer-events-none group-hover/user:opacity-100 group-hover/user:translate-y-0 transition-all duration-200 z-[105]">
-                      <p className="text-xs font-bold text-text-primary">{user.name}</p>
-                      <p className="text-[10px] font-bold text-brand tracking-wide">
-                        {user.role === 'user' ? 'Member'
-                          : user.role === 'professional' ? 'Pro'
-                          : user.role === 'admin' ? 'Admin'
-                          : user.role === 'admin_limited' ? 'Sub-Admin'
-                          : user.role}
-                      </p>
-                    </div>
-                  )}
 
                   {/* User Dropdown Menu */}
                   {isUserMenuOpen && (
@@ -389,7 +375,7 @@ export default function Navbar() {
             ) : (
               <Link 
                 to="/login"
-                className="px-3.5 sm:px-4 py-1 border border-brand text-brand hover:bg-brand hover:text-white rounded-full font-semibold text-xs transition-all shadow-xs"
+                className="px-5 py-2 border border-brand text-brand hover:bg-brand hover:text-white rounded-full font-bold text-sm transition-all shadow-xs"
               >
                 Sign In
               </Link>
@@ -400,7 +386,7 @@ export default function Navbar() {
 
       {/* Global Search Overlay */}
       {isSearchOpen && (
-        <div className="fixed inset-0 z-[150] flex flex-col pt-[64px] animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[150] flex flex-col pt-[72px] animate-in fade-in duration-300">
           <div 
             className="absolute inset-0 bg-black/90 backdrop-blur-md"
             onClick={() => setIsSearchOpen(false)}
@@ -409,7 +395,7 @@ export default function Navbar() {
           <div className="relative w-full max-w-4xl mx-auto px-4 mt-12 md:mt-24">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="font-heading text-2xl md:text-3xl text-text-primary">Search MuviDB</h2>
+                <h2 className="font-heading text-2xl md:text-3xl text-text-primary font-bold">Search MuviDB</h2>
                 <p className="text-xs text-text-muted mt-1">Films, stage plays, talent, cinemas &amp; industry intelligence</p>
               </div>
               <button 

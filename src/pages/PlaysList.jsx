@@ -14,7 +14,6 @@ export default function PlaysList() {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedCity, setSelectedCity] = useState('all');
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
 
   useEffect(() => {
     async function load() {
@@ -126,17 +125,14 @@ export default function PlaysList() {
 
       {/* Desktop Repertoire View (>= md) */}
       <div className="hidden md:block">
-        {/* Theatrical Curtain Header */}
-        <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-surface/50 via-bg to-bg px-4 sm:px-6 lg:px-8">
-          <div className="absolute inset-0 grid-bg opacity-15 pointer-events-none" />
-          <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-          
+        {/* Header Section */}
+        <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-surface/40 via-bg to-bg px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto py-12 md:py-16 relative z-10">
-            <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-12 items-center">
+            <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-10 lg:gap-12 items-center">
               <div className="max-w-2xl">
-                <div className="inline-flex items-center gap-2 border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-4">
+                <div className="inline-flex items-center gap-2 border border-brand/30 bg-brand/10 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-[0.2em] text-brand mb-4">
                   <Icon icon="solar:masks-bold" className="text-base" />
-                  <span>Live Stage &amp; Repertoire</span>
+                  <span>Stage Plays &amp; Repertoire</span>
                 </div>
                 
                 <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-text-primary leading-[1.05]">
@@ -144,11 +140,11 @@ export default function PlaysList() {
                 </h1>
                 
                 <p className="mt-4 text-sm sm:text-base text-text-muted leading-relaxed">
-                  Discover live theatrical productions across Lagos, London, Abuja, and beyond. Explore active runs at MUSON Centre and Terra Kulture, upcoming tours, and historic stage archives with full ensemble credits.
+                  Discover live theatrical performances across Lagos, London, Abuja and beyond. Browse active runs at MUSON Centre, Terra Kulture and the National Theatre, upcoming tours, and historic stage archives.
                 </p>
 
                 {/* Status Segment Tabs */}
-                <div className="mt-7 grid grid-cols-2 sm:grid-cols-5 border border-border bg-surface divide-x divide-y sm:divide-y-0 divide-border rounded-2xl overflow-hidden shadow-lg shadow-black/10">
+                <div className="mt-8 grid grid-cols-2 sm:grid-cols-5 border border-border bg-surface divide-x divide-y sm:divide-y-0 divide-border rounded-2xl overflow-hidden shadow-lg shadow-black/10">
                   {[
                     { id: 'all', label: 'All Plays', count: counts.all },
                     { id: 'currently_running', label: 'On Stage', count: counts.currently_running, highlight: 'emerald' },
@@ -192,23 +188,14 @@ export default function PlaysList() {
                 </div>
               </div>
 
-              {/* Featured Play Spotlight (Theatrical Playbill Marquee) */}
+              {/* Featured Play Spotlight (Clean, Cinematic Spotlight) */}
               {featuredPlay && (
                 <Link
                   to={`/plays/${featuredPlay.slug || featuredPlay.id}`}
-                  className="group block border border-border/90 hover:border-brand/70 bg-surface overflow-hidden rounded-2xl shadow-2xl shadow-black/30 transition-all duration-300 hover:-translate-y-1"
+                  className="group block border border-border/90 hover:border-brand/70 bg-surface overflow-hidden rounded-2xl shadow-xl shadow-black/20 transition-all duration-300 hover:-translate-y-1"
                 >
-                  {/* Top Playbill Header */}
-                  <div className="px-4 py-2 bg-gradient-to-r from-amber-500/20 via-surface-2 to-surface-2 border-b border-border/70 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">
-                    <span className="flex items-center gap-1.5">
-                      <Icon icon="solar:star-bold" className="text-xs" />
-                      Featured Production
-                    </span>
-                    <span className="text-text-muted">{featuredPlay.city || 'Nigeria'}</span>
-                  </div>
-
-                  <div className="grid grid-cols-[140px_1fr] sm:grid-cols-[180px_1fr] min-h-[240px]">
-                    <div className="relative bg-surface-2 overflow-hidden border-r border-dashed border-border/80">
+                  <div className="grid grid-cols-[140px_1fr] sm:grid-cols-[175px_1fr] min-h-[230px]">
+                    <div className="relative bg-surface-2 overflow-hidden">
                       <ImageWithFallback
                         src={featuredPlay.poster_url || featuredPlay.banner_url}
                         alt={featuredPlay.title}
@@ -216,23 +203,19 @@ export default function PlaysList() {
                         name={featuredPlay.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         width={384}
-                        sizes="180px"
+                        sizes="175px"
                       />
-                      <span className="absolute left-2 top-2 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-brand text-white shadow-md">
+                      <span className="absolute left-2.5 top-2.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-brand text-white shadow-md">
                         Spotlight
                       </span>
-
-                      {/* Notches */}
-                      <div className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-bg border border-border/80" />
-                      <div className="absolute -bottom-2.5 -right-2.5 w-5 h-5 rounded-full bg-bg border border-border/80" />
                     </div>
 
                     <div className="p-5 sm:p-6 flex flex-col justify-between min-w-0">
                       <div>
                         <span className="text-[10px] font-black uppercase tracking-[0.22em] text-brand block mb-1">
-                          {featuredPlay.genre || 'Theatrical Repertoire'}
+                          {featuredPlay.genre || 'Stage Production'}
                         </span>
-                        <h2 className="text-xl sm:text-2xl font-black font-heading tracking-tight text-text-primary group-hover:text-brand transition-colors line-clamp-2 leading-tight">
+                        <h2 className="text-xl font-black font-heading tracking-tight text-text-primary group-hover:text-brand transition-colors line-clamp-2 leading-snug">
                           {featuredPlay.title}
                         </h2>
                         {(featuredPlay.director || featuredPlay.playwright) && (
@@ -245,7 +228,7 @@ export default function PlaysList() {
                         </p>
                       </div>
 
-                      <div className="pt-4 mt-3 border-t border-border/40 flex flex-wrap gap-2 text-[10px] font-bold text-text-muted">
+                      <div className="pt-4 mt-2 border-t border-border/40 flex flex-wrap gap-2 text-[10px] font-bold text-text-muted">
                         <span className="border border-border bg-bg/80 px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-text-secondary">
                           <Icon icon="solar:calendar-minimalistic-bold" className="text-brand text-xs" />
                           {getPlayDateLabel(featuredPlay, 'Date TBA')}
@@ -263,7 +246,7 @@ export default function PlaysList() {
           </div>
         </section>
 
-        {/* Discovery & Filter Bar */}
+        {/* Discovery & Search Bar */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border/80">
             {/* City / Venue Pills */}
@@ -278,7 +261,7 @@ export default function PlaysList() {
                   <button
                     key={c}
                     onClick={() => setSelectedCity(c)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold capitalize whitespace-nowrap transition-colors cursor-pointer select-none ${
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold capitalize whitespace-nowrap transition-colors cursor-pointer select-none ${
                       isSelected
                         ? 'bg-brand text-white shadow-xs'
                         : 'bg-surface border border-border text-text-muted hover:text-text-primary hover:border-brand/40'
@@ -290,52 +273,19 @@ export default function PlaysList() {
               })}
             </div>
 
-            {/* Right Controls: View Mode Switcher + Live Search */}
-            <div className="flex items-center gap-3 shrink-0">
-              {/* Dual View Mode: Playbill Grid vs Schedule List */}
-              <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-xl border border-border/60">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grid')}
-                  title="Playbill Gallery (Grid)"
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
-                    viewMode === 'grid'
-                      ? 'bg-brand text-white shadow-xs'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  <Icon icon="solar:widget-2-bold" className="text-sm" />
-                  <span>Playbills</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('list')}
-                  title="Repertoire Schedule (List)"
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
-                    viewMode === 'list'
-                      ? 'bg-brand text-white shadow-xs'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  <Icon icon="solar:list-bold" className="text-sm" />
-                  <span>Schedule</span>
-                </button>
-              </div>
-
-              {/* Search Input */}
-              <div className="relative w-full md:w-72 group">
-                <Icon
-                  icon="solar:magnifer-linear"
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-brand transition-colors text-sm"
-                />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search play, playwright, venue..."
-                  className="w-full h-10 bg-surface border border-border rounded-xl pl-10 pr-4 text-xs text-text-primary outline-none placeholder:text-text-muted focus:border-brand transition-colors"
-                />
-              </div>
+            {/* Search Input */}
+            <div className="relative w-full md:w-80 group">
+              <Icon
+                icon="solar:magnifer-linear"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-brand transition-colors text-base"
+              />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search play, venue, playwright..."
+                className="w-full h-11 bg-surface border border-border rounded-xl pl-10 pr-4 text-xs sm:text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-brand transition-colors shadow-xs"
+              />
             </div>
           </div>
 
@@ -350,7 +300,7 @@ export default function PlaysList() {
               </div>
               <h3 className="text-xl font-bold text-text-primary mb-1">No theatrical productions found</h3>
               <p className="text-xs text-text-muted max-w-sm mx-auto leading-relaxed">
-                No stage plays match your search query or location filter. Try clearing filters or selecting another location.
+                No stage plays match your search query or location filter.
               </p>
               {(search || selectedCity !== 'all' || activeTab !== 'all') && (
                 <button
@@ -379,9 +329,9 @@ export default function PlaysList() {
                 </div>
               </div>
 
-              <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "space-y-4"}>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 {filtered.map((play) => (
-                  <DesktopPlayCard key={play.id} play={play} mode={viewMode} />
+                  <DesktopPlayCard key={play.id} play={play} />
                 ))}
               </div>
             </div>
@@ -420,9 +370,9 @@ export default function PlaysList() {
                     <p className="text-xs text-text-muted mt-1">Check the upcoming productions below for dates and venue announcements.</p>
                   </div>
                 ) : (
-                  <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "space-y-4"}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                     {runningPlays.map((play) => (
-                      <DesktopPlayCard key={play.id} play={play} mode={viewMode} />
+                      <DesktopPlayCard key={play.id} play={play} />
                     ))}
                   </div>
                 )}
@@ -457,9 +407,9 @@ export default function PlaysList() {
                     <p className="text-xs text-text-muted mt-1">New dates are continuously added as theatre companies announce tours.</p>
                   </div>
                 ) : (
-                  <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "space-y-4"}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                     {upcomingPlays.map((play) => (
-                      <DesktopPlayCard key={play.id} play={play} mode={viewMode} />
+                      <DesktopPlayCard key={play.id} play={play} />
                     ))}
                   </div>
                 )}
@@ -488,13 +438,13 @@ export default function PlaysList() {
                   </button>
                 </div>
 
-                <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "space-y-4"}>
-                  {archivedPlays.slice(0, 12).map((play) => (
-                    <DesktopPlayCard key={play.id} play={play} mode={viewMode} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                  {archivedPlays.slice(0, 15).map((play) => (
+                    <DesktopPlayCard key={play.id} play={play} />
                   ))}
                 </div>
 
-                {archivedPlays.length > 12 && (
+                {archivedPlays.length > 15 && (
                   <div className="text-center pt-8">
                     <button
                       onClick={() => setActiveTab('archived')}
