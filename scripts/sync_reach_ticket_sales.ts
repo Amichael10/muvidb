@@ -57,23 +57,51 @@ export async function syncReachTicketSales() {
   const { dateFrom, dateTo, yesterdayStr } = getTargetDateRange();
   console.log(`Auditing ticket sales window: ${dateFrom} to ${dateTo}...`);
 
-  // Load mapped branches
-  const catPath = path.join(process.cwd(), 'scratch', 'reach-catalogue.json');
-  if (!fs.existsSync(catPath)) {
-    console.error('❌ scratch/reach-catalogue.json not found!');
-    return;
-  }
-
-  const cat = JSON.parse(fs.readFileSync(catPath, 'utf8'));
+  // Load mapped branches: first from Supabase cinemas table, with fallback to local catalogue
   const branches: Array<{ id: string; name: string; jwt: string }> = [];
-  for (const [_, v] of Object.entries<any>(cat)) {
-    if (v.branches) {
-      for (const b of v.branches) {
-        if (b.id && b.isActive !== false) {
-          branches.push({ id: b.id, name: b.name, jwt: b.jwt || v.jwt || JWT });
+
+  try {
+    const { data: dbCinemas } = await supabase
+      .from('cinemas')
+      .select('id, name, scrape_config')
+      .eq('scrape_adapter', 'reach_cinema')
+      .eq('scrape_enabled', true);
+
+    if (dbCinemas && dbCinemas.length > 0) {
+      for (const c of dbCinemas) {
+        const extId = c.scrape_config?.externalCinemaId;
+        if (extId) {
+          branches.push({
+            id: extId,
+            name: c.name,
+            jwt: c.scrape_config?.jwt || JWT,
+          });
         }
       }
     }
+  } catch (err: any) {
+    console.warn('⚠️ Could not load branches from Supabase:', err.message);
+  }
+
+  if (branches.length === 0) {
+    const catPath = path.join(process.cwd(), 'scratch', 'reach-catalogue.json');
+    if (fs.existsSync(catPath)) {
+      const cat = JSON.parse(fs.readFileSync(catPath, 'utf8'));
+      for (const [_, v] of Object.entries<any>(cat)) {
+        if (v.branches) {
+          for (const b of v.branches) {
+            if (b.id && b.isActive !== false) {
+              branches.push({ id: b.id, name: b.name, jwt: b.jwt || v.jwt || JWT });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (branches.length === 0) {
+    console.error('❌ No active Reach Cinema branches found to sync!');
+    return;
   }
 
   console.log(`Loaded ${branches.length} active Reach branches.`);
