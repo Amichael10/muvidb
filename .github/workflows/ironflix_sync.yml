@@ -12,7 +12,7 @@ on:
 
 jobs:
   scrape:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Fix Git Permissions
         run: git config --global --add safe.directory "*"

@@ -388,7 +388,7 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
       const rec = await recommendInstagramAudioForContent({
         title: snap.title,
         genres: snap.genres,
-        synopsis: snap.overview,
+        synopsis: snap.synopsis || (snap as any).overview,
         contentType: options.seriesLabel === 'Now Streaming' ? 'where_to_watch' : 'upcoming_movie',
       });
       if (rec.recommended?.previewUrl) {

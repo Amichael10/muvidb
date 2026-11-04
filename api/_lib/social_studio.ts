@@ -3918,7 +3918,7 @@ export async function approveEditorialSlot(
   // 4. Schedule the draft
   // CRITICAL RULE: If this is a reel-required series (upcoming_movie / where_to_watch),
   // NEVER schedule it as a static image or poster! Wait until the 9:16 Reel is rendered by the background worker.
-  let scheduledItem = draft.contentItem;
+  let scheduledItem: any = draft.contentItem;
   if (isReelRequiredSeries && !hasVideoAsset) {
     console.log(`[social_studio] Draft ${draft.contentItem.id} requires 9:16 Reel. Keeping in 'approved' status awaiting background reel rendering; NOT scheduling static image.`);
   } else {
@@ -4152,7 +4152,7 @@ export async function generateAndAttachReelForContentItem(
       input.instagramAudio ||
       (renderedReel.audioTrack
         ? {
-            audio_id: renderedReel.audioTrack.id,
+            audio_id: renderedReel.audioTrack.audioId || (renderedReel.audioTrack as any).id,
             title: renderedReel.audioTrack.title,
             artist: renderedReel.audioTrack.artist,
             audio_volume: 100,

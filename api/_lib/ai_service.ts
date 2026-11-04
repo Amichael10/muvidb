@@ -407,7 +407,7 @@ export async function generateAIContent(
   for (const provider of orderedProviders) {
     try {
       console.log(`Trying AI Provider: ${provider.name}...`);
-      const { text, engine, headers } = await withCallTimeout(provider.execute(), 12000, `Provider ${provider.name}`);
+      const { text, engine, headers } = (await withCallTimeout(provider.execute(), 12000, `Provider ${provider.name}`)) as any;
 
       let telemetry: any = { engine, status: 'ok', remaining: 100, reset: 0 };
       if (engine === 'groq' && headers) {

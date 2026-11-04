@@ -220,7 +220,7 @@ export async function autoScheduleDueCalendarSlots(now = new Date(), options: { 
   const { data: slots, error } = await supabase
     .from('social_calendar')
     .select(`
-      id, scheduled_date, scheduled_time, status, priority, subject_entity_type, subject_entity_id, selection_locked, planner_key,
+      id, scheduled_date, scheduled_time, status, priority, subject_entity_type, subject_entity_id, selection_locked, planner_key, draft_id,
       social_content_series (id, name, slug)
     `)
     .eq('scheduled_date', dateStr)
@@ -288,11 +288,11 @@ export async function autoScheduleDueCalendarSlots(now = new Date(), options: { 
     }
 
     // Zero-Duplicate Guarantee: If slot already has an approved/scheduled draft, do not regenerate
-    if (slot.draft_id) {
+    if ((slot as any).draft_id) {
       const { data: existingDraft } = await supabase
         .from('social_content_items')
         .select('id, status, source_entity_id')
-        .eq('id', slot.draft_id)
+        .eq('id', (slot as any).draft_id)
         .maybeSingle();
 
       if (existingDraft && ['approved', 'scheduled', 'publishing', 'published'].includes(existingDraft.status)) {

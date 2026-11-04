@@ -45,7 +45,7 @@ on:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       BASE_URL: 'https://muvidb.com'
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
