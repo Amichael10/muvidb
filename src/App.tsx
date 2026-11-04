@@ -115,6 +115,7 @@ const AdminAutomation = lazyWithRetry(() => import('./pages/admin/AdminAutomatio
 const AdminCountries = lazyWithRetry(() => import('./pages/admin/AdminCountries'));
 const AdminCritics = lazyWithRetry(() => import('./pages/admin/AdminCritics'));
 const AdminPlays = lazyWithRetry(() => import('./pages/admin/AdminPlays'));
+const AdminEndpoints = lazyWithRetry(() => import('./pages/admin/AdminEndpoints'));
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -431,6 +432,8 @@ export default function App() {
                   <Route path="title-search" element={<TitleChecker />} />
                   <Route path="title-checker" element={<TitleChecker />} />
                   <Route path="automation" element={<AdminAutomation />} />
+                  <Route path="endpoints" element={<ProtectedRoute allowedRoles={['admin']}><AdminEndpoints /></ProtectedRoute>} />
+                  <Route path="data-sync" element={<ProtectedRoute allowedRoles={['admin']}><AdminEndpoints /></ProtectedRoute>} />
                   <Route path="countries" element={<AdminCountries />} />
                   <Route path="critics" element={<AdminCritics />} />
                   <Route path="plays" element={<AdminPlays />} />

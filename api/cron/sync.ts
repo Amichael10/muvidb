@@ -224,6 +224,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           status: 'moved_to_github_actions',
           message: 'Kava sync now runs directly in GitHub Actions to bypass Vercel timeout limits.' 
         });
+            case 'box_office_digest': {
+        const { runBoxOfficeDigestSync } = await import('../_lib/box_office_digest.js');
+        result = await runBoxOfficeDigestSync();
+        break;
+      }
       default:
         return res.status(400).json({ error: 'Invalid task' });
     }

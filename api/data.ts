@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { handleCors } from './_lib/cors.js';
 import { prepareRequestBody } from './_lib/request_body.js';
 
+export const maxDuration = 60;
 export const config = { api: { bodyParser: false } };
 
 /**

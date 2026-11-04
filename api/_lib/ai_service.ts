@@ -18,13 +18,21 @@ function collectKeys(base: string): string[] {
   ];
 }
 
+function withCallTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
+
 // Gemini: rotate on 429/RESOURCE_EXHAUSTED before falling back to OpenAI/Groq.
 const GEMINI_KEYS = collectKeys('GEMINI_API_KEY');
-const GEMINI_TEXT_MODELS = (process.env.GEMINI_TEXT_MODELS || process.env.GEMINI_TEXT_MODEL || 'gemini-flash-latest,gemini-flash-lite-latest,gemini-3.8-flash')
+const GEMINI_TEXT_MODELS = (process.env.GEMINI_TEXT_MODELS || process.env.GEMINI_TEXT_MODEL || 'gemini-flash-lite-latest,gemini-2.5-flash,gemini-flash-latest')
   .split(',')
   .map((model) => model.trim())
   .filter(Boolean);
-const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-flash-latest,gemini-flash-lite-latest,gemini-3.8-flash')
+const GEMINI_VISION_MODELS = (process.env.GEMINI_VISION_MODELS || 'gemini-flash-lite-latest,gemini-2.5-flash,gemini-flash-latest')
   .split(',')
   .map((model) => model.trim())
   .filter(Boolean);
@@ -57,7 +65,7 @@ function isGeminiUnsupportedModelError(err: any): boolean {
   const msg = (err?.message || '').toLowerCase();
   return (
     err?.status === 404 ||
-    /not found|is not found for api version|unsupported model|\b404\b/.test(msg)
+    /not found|is not found for api version|unsupported model|\b404\b|no longer available/.test(msg)
   );
 }
 const deadGeminiKeys = new Set<string>();
@@ -71,7 +79,7 @@ async function withGeminiRotation(model: string, fn: (m: any) => Promise<any>): 
       continue;
     }
     try {
-      return await fn(geminiModelFor(model));
+      return await withCallTimeout(fn(geminiModelFor(model)), 8000, `Gemini (${model})`);
     } catch (err: any) {
       lastErr = err;
       if (isDeadGeminiKeyError(err) && GEMINI_KEYS.length > 1) {
@@ -399,7 +407,7 @@ export async function generateAIContent(
   for (const provider of orderedProviders) {
     try {
       console.log(`Trying AI Provider: ${provider.name}...`);
-      const { text, engine, headers } = await provider.execute();
+      const { text, engine, headers } = await withCallTimeout(provider.execute(), 12000, `Provider ${provider.name}`);
 
       let telemetry: any = { engine, status: 'ok', remaining: 100, reset: 0 };
       if (engine === 'groq' && headers) {

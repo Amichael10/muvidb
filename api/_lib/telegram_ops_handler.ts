@@ -24,6 +24,7 @@ import {
 import { recentHitsForIp, topHitters } from './scrape_guard.js';
 import { supabase } from './supabase.js';
 import { generateAIContent } from './ai_service.js';
+import { resolveHandlesToRealNames } from './instagram_name_resolver.js';
 
 /**
  * Telegram button handlers run inside a 60s Vercel function. Any external call
@@ -35,7 +36,7 @@ import { generateAIContent } from './ai_service.js';
  * Racing slow work against a deadline well under the limit means we always get
  * back in time to tell the user what happened.
  */
-const TELEGRAM_WORK_DEADLINE_MS = Number(process.env.TELEGRAM_WORK_DEADLINE_MS || 35_000);
+const TELEGRAM_WORK_DEADLINE_MS = Number(process.env.TELEGRAM_WORK_DEADLINE_MS || 45_000);
 
 export function withDeadline<T>(work: Promise<T>, label: string, ms = TELEGRAM_WORK_DEADLINE_MS): Promise<T> {
   let timer: NodeJS.Timeout;
@@ -922,7 +923,15 @@ async function handleCallback(query: any) {
   "synopsis": string or null
 }`;
     } else if (kind === 'film') {
-      prompt = `You are an expert Nollywood film archivist for MuviDB. Extract film/movie details from this text and source:\n${context}\n\nReturn ONLY a valid JSON object matching:
+      prompt = `You are an expert Nollywood film archivist for MuviDB. Extract film/movie details from this text and source:
+${context}
+
+CRITICAL RULES:
+1. CAST & CREW NAMES: If cast or crew members are tagged with Instagram handles (e.g. @iniedo, @funkejenifaakindele, @deyemitheactor, @timini, @kayodekasum, @bimboademoye, @stan_nze), you MUST resolve them to their real human actor/director names (e.g. "Ini Edo", "Funke Akindele", "Deyemi Okanlawon", "Timini Egbuson", "Kayode Kasum", "Bimbo Ademoye", "Stan Nze"). DO NOT output raw '@' handles in cast or director.
+2. TITLE: Extract the official film title without hashtag signs (#) or promotional clutter.
+3. GENRES: Return an array of valid genres (e.g. ["Drama", "Comedy", "Thriller", "Action", "Romance"]).
+
+Return ONLY a valid JSON object matching:
 {
   "title": string,
   "year": number or null,
@@ -959,8 +968,27 @@ async function handleCallback(query: any) {
     }
 
     try {
-      const aiRes = await withDeadline(generateAIContent(prompt), 'The AI extraction');
-      const payload = parseAiJson(aiRes.text || '');
+      const aiRes = await withDeadline(generateAIContent(prompt, { preferredProvider: 'groq' }), 'The AI extraction');
+      let payload = parseAiJson(aiRes.text || '');
+
+      if (kind === 'film' && payload) {
+        if (Array.isArray(payload.cast) && payload.cast.length) {
+          payload.cast = await resolveHandlesToRealNames(payload.cast);
+        }
+        if (payload.director && String(payload.director).startsWith('@')) {
+          const resolvedDir = await resolveHandlesToRealNames([payload.director]);
+          payload.director = resolvedDir[0] || payload.director;
+        }
+      } else if (kind === 'play' && payload) {
+        if (payload.director && String(payload.director).startsWith('@')) {
+          const resolvedDir = await resolveHandlesToRealNames([payload.director]);
+          payload.director = resolvedDir[0] || payload.director;
+        }
+        if (payload.playwright && String(payload.playwright).startsWith('@')) {
+          const resolvedPw = await resolveHandlesToRealNames([payload.playwright]);
+          payload.playwright = resolvedPw[0] || payload.playwright;
+        }
+      }
 
       const metadata = intakeMetadata(event.metadata);
       metadata.extracted_kind = kind;
@@ -1541,7 +1569,7 @@ Respond ONLY with a valid JSON object matching this schema:
   "tiktok_caption": "..."
 }`;
 
-      const aiRes = await withDeadline(generateAIContent(prompt), 'The AI extraction');
+      const aiRes = await withDeadline(generateAIContent(prompt, { preferredProvider: 'groq' }), 'The AI extraction');
       let aiJson: any = {};
       try {
         const cleaned = (aiRes.text || '').replace(/```json/g, '').replace(/```/g, '').trim();
@@ -1983,8 +2011,21 @@ async function prepareStructuredIntake(eventId: string, kind: 'film' | 'critic_r
   }
 
   try {
-    const ai = await withDeadline(generateAIContent(prompt), 'The AI extraction');
-    const payload = parseAiJson(ai.text || '');
+    const ai = await withDeadline(generateAIContent(prompt, { preferredProvider: 'groq' }), 'The AI extraction');
+    let payload = parseAiJson(ai.text || '');
+    if (kind === 'film' && payload) {
+      if (payload.cast?.length) {
+        payload.cast = await resolveHandlesToRealNames(payload.cast);
+      }
+      if (payload.crew?.length) {
+        for (const cr of payload.crew) {
+          if (cr.name && String(cr.name).startsWith('@')) {
+            const resolved = await resolveHandlesToRealNames([cr.name]);
+            cr.name = resolved[0] || cr.name;
+          }
+        }
+      }
+    }
     if (kind === 'film' && !payload.poster_url && metadata.image_url) payload.poster_url = metadata.image_url;
     if (kind === 'critic_review' && !payload.review_url) payload.review_url = event.source_url;
     metadata.extracted_payload = payload;
