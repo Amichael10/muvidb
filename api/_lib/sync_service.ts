@@ -931,34 +931,17 @@ export async function runVideosSync(options: { channelId?: string; force?: boole
  * Delete unmapped buffer rows older than `maxAgeDays` so the triage queue
  * cannot grow forever. Linked videos (film_id set) are never touched.
  */
+/**
+ * Permanently disabled per admin policy: Unmapped channel videos are preserved
+ * in the database and never automatically deleted.
+ */
 export async function purgeStaleUnmappedChannelVideos(opts: { maxAgeDays?: number } = {}) {
-  const maxAgeDays = Math.max(1, opts.maxAgeDays ?? 30);
-  const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString();
-  const BATCH = 500;
-  let deleted = 0;
-
-  for (;;) {
-    const { data, error } = await supabase
-      .from('channel_videos')
-      .select('id')
-      .is('film_id', null)
-      .lt('created_at', cutoff)
-      .limit(BATCH);
-    if (error) throw error;
-    if (!data?.length) break;
-
-    const ids = data.map((r) => r.id);
-    const { error: dErr } = await supabase.from('channel_videos').delete().in('id', ids);
-    if (dErr) throw dErr;
-    deleted += ids.length;
-  }
-
   return {
     task: 'purge_stale_buffer',
-    status: 'completed',
-    max_age_days: maxAgeDays,
-    cutoff,
-    deleted,
+    status: 'disabled',
+    max_age_days: opts.maxAgeDays ?? 30,
+    deleted: 0,
+    message: 'Purge script disabled per admin policy: all channel videos are preserved without deletion.',
   };
 }
 

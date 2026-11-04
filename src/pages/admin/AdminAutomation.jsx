@@ -88,6 +88,31 @@ export default function AdminAutomation() {
         </button>
       </div>
       
+      {/* Direct link banner to Endpoints & Sync runner */}
+      <div className="mb-8 p-5 rounded-2xl bg-gradient-to-r from-brand/15 via-brand/5 to-surface border border-brand/30 shadow-lg shadow-brand/5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-brand text-white flex items-center justify-center flex-shrink-0 shadow-md shadow-brand/30">
+            <Icon icon="solar:server-minimalistic-bold" className="text-2xl" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-text-primary">API & Endpoints Runner</h3>
+              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand text-white font-mono font-bold">Dedicated Page</span>
+            </div>
+            <p className="text-xs text-text-muted mt-1">
+              Trigger and live-monitor all backend sync APIs: Nile & Reach Cinemas, Box Office Digest, YouTube Channels, TMDB, Stage Plays & Review Mining.
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/admin/endpoints"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-md shadow-brand/20 flex-shrink-0"
+        >
+          <Icon icon="solar:play-circle-bold" className="text-base" />
+          Open Endpoints Runner
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Actor Enricher Card */}
         <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col justify-between">

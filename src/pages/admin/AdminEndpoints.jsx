@@ -155,22 +155,7 @@ const ENDPOINTS_CATALOG = [
       'Renews Google WebSub / PubSubHubbub push callback subscriptions to maintain real-time webhooks on newly published Nollywood films.',
     affected: 'youtube_websub_subscriptions',
   },
-  {
-    id: 'purge_stale_buffer',
-    name: 'Stale Channel Video Buffer Purge',
-    category: 'streaming',
-    categoryLabel: 'Streaming & Video',
-    categoryIcon: 'solar:broom-bold',
-    categoryColor: 'red',
-    route: '/api/cron/sync?task=purge_stale_buffer',
-    method: 'POST',
-    schedule: 'Weekly on Sunday',
-    logSource: 'purge_stale_buffer',
-    triggerable: true,
-    description:
-      'Purges unmapped channel videos older than 30 days that were never linked to catalogue films, keeping database indexes fast and lightweight.',
-    affected: 'channel_videos (unmapped buffer)',
-  },
+
   {
     id: 'refresh_videos',
     name: 'Video Metadata & Stream Re-evaluator',

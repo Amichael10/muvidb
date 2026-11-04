@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-import { purgeStaleUnmappedChannelVideos, runVideosSync, refreshYouTubeViewCounts } from '../api/_lib/sync_service.js';
+import { runVideosSync, refreshYouTubeViewCounts } from '../api/_lib/sync_service.js';
 import { runCastExtraction } from '../api/_lib/ai_maintenance.js';
 
 async function main() {
@@ -36,10 +36,10 @@ async function main() {
       console.log('Post-backfill AI maintenance (cast extraction):', JSON.stringify({ castResult }, null, 2));
     }
 
-    // Keep the unmapped buffer from growing forever — drop signals nobody
-    // mapped within 30 days. Linked rows are never touched.
-    const purged = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 });
-    console.log("Stale buffer purge:", JSON.stringify(purged, null, 2));
+
+
+
+
   } catch (err: any) {
     console.error("Fatal error running YouTube Sync:", err.message);
     process.exit(1);

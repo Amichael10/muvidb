@@ -160,7 +160,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'people_cutouts': result = await runPeopleCutoutJob({ limit: 2 }); break;
       // Advisory only — records a verdict, never hides or deletes a film.
       case 'classify_film_kinds': result = await classifyFilmKinds({ limit: 100 }); break;
-      case 'purge_stale_buffer': result = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 }); break;
+      case 'purge_stale_buffer':
+        result = { task: 'purge_stale_buffer', status: 'disabled', deleted: 0, message: 'Purge script disabled per user policy: unmapped videos are preserved and never deleted.' };
+        break;
       case 'theatre_status_sweep': result = await sweepAndUpdatePlayStatuses(); break;
       case 'youtube_watch':
         return res.status(200).json({

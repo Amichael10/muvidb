@@ -72,7 +72,7 @@ export default function AdminLayout() {
     { path: '/admin/title-checker', label: 'Title Search', icon: 'solar:magnifer-zoom-in-bold' },
     { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear' },
     { path: '/admin/automation', label: 'Automation', icon: 'solar:server-square-linear' },
-    { path: '/admin/endpoints', label: 'Endpoints & Sync', icon: 'solar:server-minimalistic-linear' },
+    { path: '/admin/endpoints', label: 'API & Endpoints', icon: 'solar:server-minimalistic-linear' },
     { path: '/admin/api-keys', label: 'Developer API', icon: 'solar:key-minimalistic-square-linear' },
   ];
 

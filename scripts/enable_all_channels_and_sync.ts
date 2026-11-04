@@ -1,5 +1,5 @@
 import { getSupabase } from '../api/_lib/supabase.js';
-import { runVideosSync, purgeStaleUnmappedChannelVideos } from '../api/_lib/sync_service.js';
+import { runVideosSync } from '../api/_lib/sync_service.js';
 import { runCastExtraction } from '../api/_lib/ai_maintenance.js';
 import * as dotenv from 'dotenv';
 import path from 'path';
@@ -79,14 +79,6 @@ async function main() {
     console.log('Cast extraction result:', castResult);
   } catch (err: any) {
     console.warn('Post-sync AI maintenance notice:', err?.message);
-  }
-
-  console.log('\n--- Step 5: Purging stale unmapped channel videos buffer ---');
-  try {
-    const purged = await purgeStaleUnmappedChannelVideos({ maxAgeDays: 30 });
-    console.log('Stale buffer purge result:', purged);
-  } catch (err: any) {
-    console.warn('Buffer purge notice:', err?.message);
   }
 
   console.log('\nAll sync tasks finished successfully!');
