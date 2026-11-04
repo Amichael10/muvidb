@@ -130,6 +130,8 @@ export default [
         route('outreach', 'pages/admin/AdminOutreach.jsx'),
         route('logs', 'pages/admin/AdminLogs.jsx'),
         route('api-keys', 'pages/admin/AdminApiKeys.jsx'),
+        route('endpoints', 'pages/admin/AdminEndpoints.jsx'),
+        route('data-sync', 'pages/admin/AdminEndpoints.jsx', { id: 'admin-endpoints-alias' }),
       ]),
     ]),
   ]),
