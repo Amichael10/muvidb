@@ -764,7 +764,7 @@ export default function AutoPilotReviewModal({
                 <button
                   type="button"
                   onClick={() => setVideoStudioOpen(true)}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-brand to-amber-500 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-md hover:opacity-90 transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-brand hover:bg-brand/90 px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white shadow-md transition-all active:scale-95"
                 >
                   <Icon icon="solar:clapperboard-edit-bold" width="16" />
                   <span>🚀 Open Clip Studio & Click &ldquo;Start Clipping (Render MP4)&rdquo;</span>

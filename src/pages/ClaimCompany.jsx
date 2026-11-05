@@ -281,7 +281,7 @@ export default function ClaimCompany() {
                     href="https://ig.me/m/muvidb"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-95 text-white font-bold text-xs transition shadow-sm"
+                    className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#E1306C] hover:bg-[#d42d64] text-white font-bold text-xs transition shadow-sm active:scale-95"
                   >
                     <Icon icon="solar:chat-round-dots-bold" width="16" />
                     <span>Open Instagram DM (@muvidb)</span>

@@ -604,7 +604,7 @@ export default function Dashboard() {
 
                   <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     <div className="flex items-start gap-4 md:gap-5 max-w-2xl">
-                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-brand text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/25 mt-1">
+                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-brand text-white flex items-center justify-center shrink-0 shadow-lg shadow-brand/20 mt-1">
                         <Icon icon="solar:bell-bing-bold" className="text-2xl md:text-3xl" />
                       </div>
                       <div className="space-y-2 min-w-0">

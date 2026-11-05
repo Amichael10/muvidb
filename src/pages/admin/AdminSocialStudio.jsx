@@ -2108,7 +2108,7 @@ export default function AdminSocialStudio() {
           onClick={() => setActiveTab('copilot')}
           className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
             activeTab === 'copilot'
-              ? 'bg-gradient-to-r from-brand to-amber-500 text-white shadow-md shadow-brand/25'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
               : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
           }`}
         >
@@ -2124,7 +2124,7 @@ export default function AdminSocialStudio() {
           onClick={() => setActiveTab('instant')}
           className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
             activeTab === 'instant'
-              ? 'bg-gradient-to-r from-brand via-orange-500 to-amber-500 text-white shadow-md shadow-brand/25'
+              ? 'bg-brand text-white shadow-md shadow-brand/20'
               : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
           }`}
         >
@@ -4139,7 +4139,7 @@ export default function AdminSocialStudio() {
           <button
             type="button"
             onClick={() => setActiveTab('copilot')}
-            className="flex items-center gap-2.5 rounded-2xl bg-gradient-to-tr from-brand via-orange-500 to-amber-400 px-4.5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-2xl shadow-brand/40 hover:scale-105 active:scale-95 transition-all border border-white/20"
+            className="flex items-center gap-2.5 rounded-2xl bg-brand hover:bg-brand/90 px-4.5 py-3 text-xs font-black uppercase tracking-wider text-white shadow-2xl shadow-brand/25 active:scale-95 transition-all border border-white/20"
           >
             <Icon icon="solar:chat-round-line-bold" width="18" />
             <span>AI Copilot</span>

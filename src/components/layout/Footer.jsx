@@ -177,7 +177,7 @@ export default function Footer() {
           <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
             <Link
               to="/claim"
-              className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand to-brand-600 hover:from-brand-600 hover:to-brand text-white text-xs font-bold transition shadow-lg shadow-brand/25 text-center flex items-center justify-center gap-2"
+              className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-brand hover:bg-brand/90 text-white text-xs font-bold transition shadow-lg shadow-brand/20 active:scale-95 text-center flex items-center justify-center gap-2"
             >
               <Icon icon="solar:verified-check-bold" width="15" />
               <span>Claim Profile</span>

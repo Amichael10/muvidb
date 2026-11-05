@@ -615,7 +615,7 @@ export default function SocialCanvasViewport({
                 onClick={() => {
                   onOpenVideoStudio?.();
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-brand to-amber-500 px-4 py-1.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 transition-all shadow-lg"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand hover:bg-brand/90 px-4 py-1.5 text-xs font-black uppercase tracking-wider text-white transition-all shadow-md active:scale-95"
               >
                 <Icon icon="solar:clapperboard-edit-bold" width="14" />
                 <span>🎬 Cut, Crop & Attach MP4</span>

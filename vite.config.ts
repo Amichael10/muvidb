@@ -80,6 +80,9 @@ export default defineConfig(({ mode, isSsrBuild }) => {
     server: {
       port: 3001,
       host: '127.0.0.1',
+      hmr: {
+        overlay: false,
+      },
       // Harvest workers append progress continuously. Keeping those files out
       // of Vite's watcher prevents the approval UI from being starved by
       // needless rescans while multiple workers are active.

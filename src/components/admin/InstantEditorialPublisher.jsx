@@ -1032,7 +1032,7 @@ export default function InstantEditorialPublisher({ onPublished }) {
               type="button"
               onClick={handlePostNow}
               disabled={publishingNow || loadingAutoFill}
-              className="inline-flex h-12 items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-brand via-orange-500 to-amber-500 px-8 text-sm font-black uppercase tracking-wider text-white shadow-lg shadow-brand/30 transition hover:brightness-110 disabled:opacity-50"
+              className="inline-flex h-12 items-center justify-center gap-2.5 rounded-2xl bg-brand hover:bg-brand/90 px-8 text-sm font-black uppercase tracking-wider text-white shadow-lg shadow-brand/20 transition active:scale-95 disabled:opacity-50"
             >
               <Icon
                 icon={publishingNow ? 'solar:spinner-linear' : 'solar:plain-bold'}

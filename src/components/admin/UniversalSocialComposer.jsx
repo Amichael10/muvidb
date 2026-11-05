@@ -840,7 +840,7 @@ export default function UniversalSocialComposer({
             type="button"
             onClick={() => handleSubmit('publish_now')}
             disabled={isSubmitting}
-            className="px-5 py-2 text-xs font-black text-white bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 rounded-lg shadow-lg shadow-orange-500/20 transition-all flex items-center gap-1.5"
+            className="px-5 py-2 text-xs font-black text-white bg-brand hover:bg-brand/90 rounded-lg shadow-md transition-all active:scale-95 flex items-center gap-1.5"
           >
             <Icon icon="solar:bolt-bold" width="16" />
             <span>Publish Now</span>
@@ -1172,7 +1172,7 @@ export default function UniversalSocialComposer({
                 type="button"
                 onClick={handleGenerateAIVariations}
                 disabled={generatingAI || !universalCaption.trim()}
-                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-500/20 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-500 text-white shadow-sm flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
               >
                 {generatingAI ? (
                   <Icon icon="solar:spinner-line-duotone" className="animate-spin" width="14" />
@@ -1227,7 +1227,7 @@ export default function UniversalSocialComposer({
                     type="button"
                     onClick={handleGenerateEnsembleCaption}
                     disabled={isGeneratingEnsembleCaption}
-                    className="px-3.5 py-1.5 text-xs font-black rounded-lg bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 text-white shadow-md shadow-pink-500/20 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                    className="px-3.5 py-1.5 text-xs font-black rounded-lg bg-purple-600 hover:bg-purple-500 text-white shadow-sm flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
                   >
                     {isGeneratingEnsembleCaption ? (
                       <>
@@ -1464,7 +1464,7 @@ export default function UniversalSocialComposer({
                   type="button"
                   onClick={() => handleSubmit('publish_now')}
                   disabled={isSubmitting}
-                  className="flex-1 sm:flex-initial px-5 py-2.5 text-xs font-black text-white bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-1.5"
+                  className="flex-1 sm:flex-initial px-5 py-2.5 text-xs font-black text-white bg-brand hover:bg-brand/90 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"
                 >
                   <Icon icon="solar:bolt-bold" width="16" />
                   Publish Now

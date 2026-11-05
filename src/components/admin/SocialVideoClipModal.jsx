@@ -981,7 +981,7 @@ export default function SocialVideoClipModal({
                     type="button"
                     onClick={handleRenderAndAttachClip}
                     disabled={!videoUrl || clipDuration <= 0 || isRendering}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand via-amber-500 to-emerald-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-95 disabled:opacity-50 shadow-lg shadow-brand/20 active:scale-95 transition-all"
+                    className="inline-flex items-center gap-2 rounded-xl bg-brand hover:bg-brand/90 disabled:opacity-50 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-brand/20 active:scale-95 transition-all"
                     title="Downloads source, cuts with local FFmpeg, crops to ratio, uploads to storage, and attaches real MP4 to draft"
                   >
                     <Icon icon="solar:clapperboard-edit-bold" width="16" />
@@ -1116,7 +1116,7 @@ export default function SocialVideoClipModal({
                     type="button"
                     onClick={handleRenderAndAttachClip}
                     disabled={!videoUrl || isRendering}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand via-amber-500 to-emerald-500 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white hover:opacity-95 shadow-lg shadow-brand/20 active:scale-95 transition-all"
+                    className="inline-flex items-center gap-2 rounded-xl bg-brand hover:bg-brand/90 disabled:opacity-50 px-5 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-lg shadow-brand/20 active:scale-95 transition-all"
                   >
                     <Icon icon="solar:clapperboard-edit-bold" width="16" />
                     <span>🚀 Render & Attach Full MP4 Video</span>

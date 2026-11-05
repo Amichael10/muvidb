@@ -1192,7 +1192,7 @@ export default function PersonDetailV2() {
               {canonicalAwardEntries.length > 0 && (
                 <div
                   onClick={() => awardsRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                  className="cursor-pointer group flex items-center gap-3 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-brand/5 to-transparent px-4 py-2.5 text-xs transition duration-300 hover:border-amber-400 hover:from-amber-500/20"
+                  className="cursor-pointer group flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs transition duration-300 hover:border-amber-400 hover:bg-amber-500/15"
                 >
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40">
                     <Icon icon="solar:cup-star-bold" width="18" />
@@ -1862,7 +1862,7 @@ export default function PersonDetailV2() {
                   onClick={() => setFilmographyMedium('screen')}
                   className={`group relative flex items-center justify-center gap-2.5 px-5 sm:px-7 py-3.5 rounded-xl font-heading font-black text-sm sm:text-base transition-all duration-300 cursor-pointer flex-1 sm:flex-initial ${
                     filmographyMedium === 'screen'
-                      ? 'bg-gradient-to-r from-brand via-brand to-brand-600 text-white shadow-lg shadow-brand/30 ring-1 ring-white/20'
+                      ? 'bg-brand text-white shadow-lg shadow-brand/20'
                       : 'text-text-muted hover:text-text-primary hover:bg-surface/60'
                   }`}
                 >
@@ -1887,7 +1887,7 @@ export default function PersonDetailV2() {
                   onClick={() => setFilmographyMedium('stage')}
                   className={`group relative flex items-center justify-center gap-2.5 px-5 sm:px-7 py-3.5 rounded-xl font-heading font-black text-sm sm:text-base transition-all duration-300 cursor-pointer flex-1 sm:flex-initial ${
                     filmographyMedium === 'stage'
-                      ? 'bg-gradient-to-r from-purple-600 via-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30 ring-1 ring-white/20'
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20'
                       : 'text-text-muted hover:text-text-primary hover:bg-surface/60'
                   }`}
                 >
@@ -2158,7 +2158,7 @@ export default function PersonDetailV2() {
                       onClick={() => setActiveStageRole(role)}
                       className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
                         activeStageRole === role
-                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/25 ring-1 ring-white/20'
+                          ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
                           : 'bg-surface border border-border text-text-muted hover:text-text-primary hover:border-purple-500/40'
                       }`}
                     >

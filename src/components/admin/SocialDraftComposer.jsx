@@ -2835,7 +2835,7 @@ export default function SocialDraftComposer({
                   <button
                     type="button"
                     onClick={() => handleOpenInStudio()}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 px-3 py-1 text-xs font-black text-white shadow-xs transition-all hover:scale-105 hover:from-emerald-500 hover:to-teal-500"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 px-3 py-1 text-xs font-black text-white shadow-xs transition-all active:scale-95"
                     title="Open in OpenCut Studio to crop, resize, and add watermark with instant round-trip save"
                   >
                     <Icon icon="solar:magic-stick-3-bold" width="14" />
@@ -3678,7 +3678,7 @@ export default function SocialDraftComposer({
                                 }
                               }}
                               disabled={!activeAssetIsReel}
-                              className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-fuchsia-500 to-rose-500 text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-fuchsia-950/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
+                              className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#E1306C] hover:bg-[#d42d64] text-[10px] font-black uppercase tracking-wider text-white shadow-md transition active:scale-95 disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
                             >
                               <Icon icon="solar:diskette-bold" width="15" />
                               Save Reel Soundtrack
@@ -3797,7 +3797,7 @@ export default function SocialDraftComposer({
                 <button
                   type="button"
                   onClick={() => setVideoStudioOpen(true)}
-                  className="rounded-lg bg-gradient-to-r from-brand to-amber-500 px-4 py-2 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 transition-all shadow-sm"
+                  className="rounded-lg bg-brand hover:bg-brand/90 px-4 py-2 text-xs font-black uppercase tracking-wider text-white transition-all shadow-sm active:scale-95"
                 >
                   🚀 Open Clip Studio & Click &ldquo;Start Clipping (Render MP4)&rdquo;
                 </button>
