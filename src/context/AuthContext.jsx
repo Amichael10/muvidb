@@ -355,11 +355,14 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (redirectToPath = '/dashboard') => {
+    const redirectUrl = redirectToPath
+      ? (redirectToPath.startsWith('http') ? redirectToPath : `${window.location.origin}${redirectToPath}`)
+      : `${window.location.origin}/dashboard`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin
+        redirectTo: redirectUrl
       }
     });
     if (error) console.error('Google login error:', error);

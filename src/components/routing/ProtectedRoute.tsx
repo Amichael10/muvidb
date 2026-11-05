@@ -25,12 +25,12 @@ export default function ProtectedRoute({
   if (!user) return <Navigate to="/login" replace />;
 
   // Force onboarding if not complete
-  if (!user.onboarded && user.role !== 'admin' && location.pathname !== '/onboarding') {
+  if (!user.onboarded && user.role !== 'admin' && user.role !== 'fan' && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 
   // Prevent accessing onboarding if already complete
-  if (user.onboarded && location.pathname === '/onboarding') {
+  if ((user.onboarded || user.role === 'fan') && location.pathname === '/onboarding') {
     return <Navigate to={user.role === 'professional' ? '/pro-dashboard' : '/dashboard'} replace />;
   }
 

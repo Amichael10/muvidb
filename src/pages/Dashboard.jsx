@@ -112,6 +112,24 @@ export default function Dashboard() {
   const [newPassword, setNewPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
+  // Fan Artist Follow & Release Alerts banner state
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    try {
+      return localStorage.getItem('muvidb_fan_follow_banner_dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissBanner = () => {
+    try {
+      localStorage.setItem('muvidb_fan_follow_banner_dismissed', 'true');
+    } catch (e) {
+      // ignore
+    }
+    setBannerDismissed(true);
+  };
+
   useEffect(() => {
     if (user) {
       setDisplayName(user.name || '');
@@ -569,6 +587,101 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="animate-in fade-in duration-500">
+              {/* Fan Onboarding & Artist Release Alert Banner */}
+              {!bannerDismissed && (
+                <div className="relative overflow-hidden rounded-3xl border border-brand/30 bg-gradient-to-br from-brand/15 via-surface to-surface-2 p-6 md:p-8 mb-8 shadow-2xl shadow-brand/10 transition-all">
+                  {/* Ambient Glow Effects */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-brand/20 blur-3xl"
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-brand/10 blur-2xl"
+                  />
+
+                  <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div className="flex items-start gap-4 md:gap-5 max-w-2xl">
+                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-brand to-brand/80 text-white flex items-center justify-center shrink-0 shadow-lg shadow-brand/35 mt-1">
+                        <Icon icon="solar:bell-bing-bold" className="text-2xl md:text-3xl" />
+                      </div>
+                      <div className="space-y-2 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-brand/20 text-brand border border-brand/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+                            Fan Alerts
+                          </span>
+                          <span className="text-xs text-text-muted hidden sm:inline">
+                            · Stay updated on Nollywood
+                          </span>
+                        </div>
+                        <h2 className="font-heading text-2xl md:text-3xl font-bold text-text-primary tracking-tight leading-tight">
+                          Follow your favorite artists &amp; creatives
+                        </h2>
+                        <p className="text-sm md:text-base text-text-muted leading-relaxed">
+                          Follow your favorite artist and get notified whenever they release a new movie or get featured in one.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                      <Link
+                        to="/people"
+                        className="inline-flex items-center justify-center gap-2 bg-brand text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg shadow-brand/25 hover:brightness-110 active:scale-95 transition-all text-center"
+                      >
+                        <Icon icon="solar:users-group-rounded-bold" className="text-base" />
+                        Explore &amp; Follow Artists
+                      </Link>
+                      {following.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('following')}
+                          className="inline-flex items-center justify-center gap-2 bg-surface border border-border px-5 py-3.5 rounded-xl text-xs font-bold text-text-primary hover:bg-surface-2 transition-colors text-center"
+                        >
+                          Following ({following.length})
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dismiss Button */}
+                    <button
+                      type="button"
+                      onClick={handleDismissBanner}
+                      aria-label="Dismiss banner"
+                      title="Dismiss banner"
+                      className="absolute top-0 right-0 p-2 text-text-muted hover:text-text-primary hover:bg-surface-2/80 rounded-xl transition-colors"
+                    >
+                      <Icon icon="solar:close-circle-linear" className="text-xl opacity-70 hover:opacity-100" />
+                    </button>
+                  </div>
+
+                  {/* Quick Popular Artists Inspiration Strip */}
+                  <div className="relative mt-6 pt-5 border-t border-border/60 flex items-center gap-2 overflow-x-auto scrollbar-none">
+                    <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider shrink-0 flex items-center gap-1.5 mr-1">
+                      <Icon icon="solar:fire-bold" className="text-amber-500 text-sm" />
+                      Popular to follow:
+                    </span>
+                    {[
+                      { name: 'Lateef Adedimeji', slug: 'lateef-adedimeji' },
+                      { name: 'Bimbo Ademoye', slug: 'bimbo-ademoye' },
+                      { name: 'Funke Akindele', slug: 'funke-akindele' },
+                      { name: 'Kunle Afolayan', slug: 'kunle-afolayan' },
+                      { name: 'Odunlade Adekola', slug: 'odunlade-adekola' },
+                      { name: 'Femi Adebayo', slug: 'femi-adebayo' },
+                      { name: 'Mercy Aigbe', slug: 'mercy-aigbe' },
+                    ].map((artist) => (
+                      <Link
+                        key={artist.slug}
+                        to={`/people/${artist.slug}`}
+                        className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-surface/80 hover:bg-brand/15 hover:text-brand border border-border/80 hover:border-brand/40 text-text-secondary transition-all"
+                      >
+                        <span>{artist.name}</span>
+                        <Icon icon="solar:arrow-right-up-linear" className="text-[10px] opacity-60" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
               {professionalClaim ? <Link to="/pro-dashboard" className="mb-8 flex flex-col gap-4 rounded-2xl border border-brand/30 bg-brand/5 p-5 transition-colors hover:border-brand sm:flex-row sm:items-center"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-white"><Icon icon="solar:verified-check-linear" width="22" /></div><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-brand">Professional profile claim</p><h2 className="mt-1 truncate text-lg font-bold text-text-primary">{professionalClaim.people?.name || 'Professional profile'}</h2><p className="mt-1 text-xs text-text-muted">Status: {String(professionalClaim.verification_status).replaceAll('_', ' ')} · Reference {String(professionalClaim.id).slice(0, 8).toUpperCase()}</p></div><span className="sm:ml-auto text-xs font-black text-brand">Track progress →</span></Link> : <Link to="/claim" className="mb-8 flex items-center gap-4 rounded-2xl border border-border bg-surface p-5 hover:border-brand"><Icon icon="solar:clapperboard-text-linear" className="text-brand" width="26" /><div><p className="text-sm font-bold text-text-primary">Do you work in film?</p><p className="mt-1 text-xs text-text-muted">Find and claim your professional profile without creating another account.</p></div><span className="ml-auto text-xs font-black text-brand">Get started</span></Link>}
               {/* WATCHLIST */}
               {activeTab === 'watchlist' && (

@@ -32,10 +32,11 @@ export default function Signup() {
     if (user) {
       if (user.role === 'admin' || user.role === 'admin_limited') {
         navigate('/admin');
-      } else if (!user.onboarded) {
-        navigate('/onboarding');
+      } else if (user.role === 'professional') {
+        navigate(user.onboarded ? '/pro-dashboard' : '/onboarding');
       } else {
-        navigate(user.role === 'professional' ? '/pro-dashboard' : '/dashboard');
+        // Fans and regular users land directly on their dashboard
+        navigate('/dashboard');
       }
     }
   }, [user, navigate]);
@@ -205,7 +206,7 @@ export default function Signup() {
         <div className="flex-grow border-t border-border opacity-50"></div>
       </div>
 
-      {accountType === 'fan' ? <GoogleSignInButton mode="signup" onClick={() => loginWithGoogle()} /> : <p className="rounded-xl border border-border bg-surface-2/40 p-4 text-center text-[10px] leading-5 text-text-muted">Professional signup currently uses email so your selected industry roles are preserved. Google signup remains available for fan accounts.</p>}
+      {accountType === 'fan' ? <GoogleSignInButton mode="signup" onClick={() => loginWithGoogle('/dashboard')} /> : <p className="rounded-xl border border-border bg-surface-2/40 p-4 text-center text-[10px] leading-5 text-text-muted">Professional signup currently uses email so your selected industry roles are preserved. Google signup remains available for fan accounts.</p>}
 
       <p className="text-center mt-10">
         <span className="text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">ALREADY HAVE AN ACCOUNT? </span>

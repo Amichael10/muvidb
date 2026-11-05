@@ -18,7 +18,7 @@ export default function Onboarding() {
 
   useEffect(() => {
     document.title = "MuviDB | Complete Your Profile";
-    if (user?.onboarded) {
+    if (user?.role === 'fan' || user?.onboarded) {
       navigate(user.role === 'professional' ? '/pro-dashboard' : '/dashboard');
     }
     if (user?.name) setName(user.name);
