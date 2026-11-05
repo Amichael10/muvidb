@@ -161,6 +161,7 @@ export default function InstantEditorialPublisher({ onPublished }) {
   const [audioTracks, setAudioTracks] = useState([]);
   const [selectedAudio, setSelectedAudio] = useState(null);
   const [audioMood, setAudioMood] = useState('');
+  const [selectedAudioGenre, setSelectedAudioGenre] = useState('all');
   const [audioSearchQuery, setAudioSearchQuery] = useState('');
   const [searchingAudio, setSearchingAudio] = useState(false);
   const [playingAudioId, setPlayingAudioId] = useState(null);
@@ -411,20 +412,23 @@ export default function InstantEditorialPublisher({ onPublished }) {
     });
   };
 
-  const handleSearchAudioManual = async () => {
+  const handleSearchAudioManual = async (overrideGenre = null, shuffle = false) => {
     setSearchingAudio(true);
     try {
+      const activeGenre = overrideGenre !== null ? overrideGenre : selectedAudioGenre;
       const params = new URLSearchParams({
         task: 'instagram_audio_search',
         audioType: 'music',
       });
       if (audioSearchQuery.trim()) params.set('q', audioSearchQuery.trim());
+      if (activeGenre && activeGenre !== 'all') params.set('genre', activeGenre);
+      if (shuffle) params.set('shuffle', 'true');
       const res = await fetch(`/api/social?${params}`, { headers: await authHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Audio search failed');
       const tracks = Array.isArray(data.tracks) ? data.tracks : [];
       setAudioTracks(tracks);
-      if (tracks[0] && !selectedAudio) setSelectedAudio(tracks[0]);
+      if (tracks[0] && (!selectedAudio || shuffle)) setSelectedAudio(tracks[0]);
     } catch (err) {
       toast.error(err.message || 'Audio search failed');
     } finally {
@@ -886,7 +890,45 @@ export default function InstantEditorialPublisher({ onPublished }) {
                 </div>
               )}
 
-              {/* Search or switch to another trending track */}
+              {/* Quick Genre & Mood Chips */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+                  <span>Browse 135+ Nollywood & African Tracks</span>
+                  <span className="text-fuchsia-300">Anti-repeat active</span>
+                </div>
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+                  {[
+                    { id: 'all', label: 'All Catalog', icon: 'solar:music-library-2-bold' },
+                    { id: 'trending', label: 'Trending on IG', icon: 'solar:fire-bold' },
+                    { id: 'afrobeats_hits', label: 'Afrobeats Hits', icon: 'solar:star-fall-2-bold' },
+                    { id: 'romance_drama', label: 'Romance & Drama', icon: 'solar:heart-bold' },
+                    { id: 'nollywood_soundtrack', label: 'Nollywood OST', icon: 'solar:clapperboard-play-bold' },
+                    { id: 'cultural_highlife', label: 'Highlife & Cultural', icon: 'solar:record-bold' },
+                    { id: 'amapiano_energy', label: 'Amapiano & Street', icon: 'solar:bolt-bold' },
+                    { id: 'faith_inspirational', label: 'Faith & Gospel', icon: 'solar:sun-2-bold' },
+                    { id: 'cinematic_thriller', label: 'Thriller & Tension', icon: 'solar:shield-warning-bold' },
+                  ].map(chip => (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedAudioGenre(chip.id);
+                        handleSearchAudioManual(chip.id, false);
+                      }}
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold transition ${
+                        selectedAudioGenre === chip.id
+                          ? 'bg-fuchsia-500 text-white shadow-sm'
+                          : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <Icon icon={chip.icon} width="11" />
+                      <span>{chip.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Search, Shuffle, or switch tracks */}
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -898,17 +940,27 @@ export default function InstantEditorialPublisher({ onPublished }) {
                       handleSearchAudioManual();
                     }
                   }}
-                  placeholder="Search another song or artist (or leave blank to reload Trending)..."
+                  placeholder="Search 135+ tracks by song, artist, mood..."
                   className="h-9 flex-1 rounded-xl border border-white/10 bg-black/40 px-3 text-xs text-white outline-none focus:border-fuchsia-400"
                 />
                 <button
                   type="button"
-                  onClick={handleSearchAudioManual}
+                  onClick={() => handleSearchAudioManual()}
                   disabled={searchingAudio}
                   className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/20"
                 >
                   <Icon icon={searchingAudio ? 'solar:spinner-linear' : 'solar:magnifer-linear'} width="14" className={searchingAudio ? 'animate-spin' : ''} />
-                  {audioSearchQuery.trim() ? 'Search Audio' : 'Trending List'}
+                  {audioSearchQuery.trim() ? 'Search' : 'Browse'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSearchAudioManual(selectedAudioGenre, true)}
+                  disabled={searchingAudio}
+                  title="Shuffle fresh tracks in this category"
+                  className="inline-flex h-9 items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-2.5 text-xs font-bold text-white hover:bg-white/10"
+                >
+                  <Icon icon="solar:shuffle-bold" width="13" />
+                  Shuffle
                 </button>
               </div>
 
@@ -939,7 +991,12 @@ export default function InstantEditorialPublisher({ onPublished }) {
                             </span>
                           )}
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[11px] font-bold text-white">{track.title}</span>
+                            <span className="flex items-center gap-1.5">
+                              <span className="block truncate text-[11px] font-bold text-white">{track.title}</span>
+                              {track.isRecentlyUsed && (
+                                <span className="shrink-0 rounded bg-amber-500/20 px-1 py-0.2 text-[8px] font-bold text-amber-300">Used</span>
+                              )}
+                            </span>
                             <span className="block truncate text-[9px] text-zinc-400">{track.artist}</span>
                           </span>
                         </button>

@@ -526,6 +526,9 @@ export default function SocialDraftComposer({
   const [instagramAudioResults, setInstagramAudioResults] = useState([]);
   const [instagramAudioLoading, setInstagramAudioLoading] = useState(false);
   const [instagramAudio, setInstagramAudio] = useState(null);
+  const [instagramAudioGenre, setInstagramAudioGenre] = useState('all');
+  const [playingAudioId, setPlayingAudioId] = useState(null);
+  const audioPreviewRef = useRef(null);
   const [step1Open, setStep1Open] = useState(true);
   const [step2Open, setStep2Open] = useState(true);
   const [step3Open, setStep3Open] = useState(true);
@@ -1452,6 +1455,30 @@ export default function SocialDraftComposer({
     }));
   };
 
+  const togglePlayAudioPreview = (track) => {
+    if (!track?.previewUrl || track.previewUrl.includes('instagram.com/reels/audio')) {
+      toast('Direct browser preview is unavailable for this track, but Instagram will attach it on publish.');
+      return;
+    }
+    if (playingAudioId === track.audioId && audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+      setPlayingAudioId(null);
+      return;
+    }
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+    }
+    const audio = new Audio(track.previewUrl);
+    audio.volume = 0.85;
+    audio.onended = () => setPlayingAudioId(null);
+    audio.play().then(() => {
+      audioPreviewRef.current = audio;
+      setPlayingAudioId(track.audioId);
+    }).catch(() => {
+      toast.error('Could not stream audio preview');
+    });
+  };
+
   const autoRecommendInstagramAudio = async () => {
     setInstagramAudioLoading(true);
     try {
@@ -1462,6 +1489,7 @@ export default function SocialDraftComposer({
         synopsis: snap.synopsis || selected?.subtext || '',
         theme: themeId || '',
         contentType: result?.contentItem?.content_type || '',
+        shuffle: 'true',
       });
       const res = await fetch(`/api/social?task=instagram_audio_recommend&${params}`, {
         headers: await authHeaders(),
@@ -1490,11 +1518,14 @@ export default function SocialDraftComposer({
     }
   };
 
-  const searchInstagramAudio = async () => {
+  const searchInstagramAudio = async (overrideGenre = null, shuffle = false) => {
     setInstagramAudioLoading(true);
     try {
+      const activeGenre = overrideGenre !== null ? overrideGenre : instagramAudioGenre;
       const params = new URLSearchParams({ audioType: instagramAudioType });
       if (instagramAudioQuery.trim()) params.set('q', instagramAudioQuery.trim());
+      if (activeGenre && activeGenre !== 'all') params.set('genre', activeGenre);
+      if (shuffle) params.set('shuffle', 'true');
       const res = await fetch(`/api/social?task=instagram_audio_search&${params}`, {
         headers: await authHeaders(),
       });
@@ -3573,6 +3604,44 @@ export default function SocialDraftComposer({
                           </div>
                         )}
 
+                        {/* Category & Genre Filter Chips */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            <span>Browse Music Library (135+ Nollywood & African Tracks)</span>
+                            <span className="text-fuchsia-300">Anti-repeat rotation active</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                            {[
+                              { id: 'all', label: 'All Catalog', icon: 'solar:music-library-2-bold' },
+                              { id: 'trending', label: 'Trending on IG', icon: 'solar:fire-bold' },
+                              { id: 'afrobeats_hits', label: 'Afrobeats Hits', icon: 'solar:star-fall-2-bold' },
+                              { id: 'romance_drama', label: 'Romance & Drama', icon: 'solar:heart-bold' },
+                              { id: 'nollywood_soundtrack', label: 'Nollywood OST', icon: 'solar:clapperboard-play-bold' },
+                              { id: 'cultural_highlife', label: 'Highlife & Cultural', icon: 'solar:record-bold' },
+                              { id: 'amapiano_energy', label: 'Amapiano & Street', icon: 'solar:bolt-bold' },
+                              { id: 'faith_inspirational', label: 'Faith & Gospel', icon: 'solar:sun-2-bold' },
+                              { id: 'cinematic_thriller', label: 'Thriller & Tension', icon: 'solar:shield-warning-bold' },
+                            ].map(chip => (
+                              <button
+                                key={chip.id}
+                                type="button"
+                                onClick={() => {
+                                  setInstagramAudioGenre(chip.id);
+                                  searchInstagramAudio(chip.id, false);
+                                }}
+                                className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                                  instagramAudioGenre === chip.id
+                                    ? 'bg-fuchsia-500 text-white shadow-sm'
+                                    : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <Icon icon={chip.icon} width="12" />
+                                <span>{chip.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
                         <div className="flex flex-col gap-2 sm:flex-row">
                           <select
                             value={instagramAudioType}
@@ -3588,24 +3657,34 @@ export default function SocialDraftComposer({
                               value={instagramAudioQuery}
                               onChange={event => setInstagramAudioQuery(event.target.value)}
                               onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); searchInstagramAudio(); } }}
-                              placeholder="Search song, artist, mood — or leave blank for trending"
+                              placeholder="Search 135+ tracks by song, artist, mood, or genre..."
                               className="h-10 w-full rounded-xl border border-white/10 bg-black/30 pl-9 pr-3 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-fuchsia-400"
                             />
                           </div>
                           <button
                             type="button"
-                            onClick={searchInstagramAudio}
+                            onClick={() => searchInstagramAudio()}
                             disabled={instagramAudioLoading}
                             className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-black transition hover:bg-fuchsia-100 disabled:opacity-50"
                           >
-                            <Icon icon={instagramAudioLoading ? 'solar:spinner-linear' : 'solar:music-library-2-bold'} width="16" className={instagramAudioLoading ? 'animate-spin' : ''} />
-                            {instagramAudioLoading ? 'Searching' : instagramAudioQuery.trim() ? 'Search' : 'Trending'}
+                            <Icon icon={instagramAudioLoading ? 'solar:spinner-linear' : 'solar:magnifer-linear'} width="16" className={instagramAudioLoading ? 'animate-spin' : ''} />
+                            {instagramAudioLoading ? 'Searching' : instagramAudioQuery.trim() ? 'Search' : 'Browse'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => searchInstagramAudio(instagramAudioGenre, true)}
+                            disabled={instagramAudioLoading}
+                            title="Shuffle and get fresh randomized tracks from this category"
+                            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 text-xs font-bold text-white transition hover:bg-white/10 disabled:opacity-50"
+                          >
+                            <Icon icon="solar:shuffle-bold" width="14" />
+                            Shuffle
                           </button>
                           <button
                             type="button"
                             onClick={autoRecommendInstagramAudio}
                             disabled={instagramAudioLoading}
-                            title="Automatically match the best trending Afrobeats soundtrack to this film's genre & mood (with no-repeat rotation)"
+                            title="Automatically match the best soundtrack to this film's genre & mood (with guaranteed anti-repeat rotation)"
                             className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-fuchsia-400/40 bg-fuchsia-500/15 px-3.5 text-xs font-black text-fuchsia-200 transition hover:bg-fuchsia-500/25 disabled:opacity-50"
                           >
                             <Icon icon="solar:magic-stick-3-bold" width="15" />
@@ -3614,33 +3693,80 @@ export default function SocialDraftComposer({
                         </div>
 
                         {instagramAudioResults.length > 0 && (
-                          <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+                          <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
                             {instagramAudioResults.map(track => {
                               const selectedTrack = instagramAudio?.audio_id === track.audioId;
+                              const isPlaying = playingAudioId === track.audioId;
                               return (
-                                <button
+                                <div
                                   key={track.audioId}
-                                  type="button"
-                                  onClick={() => setInstagramAudio({
-                                    audio_id: track.audioId,
-                                    audio_type: track.audioType,
-                                    title: track.title,
-                                    artist: track.artist,
-                                    artwork_url: track.artworkUrl,
-                                    audio_volume: 85,
-                                    video_volume: 15,
-                                  })}
-                                  className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition ${selectedTrack ? 'border-fuchsia-400/60 bg-fuchsia-400/10' : 'border-white/5 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.06]'}`}
+                                  className={`flex w-full items-center justify-between gap-3 rounded-xl border p-2.5 text-left transition ${selectedTrack ? 'border-fuchsia-400/60 bg-fuchsia-400/10' : 'border-white/5 bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.06]'}`}
                                 >
-                                  {track.artworkUrl ? <img src={track.artworkUrl} alt="" className="h-10 w-10 rounded-lg object-cover" /> : (
-                                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-fuchsia-400/10 text-fuchsia-300"><Icon icon="solar:music-note-bold" width="18" /></span>
-                                  )}
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-xs font-black text-white">{track.title}</span>
-                                    <span className="mt-0.5 block truncate text-[10px] text-zinc-500">{track.artist || (track.audioType === 'music' ? 'Instagram Music' : 'Original sound')}{track.durationMs ? ` · ${Math.round(track.durationMs / 1000)}s` : ''}{track.matchReason ? ` · ${track.matchReason}` : ''}</span>
-                                  </span>
-                                  <Icon icon={selectedTrack ? 'solar:check-circle-bold' : 'solar:add-circle-linear'} width="19" className={selectedTrack ? 'text-fuchsia-300' : 'text-zinc-600'} />
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setInstagramAudio({
+                                      audio_id: track.audioId,
+                                      audio_type: track.audioType,
+                                      title: track.title,
+                                      artist: track.artist,
+                                      artwork_url: track.artworkUrl,
+                                      audio_volume: 85,
+                                      video_volume: 15,
+                                    })}
+                                    className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                                  >
+                                    {track.artworkUrl ? (
+                                      <img src={track.artworkUrl} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0" />
+                                    ) : (
+                                      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-fuchsia-400/10 text-fuchsia-300 shrink-0">
+                                        <Icon icon="solar:music-note-bold" width="18" />
+                                      </span>
+                                    )}
+                                    <span className="min-w-0 flex-1">
+                                      <span className="flex items-center gap-2">
+                                        <span className="block truncate text-xs font-black text-white">{track.title}</span>
+                                        {track.isRecentlyUsed ? (
+                                          <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">Used recently</span>
+                                        ) : (
+                                          <span className="shrink-0 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold text-emerald-300">Fresh</span>
+                                        )}
+                                      </span>
+                                      <span className="mt-0.5 block truncate text-[10px] text-zinc-500">
+                                        {track.artist || (track.audioType === 'music' ? 'Instagram Music' : 'Original sound')}
+                                        {track.durationMs ? ` · ${Math.round(track.durationMs / 1000)}s` : ''}
+                                        {track.matchReason ? ` · ${track.matchReason}` : ''}
+                                      </span>
+                                    </span>
+                                  </button>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {track.previewUrl && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); togglePlayAudioPreview(track); }}
+                                        className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/20 transition"
+                                        title={isPlaying ? 'Pause preview' : 'Play audio preview'}
+                                      >
+                                        <Icon icon={isPlaying ? 'solar:pause-bold' : 'solar:play-bold'} width="14" />
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => setInstagramAudio({
+                                        audio_id: track.audioId,
+                                        audio_type: track.audioType,
+                                        title: track.title,
+                                        artist: track.artist,
+                                        artwork_url: track.artworkUrl,
+                                        audio_volume: 85,
+                                        video_volume: 15,
+                                      })}
+                                      className={`rounded-lg p-2 transition ${selectedTrack ? 'bg-fuchsia-500 text-white' : 'bg-white/5 text-zinc-400 hover:bg-white/15 hover:text-white'}`}
+                                    >
+                                      <Icon icon={selectedTrack ? 'solar:check-circle-bold' : 'solar:add-circle-linear'} width="17" />
+                                    </button>
+                                  </div>
+                                </div>
                               );
                             })}
                           </div>

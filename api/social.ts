@@ -450,13 +450,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { searchInstagramAudio } = await import('./_lib/social-studio/platforms/instagram-audio.js');
         const audioType = String(req.query?.audioType || 'music') === 'original_sound' ? 'original_sound' : 'music';
         const query = String(req.query?.q || '');
+        const genre = String(req.query?.genre || '');
+        const mood = String(req.query?.mood || '');
+        const shuffle = String(req.query?.shuffle || '') === 'true';
+        const limit = Number(req.query?.limit || 40);
         const connectionId = String(req.query?.connectionId || '') || null;
-        return res.status(200).json(await searchInstagramAudio({ query, audioType, connectionId }));
+        return res.status(200).json(await searchInstagramAudio({ query, genre, mood, audioType, connectionId, shuffle, limit }));
+      }
+
+      if (task === 'instagram_audio_genres') {
+        await requireSocialStudioAdmin(req);
+        const { AUDIO_GENRES, getAudioCatalogStats } = await import('./_lib/social-studio/platforms/instagram-audio.js');
+        return res.status(200).json({ genres: AUDIO_GENRES, stats: getAudioCatalogStats() });
       }
 
       if (task === 'instagram_audio_recommend') {
         await requireSocialStudioAdmin(req);
         const { recommendInstagramAudioForContent } = await import('./_lib/social-studio/platforms/instagram-audio.js');
+        const excludeRaw = String(req.query?.excludeAudioIds || '');
+        const excludeAudioIds = excludeRaw ? excludeRaw.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
         return res.status(200).json(await recommendInstagramAudioForContent({
           title: String(req.query?.title || ''),
           genres: String(req.query?.genres || ''),
@@ -464,6 +476,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           theme: String(req.query?.theme || ''),
           contentType: String(req.query?.contentType || ''),
           connectionId: String(req.query?.connectionId || '') || null,
+          excludeAudioIds,
+          shuffle: String(req.query?.shuffle || '') === 'true',
         }));
       }
 
