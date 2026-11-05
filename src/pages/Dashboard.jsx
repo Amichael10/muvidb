@@ -7,6 +7,7 @@ import { setWatchlistWatched } from '../hooks/useWatchlist';
 import { toast } from 'react-hot-toast';
 import FilmCard from '../components/film/FilmCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
+import WhatsAppOptInModal from '../components/person/WhatsAppOptInModal';
 
 function canMutateReview(createdAt) {
   if (!createdAt) return false;
@@ -113,6 +114,7 @@ export default function Dashboard() {
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
   // Fan Artist Follow & Release Alerts banner state
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     try {
       return localStorage.getItem('muvidb_fan_follow_banner_dismissed') === 'true';
@@ -597,29 +599,29 @@ export default function Dashboard() {
                   />
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-brand/10 blur-2xl"
+                    className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-emerald-500/10 blur-2xl"
                   />
 
                   <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     <div className="flex items-start gap-4 md:gap-5 max-w-2xl">
-                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-brand to-brand/80 text-white flex items-center justify-center shrink-0 shadow-lg shadow-brand/35 mt-1">
+                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-brand text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/25 mt-1">
                         <Icon icon="solar:bell-bing-bold" className="text-2xl md:text-3xl" />
                       </div>
                       <div className="space-y-2 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-brand/20 text-brand border border-brand/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-                            Fan Alerts
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                            <Icon icon="logos:whatsapp-icon" className="text-xs" />
+                            WhatsApp &amp; Fan Alerts
                           </span>
                           <span className="text-xs text-text-muted hidden sm:inline">
-                            · Stay updated on Nollywood
+                            · Direct to your phone
                           </span>
                         </div>
                         <h2 className="font-heading text-2xl md:text-3xl font-bold text-text-primary tracking-tight leading-tight">
-                          Follow your favorite artists &amp; creatives
+                          Follow your favorite artists &amp; get notified on WhatsApp
                         </h2>
                         <p className="text-sm md:text-base text-text-muted leading-relaxed">
-                          Follow your favorite artist and get notified whenever they release a new movie or get featured in one.
+                          Follow your favorite artist and get notified on WhatsApp whenever they release a new movie or get featured in one.
                         </p>
                       </div>
                     </div>
@@ -630,8 +632,31 @@ export default function Dashboard() {
                         className="inline-flex items-center justify-center gap-2 bg-brand text-white px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg shadow-brand/25 hover:brightness-110 active:scale-95 transition-all text-center"
                       >
                         <Icon icon="solar:users-group-rounded-bold" className="text-base" />
-                        Explore &amp; Follow Artists
+                        Explore Artists
                       </Link>
+
+                      {whatsappPhone ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowWhatsAppModal(true)}
+                          title="Click to update your WhatsApp phone number"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 transition-colors"
+                        >
+                          <Icon icon="logos:whatsapp-icon" className="text-sm" />
+                          <span className="truncate max-w-[130px]">{whatsappPhone}</span>
+                          <Icon icon="solar:check-circle-bold" className="text-xs text-emerald-500" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowWhatsAppModal(true)}
+                          className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg shadow-emerald-600/20 active:scale-95 transition-all text-center"
+                        >
+                          <Icon icon="solar:chat-round-dots-bold" className="text-base" />
+                          Get WhatsApp Alerts
+                        </button>
+                      )}
+
                       {following.length > 0 && (
                         <button
                           type="button"
@@ -1123,7 +1148,17 @@ export default function Dashboard() {
               )}
             </div>
           )}
-        </main>
+          <WhatsAppOptInModal
+        isOpen={showWhatsAppModal}
+        onClose={() => setShowWhatsAppModal(false)}
+        personName="your favorite artists"
+        user={user}
+        onOptInSuccess={(phone) => {
+          setWhatsappPhone(phone);
+          if (refreshUserProfile) refreshUserProfile();
+        }}
+      />
+    </main>
       </div>
     </div>
   );
