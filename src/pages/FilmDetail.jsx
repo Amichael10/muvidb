@@ -27,7 +27,7 @@ import { slugOrId } from '../utils/slug';
 import { getShowName } from '../utils/series';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import AwardLogo from '../components/awards/AwardLogo';
-import { normOrg } from '../lib/awards';
+import { normOrg, dedupeAwards } from '../lib/awards';
 import { formatFilmTitle, toSentenceCase, formatPersonName, toTitleCase } from '../utils/format';
 import { getFilmLanguages, getLanguageEndonym } from '../utils/languages';
 import { formatRole } from '../lib/creditRoles';
@@ -419,20 +419,8 @@ export default function FilmDetail() {
       if (personAwardsForFilm.length > 0) {
         setFilm(prev => {
           if (!prev) return null;
-          const currentAwards = Array.isArray(prev.awards) ? [...prev.awards] : [];
-          let changed = false;
-          personAwardsForFilm.forEach(pa => {
-            const exists = currentAwards.some(ca => 
-              (ca.organization || '').trim().toLowerCase() === (pa.organization || '').trim().toLowerCase() &&
-              (ca.category || ca.title || '').trim().toLowerCase() === (pa.category || pa.title || '').trim().toLowerCase() &&
-              (!ca.year || !pa.year || Number(ca.year) === Number(pa.year))
-            );
-            if (!exists) {
-              currentAwards.push(pa);
-              changed = true;
-            }
-          });
-          return changed ? { ...prev, awards: currentAwards } : prev;
+          const merged = dedupeAwards([...(Array.isArray(prev.awards) ? prev.awards : []), ...personAwardsForFilm]);
+          return { ...prev, awards: merged };
         });
       }
     } catch (error) {
@@ -962,8 +950,10 @@ export default function FilmDetail() {
                     </>
                   )}
                   {Array.isArray(film.awards) && film.awards.length > 0 && (() => {
-                    const wins = film.awards.filter(a => a.won !== false).length;
-                    const noms = film.awards.filter(a => a.won === false).length;
+                    const cleanAwards = dedupeAwards(film.awards);
+                    if (cleanAwards.length === 0) return null;
+                    const wins = cleanAwards.filter(a => a.won !== false).length;
+                    const noms = cleanAwards.filter(a => a.won === false).length;
                     return (
                       <>
                         <span className="w-1 h-1 rounded-full bg-white/40"></span>
@@ -1944,8 +1934,10 @@ export default function FilmDetail() {
 
             {/* Awards — before reviews, collapsed by default */}
             {Array.isArray(film.awards) && film.awards.length > 0 && (() => {
-              const wins = film.awards.filter((a) => a.won !== false).length;
-              const nominations = film.awards.filter((a) => a.won === false).length;
+              const cleanAwards = dedupeAwards(film.awards);
+              if (cleanAwards.length === 0) return null;
+              const wins = cleanAwards.filter((a) => a.won !== false).length;
+              const nominations = cleanAwards.filter((a) => a.won === false).length;
               return (
               <section id="awards-section" className="p-8 md:p-12 border-b border-border scroll-mt-28">
                 <button
@@ -1979,7 +1971,7 @@ export default function FilmDetail() {
                 </button>
                 {awardsOpen && (
                   <ul className="mt-6 divide-y divide-border/70 border-y border-border/70">
-                    {[...film.awards]
+                    {[...cleanAwards]
                       .sort((a, b) => (b.year || 0) - (a.year || 0))
                       .map((award, idx) => (
                         <li

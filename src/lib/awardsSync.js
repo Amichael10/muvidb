@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js';
-import { AWARD_ORGS, normOrg } from './awards.js';
+import { AWARD_ORGS, normOrg, areSameAwardSlot, dedupeAwards } from './awards.js';
 
 /**
  * Common canonical categories available across most award bodies.
@@ -322,24 +322,7 @@ export function getCategoriesForOrg(org) {
  * Match two award records to see if they refer to the same award slot.
  */
 function isSameAward(a, b) {
-  if (!a || !b) return false;
-  const orgA = normOrg(a.organization);
-  const orgB = normOrg(b.organization);
-  if (orgA !== orgB) return false;
-
-  const yearA = a.year ? parseInt(a.year, 10) : null;
-  const yearB = b.year ? parseInt(b.year, 10) : null;
-  const seasonA = a.season ? parseInt(a.season, 10) : null;
-  const seasonB = b.season ? parseInt(b.season, 10) : null;
-
-  if (yearA && yearB && yearA !== yearB) return false;
-  if (seasonA && seasonB && seasonA !== seasonB) return false;
-
-  const catA = (a.category || a.title || '').trim().toLowerCase();
-  const catB = (b.category || b.title || '').trim().toLowerCase();
-  if (catA && catB && catA !== catB) return false;
-
-  return true;
+  return areSameAwardSlot(a, b);
 }
 
 /**
@@ -410,7 +393,7 @@ export async function syncPersonAwardsToFilms(personId, personName, personAwards
         });
       }
 
-      await supabase.from('films').update({ awards: filmAwards }).eq('id', targetFilmId);
+      await supabase.from('films').update({ awards: dedupeAwards(filmAwards) }).eq('id', targetFilmId);
     } catch (err) {
       console.warn('syncPersonAwardsToFilms error for film:', targetFilmId, err);
     }

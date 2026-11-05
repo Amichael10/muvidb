@@ -1596,6 +1596,120 @@ export function normOrg(raw) {
   return s;
 }
 
+function cleanCategory(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .replace(/\b(amaa|amvca|tinff|bon|aiff|afriff|oafp|naga|eloy|eko star)\b/gi, '')
+    .replace(/\b(201\d|202\d)\b/g, '')
+    .replace(/\b(michael anyiam osigwe|efere ozako|efer ozako|jubril malaifia|ousmane sembene|mane sembene)\b/gi, '')
+    .replace(/\b(award for|awards|award)\b/gi, '')
+    .replace(/[–—−]/g, '-')
+    .replace(/[^a-zA-Z0-9\(\)\- ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function baseCategory(clean) {
+  return clean
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function areSameAwardCategory(cat1, cat2) {
+  if (!cat1 || !cat2) return false;
+  const c1 = cleanCategory(cat1);
+  const c2 = cleanCategory(cat2);
+  if (c1 === c2) return true;
+
+  const b1 = baseCategory(c1);
+  const b2 = baseCategory(c2);
+  if (b1 && b2 && b1 === b2) return true;
+
+  return false;
+}
+
+export function areSameAwardSlot(a, b) {
+  if (!a || !b) return false;
+  const orgA = normOrg(a.organization);
+  const orgB = normOrg(b.organization);
+  if (orgA && orgB && orgA !== orgB) return false;
+
+  const yA = a.year ? Number(a.year) : null;
+  const yB = b.year ? Number(b.year) : null;
+  if (yA && yB && yA !== yB) return false;
+
+  const sA = a.season != null && a.season !== '' ? Number(a.season) : null;
+  const sB = b.season != null && b.season !== '' ? Number(b.season) : null;
+  if (sA && sB && sA !== sB) return false;
+
+  if (a.film_id && b.film_id && a.film_id !== b.film_id) return false;
+  const workA = (a.work || '').trim().toLowerCase();
+  const workB = (b.work || '').trim().toLowerCase();
+  if (workA && workB && workA !== workB) return false;
+
+  const catA = a.category || a.title || '';
+  const catB = b.category || b.title || '';
+  return areSameAwardCategory(catA, catB);
+}
+
+/**
+ * Deduplicate award entries:
+ * If an entity has a NOMINATION and later a WIN for the same award & category,
+ * the nomination is removed and the WIN replaces it.
+ */
+export function dedupeAwards(awards) {
+  if (!Array.isArray(awards) || awards.length <= 1) return awards || [];
+
+  const result = [];
+
+  for (const current of awards) {
+    if (!current) continue;
+
+    const existingIndex = result.findIndex((existing) => areSameAwardSlot(existing, current));
+
+    if (existingIndex === -1) {
+      result.push({ ...current });
+    } else {
+      const existing = result[existingIndex];
+      const existingWon = existing.won === true || existing.won === 'true';
+      const currentWon = current.won === true || current.won === 'true';
+
+      if (currentWon && !existingWon) {
+        // Current is a WIN, existing was a NOMINATION:
+        // WIN replaces NOMINATION!
+        result[existingIndex] = {
+          ...existing,
+          ...current,
+          won: true,
+          recipients: current.recipients?.length ? current.recipients : existing.recipients,
+        };
+      } else if (!currentWon && existingWon) {
+        // Existing is already a WIN, current is a NOMINATION:
+        // Keep the WIN, do not re-add the nomination!
+        if (current.recipients?.length) {
+          const recSet = new Set([...(existing.recipients || []), ...current.recipients]);
+          result[existingIndex].recipients = [...recSet];
+        }
+      } else {
+        // Both won or both nominated: retain richer record
+        const currCatLen = (current.category || '').length;
+        const existCatLen = (existing.category || '').length;
+        const better = currCatLen >= existCatLen ? current : existing;
+        const recSet = new Set([...(existing.recipients || []), ...(current.recipients || [])]);
+        result[existingIndex] = {
+          ...better,
+          won: existingWon || currentWon,
+          recipients: recSet.size ? [...recSet] : undefined,
+        };
+      }
+    }
+  }
+
+  return result;
+}
+
 async function pageTable(table, cols) {
   const pageSize = 1000;
   let from = 0;
@@ -1671,7 +1785,7 @@ export async function loadAwardsCatalog() {
       : null;
 
   for (const person of people) {
-    const awards = Array.isArray(person.awards) ? person.awards : [];
+    const awards = dedupeAwards(Array.isArray(person.awards) ? person.awards : []);
     for (const a of awards) {
       const org = normOrg(a.organization);
       const year = Number(a.year) || null;
@@ -1702,7 +1816,7 @@ export async function loadAwardsCatalog() {
   }
 
   for (const film of films) {
-    const awards = Array.isArray(film.awards) ? film.awards : [];
+    const awards = dedupeAwards(Array.isArray(film.awards) ? film.awards : []);
     for (const a of awards) {
       const org = normOrg(a.organization);
       const year = Number(a.year) || null;
@@ -1750,7 +1864,7 @@ export async function loadAwardsCatalog() {
   }
 
   for (const company of companies) {
-    const awards = Array.isArray(company.awards) ? company.awards : [];
+    const awards = dedupeAwards(Array.isArray(company.awards) ? company.awards : []);
     for (const a of awards) {
       const org = normOrg(a.organization);
       const year = Number(a.year) || null;
@@ -1776,7 +1890,7 @@ export async function loadAwardsCatalog() {
   }
 
   for (const cinema of cinemas) {
-    const awards = Array.isArray(cinema.awards) ? cinema.awards : [];
+    const awards = dedupeAwards(Array.isArray(cinema.awards) ? cinema.awards : []);
     for (const a of awards) {
       const org = normOrg(a.organization);
       const year = Number(a.year) || null;
@@ -1865,6 +1979,35 @@ export function groupAwards(rows, { org, year } = {}) {
     const bucket = byCategory.get(cat);
     if (r.won) bucket.winners.push(r);
     else bucket.nominees.push(r);
+  }
+
+  // Deduplicate: if an entity won, remove them from nominees for the same category
+  for (const bucket of byCategory.values()) {
+    if (bucket.winners.length > 0 && bucket.nominees.length > 0) {
+      const winnerFilmIds = new Set(bucket.winners.map((w) => w.film?.id).filter(Boolean));
+      const winnerFilmTitles = new Set(bucket.winners.map((w) => (w.film?.title || w.work || '').trim().toLowerCase()).filter(Boolean));
+      const winnerPersonIds = new Set(bucket.winners.map((w) => w.person?.id).filter(Boolean));
+      const winnerPersonNames = new Set(bucket.winners.map((w) => (w.person?.name || '').trim().toLowerCase()).filter(Boolean));
+
+      bucket.nominees = bucket.nominees.filter((n) => {
+        const filmId = n.film?.id;
+        const filmTitle = (n.film?.title || n.work || '').trim().toLowerCase();
+        const personId = n.person?.id;
+        const personName = (n.person?.name || '').trim().toLowerCase();
+
+        if (personId || personName) {
+          const personWon = (personId && winnerPersonIds.has(personId)) || (personName && winnerPersonNames.has(personName));
+          if (personWon) return false;
+        }
+
+        const filmWon = (filmId && winnerFilmIds.has(filmId)) || (filmTitle && winnerFilmTitles.has(filmTitle));
+        if (filmWon && (!n.person || !n.person.name)) {
+          return false;
+        }
+
+        return true;
+      });
+    }
   }
 
   return [...byCategory.values()].sort((a, b) => a.category.localeCompare(b.category));

@@ -39,6 +39,7 @@
     "harvest:automated": "tsx scripts/run_automated_credit_harvester.ts",
     "build:user-words": "tsx scripts/build_tesseract_user_words.ts",
     "harvest:legacy": "tsx scripts/harvest_credits.ts",
+    "reconcile:awards": "tsx scripts/reconcile_awards_wins_and_nominations.ts",
     "cleanup:people": "tsx scripts/daily_people_cleanup.ts",
     "cleanup:people:deep": "tsx scripts/daily_people_cleanup.ts --deep",
     "sync:kava": "tsx scripts/sync_feed_kappa.ts",

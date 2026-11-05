@@ -27,7 +27,7 @@ import PersonPhotoLightboxModal from '../components/person/PersonPhotoLightboxMo
 import BookingModal from '../components/person/BookingModal'
 import TalentAccessModal from '../components/person/TalentAccessModal'
 import AwardLogo from '../components/awards/AwardLogo'
-import { normOrg } from '../lib/awards'
+import { normOrg, dedupeAwards } from '../lib/awards'
 
 const PLATFORM_STYLES = {
   cinema:      { label: 'Cinema',   bg: 'bg-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-400' },
@@ -560,10 +560,11 @@ export default function PersonDetailV2() {
   // ── Known For Calculation ──
   const rawAwards = Array.isArray(person?.awards) ? person.awards : []
   const canonicalAwardEntries = useMemo(() => {
-    return rawAwards.map(a => ({
+    const list = rawAwards.map(a => ({
       ...a,
       canonicalOrg: canonicalizeAwardOrg(a.organization)
     }))
+    return dedupeAwards(list);
   }, [rawAwards])
 
   const awardWins = canonicalAwardEntries.filter((award) => award.won !== false).length
