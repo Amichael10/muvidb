@@ -113,7 +113,10 @@ export const SOCIAL_PLATFORMS: SocialPlatform[] = [
     tint: 'bg-sky-500/10',
     solid: 'bg-[#0A66C2]',
     hosts: ['linkedin.com', 'lnkd.in'],
-    handleToUrl: (h) => `https://linkedin.com/in/${h}`,
+    handleToUrl: (h) => {
+      const clean = String(h || '').trim().replace(/^https?:\/\/(?:www\.)?linkedin\.com\/in\//i, '').replace(/^\/?in\//i, '').replace(/^@/, '');
+      return `https://linkedin.com/in/${clean}`;
+    },
   },
   {
     key: 'whatsapp',

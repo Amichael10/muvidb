@@ -116,8 +116,6 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
   const [activeTab, setActiveTab] = useState('header'); // 'header' | 'themes' | 'content' | 'contact'
   const [themeSubTab, setThemeSubTab] = useState('curated'); // 'curated' | 'custom'
   const [mobilePane, setMobilePane] = useState('editor'); // 'editor' | 'preview'
-  const [titleStyle, setTitleStyle] = useState('text'); // 'text' | 'logo'
-  const [altFont, setAltFont] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -451,9 +449,10 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
     }
     // A bare handle is fine when we know the platform — "rinaboyxx" under
     // Instagram becomes the full profile URL.
-    const presetPlatform = preset?.platformKey ? platformFor(preset.platformKey) : null;
+    const targetPlatformKey = preset?.platformKey || newLink.platformKey;
+    const presetPlatform = targetPlatformKey ? platformFor(targetPlatformKey) : null;
     const cleanUrl = presetPlatform
-      ? resolveSocialUrl(presetPlatform.key, rawUrl)
+      ? (resolveSocialUrl(presetPlatform.key, rawUrl) || (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`))
       : (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
     const matched = presetPlatform || detectPlatform(cleanUrl);
     // Title is optional: the platform name is a better default than making
@@ -882,59 +881,6 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                         placeholder="Creative Product Designer voyaging around emerging technologies e.g AI, Web3."
                         className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none resize-none"
                       />
-                    </div>
-
-                    {/* Title Style and Font Options */}
-                    <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-white/5">
-                      <div>
-                        <label className="block text-[11px] font-mono text-zinc-400 uppercase tracking-wider mb-1.5">
-                          Title Style
-                        </label>
-                        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 w-fit">
-                          <button
-                            type="button"
-                            onClick={() => setTitleStyle('text')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                              titleStyle === 'text' ? 'bg-white/15 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
-                            }`}
-                          >
-                            <span className="font-serif">Aa</span>
-                            <span>Text</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setTitleStyle('logo')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                              titleStyle === 'logo' ? 'bg-white/15 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
-                            }`}
-                          >
-                            <Icon icon="solar:gallery-minimalistic-bold" width="13" />
-                            <span>Logo</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-bold text-white">Alternative Title Font</p>
-                            <p className="text-[10px] text-zinc-400">Matches page font by default</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setAltFont(!altFont)}
-                            className={`w-10 h-6 rounded-full transition-colors p-0.5 ${
-                              altFont ? 'bg-brand' : 'bg-white/10'
-                            }`}
-                          >
-                            <div
-                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                                altFont ? 'translate-x-4' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 )}
@@ -1453,7 +1399,17 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                             value={newLink.url}
                             onChange={(e) => setNewLink({ ...newLink, url: e.target.value })}
                             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddLink(); } }}
-                            placeholder={newLink.platformKey ? '@handle or full link' : 'https://...'}
+                            placeholder={
+                              !newLink.platformKey
+                                ? 'https://...'
+                                : newLink.platformKey === 'linkedin'
+                                ? 'Profile URL or username (e.g. linkedin.com/in/...)'
+                                : newLink.platformKey === 'whatsapp'
+                                ? 'Phone number e.g. +234...'
+                                : newLink.platformKey === 'youtube'
+                                ? '@channel or youtube.com/...'
+                                : '@handle or full link'
+                            }
                             className="w-full rounded-xl border border-white/10 bg-white/5 pl-3 pr-9 py-2 text-xs text-white placeholder-zinc-500 focus:border-brand focus:outline-none"
                           />
                           {/* Live proof the icon was recognised, before saving. */}

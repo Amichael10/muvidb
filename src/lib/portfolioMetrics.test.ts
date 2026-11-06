@@ -53,9 +53,9 @@ describe('Creator Link Portfolio Metrics', () => {
       })),
     ];
 
-    // 3 stage productions
+    // 3 stage productions with one having stage theatre box office
     const mockStageCredits = [
-      { id: 'stage-1', role: 'Lead Actor', plays: { title: 'Wole Soyinka Death and the Kings Horseman' } },
+      { id: 'stage-1', role: 'Lead Actor', box_office_domestic: 18_500_000, plays: { title: 'Wole Soyinka Death and the Kings Horseman' } },
       { id: 'stage-2', role: 'Director', plays: { title: 'The Lion and the Jewel' } },
       { id: 'stage-3', role: 'Producer', plays: { title: 'Kurunmi' } },
     ];
@@ -69,6 +69,9 @@ describe('Creator Link Portfolio Metrics', () => {
 
     expect(metrics.totalBoxOffice).toBe(420_000_000);
     expect(metrics.formattedBoxOffice).toBe('₦420M');
+
+    expect(metrics.totalStageBoxOffice).toBe(18_500_000);
+    expect(metrics.formattedStageBoxOffice).toBe('₦18.5M');
 
     expect(metrics.totalViews).toBe(86_000_000);
     expect(metrics.formattedViews).toBe('86M');

@@ -265,6 +265,7 @@ export default function FilmmakerPortfolio() {
   const hasCommercialToDisplay =
     showMetrics &&
     ((showBoxOffice && (computedMetrics?.totalBoxOffice || 0) > 0) ||
+     (showBoxOffice && (computedMetrics?.totalStageBoxOffice || 0) > 0) ||
      (showYoutubeViews && (computedMetrics?.totalViews || 0) > 0));
 
   const theme = THEME_STYLES[portfolio.theme_preset] || THEME_STYLES.midnight;
@@ -497,121 +498,84 @@ export default function FilmmakerPortfolio() {
           </div>
         </section>
 
-        {/* Commercial Footprint & Across Screens (Dedicated Trade Credentials Section) */}
-        {showMetrics && (hasCommercialToDisplay || computedMetrics?.acrossScreensText) && (
+        {/* Commercial Footprint (Cinema Box Office, Theatre Box Office & YouTube Views) */}
+        {hasCommercialToDisplay && (
           <section className="relative rounded-3xl border border-white/10 bg-zinc-950/80 p-6 sm:p-7 backdrop-blur-xl overflow-hidden shadow-xl">
             {/* Ambient Background Glow */}
             <div className={`absolute top-0 right-0 w-80 h-80 rounded-full bg-gradient-to-b ${theme.heroGlow} blur-3xl opacity-20 pointer-events-none`} />
 
             {/* Section Header */}
-            <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Icon icon="solar:chart-square-bold" width="18" className="text-brand" />
-                  <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-300 font-bold">
-                    Commercial Footprint
-                  </h2>
-                </div>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Documented cinema box office milestones and verified digital viewership
-                </p>
+            <div className="relative border-b border-white/5 pb-4">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:chart-square-bold" width="18" className="text-brand" />
+                <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-300 font-bold">
+                  Commercial Footprint
+                </h2>
               </div>
+              <p className="text-xs text-zinc-400 mt-1">
+                Documented theatrical box office milestones and verified digital viewership
+              </p>
+            </div>
 
-              {/* Across Screens Scope Pills */}
-              {computedMetrics?.acrossScreensText && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
-                  {computedMetrics.cinemaCount > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs font-mono font-medium">
-                      <Icon icon="solar:ticket-bold" width="13" />
-                      <span>{computedMetrics.cinemaCount} Cinema Release{computedMetrics.cinemaCount > 1 ? 's' : ''}</span>
+            {/* Metric Highlights Grid - Strictly Commercial & Audience Figures */}
+            <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {showBoxOffice && (computedMetrics?.totalBoxOffice || 0) > 0 && (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.04] p-5 flex flex-col justify-between hover:border-amber-500/50 transition">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400">
+                      Cinema Box Office
                     </span>
-                  )}
-                  {computedMetrics.youtubeCount > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-red-300 text-xs font-mono font-medium">
-                      <Icon icon="simple-icons:youtube" width="12" />
-                      <span>{computedMetrics.youtubeCount} YouTube Film{computedMetrics.youtubeCount > 1 ? 's' : ''}</span>
+                    <Icon icon="solar:ticket-bold" width="16" className="text-amber-400" />
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+                      {computedMetrics.formattedBoxOffice}
+                    </div>
+                    <p className="text-xs text-zinc-300 font-medium mt-1">
+                      Documented Cinema Box Office
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {showBoxOffice && (computedMetrics?.totalStageBoxOffice || 0) > 0 && (
+                <div className="rounded-2xl border border-purple-500/30 bg-purple-500/[0.04] p-5 flex flex-col justify-between hover:border-purple-500/50 transition">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-400">
+                      Theatre Box Office
                     </span>
-                  )}
-                  {computedMetrics.stageCount > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/25 text-purple-300 text-xs font-mono font-medium">
-                      <Icon icon="solar:masks-bold" width="13" />
-                      <span>{computedMetrics.stageCount} Stage Production{computedMetrics.stageCount > 1 ? 's' : ''}</span>
+                    <Icon icon="solar:masks-bold" width="16" className="text-purple-400" />
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+                      {computedMetrics.formattedStageBoxOffice}
+                    </div>
+                    <p className="text-xs text-zinc-300 font-medium mt-1">
+                      Documented Theatre Box Office
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {showYoutubeViews && (computedMetrics?.totalViews || 0) > 0 && (
+                <div className="rounded-2xl border border-red-500/30 bg-red-500/[0.04] p-5 flex flex-col justify-between hover:border-red-500/50 transition">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-red-400">
+                      Audience Reach
                     </span>
-                  )}
+                    <Icon icon="simple-icons:youtube" width="16" className="text-red-400" />
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+                      {computedMetrics.formattedViews}
+                    </div>
+                    <p className="text-xs text-zinc-300 font-medium mt-1">
+                      Combined YouTube Views
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Metric Highlights Grid */}
-            {hasCommercialToDisplay && (
-              <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {showBoxOffice && computedMetrics.totalBoxOffice > 0 && (
-                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.04] p-5 flex flex-col justify-between hover:border-amber-500/50 transition">
-                    <div className="flex items-center justify-between text-zinc-400">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400">
-                        Cinema Box Office
-                      </span>
-                      <Icon icon="solar:ticket-bold" width="16" className="text-amber-400" />
-                    </div>
-                    <div className="mt-3">
-                      <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
-                        {computedMetrics.formattedBoxOffice}
-                      </div>
-                      <p className="text-xs text-zinc-300 font-medium mt-1">
-                        Documented Cinema Box Office
-                      </p>
-                      <span className="text-[11px] font-mono text-zinc-500 block mt-0.5">
-                        From {computedMetrics.cinemaCount} verified theatrical release{computedMetrics.cinemaCount > 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {showYoutubeViews && computedMetrics.totalViews > 0 && (
-                  <div className="rounded-2xl border border-red-500/30 bg-red-500/[0.04] p-5 flex flex-col justify-between hover:border-red-500/50 transition">
-                    <div className="flex items-center justify-between text-zinc-400">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-red-400">
-                        Audience Reach
-                      </span>
-                      <Icon icon="simple-icons:youtube" width="16" className="text-red-400" />
-                    </div>
-                    <div className="mt-3">
-                      <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
-                        {computedMetrics.formattedViews}
-                      </div>
-                      <p className="text-xs text-zinc-300 font-medium mt-1">
-                        Combined YouTube Views
-                      </p>
-                      <span className="text-[11px] font-mono text-zinc-500 block mt-0.5">
-                        Across {computedMetrics.youtubeCount} digital streaming title{computedMetrics.youtubeCount > 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {computedMetrics.stageCount > 0 && (
-                  <div className="rounded-2xl border border-purple-500/30 bg-purple-500/[0.04] p-5 flex flex-col justify-between hover:border-purple-500/50 transition">
-                    <div className="flex items-center justify-between text-zinc-400">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-400">
-                        Live Theatre
-                      </span>
-                      <Icon icon="solar:masks-bold" width="16" className="text-purple-400" />
-                    </div>
-                    <div className="mt-3">
-                      <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
-                        {computedMetrics.stageCount}
-                      </div>
-                      <p className="text-xs text-zinc-300 font-medium mt-1">
-                        Stage Productions
-                      </p>
-                      <span className="text-[11px] font-mono text-zinc-500 block mt-0.5">
-                        Archived theatrical &amp; live performance credits
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </section>
         )}
 

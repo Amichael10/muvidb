@@ -42,6 +42,8 @@ export interface PortfolioMetrics {
   acrossScreensText: string;
   totalBoxOffice: number;
   formattedBoxOffice: string;
+  totalStageBoxOffice: number;
+  formattedStageBoxOffice: string;
   totalViews: number;
   formattedViews: string;
   hasCommercialFootprint: boolean;
@@ -502,6 +504,7 @@ export function computePortfolioMetrics(
   let youtubeCount = 0;
   let totalBoxOffice = 0;
   let totalViews = 0;
+  let totalStageBoxOffice = 0;
 
   for (const f of allFilms) {
     const bo = Number(f.box_office_domestic || f.box_office_worldwide || f.streaming_links?.box_office?.domestic) || 0;
@@ -523,6 +526,11 @@ export function computePortfolioMetrics(
 
     if (bo > 0) totalBoxOffice += bo;
     if (views > 0) totalViews += views;
+  }
+
+  for (const s of (stageCredits || [])) {
+    const sBo = Number(s.box_office_domestic || s.play?.box_office_domestic) || 0;
+    if (sBo > 0) totalStageBoxOffice += sBo;
   }
 
   if (personYoutubeStats?.views && typeof personYoutubeStats.views === 'number' && personYoutubeStats.views > totalViews) {
@@ -547,8 +555,9 @@ export function computePortfolioMetrics(
 
   const acrossScreensText = screenBits.join(' · ') || 'Active Across Screens & Stage';
   const formattedBoxOffice = formatCurrencyShort(totalBoxOffice);
+  const formattedStageBoxOffice = formatCurrencyShort(totalStageBoxOffice);
   const formattedViews = formatViewsShort(totalViews);
-  const hasCommercialFootprint = totalBoxOffice > 0 || totalViews > 0;
+  const hasCommercialFootprint = totalBoxOffice > 0 || totalViews > 0 || totalStageBoxOffice > 0;
 
   return {
     cinemaCount,
@@ -557,6 +566,8 @@ export function computePortfolioMetrics(
     acrossScreensText,
     totalBoxOffice,
     formattedBoxOffice,
+    totalStageBoxOffice,
+    formattedStageBoxOffice,
     totalViews,
     formattedViews,
     hasCommercialFootprint,

@@ -20,7 +20,6 @@ import VideoUploadModal from '../components/professional/VideoUploadModal';
 import ProVideoTheaterModal from '../components/professional/ProVideoTheaterModal';
 import PortfolioEditorModal from '../components/professional/PortfolioEditorModal';
 import DashboardWalkthroughModal from '../components/professional/DashboardWalkthroughModal';
-import ProIntelligenceAssistant from '../components/professional/ProIntelligenceAssistant';
 import { submitProProfileUpdate, notifyProAdminOnTelegram } from '../lib/proModeration';
 
 const NIGERIAN_GUILDS = [
@@ -637,7 +636,6 @@ export default function ProDashboard() {
       items: [
         { id: 'representation', label: 'Representation', icon: 'solar:users-group-two-rounded-bold' },
         { id: 'awards', label: 'Awards & Guilds', icon: 'solar:cup-star-bold', count: awardsList.length },
-        { id: 'intelligence', label: 'AI Studio', icon: 'solar:magic-stick-3-bold', badge: 'PRO' },
         { id: 'requests', label: 'Requests & Status', icon: 'solar:inbox-bold', count: openRequests.length },
       ],
     },
@@ -873,7 +871,6 @@ export default function ProDashboard() {
                 { id: 'videos', label: 'Showreels', icon: 'solar:videocamera-record-bold', count: videosList.length },
                 { id: 'awards', label: 'Awards', icon: 'solar:cup-star-bold', count: awardsList.length },
                 { id: 'representation', label: 'Rep', icon: 'solar:users-group-two-rounded-bold' },
-                { id: 'intelligence', label: 'AI Studio', icon: 'solar:magic-stick-3-bold', badge: 'Pro' },
                 { id: 'requests', label: 'Requests', icon: 'solar:inbox-bold', count: openRequests.length },
               ].map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -2097,11 +2094,6 @@ export default function ProDashboard() {
               ))}
             </div>
           </section>
-        )}
-
-        {/* Tab: Pro AI Industry Intelligence */}
-        {activeTab === 'intelligence' && (
-          <ProIntelligenceAssistant person={person} credits={credits} />
         )}
         </div>
       </div>
