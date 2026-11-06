@@ -99,6 +99,7 @@ export default function FilmmakerPortfolio() {
     budget: '',
     message: '',
   });
+  const [showAllFilmography, setShowAllFilmography] = useState(false);
 
   const handle = useMemo(() => {
     const raw =
@@ -109,6 +110,49 @@ export default function FilmmakerPortfolio() {
         : '');
     return decodeURIComponent(raw || '').replace(/^@+/, '').trim();
   }, [params, location.pathname]);
+
+  const allFilms = data?.allFilms || [];
+  const stageCredits = data?.stageCredits || [];
+  const metrics = data?.metrics;
+  const person = data?.person;
+
+  const computedMetrics = useMemo(() => {
+    if (!data) return null;
+    if (metrics) return metrics;
+    return computePortfolioMetrics(allFilms, stageCredits, person?.youtube_stats);
+  }, [data, metrics, allFilms, stageCredits, person]);
+
+  // Dynamically compute department tabs based ONLY on what this creator has actually done.
+  // If they have never directed or produced, those tabs will not appear.
+  const availableTabs = useMemo(() => {
+    if (!data) return [{ id: 'all', label: 'All' }];
+    const tabs = [{ id: 'all', label: 'All' }];
+    const allRoles = allFilms.flatMap((f) => (f.roles || []).map((r) => String(r).toLowerCase()));
+
+    const hasDirecting = allRoles.some((r) => r.includes('direct'));
+    if (hasDirecting) tabs.push({ id: 'directing', label: 'Directing' });
+
+    const hasProducing = allRoles.some((r) => r.includes('produc'));
+    if (hasProducing) tabs.push({ id: 'producing', label: 'Producing' });
+
+    const hasWriting = allRoles.some((r) => r.includes('writ') || r.includes('screen'));
+    if (hasWriting) tabs.push({ id: 'writing', label: 'Writing' });
+
+    const hasActing = allRoles.some((r) => r.includes('act') || r.includes('cast'));
+    if (hasActing) tabs.push({ id: 'acting', label: 'Acting' });
+
+    if (stageCredits && stageCredits.length > 0) {
+      tabs.push({ id: 'stage', label: '🎭 Stage & Theatre' });
+    }
+
+    return tabs;
+  }, [data, allFilms, stageCredits]);
+
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.some((t) => t.id === activeTab)) {
+      setActiveTab('all');
+    }
+  }, [availableTabs, activeTab]);
 
   useEffect(() => {
     let isMounted = true;
@@ -213,15 +257,10 @@ export default function FilmmakerPortfolio() {
     );
   }
 
-  const { portfolio, person, featuredFilms, allFilms, stageCredits = [], media, metrics, settings = {} } = data;
+  const { portfolio, featuredFilms, media, settings = {} } = data;
   const showMetrics = settings.show_metrics !== false;
   const showBoxOffice = settings.show_box_office !== false;
   const showYoutubeViews = settings.show_youtube_views !== false;
-
-  const computedMetrics = useMemo(() => {
-    if (metrics) return metrics;
-    return computePortfolioMetrics(allFilms, stageCredits, person?.youtube_stats);
-  }, [metrics, allFilms, stageCredits, person]);
 
   const hasCommercialToDisplay =
     showMetrics &&
@@ -268,39 +307,6 @@ export default function FilmmakerPortfolio() {
         art: platform || GENERIC_LINK,
       };
     });
-
-  // Dynamically compute department tabs based ONLY on what this creator has actually done.
-  // If they have never directed or produced, those tabs will not appear.
-  const availableTabs = useMemo(() => {
-    const tabs = [{ id: 'all', label: 'All' }];
-    const allRoles = (allFilms || []).flatMap((f) => (f.roles || []).map((r) => String(r).toLowerCase()));
-
-    const hasDirecting = allRoles.some((r) => r.includes('direct'));
-    if (hasDirecting) tabs.push({ id: 'directing', label: 'Directing' });
-
-    const hasProducing = allRoles.some((r) => r.includes('produc'));
-    if (hasProducing) tabs.push({ id: 'producing', label: 'Producing' });
-
-    const hasWriting = allRoles.some((r) => r.includes('writ') || r.includes('screen'));
-    if (hasWriting) tabs.push({ id: 'writing', label: 'Writing' });
-
-    const hasActing = allRoles.some((r) => r.includes('act') || r.includes('cast'));
-    if (hasActing) tabs.push({ id: 'acting', label: 'Acting' });
-
-    if (stageCredits && stageCredits.length > 0) {
-      tabs.push({ id: 'stage', label: '🎭 Stage & Theatre' });
-    }
-
-    return tabs;
-  }, [allFilms, stageCredits]);
-
-  useEffect(() => {
-    if (availableTabs.length > 0 && !availableTabs.some((t) => t.id === activeTab)) {
-      setActiveTab('all');
-    }
-  }, [availableTabs, activeTab]);
-
-  const [showAllFilmography, setShowAllFilmography] = useState(false);
 
   // Filter filmography tabs
   const filteredFilms = (allFilms || []).filter((film) => {
