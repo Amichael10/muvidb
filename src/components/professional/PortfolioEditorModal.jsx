@@ -9,23 +9,24 @@ import { authHeaders } from '../../lib/apiAuth';
 
 const THEME_OPTIONS = [
   {
-    id: 'muvi',
-    name: 'Muvi Cinema',
-    tag: 'African Cinema Noir + Orange',
-    bg: '#080A0D',
-    cardBg: '#12161D',
-    glowColor: 'rgba(255, 90, 31, 0.4)',
+    id: 'heritage',
+    name: 'Nollywood Heritage',
+    tag: 'African Geometric & 35mm Celluloid',
+    bg: '#0a0604',
+    cardBg: '#130a05',
+    glowColor: 'rgba(255, 90, 31, 0.45)',
     accent: '#FF5A1F',
     ring: 'ring-brand',
     border: 'border-brand/50',
     textAccent: 'text-brand',
     buttonBg: '#FF5A1F',
-    buttonText: '#ffffff',
+    buttonText: '#000000',
+    previewTop: '/skins/heritage-top.jpg',
   },
   {
     id: 'gold',
     name: 'Cinema Gold',
-    tag: 'Awards & Festival Gold',
+    tag: 'Awards & Festival Laurels',
     bg: '#0c0b09',
     cardBg: '#181510',
     glowColor: 'rgba(245, 158, 11, 0.35)',
@@ -35,6 +36,7 @@ const THEME_OPTIONS = [
     textAccent: 'text-amber-400',
     buttonBg: '#F59E0B',
     buttonText: '#000000',
+    previewTop: '/skins/gold-top.jpg',
   },
   {
     id: 'velvet',
@@ -49,26 +51,43 @@ const THEME_OPTIONS = [
     textAccent: 'text-rose-400',
     buttonBg: '#E11D48',
     buttonText: '#ffffff',
+    previewTop: '/skins/velvet-top.jpg',
   },
   {
     id: 'midnight',
-    name: 'Midnight Noir',
-    tag: 'Deep Charcoal & Silver',
-    bg: '#0a0a0c',
+    name: 'Premiere Noir',
+    tag: '35mm Celluloid & Anamorphic Streak',
+    bg: '#08090c',
     cardBg: '#141418',
-    glowColor: 'rgba(255, 255, 255, 0.25)',
-    accent: '#ffffff',
-    ring: 'ring-white',
-    border: 'border-white/40',
-    textAccent: 'text-white',
-    buttonBg: '#ffffff',
+    glowColor: 'rgba(255, 90, 31, 0.35)',
+    accent: '#FF5A1F',
+    ring: 'ring-brand',
+    border: 'border-brand/40',
+    textAccent: 'text-brand',
+    buttonBg: '#FF5A1F',
     buttonText: '#000000',
+    previewTop: '/skins/midnight-top.jpg',
+  },
+  {
+    id: 'muvi',
+    name: 'Muvi Cinema',
+    tag: 'African Cinema Noir + Orange',
+    bg: '#080A0D',
+    cardBg: '#12161D',
+    glowColor: 'rgba(255, 90, 31, 0.4)',
+    accent: '#FF5A1F',
+    ring: 'ring-brand',
+    border: 'border-brand/50',
+    textAccent: 'text-brand',
+    buttonBg: '#FF5A1F',
+    buttonText: '#ffffff',
+    previewTop: '/skins/midnight-top.jpg',
   },
   {
     id: 'neon',
     name: 'Cyber Indie',
     tag: 'Cyan & Neon Blue',
-    bg: '#080b11',
+    bg: '#060910',
     cardBg: '#0f1420',
     glowColor: 'rgba(6, 182, 212, 0.4)',
     accent: '#06b6d4',
@@ -77,12 +96,13 @@ const THEME_OPTIONS = [
     textAccent: 'text-cyan-400',
     buttonBg: '#06b6d4',
     buttonText: '#080b11',
+    previewTop: '/skins/midnight-top.jpg',
   },
   {
     id: 'minimal',
     name: 'Editorial Monochrome',
     tag: 'Monochrome B&W',
-    bg: '#111113',
+    bg: '#09090b',
     cardBg: '#1a1a1e',
     glowColor: 'rgba(255, 255, 255, 0.3)',
     accent: '#ffffff',
@@ -1275,6 +1295,13 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                                 className="w-full aspect-square rounded-xl relative overflow-hidden border border-white/10 p-2.5 flex flex-col justify-between shadow-inner"
                                 style={{ backgroundColor: t.bg }}
                               >
+                                {t.previewTop && (
+                                  <img
+                                    src={t.previewTop}
+                                    alt=""
+                                    className="absolute inset-0 w-full h-full object-cover object-top opacity-50 mix-blend-screen pointer-events-none"
+                                  />
+                                )}
                                 <div
                                   className="absolute inset-x-0 top-0 h-16 pointer-events-none opacity-90"
                                   style={{
@@ -1530,8 +1557,20 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                 </div>
               </div>
 
+              {/* Skin Top Graphic Preview inside Phone */}
+              {currentTheme.previewTop && (
+                <div className="absolute top-0 inset-x-0 h-32 pointer-events-none overflow-hidden z-0">
+                  <img
+                    src={currentTheme.previewTop}
+                    alt=""
+                    className="w-full h-full object-cover object-top opacity-60 mix-blend-screen"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black" />
+                </div>
+              )}
+
               {/* Scrollable Phone Content Screen */}
-              <div className="flex-1 overflow-y-auto pt-6 pb-4 px-3 space-y-2.5 text-center custom-scrollbar">
+              <div className="relative z-10 flex-1 overflow-y-auto pt-6 pb-4 px-3 space-y-2.5 text-center custom-scrollbar">
                 {/* Header Section (reflecting selected layout: hero vs classic vs banner) */}
                 {portfolio.header_layout === 'hero' ? (
                   <div className="relative -mx-3 -mt-6 mb-2 h-36 overflow-hidden rounded-b-2xl">

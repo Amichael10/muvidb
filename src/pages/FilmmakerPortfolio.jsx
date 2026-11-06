@@ -33,59 +33,123 @@ const LEGACY_DEFAULT_ACCENT = '#f59e0b';
  * resolves to the creator's chosen colour automatically.
  */
 const THEME_STYLES = {
-  midnight: {
+  heritage: {
     accent: BRAND_ACCENT,
-    bg: 'bg-[#080A0D]',
-    heroGlow: 'from-[#FF5A1F]/15 via-transparent to-transparent',
-    accentText: 'text-brand',
-    accentBorder: 'border-brand/30',
+    hexBg: '#0a0604',
+    bg: 'bg-[#0a0604]',
+    topSkin: '/skins/heritage-top.jpg',
+    bottomSkin: '/skins/heritage-bottom.jpg',
+    patternStrip: '/skins/heritage-pattern-strip.jpg',
+    heroGlow: 'from-amber-500/20 via-orange-600/10 to-transparent',
+    cardBg: 'bg-[#120a06]/85 backdrop-blur-xl border border-amber-500/25 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-amber-500/40',
+    accentText: 'text-amber-400',
+    accentBorder: 'border-amber-500/30',
     accentBg: 'bg-brand',
-    badgeTone: 'border-brand/25 bg-brand/10 text-brand',
+    badgeTone: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+    statBorder: 'border-amber-500/20 bg-amber-500/[0.04]',
+    linkCardBg: 'bg-[#160d08]/90 border border-amber-500/20 hover:border-amber-500/50 hover:bg-[#1f110a]',
+    filmCardBg: 'bg-[#140b07]/80 border border-amber-500/15 hover:border-amber-500/35',
   },
   muvi: {
     accent: BRAND_ACCENT,
+    hexBg: '#080A0D',
     bg: 'bg-[#080A0D]',
-    heroGlow: 'from-[#FF5A1F]/15 via-transparent to-transparent',
+    topSkin: '/skins/midnight-top.jpg',
+    bottomSkin: '/skins/heritage-bottom.jpg',
+    heroGlow: 'from-[#FF5A1F]/20 via-transparent to-transparent',
+    cardBg: 'bg-[#10141d]/85 backdrop-blur-xl border border-brand/25 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-brand/40',
     accentText: 'text-brand',
     accentBorder: 'border-brand/30',
     accentBg: 'bg-brand',
     badgeTone: 'border-brand/25 bg-brand/10 text-brand',
+    statBorder: 'border-brand/20 bg-brand/[0.04]',
+    linkCardBg: 'bg-[#121620]/90 border border-brand/20 hover:border-brand/45 hover:bg-[#181e2b]',
+    filmCardBg: 'bg-[#10141d]/80 border border-brand/15 hover:border-brand/35',
   },
   gold: {
     accent: '#F59E0B',
+    hexBg: '#0c0b09',
     bg: 'bg-[#0c0b09]',
-    heroGlow: 'from-amber-500/15 via-transparent to-transparent',
+    topSkin: '/skins/gold-top.jpg',
+    bottomSkin: '/skins/heritage-bottom.jpg',
+    heroGlow: 'from-amber-500/20 via-yellow-600/10 to-transparent',
+    cardBg: 'bg-[#16130c]/85 backdrop-blur-xl border border-amber-500/25 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-amber-500/40',
     accentText: 'text-amber-400',
     accentBorder: 'border-amber-500/30',
     accentBg: 'bg-amber-500',
     badgeTone: 'border-amber-500/25 bg-amber-500/10 text-amber-300',
+    statBorder: 'border-amber-500/20 bg-amber-500/[0.04]',
+    linkCardBg: 'bg-[#1a170f]/90 border border-amber-500/20 hover:border-amber-500/50 hover:bg-[#252015]',
+    filmCardBg: 'bg-[#18140c]/80 border border-amber-500/15 hover:border-amber-500/35',
   },
   velvet: {
     accent: '#E11D48',
+    hexBg: '#0d070a',
     bg: 'bg-[#0d070a]',
-    heroGlow: 'from-rose-500/15 via-transparent to-transparent',
+    topSkin: '/skins/velvet-top.jpg',
+    bottomSkin: '/skins/velvet-bottom.jpg',
+    heroGlow: 'from-rose-500/20 via-transparent to-transparent',
+    cardBg: 'bg-[#150a0f]/85 backdrop-blur-xl border border-rose-500/25 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-rose-500/40',
     accentText: 'text-rose-400',
     accentBorder: 'border-rose-500/30',
     accentBg: 'bg-rose-500',
     badgeTone: 'border-rose-500/25 bg-rose-500/10 text-rose-300',
+    statBorder: 'border-rose-500/20 bg-rose-500/[0.04]',
+    linkCardBg: 'bg-[#190c13]/90 border border-rose-500/20 hover:border-rose-500/50 hover:bg-[#230f1b]',
+    filmCardBg: 'bg-[#160a10]/80 border border-rose-500/15 hover:border-rose-500/35',
+  },
+  midnight: {
+    accent: BRAND_ACCENT,
+    hexBg: '#08090c',
+    bg: 'bg-[#08090c]',
+    topSkin: '/skins/midnight-top.jpg',
+    bottomSkin: '/skins/heritage-bottom.jpg',
+    heroGlow: 'from-[#FF5A1F]/15 via-transparent to-transparent',
+    cardBg: 'bg-[#111318]/85 backdrop-blur-xl border border-white/15 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-brand/40',
+    accentText: 'text-brand',
+    accentBorder: 'border-brand/30',
+    accentBg: 'bg-brand',
+    badgeTone: 'border-brand/25 bg-brand/10 text-brand',
+    statBorder: 'border-white/10 bg-white/[0.02]',
+    linkCardBg: 'bg-[#141720]/90 border border-white/10 hover:border-brand/40 hover:bg-[#1a1f2b]',
+    filmCardBg: 'bg-[#12141c]/80 border border-white/10 hover:border-brand/30',
   },
   neon: {
     accent: '#06B6D4',
+    hexBg: '#060910',
     bg: 'bg-[#060910]',
-    heroGlow: 'from-cyan-500/15 via-transparent to-transparent',
+    topSkin: '/skins/midnight-top.jpg',
+    bottomSkin: '/skins/heritage-bottom.jpg',
+    heroGlow: 'from-cyan-500/20 via-transparent to-transparent',
+    cardBg: 'bg-[#090e1a]/85 backdrop-blur-xl border border-cyan-500/25 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-cyan-500/40',
     accentText: 'text-cyan-400',
     accentBorder: 'border-cyan-500/30',
     accentBg: 'bg-cyan-500',
     badgeTone: 'border-cyan-500/25 bg-cyan-500/10 text-cyan-300',
+    statBorder: 'border-cyan-500/20 bg-cyan-500/[0.03]',
+    linkCardBg: 'bg-[#0c1424]/90 border border-cyan-500/20 hover:border-cyan-500/50 hover:bg-[#111c33]',
+    filmCardBg: 'bg-[#0a1120]/80 border border-cyan-500/15 hover:border-cyan-500/35',
   },
   minimal: {
     accent: '#FFFFFF',
+    hexBg: '#09090b',
     bg: 'bg-[#09090b]',
     heroGlow: 'from-white/10 via-transparent to-transparent',
+    cardBg: 'bg-[#141416]/85 backdrop-blur-xl border border-white/20 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-white/35',
     accentText: 'text-white',
     accentBorder: 'border-white/20',
     accentBg: 'bg-white text-black',
     badgeTone: 'border-white/20 bg-white/10 text-zinc-200',
+    statBorder: 'border-white/10 bg-white/[0.02]',
+    linkCardBg: 'bg-[#18181c]/90 border border-white/15 hover:border-white/40 hover:bg-[#202026]',
+    filmCardBg: 'bg-[#141417]/80 border border-white/10 hover:border-white/25',
   },
 };
 
@@ -286,7 +350,7 @@ export default function FilmmakerPortfolio() {
      (showBoxOffice && (computedMetrics?.totalStageBoxOffice || 0) > 0) ||
      (showYoutubeViews && (computedMetrics?.totalViews || 0) > 0));
 
-  const theme = THEME_STYLES[portfolio.theme_preset] || THEME_STYLES.midnight;
+  const theme = THEME_STYLES[portfolio.theme_preset] || THEME_STYLES.heritage || THEME_STYLES.midnight;
   // A creator can store a free-form accent_color; fall back to the preset's
   // colour, then to the MuviDB brand. Previously none of this was read at all.
   //
@@ -342,56 +406,81 @@ export default function FilmmakerPortfolio() {
 
   return (
     <div
-      className={`min-h-screen ${theme.bg} text-white selection:bg-brand selection:text-black font-sans`}
+      className={`min-h-screen ${theme.bg} text-white selection:bg-brand selection:text-black font-sans relative overflow-x-hidden`}
       style={{ '--color-brand': accentColor, '--color-brand-hover': accentColor }}
     >
-      {/* Top Floating Cinema Bar */}
-      <nav className="sticky top-0 z-40 backdrop-blur-md bg-black/60 border-b border-white/5 px-4 lg:px-8 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5 group" aria-label="MuviDB home">
-          {/* The real wordmark, same asset the site navbar uses. The previous
-              hand-drawn "M" square was not the brand mark. */}
+      {/* Top Cinema Skin Backdrop Graphic */}
+      {theme.topSkin && (
+        <div className="absolute top-0 inset-x-0 h-[360px] sm:h-[480px] lg:h-[560px] pointer-events-none overflow-hidden select-none z-0">
           <img
-            src="/images/MuviDB Brand/White Wordmark.svg"
-            alt="MuviDB"
-            className="h-5 w-auto opacity-90 group-hover:opacity-100 transition"
+            src={theme.topSkin}
+            alt=""
+            className="w-full h-full object-cover object-top opacity-90"
           />
-          <span className={`${theme.accentText} font-mono text-[10px] uppercase tracking-widest`}>
-            Creator
-          </span>
-        </Link>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setPassportModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand/40 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold transition"
-            title="Export Industry Casting CV as PDF"
-          >
-            <Icon icon="solar:document-text-bold" width="14" />
-            <span>Export CV</span>
-          </button>
-
-          <Link
-            to={`/person/${person.slug}`}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 text-zinc-400 hover:text-white hover:border-white/20 text-xs transition"
-          >
-            <Icon icon="solar:database-bold" width="14" />
-            <span>Database Bio</span>
-          </Link>
-
-          <button
-            onClick={copyPortfolioLink}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition"
-          >
-            <Icon icon="solar:share-bold" width="14" />
-            <span>Share Link</span>
-          </button>
+          {/* Smooth blend downward into page background */}
+          <div
+            className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--skin-bg)]"
+            style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
+          />
+          <div
+            className="absolute inset-0 bg-gradient-to-t from-[var(--skin-bg)] via-transparent to-black/30"
+            style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
+          />
+          {/* Radial spotlight center vignette */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_20%,rgba(0,0,0,0.65)_100%)]" />
         </div>
-      </nav>
+      )}
 
-      {/* Main Container */}
-      <main className="max-w-4xl mx-auto px-4 py-8 lg:py-12 space-y-12">
+      {/* Side Decorative African Pattern Strips (Ultra-Wide screens) */}
+      {theme.patternStrip && (
+        <>
+          <div
+            className="hidden 2xl:block fixed top-0 bottom-0 left-0 w-28 pointer-events-none opacity-20 mix-blend-screen z-0"
+            style={{
+              backgroundImage: `url(${theme.patternStrip})`,
+              backgroundRepeat: 'repeat-y',
+              backgroundSize: '100% auto',
+              maskImage: 'linear-gradient(to right, black, transparent)',
+              WebkitMaskImage: 'linear-gradient(to right, black, transparent)',
+            }}
+          />
+          <div
+            className="hidden 2xl:block fixed top-0 bottom-0 right-0 w-28 pointer-events-none opacity-20 mix-blend-screen transform scale-x-[-1] z-0"
+            style={{
+              backgroundImage: `url(${theme.patternStrip})`,
+              backgroundRepeat: 'repeat-y',
+              backgroundSize: '100% auto',
+              maskImage: 'linear-gradient(to right, black, transparent)',
+              WebkitMaskImage: 'linear-gradient(to right, black, transparent)',
+            }}
+          />
+        </>
+      )}
+
+      {/* Bottom Cinema Skin Backdrop Graphic */}
+      {theme.bottomSkin && (
+        <div className="absolute bottom-0 inset-x-0 h-[340px] sm:h-[440px] lg:h-[500px] pointer-events-none overflow-hidden select-none z-0">
+          <img
+            src={theme.bottomSkin}
+            alt=""
+            className="w-full h-full object-cover object-bottom opacity-85"
+          />
+          {/* Smooth blend upward into page background */}
+          <div
+            className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-[var(--skin-bg)]"
+            style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
+          />
+          <div
+            className="absolute inset-0 bg-gradient-to-b from-[var(--skin-bg)] via-transparent to-black/50"
+            style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
+          />
+        </div>
+      )}
+
+      {/* Main Container - Elevated Above Skin Backdrop Artwork */}
+      <main className="relative z-10 max-w-4xl mx-auto px-4 py-8 lg:py-14 space-y-12">
         {/* Profile Card / Hero Identity */}
-        <section className="relative rounded-3xl border border-white/10 bg-zinc-950/80 p-6 lg:p-8 backdrop-blur-xl overflow-hidden shadow-2xl">
+        <section className={`relative rounded-3xl ${theme.cardBg || 'border border-white/10 bg-zinc-950/80'} p-6 lg:p-8 backdrop-blur-xl overflow-hidden shadow-2xl`}>
           <div className={`absolute -top-32 -right-32 w-80 h-80 rounded-full bg-gradient-to-b ${theme.heroGlow} blur-3xl pointer-events-none`} />
 
           <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
@@ -518,7 +607,7 @@ export default function FilmmakerPortfolio() {
 
         {/* Commercial Footprint (Cinema Box Office, Theatre Box Office & YouTube Views) */}
         {hasCommercialToDisplay && (
-          <section className="relative rounded-3xl border border-white/10 bg-zinc-950/80 p-6 sm:p-7 backdrop-blur-xl overflow-hidden shadow-xl">
+          <section className={`relative rounded-3xl ${theme.cardBg || 'border border-white/10 bg-zinc-950/80'} p-6 sm:p-7 backdrop-blur-xl overflow-hidden shadow-xl`}>
             {/* Ambient Background Glow */}
             <div className={`absolute top-0 right-0 w-80 h-80 rounded-full bg-gradient-to-b ${theme.heroGlow} blur-3xl opacity-20 pointer-events-none`} />
 
@@ -639,7 +728,7 @@ export default function FilmmakerPortfolio() {
                 return (
                   <article
                     key={film.id}
-                    className="group relative rounded-2xl border border-white/10 bg-zinc-950/70 hover:border-brand/40 transition duration-300 overflow-hidden flex flex-col justify-between"
+                    className={`group relative rounded-2xl ${theme.cardBg || 'border border-white/10 bg-zinc-950/70'} ${theme.cardHover || 'hover:border-brand/40'} transition duration-300 overflow-hidden flex flex-col justify-between`}
                   >
                     {/* Backdrop / Poster Top */}
                     <div className="relative aspect-[16/10] w-full overflow-hidden bg-zinc-900">
@@ -745,7 +834,7 @@ export default function FilmmakerPortfolio() {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex items-stretch overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200"
+                  className={`group relative flex items-stretch overflow-hidden rounded-2xl ${theme.linkCardBg || 'border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25'} hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200`}
                 >
                   <span className={`w-16 sm:w-20 shrink-0 grid place-items-center ${link.art.tint} ${link.art.fg}`}>
                     <Icon icon={link.art.icon} width="24" />
@@ -773,7 +862,7 @@ export default function FilmmakerPortfolio() {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex items-stretch overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200"
+                  className={`group relative flex items-stretch overflow-hidden rounded-2xl ${theme.linkCardBg || 'border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25'} hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200`}
                 >
                   <span className={`w-16 sm:w-20 shrink-0 grid place-items-center ${platform.tint} ${platform.fg}`}>
                     <Icon icon={platform.icon} width="24" />
@@ -827,7 +916,7 @@ export default function FilmmakerPortfolio() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/60 divide-y divide-white/5 overflow-hidden">
+          <div className={`rounded-2xl ${theme.cardBg || 'border border-white/10 bg-zinc-950/60'} divide-y divide-white/5 overflow-hidden`}>
             {activeTab === 'stage' ? (
               stageCredits.length > 0 ? (
                 stageCredits.map((stg, idx) => {

@@ -80,6 +80,7 @@ project.tar.gz
 !public/images/**/*.webp
 !public/images/**/*.svg
 !public/brand/**
+!public/skins/**
 !api/_lib/decor/**
 *.bak
 
@@ -175,6 +176,7 @@ project.tar.gz
 !public/images/**/*.webp
 !public/images/**/*.svg
 !public/brand/**
+!public/skins/**
 !api/_lib/decor/**
 *.bak
 
