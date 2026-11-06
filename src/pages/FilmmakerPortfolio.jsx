@@ -35,34 +35,52 @@ const LEGACY_DEFAULT_ACCENT = '#f59e0b';
 const THEME_STYLES = {
   midnight: {
     accent: BRAND_ACCENT,
-    bg: 'bg-[#0a0a0c]',
-    heroGlow: 'from-brand/10 via-transparent to-transparent',
+    bg: 'bg-[#080A0D]',
+    heroGlow: 'from-[#FF5A1F]/15 via-transparent to-transparent',
     accentText: 'text-brand',
     accentBorder: 'border-brand/30',
     accentBg: 'bg-brand',
-    badgeTone: 'border-brand/20 bg-brand/10 text-brand',
+    badgeTone: 'border-brand/25 bg-brand/10 text-brand',
+  },
+  muvi: {
+    accent: BRAND_ACCENT,
+    bg: 'bg-[#080A0D]',
+    heroGlow: 'from-[#FF5A1F]/15 via-transparent to-transparent',
+    accentText: 'text-brand',
+    accentBorder: 'border-brand/30',
+    accentBg: 'bg-brand',
+    badgeTone: 'border-brand/25 bg-brand/10 text-brand',
   },
   gold: {
-    accent: '#EAB308',
-    bg: 'bg-[#0f0e0c]',
-    heroGlow: 'from-yellow-500/15 via-transparent to-transparent',
-    accentText: 'text-yellow-400',
-    accentBorder: 'border-yellow-500/30',
-    accentBg: 'bg-yellow-500',
-    badgeTone: 'border-yellow-500/20 bg-yellow-500/10 text-yellow-300',
+    accent: '#F59E0B',
+    bg: 'bg-[#0c0b09]',
+    heroGlow: 'from-amber-500/15 via-transparent to-transparent',
+    accentText: 'text-amber-400',
+    accentBorder: 'border-amber-500/30',
+    accentBg: 'bg-amber-500',
+    badgeTone: 'border-amber-500/25 bg-amber-500/10 text-amber-300',
+  },
+  velvet: {
+    accent: '#E11D48',
+    bg: 'bg-[#0d070a]',
+    heroGlow: 'from-rose-500/15 via-transparent to-transparent',
+    accentText: 'text-rose-400',
+    accentBorder: 'border-rose-500/30',
+    accentBg: 'bg-rose-500',
+    badgeTone: 'border-rose-500/25 bg-rose-500/10 text-rose-300',
   },
   neon: {
-    accent: '#22D3EE',
-    bg: 'bg-[#080b11]',
+    accent: '#06B6D4',
+    bg: 'bg-[#060910]',
     heroGlow: 'from-cyan-500/15 via-transparent to-transparent',
     accentText: 'text-cyan-400',
     accentBorder: 'border-cyan-500/30',
     accentBg: 'bg-cyan-500',
-    badgeTone: 'border-cyan-500/20 bg-cyan-500/10 text-cyan-300',
+    badgeTone: 'border-cyan-500/25 bg-cyan-500/10 text-cyan-300',
   },
   minimal: {
     accent: '#FFFFFF',
-    bg: 'bg-[#111113]',
+    bg: 'bg-[#09090b]',
     heroGlow: 'from-white/10 via-transparent to-transparent',
     accentText: 'text-white',
     accentBorder: 'border-white/20',
@@ -927,22 +945,22 @@ export default function FilmmakerPortfolio() {
 
         {/* Linktree-style Signature MuviDB Actions & Footer */}
         <footer className="pt-10 pb-20 border-t border-white/10 text-center space-y-5">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto">
             <Link
               to={`/people/${person.slug || person.id}`}
-              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 px-5 py-3 text-xs font-bold text-white transition hover:scale-[1.02] shadow-lg"
+              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 px-5 py-3 text-xs font-bold text-white transition hover:scale-[1.02] shadow-lg whitespace-nowrap"
             >
               <Icon icon="solar:user-bold" className="text-brand" width="16" />
-              <span>See Full Profile on MuviDB Creator Link</span>
+              <span>View on MuviDB</span>
               <Icon icon="solar:arrow-right-up-linear" width="14" className="text-zinc-400" />
             </Link>
 
             <Link
               to="/claim"
-              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-brand/30 bg-brand/10 hover:bg-brand/20 px-5 py-3 text-xs font-bold text-brand transition hover:scale-[1.02] shadow-lg"
+              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl bg-brand text-black font-black px-6 py-3 text-xs uppercase tracking-wider hover:brightness-110 transition hover:scale-[1.02] shadow-lg shadow-brand/20 whitespace-nowrap"
             >
-              <Icon icon="solar:shield-check-bold" className="text-brand" width="16" />
-              <span>Claim Your Profile on MuviDB</span>
+              <Icon icon="solar:shield-check-bold" width="16" />
+              <span>Claim Your Profile</span>
             </Link>
           </div>
 
