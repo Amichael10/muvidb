@@ -3,7 +3,7 @@ import FilmmakerPortfolio from '../pages/FilmmakerPortfolio';
 
 /**
  * Catch-all handler:
- * - If the URL starts with `/@...`, serve the Filmmaker Link-in-Bio Portfolio.
+ * - If the URL starts with `/@...`, serve the Creator Link.
  * - Otherwise, throw 404 so the root ErrorBoundary renders ErrorPage.
  */
 export async function loader({ request }: { request: Request }) {
@@ -18,7 +18,7 @@ export function meta({ location }: { location?: { pathname: string } }) {
   if (location?.pathname?.startsWith('/@')) {
     const handle = location.pathname.slice(2).split('/')[0];
     return [
-      { title: `@${decodeURIComponent(handle)} | MuviDB Creator Portfolio` },
+      { title: `@${decodeURIComponent(handle)} | MuviDB Creator Link` },
       { name: 'robots', content: 'index, follow' },
     ];
   }

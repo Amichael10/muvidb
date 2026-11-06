@@ -612,7 +612,7 @@ export default function ProDashboard() {
   const TAB_TITLES = {
     overview: 'Creator Studio & Career Passport',
     filmography: 'Filmography & Box Office Credits',
-    portfolio: 'Filmmaker Link-in-Bio Showcase',
+    portfolio: 'Creator Link Showcase',
     photos: 'Headshots & Production Stills Gallery',
     videos: 'Video Showreels & Performance Reels',
     awards: 'Industry Awards, Guilds & Accolades',
@@ -627,7 +627,7 @@ export default function ProDashboard() {
       items: [
         { id: 'overview', label: 'Overview', icon: 'solar:home-smile-angle-bold' },
         { id: 'filmography', label: 'Filmography', icon: 'solar:clapperboard-bold', count: credits.length },
-        { id: 'portfolio', label: 'Link-in-Bio Portfolio', icon: 'solar:link-circle-bold', badge: 'PUBLIC' },
+        { id: 'portfolio', label: 'Creator Link', icon: 'solar:link-circle-bold', badge: 'PUBLIC' },
         { id: 'photos', label: 'Photos & Stills', icon: 'solar:camera-bold', count: photosList.length },
         { id: 'videos', label: 'Video Showreels', icon: 'solar:videocamera-record-bold', count: videosList.length },
       ],
@@ -695,10 +695,10 @@ export default function ProDashboard() {
               data-tour="portfolio-btn"
               onClick={() => setActiveTab('portfolio')}
               className="w-full mt-3.5 flex items-center justify-center gap-2 rounded-xl bg-brand text-white font-bold py-2.5 text-xs shadow-lg shadow-brand/25 hover:brightness-110 transition"
-              title="Open Link-in-Bio Portfolio Studio"
+              title="Open Creator Link Studio"
             >
               <Icon icon="solar:link-circle-bold" width="16" />
-              <span>Portfolio Link-in-Bio</span>
+              <span>Creator Link</span>
             </button>
           </div>
 
@@ -846,9 +846,9 @@ export default function ProDashboard() {
               <button
                 onClick={() => setActiveTab('portfolio')}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-brand/30 bg-brand/10 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-black text-brand transition hover:bg-brand/20 hover:border-brand/50 shadow-sm"
-                title="Customize your Link-in-Bio showcase and public showreel"
+                title="Customize your Creator Link showcase and public showreel"
               >
-                <Icon icon="solar:link-circle-bold" width="15" /> Link-in-Bio
+                <Icon icon="solar:link-circle-bold" width="15" /> Creator Link
               </button>
               <button
                 onClick={() => setAddingCredit(true)}
@@ -1011,8 +1011,9 @@ export default function ProDashboard() {
                       <button
                         onClick={() => setPassportOpen(true)}
                         className="flex items-center justify-center gap-1.5 rounded-xl bg-brand py-2 text-xs font-black text-white shadow-lg shadow-brand/15 transition hover:bg-brand/90"
+                        title="Customize & Export PDF Casting CV or Social Card"
                       >
-                        <Icon icon="solar:share-bold" width="14" /> Passport
+                        <Icon icon="solar:document-text-bold" width="14" /> Export CV / EPK
                       </button>
                     </div>
                   </div>
@@ -1059,10 +1060,10 @@ export default function ProDashboard() {
                     <span className="text-[10px] font-mono text-brand font-bold uppercase">Launch</span>
                   </div>
                   <h3 className="mt-3 text-sm font-black text-white group-hover:text-brand transition">
-                    Link-in-Bio Portfolio
+                    Creator Link
                   </h3>
                   <p className="mt-1 text-xs text-zinc-400 line-clamp-2">
-                    Standalone reel, top projects showcase, and direct inquiry link at muvidb.com/@{person.slug || 'you'}.
+                    Standalone reel, verified screen metrics, commercial footprint, and direct inquiry link at muvidb.com/@{person.slug || 'you'}.
                   </p>
                 </div>
 
@@ -1183,7 +1184,7 @@ export default function ProDashboard() {
             </div>
           )}
 
-          {/* TAB: LINK-IN-BIO PORTFOLIO STUDIO */}
+          {/* TAB: CREATOR LINK STUDIO */}
           {activeTab === 'portfolio' && (
             <div className="space-y-6">
               <PortfolioEditorModal
@@ -2103,6 +2104,24 @@ export default function ProDashboard() {
           <ProIntelligenceAssistant person={person} credits={credits} />
         )}
         </div>
+      </div>
+
+      {/* Mobile Sticky Quick Action Dock (< lg) */}
+      <div className="fixed bottom-0 inset-x-0 z-40 lg:hidden p-3 bg-black/85 backdrop-blur-xl border-t border-white/10 flex items-center justify-between gap-3">
+        <button
+          onClick={() => setPassportOpen(true)}
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl border border-white/15 bg-white/[0.04] text-xs font-black text-white hover:border-brand/40 transition active:scale-95"
+        >
+          <Icon icon="solar:document-text-bold" className="text-brand" width="16" />
+          <span>Export CV / EPK</span>
+        </button>
+        <button
+          onClick={() => setAddingCredit(true)}
+          className="flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-brand text-white text-xs font-black shadow-lg shadow-brand/25 transition active:scale-95"
+        >
+          <Icon icon="solar:add-circle-bold" width="16" />
+          <span>+ Add Credit</span>
+        </button>
       </div>
 
       {/* Modals */}

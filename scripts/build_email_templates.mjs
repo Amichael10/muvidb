@@ -30,6 +30,10 @@ const templates = [
     in: resolve(root, 'api/_lib/MuviDbFeatureAnnouncementEmail.tsx'),
     out: resolve(root, 'api/_lib/MuviDbFeatureAnnouncementEmail.generated.js'),
   },
+  {
+    in: resolve(root, 'api/_lib/MuviDbContributionThankYouEmail.tsx'),
+    out: resolve(root, 'api/_lib/MuviDbContributionThankYouEmail.generated.js'),
+  },
 ];
 
 async function main() {

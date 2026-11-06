@@ -12,7 +12,7 @@ const TOUR_STEPS = [
   },
   {
     target: '[data-tour="portfolio-btn"]',
-    title: 'Link-in-Bio Portfolio',
+    title: 'Creator Link',
     icon: 'solar:link-circle-bold',
     description: 'Launch your standalone public portfolio page. Feature your showreel video, priority titles, press articles, and EPK.',
     tip: 'Add this link to your Instagram, TikTok, and X bios for casting directors.',

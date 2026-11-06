@@ -180,6 +180,10 @@
       "destination": "/api/data?_r=content"
     },
     {
+      "source": "/api/contribution-notifications",
+      "destination": "/api/data?_r=contribution-notifications"
+    },
+    {
       "source": "/api/job-apply",
       "destination": "/api/data?_r=job-apply"
     },

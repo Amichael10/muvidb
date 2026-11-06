@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { fetchPersonStageCredits } from './plays';
 
 export interface CustomLink {
   id: string;
@@ -20,6 +21,30 @@ export interface PortfolioFilm {
   release_type?: string;
   streaming_links?: Record<string, string>;
   is_featured?: boolean;
+  box_office_domestic?: number | null;
+  box_office_worldwide?: number | null;
+  box_office_currency?: string | null;
+  view_count?: number | null;
+  youtube_watch_url?: string | null;
+}
+
+export interface PortfolioSettings {
+  show_metrics: boolean;
+  show_box_office: boolean;
+  show_youtube_views: boolean;
+  filmography_order: string[];
+}
+
+export interface PortfolioMetrics {
+  cinemaCount: number;
+  youtubeCount: number;
+  stageCount: number;
+  acrossScreensText: string;
+  totalBoxOffice: number;
+  formattedBoxOffice: string;
+  totalViews: number;
+  formattedViews: string;
+  hasCommercialFootprint: boolean;
 }
 
 export interface FilmmakerPortfolio {
@@ -63,9 +88,11 @@ export interface PortfolioData {
       facebook?: string | null;
       youtube?: string | null;
     };
+    youtube_stats?: any;
   };
   featuredFilms: PortfolioFilm[];
   allFilms: PortfolioFilm[];
+  stageCredits?: any[];
   media: Array<{
     id: string;
     media_type: string;
@@ -74,6 +101,8 @@ export interface PortfolioData {
     url: string;
     thumbnail_url: string | null;
   }>;
+  metrics: PortfolioMetrics;
+  settings: PortfolioSettings;
 }
 
 /**
@@ -109,8 +138,26 @@ export function sanitizeHandle(raw: string): string {
     .replace(/[^a-z0-9_-]/g, '');
 }
 
+
+export function formatCurrencyShort(amount: number, currency = 'NGN'): string {
+  if (!amount || amount <= 0) return '';
+  const symbol = currency === 'USD' ? '$' : currency === 'GBP' ? '£' : '₦';
+  if (amount >= 1_000_000_000) {
+    const val = (amount / 1_000_000_000).toFixed(1).replace(/\.0$/, '');
+    return `${symbol}${val}B`;
+  }
+  if (amount >= 1_000_000) {
+    const val = (amount / 1_000_000).toFixed(amount % 1_000_000 === 0 ? 0 : 1).replace(/\.0$/, '');
+    return `${symbol}${val}M`;
+  }
+  if (amount >= 1_000) {
+    return `${symbol}${Math.round(amount / 1_000)}K`;
+  }
+  return `${symbol}${amount.toLocaleString()}`;
+}
+
 /**
- * Fetch a complete portfolio by vanity handle or person slug.
+ * Fetch a filmmaker's public portfolio by their custom vanity handle or person slug.
  * Gracefully falls back to creating a dynamic portfolio view from the people table
  * if no custom portfolio configuration has been saved yet.
  */
@@ -153,15 +200,15 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
 
   if (!personId) return null;
 
-  // 3. Fetch comprehensive person data, credits, and media
-  const [personRes, creditsRes, mediaRes] = await Promise.all([
+  // 3. Fetch comprehensive person data, credits, media, and stage plays
+  const [personRes, creditsRes, mediaRes, stageRes] = await Promise.all([
     supabase
       .from('people')
       .select(`
         id, name, slug, photo_url, bio, nationality, is_verified, is_pro,
         popularity_score, booking_email, booking_phone, booking_whatsapp,
         availability_status, availability_note, awards, showreel_urls,
-        instagram_url, twitter_url, tiktok_url, facebook_url, youtube_handle
+        instagram_url, twitter_url, tiktok_url, facebook_url, youtube_handle, youtube_stats
       `)
       .eq('id', personId)
       .single(),
@@ -186,6 +233,7 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
       .eq('status', 'approved')
       .order('sort_order', { ascending: true })
       .limit(12),
+    fetchPersonStageCredits(personId).catch(() => []),
   ]);
 
   if (personRes.error || !personRes.data) return null;
@@ -196,6 +244,10 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
   for (const c of (creditsRes.data || [])) {
     const f: any = c.films;
     if (!f || !f.id) continue;
+
+    const boDomestic = f.box_office_domestic != null ? Number(f.box_office_domestic) : (Number(f.streaming_links?.box_office?.domestic) || null);
+    const boWorldwide = f.box_office_worldwide != null ? Number(f.box_office_worldwide) : null;
+    const views = f.view_count != null ? Number(f.view_count) : (Number(f.streaming_links?.youtube_views) || null);
 
     if (!filmMap.has(f.id)) {
       filmMap.set(f.id, {
@@ -209,12 +261,21 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
         roles: [c.role || 'Contributor'],
         release_type: f.release_type,
         streaming_links: f.streaming_links || {},
+        box_office_domestic: boDomestic,
+        box_office_worldwide: boWorldwide,
+        box_office_currency: f.box_office_currency || 'NGN',
+        view_count: views,
+        youtube_watch_url: f.youtube_watch_url || null,
       });
     } else {
       const existing = filmMap.get(f.id)!;
       if (c.role && !existing.roles.includes(c.role)) {
         existing.roles.push(c.role);
       }
+      if (existing.box_office_domestic == null && boDomestic != null) existing.box_office_domestic = boDomestic;
+      if (existing.box_office_worldwide == null && boWorldwide != null) existing.box_office_worldwide = boWorldwide;
+      if (existing.view_count == null && views != null) existing.view_count = views;
+      if (!existing.youtube_watch_url && f.youtube_watch_url) existing.youtube_watch_url = f.youtube_watch_url;
     }
   }
 
@@ -234,7 +295,7 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
       tagline: p.bio ? p.bio.split('.')[0] : 'Filmmaker & Visual Artist',
       bio_statement: p.bio || null,
       featured_reel_url: fallbackReel || null,
-      featured_film_ids: allFilms.slice(0, 4).map(f => f.id),
+      featured_film_ids: allFilms.slice(0, 3).map(f => f.id),
       custom_links: [],
       inquiry_email: p.booking_email || null,
       inquiry_phone: p.booking_phone || null,
@@ -246,11 +307,39 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
     };
   }
 
-  // Pick featured films
-  const featuredIds = new Set(portfolioRecord.featured_film_ids || []);
-  let featuredFilms = allFilms.filter(f => featuredIds.has(f.id));
+  // Extract layout and customization settings from metadata link
+  const metaLink = (portfolioRecord.custom_links || []).find((l: any) => l && l._meta === 'layout');
+  const settings: PortfolioSettings = {
+    show_metrics: metaLink?.show_metrics !== false,
+    show_box_office: metaLink?.show_box_office !== false,
+    show_youtube_views: metaLink?.show_youtube_views !== false,
+    filmography_order: Array.isArray(metaLink?.filmography_order) ? metaLink.filmography_order : [],
+  };
+
+  // Reorder allFilms if custom filmography arrangement exists
+  if (settings.filmography_order.length > 0) {
+    const orderMap = new Map<string, number>();
+    settings.filmography_order.forEach((id, idx) => orderMap.set(id, idx));
+    allFilms.sort((a, b) => {
+      const aOrder = orderMap.has(a.id) ? orderMap.get(a.id)! : 9999;
+      const bOrder = orderMap.has(b.id) ? orderMap.get(b.id)! : 9999;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return (b.year || 0) - (a.year || 0);
+    });
+  }
+
+  // Pick top 3 featured showcase films, preserving creator's selection order
+  const featuredIds = portfolioRecord.featured_film_ids || [];
+  let featuredFilms: PortfolioFilm[] = [];
+  if (featuredIds.length > 0) {
+    featuredFilms = featuredIds
+      .map(id => filmMap.get(id))
+      .filter(Boolean) as PortfolioFilm[];
+  }
   if (featuredFilms.length === 0) {
-    featuredFilms = allFilms.slice(0, 4);
+    featuredFilms = allFilms.slice(0, 3);
+  } else {
+    featuredFilms = featuredFilms.slice(0, 3);
   }
   featuredFilms.forEach(f => (f.is_featured = true));
 
@@ -279,7 +368,10 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
     },
     featuredFilms,
     allFilms,
+    stageCredits: stageRes || [],
     media: mediaRes.data || [],
+    metrics: computePortfolioMetrics(allFilms, stageRes || [], p.youtube_stats),
+    settings,
   };
 }
 
@@ -383,4 +475,90 @@ export async function savePortfolio(
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to save portfolio.' };
   }
+}
+
+export function formatViewsShort(views: number): string {
+  if (!views || views <= 0) return '';
+  if (views >= 1_000_000_000) {
+    const val = (views / 1_000_000_000).toFixed(1).replace(/\.0$/, '');
+    return `${val}B`;
+  }
+  if (views >= 1_000_000) {
+    const val = (views / 1_000_000).toFixed(views % 1_000_000 === 0 ? 0 : 1).replace(/\.0$/, '');
+    return `${val}M`;
+  }
+  if (views >= 1_000) {
+    return `${Math.round(views / 1_000)}K`;
+  }
+  return views.toLocaleString();
+}
+
+export function computePortfolioMetrics(
+  allFilms: PortfolioFilm[] = [],
+  stageCredits: any[] = [],
+  personYoutubeStats?: any
+): PortfolioMetrics {
+  let cinemaCount = 0;
+  let youtubeCount = 0;
+  let totalBoxOffice = 0;
+  let totalViews = 0;
+
+  for (const f of allFilms) {
+    const bo = Number(f.box_office_domestic || f.box_office_worldwide || f.streaming_links?.box_office?.domestic) || 0;
+    const views = Number(f.view_count || f.streaming_links?.youtube_views) || 0;
+
+    const isCinema =
+      f.release_type === 'cinema' ||
+      f.release_type === 'theatrical' ||
+      bo > 0 ||
+      Boolean(f.streaming_links && 'cinema' in f.streaming_links);
+    if (isCinema) cinemaCount++;
+
+    const isYoutube =
+      f.release_type === 'youtube' ||
+      f.release_type === 'youtube_premium' ||
+      Boolean(f.youtube_watch_url) ||
+      views > 0;
+    if (isYoutube) youtubeCount++;
+
+    if (bo > 0) totalBoxOffice += bo;
+    if (views > 0) totalViews += views;
+  }
+
+  if (personYoutubeStats?.views && typeof personYoutubeStats.views === 'number' && personYoutubeStats.views > totalViews) {
+    totalViews = personYoutubeStats.views;
+  }
+
+  const stageCount = stageCredits?.length || 0;
+
+  const screenBits: string[] = [];
+  if (cinemaCount > 0) {
+    screenBits.push(`${cinemaCount} cinema release${cinemaCount > 1 ? 's' : ''}`);
+  }
+  if (youtubeCount > 0) {
+    screenBits.push(`${youtubeCount} YouTube film${youtubeCount > 1 ? 's' : ''}`);
+  }
+  if (stageCount > 0) {
+    screenBits.push(`${stageCount} stage production${stageCount > 1 ? 's' : ''}`);
+  }
+  if (screenBits.length === 0 && allFilms.length > 0) {
+    screenBits.push(`${allFilms.length} credited production${allFilms.length > 1 ? 's' : ''}`);
+  }
+
+  const acrossScreensText = screenBits.join(' · ') || 'Active Across Screens & Stage';
+  const formattedBoxOffice = formatCurrencyShort(totalBoxOffice);
+  const formattedViews = formatViewsShort(totalViews);
+  const hasCommercialFootprint = totalBoxOffice > 0 || totalViews > 0;
+
+  return {
+    cinemaCount,
+    youtubeCount,
+    stageCount,
+    acrossScreensText,
+    totalBoxOffice,
+    formattedBoxOffice,
+    totalViews,
+    formattedViews,
+    hasCommercialFootprint,
+  };
 }

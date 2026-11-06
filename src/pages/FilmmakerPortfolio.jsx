@@ -2,10 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
-import { fetchPortfolioByHandle, formatVideoEmbed } from '../lib/portfolioClient';
+import { fetchPortfolioByHandle, formatVideoEmbed, computePortfolioMetrics, formatCurrencyShort, formatViewsShort } from '../lib/portfolioClient';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { formatFilmTitle, toTitleCase } from '../utils/format';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import CareerPassportModal from '../components/professional/CareerPassportModal';
 import {
   SOCIAL_PLATFORMS,
   GENERIC_LINK,
@@ -88,7 +89,8 @@ export default function FilmmakerPortfolio() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
   const [contactModalOpen, setContactModalOpen] = useState(false);
-  useBodyScrollLock(contactModalOpen);
+  const [passportModalOpen, setPassportModalOpen] = useState(false);
+  useBodyScrollLock(contactModalOpen || passportModalOpen);
   const [inquirySent, setInquirySent] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({
     name: '',
@@ -120,7 +122,7 @@ export default function FilmmakerPortfolio() {
           setError(`No portfolio found for @${handle}`);
         } else {
           setData(res);
-          document.title = `${res.person.name} | Official Filmmaker Portfolio`;
+          document.title = `${res.person.name} | Official Creator Link | MuviDB`;
         }
       })
       .catch((err) => {
@@ -139,7 +141,7 @@ export default function FilmmakerPortfolio() {
   const copyPortfolioLink = () => {
     const url = window.location.href;
     navigator.clipboard.writeText(url);
-    toast.success('Portfolio link copied to clipboard!', {
+    toast.success('Creator Link copied to clipboard!', {
       style: { background: '#1c1c1f', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' },
     });
   };
@@ -211,7 +213,21 @@ export default function FilmmakerPortfolio() {
     );
   }
 
-  const { portfolio, person, featuredFilms, allFilms, media } = data;
+  const { portfolio, person, featuredFilms, allFilms, stageCredits = [], media, metrics, settings = {} } = data;
+  const showMetrics = settings.show_metrics !== false;
+  const showBoxOffice = settings.show_box_office !== false;
+  const showYoutubeViews = settings.show_youtube_views !== false;
+
+  const computedMetrics = useMemo(() => {
+    if (metrics) return metrics;
+    return computePortfolioMetrics(allFilms, stageCredits, person?.youtube_stats);
+  }, [metrics, allFilms, stageCredits, person]);
+
+  const hasCommercialToDisplay =
+    showMetrics &&
+    ((showBoxOffice && (computedMetrics?.totalBoxOffice || 0) > 0) ||
+     (showYoutubeViews && (computedMetrics?.totalViews || 0) > 0));
+
   const theme = THEME_STYLES[portfolio.theme_preset] || THEME_STYLES.midnight;
   // A creator can store a free-form accent_color; fall back to the preset's
   // colour, then to the MuviDB brand. Previously none of this was read at all.
@@ -253,16 +269,51 @@ export default function FilmmakerPortfolio() {
       };
     });
 
+  // Dynamically compute department tabs based ONLY on what this creator has actually done.
+  // If they have never directed or produced, those tabs will not appear.
+  const availableTabs = useMemo(() => {
+    const tabs = [{ id: 'all', label: 'All' }];
+    const allRoles = (allFilms || []).flatMap((f) => (f.roles || []).map((r) => String(r).toLowerCase()));
+
+    const hasDirecting = allRoles.some((r) => r.includes('direct'));
+    if (hasDirecting) tabs.push({ id: 'directing', label: 'Directing' });
+
+    const hasProducing = allRoles.some((r) => r.includes('produc'));
+    if (hasProducing) tabs.push({ id: 'producing', label: 'Producing' });
+
+    const hasWriting = allRoles.some((r) => r.includes('writ') || r.includes('screen'));
+    if (hasWriting) tabs.push({ id: 'writing', label: 'Writing' });
+
+    const hasActing = allRoles.some((r) => r.includes('act') || r.includes('cast'));
+    if (hasActing) tabs.push({ id: 'acting', label: 'Acting' });
+
+    if (stageCredits && stageCredits.length > 0) {
+      tabs.push({ id: 'stage', label: '🎭 Stage & Theatre' });
+    }
+
+    return tabs;
+  }, [allFilms, stageCredits]);
+
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.some((t) => t.id === activeTab)) {
+      setActiveTab('all');
+    }
+  }, [availableTabs, activeTab]);
+
+  const [showAllFilmography, setShowAllFilmography] = useState(false);
+
   // Filter filmography tabs
-  const filteredFilms = allFilms.filter((film) => {
+  const filteredFilms = (allFilms || []).filter((film) => {
     if (activeTab === 'all') return true;
-    const lowerRoles = film.roles.map((r) => r.toLowerCase());
+    const lowerRoles = (film.roles || []).map((r) => String(r).toLowerCase());
     if (activeTab === 'directing') return lowerRoles.some((r) => r.includes('direct'));
     if (activeTab === 'producing') return lowerRoles.some((r) => r.includes('produc'));
     if (activeTab === 'writing') return lowerRoles.some((r) => r.includes('writ') || r.includes('screen'));
-    if (activeTab === 'acting') return lowerRoles.some((r) => r.includes('act'));
+    if (activeTab === 'acting') return lowerRoles.some((r) => r.includes('act') || r.includes('cast'));
     return true;
   });
+
+  const displayedFilms = showAllFilmography ? filteredFilms : filteredFilms.slice(0, 5);
 
   return (
     <div
@@ -285,6 +336,15 @@ export default function FilmmakerPortfolio() {
         </Link>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPassportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand/40 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-bold transition"
+            title="Export Industry Casting CV as PDF"
+          >
+            <Icon icon="solar:document-text-bold" width="14" />
+            <span>Export CV</span>
+          </button>
+
           <Link
             to={`/person/${person.slug}`}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 text-zinc-400 hover:text-white hover:border-white/20 text-xs transition"
@@ -310,18 +370,18 @@ export default function FilmmakerPortfolio() {
           <div className={`absolute -top-32 -right-32 w-80 h-80 rounded-full bg-gradient-to-b ${theme.heroGlow} blur-3xl pointer-events-none`} />
 
           <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
-            {/* Headshot with Status Ring */}
+            {/* Generously Sized Headshot with Prestige Ring */}
             <div className="relative shrink-0">
-              <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-2xl overflow-hidden border-2 border-white/15 shadow-xl bg-zinc-900">
+              <div className="w-36 h-36 sm:w-40 sm:h-40 lg:w-48 lg:h-48 rounded-3xl overflow-hidden border-2 border-white/20 shadow-2xl bg-zinc-900 relative group">
                 <ImageWithFallback
                   src={person.photo_url}
                   alt={person.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
               {person.is_verified && (
-                <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-brand text-black flex items-center justify-center shadow-lg border-2 border-black" title="Verified Creator">
-                  <Icon icon="solar:verified-check-bold" width="18" />
+                <div className="absolute -bottom-2 -right-2 w-9 h-9 rounded-full bg-brand text-black flex items-center justify-center shadow-xl border-2 border-black" title="Verified Creator">
+                  <Icon icon="solar:verified-check-bold" width="20" />
                 </div>
               )}
             </div>
@@ -392,10 +452,19 @@ export default function FilmmakerPortfolio() {
               <div className="mt-6 flex flex-wrap items-center justify-center sm:justify-start gap-3">
                 <button
                   onClick={() => setContactModalOpen(true)}
-                  className="rounded-full bg-brand text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-brand transition flex items-center gap-2 shadow-lg shadow-brand/20"
+                  className="rounded-full bg-brand text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-brand transition flex items-center gap-2 shadow-lg shadow-brand/20 active:scale-95"
                 >
                   <Icon icon="solar:letter-bold" width="16" />
                   <span>Work Inquiry</span>
+                </button>
+
+                <button
+                  onClick={() => setPassportModalOpen(true)}
+                  className="rounded-full border border-white/20 bg-white/5 hover:bg-white/10 px-5 py-2.5 text-xs font-bold text-white transition flex items-center gap-2 hover:border-brand/40 shadow-sm"
+                  title="Customize & Export PDF Casting CV"
+                >
+                  <Icon icon="solar:document-text-bold" width="16" className="text-brand" />
+                  <span>Export PDF CV</span>
                 </button>
 
                 {portfolio.epk_pdf_url && (
@@ -405,7 +474,7 @@ export default function FilmmakerPortfolio() {
                     rel="noopener noreferrer"
                     className="rounded-full border border-white/20 bg-white/5 hover:bg-white/10 px-5 py-2.5 text-xs font-bold text-white transition flex items-center gap-2"
                   >
-                    <Icon icon="solar:document-text-bold" width="16" />
+                    <Icon icon="solar:download-minimalistic-linear" width="16" />
                     <span>Download EPK</span>
                   </a>
                 )}
@@ -413,11 +482,79 @@ export default function FilmmakerPortfolio() {
                 <button
                   onClick={copyPortfolioLink}
                   className="rounded-full border border-white/10 bg-white/5 hover:bg-white/10 p-2.5 text-zinc-400 hover:text-white transition"
-                  title="Copy Bio Link"
+                  title="Copy Creator Link"
                 >
                   <Icon icon="solar:copy-bold" width="16" />
                 </button>
               </div>
+
+              {/* Across Screens & Commercial Footprint Banner (Controlled by creator toggle) */}
+              {showMetrics && (computedMetrics?.acrossScreensText || hasCommercialToDisplay) && (
+                <div className="mt-8 pt-6 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                  {/* Across Screens Card */}
+                  {computedMetrics?.acrossScreensText && (
+                    <div
+                      className={`rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex flex-col justify-between ${
+                        !hasCommercialToDisplay ? 'sm:col-span-2' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">
+                          Across Screens
+                        </span>
+                      </div>
+                      <p className="text-sm sm:text-base font-black text-white tracking-tight leading-snug">
+                        {computedMetrics.acrossScreensText}
+                      </p>
+                      <p className="text-[11px] text-zinc-500 mt-1 font-mono">
+                        Verified theatrical releases, YouTube streaming &amp; stage
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Commercial Footprint Card */}
+                  {hasCommercialToDisplay && (
+                    <div
+                      className={`rounded-2xl border border-brand/30 bg-brand/[0.05] p-4 flex flex-col justify-between ${
+                        !computedMetrics?.acrossScreensText ? 'sm:col-span-2' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Icon icon="solar:chart-square-bold" width="14" className="text-brand" />
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand">
+                          Commercial Footprint
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {showBoxOffice && computedMetrics.totalBoxOffice > 0 && (
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-lg sm:text-xl font-black text-white font-mono">
+                              {computedMetrics.formattedBoxOffice}
+                            </span>
+                            <span className="text-xs text-zinc-300 font-medium">
+                              documented cinema box office
+                            </span>
+                          </div>
+                        )}
+                        {showYoutubeViews && computedMetrics.totalViews > 0 && (
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-lg sm:text-xl font-black text-brand font-mono">
+                              {computedMetrics.formattedViews}
+                            </span>
+                            <span className="text-xs text-zinc-300 font-medium">
+                              combined YouTube views
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-500 mt-1 font-mono">
+                        Theatrical box office milestones &amp; verified views
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -445,7 +582,7 @@ export default function FilmmakerPortfolio() {
           </section>
         )}
 
-        {/* The Director's Showcase (Featured Films) */}
+        {/* The Director's Showcase (Featured Films - 3 on a Straight Line) */}
         {featuredFilms.length > 0 && (
           <section className="space-y-4">
             <div className="flex items-center justify-between">
@@ -453,21 +590,21 @@ export default function FilmmakerPortfolio() {
                 <Icon icon="solar:stars-bold" className="text-brand" width="18" />
                 <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Featured Showcase</h2>
               </div>
-              <span className="text-xs text-zinc-500">{featuredFilms.length} Curated Titles</span>
+              <span className="text-xs text-zinc-500">{Math.min(featuredFilms.length, 3)} Curated Titles</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {featuredFilms.map((film) => {
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {featuredFilms.slice(0, 3).map((film) => {
                 const links = film.streaming_links || {};
                 const availableProviders = STREAMING_PROVIDERS.filter((p) => Boolean(links[p.key]));
 
                 return (
                   <article
                     key={film.id}
-                    className="group relative rounded-2xl border border-white/10 bg-zinc-950/60 hover:border-brand/40 transition duration-300 overflow-hidden flex flex-col justify-between"
+                    className="group relative rounded-2xl border border-white/10 bg-zinc-950/70 hover:border-brand/40 transition duration-300 overflow-hidden flex flex-col justify-between"
                   >
                     {/* Backdrop / Poster Top */}
-                    <div className="relative aspect-[16/9] w-full overflow-hidden bg-zinc-900">
+                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-zinc-900">
                       <ImageWithFallback
                         src={film.backdrop_url || film.poster_url}
                         alt={film.title}
@@ -476,59 +613,74 @@ export default function FilmmakerPortfolio() {
                       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
 
                       {film.year && (
-                        <span className="absolute top-3 right-3 rounded-md bg-black/70 backdrop-blur-md px-2 py-0.5 text-[10px] font-mono font-bold text-zinc-200 border border-white/10">
+                        <span className="absolute top-2.5 right-2.5 rounded-md bg-black/70 backdrop-blur-md px-2 py-0.5 text-[10px] font-mono font-bold text-zinc-200 border border-white/10">
                           {film.year}
                         </span>
                       )}
 
-                      <div className="absolute bottom-3 left-3 right-3">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-brand font-bold block mb-0.5">
+                      <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1 z-10">
+                        {showMetrics && showBoxOffice && film.box_office_domestic > 0 && (
+                          <span className="rounded-md bg-black/80 backdrop-blur-md px-1.5 py-0.5 text-[9px] font-mono font-bold text-white border border-brand/40 shadow-sm flex items-center gap-1">
+                            <Icon icon="solar:ticket-bold" width="10" className="text-brand" />
+                            <span>{formatCurrencyShort(film.box_office_domestic)}</span>
+                          </span>
+                        )}
+                        {showMetrics && showYoutubeViews && film.view_count > 0 && (
+                          <span className="rounded-md bg-black/80 backdrop-blur-md px-1.5 py-0.5 text-[9px] font-mono font-bold text-white border border-red-500/40 shadow-sm flex items-center gap-1">
+                            <Icon icon="simple-icons:youtube" width="10" className="text-red-500" />
+                            <span>{formatViewsShort(film.view_count)}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="absolute bottom-2.5 left-3 right-3">
+                        <span className="text-[9px] font-mono uppercase tracking-wider text-brand font-bold block mb-0.5 truncate">
                           {film.roles.join(' • ')}
                         </span>
-                        <h3 className="text-base font-bold text-white tracking-tight leading-snug truncate">
+                        <h3 className="text-sm font-bold text-white tracking-tight leading-snug truncate">
                           {formatFilmTitle(film.title)}
                         </h3>
                       </div>
                     </div>
 
                     {/* Synopsis & Watch Bar */}
-                    <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="p-3.5 flex-1 flex flex-col justify-between gap-3">
                       {film.synopsis ? (
-                        <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2">
+                        <p className="text-[11px] text-zinc-400 leading-relaxed line-clamp-2">
                           {film.synopsis}
                         </p>
                       ) : (
-                        <p className="text-xs text-zinc-600 italic">No synopsis available.</p>
+                        <p className="text-[11px] text-zinc-600 italic">No synopsis available.</p>
                       )}
 
                       {/* Where to Watch Buttons */}
                       <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1 flex-wrap min-w-0">
                           {availableProviders.length > 0 ? (
-                            availableProviders.map((prov) => (
+                            availableProviders.slice(0, 2).map((prov) => (
                               <a
                                 key={prov.key}
                                 href={links[prov.key]}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-[11px] font-medium text-zinc-300 transition ${prov.color}`}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-white/10 bg-white/5 text-[10px] font-medium text-zinc-300 transition ${prov.color}`}
                                 title={`Watch on ${prov.name}`}
                               >
-                                <Icon icon={prov.icon} width="12" />
-                                <span>{prov.name}</span>
+                                <Icon icon={prov.icon} width="11" />
+                                <span className="truncate max-w-[65px]">{prov.name}</span>
                               </a>
                             ))
                           ) : (
-                            <span className="text-[11px] text-zinc-500 font-mono">In Catalogue</span>
+                            <span className="text-[10px] text-zinc-500 font-mono">In Catalogue</span>
                           )}
                         </div>
 
                         <Link
                           to={`/film/${film.slug}`}
-                          className="shrink-0 text-xs font-bold text-brand hover:text-brand flex items-center gap-1"
+                          className="shrink-0 text-[11px] font-bold text-brand hover:underline flex items-center gap-1"
                         >
                           <span>Details</span>
-                          <Icon icon="solar:arrow-right-linear" width="12" />
+                          <Icon icon="solar:arrow-right-linear" width="11" />
                         </Link>
                       </div>
                     </div>
@@ -617,27 +769,73 @@ export default function FilmmakerPortfolio() {
               <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Complete Filmography</h2>
             </div>
 
-            {/* Department Filter Tabs */}
-            <div className="flex items-center gap-1.5 p-1 rounded-full bg-white/5 border border-white/10 self-start sm:self-auto">
-              {['all', 'directing', 'producing', 'writing', 'acting'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition ${
-                    activeTab === tab
-                      ? 'bg-brand text-black shadow-sm'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+            {/* Department Filter Tabs (Only shown if creator has performed multiple roles) */}
+            {availableTabs.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10 self-start sm:self-auto">
+                {availableTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition ${
+                      activeTab === tab.id
+                        ? 'bg-brand text-black shadow-sm font-bold'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-zinc-950/60 divide-y divide-white/5 overflow-hidden">
-            {filteredFilms.length > 0 ? (
-              filteredFilms.map((film) => (
+            {activeTab === 'stage' ? (
+              stageCredits.length > 0 ? (
+                stageCredits.map((stg, idx) => {
+                  const play = stg.plays || stg.play || {};
+                  return (
+                    <Link
+                      key={stg.id || idx}
+                      to={play.slug ? `/play/${play.slug}` : `/plays`}
+                      className="p-4 flex items-center justify-between gap-4 hover:bg-white/[0.03] transition group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-10 h-14 rounded-lg overflow-hidden bg-purple-950/40 border border-purple-500/30 shrink-0 flex items-center justify-center text-purple-300">
+                          {play.poster_url ? (
+                            <ImageWithFallback src={play.poster_url} alt={play.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <Icon icon="solar:mask-hamsa-bold" width="20" />
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-white group-hover:text-brand transition truncate flex items-center gap-2">
+                            <span>{formatFilmTitle(play.title || 'Stage Production')}</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold uppercase tracking-wider">
+                              Stage
+                            </span>
+                          </p>
+                          <p className="text-xs text-zinc-400">
+                            {stg.role_name || 'Performer'} {play.venue_name ? `· ${play.venue_name}` : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        {play.year && <span className="text-xs font-mono text-zinc-500">{play.year}</span>}
+                        <Icon icon="solar:alt-arrow-right-linear" className="text-zinc-600 group-hover:text-white transition" width="16" />
+                      </div>
+                    </Link>
+                  );
+                })
+              ) : (
+                <div className="p-8 text-center text-xs text-zinc-500 font-mono">
+                  No verified stage credits listed.
+                </div>
+              )
+            ) : displayedFilms.length > 0 ? (
+              displayedFilms.map((film) => (
                 <Link
                   key={film.id}
                   to={`/film/${film.slug}`}
@@ -662,7 +860,19 @@ export default function FilmmakerPortfolio() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    {showMetrics && showBoxOffice && film.box_office_domestic > 0 && (
+                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.04] border border-brand/30 text-[10px] font-mono font-bold text-brand">
+                        <Icon icon="solar:ticket-bold" width="11" />
+                        <span>{formatCurrencyShort(film.box_office_domestic)}</span>
+                      </span>
+                    )}
+                    {showMetrics && showYoutubeViews && film.view_count > 0 && (
+                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.04] border border-red-500/30 text-[10px] font-mono font-bold text-red-400">
+                        <Icon icon="simple-icons:youtube" width="11" />
+                        <span>{formatViewsShort(film.view_count)}</span>
+                      </span>
+                    )}
                     {film.year && (
                       <span className="text-xs font-mono text-zinc-500">{film.year}</span>
                     )}
@@ -673,6 +883,23 @@ export default function FilmmakerPortfolio() {
             ) : (
               <div className="p-8 text-center text-xs text-zinc-500 font-mono">
                 No credits found under {activeTab}.
+              </div>
+            )}
+
+            {/* Expand / Collapse Top 5 Limit */}
+            {activeTab !== 'stage' && filteredFilms.length > 5 && (
+              <div className="p-3 bg-zinc-950/80 text-center border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setShowAllFilmography(!showAllFilmography)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-zinc-300 hover:text-white hover:bg-white/5 border border-white/10 transition"
+                >
+                  <span>{showAllFilmography ? 'Show Top 5 Only' : `View All ${filteredFilms.length} Credits`}</span>
+                  <Icon
+                    icon={showAllFilmography ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'}
+                    width="14"
+                  />
+                </button>
               </div>
             )}
           </div>
@@ -686,7 +913,7 @@ export default function FilmmakerPortfolio() {
               className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 px-5 py-3 text-xs font-bold text-white transition hover:scale-[1.02] shadow-lg"
             >
               <Icon icon="solar:user-bold" className="text-brand" width="16" />
-              <span>See Full Profile on MuviDB</span>
+              <span>See Full Profile on MuviDB Creator Link</span>
               <Icon icon="solar:arrow-right-up-linear" width="14" className="text-zinc-400" />
             </Link>
 
@@ -705,7 +932,7 @@ export default function FilmmakerPortfolio() {
               <Link to="/" className="text-zinc-300 hover:text-white font-bold underline underline-offset-2">
                 MuviDB
               </Link>{' '}
-              — The Living African Film Database
+              — The living record of African film & theatre.
             </p>
           </div>
         </footer>
@@ -731,7 +958,7 @@ export default function FilmmakerPortfolio() {
             to="/claim"
             className="text-[11px] text-brand hover:text-brand font-bold transition flex items-center gap-1"
           >
-            <span>Claim Yours</span>
+            <span>Claim Your Creator Link</span>
           </Link>
         </div>
       </div>
@@ -869,6 +1096,23 @@ export default function FilmmakerPortfolio() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Customizable Career Passport & PDF Export Studio Modal */}
+      {passportModalOpen && (
+        <CareerPassportModal
+          person={{ ...person, claimed: true }}
+          credits={allFilms.map(f => ({
+            id: f.id,
+            role: f.roles?.[0] || 'Contributor',
+            character_name: '',
+            year: f.year,
+            films: f,
+          }))}
+          stageCredits={stageCredits}
+          personalized
+          onClose={() => setPassportModalOpen(false)}
+        />
       )}
     </div>
   );

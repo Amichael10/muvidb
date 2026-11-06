@@ -94,6 +94,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handleOpay } = await import('./_lib/opay_handler.js');
       return handleOpay(req, res);
     }
+    if (key === 'contribution-notifications' || key === 'contributions-notify') {
+      const { handleContributionNotifications } = await import('./_lib/contribution_notification_handler.js');
+      return handleContributionNotifications(req, res);
+    }
     if (key === 'company-claims') {
       const { handleCompanyClaims } = await import('./_lib/company_claims_handler.js');
       return handleCompanyClaims(req, res);

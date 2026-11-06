@@ -1,5 +1,5 @@
 /**
- * Social platform registry for the link-in-bio portfolio.
+ * Social platform registry for the Creator Link portfolio.
  *
  * One entry per platform is the whole contract: add a row here and the icon,
  * brand colour and label appear everywhere — the icon row under the bio, the

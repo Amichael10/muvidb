@@ -1024,12 +1024,23 @@ export default function Dashboard() {
                   <form onSubmit={handleSaveProfile} className="space-y-6">
                     <h3 className="text-sm font-bold text-text-primary">Profile</h3>
                     <div className="flex items-center gap-5">
-                      <div className="w-16 h-16 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-muted">
-                        <Icon icon="solar:user-linear" className="text-2xl" />
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-surface-2 border-2 border-brand/40 flex items-center justify-center text-brand font-black text-2xl sm:text-3xl shadow-lg shadow-brand/10 shrink-0 overflow-hidden relative">
+                        {user?.avatar_url ? (
+                          <img src={user.avatar_url} alt={user?.name || 'User'} className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{(user?.name || user?.email || 'F').charAt(0).toUpperCase()}</span>
+                        )}
+                        <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-surface flex items-center justify-center text-[10px] text-white font-bold" title="Verified Member">
+                          ✓
+                        </span>
                       </div>
-                      <p className="text-xs text-text-muted leading-relaxed">
-                        JPG, PNG, or WebP. Square photos work best.
-                      </p>
+                      <div className="space-y-1">
+                        <p className="font-bold text-sm text-text-primary">{user?.name || 'Fan Member'}</p>
+                        <p className="text-xs text-text-muted">{user?.email}</p>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand/10 text-brand border border-brand/20 mt-1">
+                          Official Fan Account
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

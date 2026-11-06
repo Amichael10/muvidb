@@ -16,6 +16,7 @@ import {
 } from '../../lib/contributions';
 import { signedContributionUrl, publishContributionImage, deleteContributionImage } from '../../lib/imageUpload';
 import { fetchChannelData } from '../../lib/youtube';
+import { authHeaders } from '../../lib/apiAuth';
 
 // Map a single submitted social URL to the right people.* column.
 function socialField(url = '') {
@@ -601,6 +602,33 @@ export default function AdminContributions() {
     }
   };
 
+  const notifyContributionReviewed = async (contributionId) => {
+    try {
+      const res = await fetch('/api/contribution-notifications', {
+        method: 'POST',
+        headers: await authHeaders(),
+        body: JSON.stringify({
+          action: 'on-contribution-reviewed',
+          contributionId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.status === 'sent') {
+        toast.success(
+          `Thank-you email sent to contributor (${data.itemCount} contribution${data.itemCount > 1 ? 's' : ''})!`,
+          { icon: '✉️' }
+        );
+      } else if (data.status === 'held') {
+        toast(
+          `Approved! Notification held (${data.remainingPending} other pending submissions from this user in queue).`,
+          { icon: '⏳' }
+        );
+      }
+    } catch (notifyErr) {
+      console.warn('Failed to dispatch contribution notification:', notifyErr);
+    }
+  };
+
   const markReviewed = async (item, status, extraNote) => {
     const note =
       status === 'rejected'
@@ -616,6 +644,9 @@ export default function AdminContributions() {
       })
       .eq('id', item.id);
     if (error) throw error;
+
+    // Check submitter's pending queue and dispatch consolidated thank-you email if queue is cleared
+    await notifyContributionReviewed(item.id);
   };
 
   const toggleField = (itemId, key) => {
@@ -1023,6 +1054,18 @@ export default function AdminContributions() {
                           )}
                           <p className="text-text-muted text-xs mt-1">
                             Submitted by <span className="font-bold text-text-primary">{item.users?.name || item.users?.email || 'Community Member'}</span> · {new Date(item.created_at).toLocaleDateString()}
+                          {(() => {
+                            const sameUserPending = items.filter((x) => x.submitted_by && x.submitted_by === item.submitted_by).length;
+                            if (sameUserPending > 1) {
+                              return (
+                                <span className="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                  <Icon icon="solar:layers-bold" className="w-3 h-3" />
+                                  {sameUserPending} pending by this user (email batching active)
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                           </p>
                         </div>
                       </div>
