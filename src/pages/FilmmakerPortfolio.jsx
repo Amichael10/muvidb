@@ -37,10 +37,11 @@ const THEME_STYLES = {
     accent: BRAND_ACCENT,
     hexBg: '#0a0604',
     bg: 'bg-[#0a0604]',
-    topSkin: '/skins/heritage-top.jpg',
-    bottomSkin: '/skins/heritage-bottom.jpg',
-    patternStrip: '/skins/heritage-pattern-strip.jpg',
-    heroGlow: 'from-amber-500/20 via-orange-600/10 to-transparent',
+    heroSkin: '/skins/heritage-hero.png',
+    footerSkin: '/skins/heritage-footer.png',
+    topSkin: '/skins/heritage-hero.png',
+    bottomSkin: '/skins/heritage-footer.png',
+    heroGlow: 'from-amber-500/25 via-orange-600/10 to-transparent',
     cardBg: 'bg-[#120a06]/85 backdrop-blur-xl border border-amber-500/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-amber-500/40',
     accentText: 'text-amber-400',
@@ -51,14 +52,16 @@ const THEME_STYLES = {
     linkCardBg: 'bg-[#160d08]/90 border border-amber-500/20 hover:border-amber-500/50 hover:bg-[#1f110a]',
     filmCardBg: 'bg-[#140b07]/80 border border-amber-500/15 hover:border-amber-500/35',
   },
-  muvi: {
+  noir: {
     accent: BRAND_ACCENT,
-    hexBg: '#080A0D',
-    bg: 'bg-[#080A0D]',
-    topSkin: '/skins/midnight-top.jpg',
-    bottomSkin: '/skins/heritage-bottom.jpg',
-    heroGlow: 'from-[#FF5A1F]/20 via-transparent to-transparent',
-    cardBg: 'bg-[#10141d]/85 backdrop-blur-xl border border-brand/25 shadow-2xl shadow-black/80',
+    hexBg: '#08090b',
+    bg: 'bg-[#08090b]',
+    heroSkin: '/skins/noir-hero.png',
+    footerSkin: '/skins/noir-footer.png',
+    topSkin: '/skins/noir-hero.png',
+    bottomSkin: '/skins/noir-footer.png',
+    heroGlow: 'from-[#FF5A1F]/25 via-transparent to-transparent',
+    cardBg: 'bg-[#101319]/85 backdrop-blur-xl border border-brand/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-brand/40',
     accentText: 'text-brand',
     accentBorder: 'border-brand/30',
@@ -68,90 +71,128 @@ const THEME_STYLES = {
     linkCardBg: 'bg-[#121620]/90 border border-brand/20 hover:border-brand/45 hover:bg-[#181e2b]',
     filmCardBg: 'bg-[#10141d]/80 border border-brand/15 hover:border-brand/35',
   },
-  gold: {
-    accent: '#F59E0B',
-    hexBg: '#0c0b09',
-    bg: 'bg-[#0c0b09]',
-    topSkin: '/skins/gold-top.jpg',
-    bottomSkin: '/skins/heritage-bottom.jpg',
-    heroGlow: 'from-amber-500/20 via-yellow-600/10 to-transparent',
-    cardBg: 'bg-[#16130c]/85 backdrop-blur-xl border border-amber-500/25 shadow-2xl shadow-black/80',
-    cardHover: 'hover:border-amber-500/40',
-    accentText: 'text-amber-400',
-    accentBorder: 'border-amber-500/30',
-    accentBg: 'bg-amber-500',
-    badgeTone: 'border-amber-500/25 bg-amber-500/10 text-amber-300',
-    statBorder: 'border-amber-500/20 bg-amber-500/[0.04]',
-    linkCardBg: 'bg-[#1a170f]/90 border border-amber-500/20 hover:border-amber-500/50 hover:bg-[#252015]',
-    filmCardBg: 'bg-[#18140c]/80 border border-amber-500/15 hover:border-amber-500/35',
+  cyan: {
+    accent: '#00E5FF',
+    hexBg: '#040a12',
+    bg: 'bg-[#040a12]',
+    heroSkin: '/skins/cyan-hero.png',
+    footerSkin: '/skins/cyan-footer.png',
+    topSkin: '/skins/cyan-hero.png',
+    bottomSkin: '/skins/cyan-footer.png',
+    heroGlow: 'from-cyan-500/25 via-transparent to-transparent',
+    cardBg: 'bg-[#08121f]/85 backdrop-blur-xl border border-cyan-400/25 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-cyan-400/40',
+    accentText: 'text-cyan-400',
+    accentBorder: 'border-cyan-400/30',
+    accentBg: 'bg-cyan-400 text-black',
+    badgeTone: 'border-cyan-400/25 bg-cyan-400/10 text-cyan-300',
+    statBorder: 'border-cyan-400/20 bg-cyan-400/[0.04]',
+    linkCardBg: 'bg-[#0a1526]/90 border border-cyan-400/20 hover:border-cyan-400/50 hover:bg-[#0f1f38]',
+    filmCardBg: 'bg-[#08121f]/80 border border-cyan-400/15 hover:border-cyan-400/35',
   },
   velvet: {
     accent: '#E11D48',
-    hexBg: '#0d070a',
-    bg: 'bg-[#0d070a]',
-    topSkin: '/skins/velvet-top.jpg',
-    bottomSkin: '/skins/velvet-bottom.jpg',
-    heroGlow: 'from-rose-500/20 via-transparent to-transparent',
-    cardBg: 'bg-[#150a0f]/85 backdrop-blur-xl border border-rose-500/25 shadow-2xl shadow-black/80',
+    hexBg: '#0d0508',
+    bg: 'bg-[#0d0508]',
+    heroSkin: '/skins/velvet-hero.png',
+    footerSkin: '/skins/velvet-footer.png',
+    topSkin: '/skins/velvet-hero.png',
+    bottomSkin: '/skins/velvet-footer.png',
+    heroGlow: 'from-rose-500/25 via-transparent to-transparent',
+    cardBg: 'bg-[#18080f]/85 backdrop-blur-xl border border-rose-500/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-rose-500/40',
     accentText: 'text-rose-400',
     accentBorder: 'border-rose-500/30',
     accentBg: 'bg-rose-500',
     badgeTone: 'border-rose-500/25 bg-rose-500/10 text-rose-300',
     statBorder: 'border-rose-500/20 bg-rose-500/[0.04]',
-    linkCardBg: 'bg-[#190c13]/90 border border-rose-500/20 hover:border-rose-500/50 hover:bg-[#230f1b]',
-    filmCardBg: 'bg-[#160a10]/80 border border-rose-500/15 hover:border-rose-500/35',
+    linkCardBg: 'bg-[#1d0a13]/90 border border-rose-500/20 hover:border-rose-500/50 hover:bg-[#280f1b]',
+    filmCardBg: 'bg-[#18080f]/80 border border-rose-500/15 hover:border-rose-500/35',
   },
-  midnight: {
-    accent: BRAND_ACCENT,
-    hexBg: '#08090c',
-    bg: 'bg-[#08090c]',
-    topSkin: '/skins/midnight-top.jpg',
-    bottomSkin: '/skins/heritage-bottom.jpg',
-    heroGlow: 'from-[#FF5A1F]/15 via-transparent to-transparent',
+  amethyst: {
+    accent: '#A855F7',
+    hexBg: '#0c0512',
+    bg: 'bg-[#0c0512]',
+    heroSkin: '/skins/amethyst-hero.png',
+    footerSkin: '/skins/amethyst-footer.png',
+    topSkin: '/skins/amethyst-hero.png',
+    bottomSkin: '/skins/amethyst-footer.png',
+    heroGlow: 'from-purple-500/25 via-transparent to-transparent',
+    cardBg: 'bg-[#150821]/85 backdrop-blur-xl border border-purple-500/25 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-purple-500/40',
+    accentText: 'text-purple-400',
+    accentBorder: 'border-purple-500/30',
+    accentBg: 'bg-purple-500',
+    badgeTone: 'border-purple-500/25 bg-purple-500/10 text-purple-300',
+    statBorder: 'border-purple-500/20 bg-purple-500/[0.04]',
+    linkCardBg: 'bg-[#190b29]/90 border border-purple-500/20 hover:border-purple-500/50 hover:bg-[#24103a]',
+    filmCardBg: 'bg-[#150821]/80 border border-purple-500/15 hover:border-purple-500/35',
+  },
+  emerald: {
+    accent: '#10B981',
+    hexBg: '#040f09',
+    bg: 'bg-[#040f09]',
+    heroSkin: '/skins/emerald-hero.png',
+    footerSkin: '/skins/emerald-footer.png',
+    topSkin: '/skins/emerald-hero.png',
+    bottomSkin: '/skins/emerald-footer.png',
+    heroGlow: 'from-emerald-500/25 via-transparent to-transparent',
+    cardBg: 'bg-[#081810]/85 backdrop-blur-xl border border-emerald-500/25 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-emerald-500/40',
+    accentText: 'text-emerald-400',
+    accentBorder: 'border-emerald-500/30',
+    accentBg: 'bg-emerald-500 text-black',
+    badgeTone: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300',
+    statBorder: 'border-emerald-500/20 bg-emerald-500/[0.04]',
+    linkCardBg: 'bg-[#0b2016]/90 border border-emerald-500/20 hover:border-emerald-500/50 hover:bg-[#102d1f]',
+    filmCardBg: 'bg-[#081810]/80 border border-emerald-500/15 hover:border-emerald-500/35',
+  },
+  sapphire: {
+    accent: '#3B82F6',
+    hexBg: '#030714',
+    bg: 'bg-[#030714]',
+    heroSkin: '/skins/sapphire-hero.png',
+    footerSkin: '/skins/sapphire-footer.png',
+    topSkin: '/skins/sapphire-hero.png',
+    bottomSkin: '/skins/sapphire-footer.png',
+    heroGlow: 'from-blue-500/25 via-transparent to-transparent',
+    cardBg: 'bg-[#070f24]/85 backdrop-blur-xl border border-blue-500/25 shadow-2xl shadow-black/80',
+    cardHover: 'hover:border-blue-500/40',
+    accentText: 'text-blue-400',
+    accentBorder: 'border-blue-500/30',
+    accentBg: 'bg-blue-500',
+    badgeTone: 'border-blue-500/25 bg-blue-500/10 text-blue-300',
+    statBorder: 'border-blue-500/20 bg-blue-500/[0.04]',
+    linkCardBg: 'bg-[#091533]/90 border border-blue-500/20 hover:border-blue-500/50 hover:bg-[#0e204c]',
+    filmCardBg: 'bg-[#070f24]/80 border border-blue-500/15 hover:border-blue-500/35',
+  },
+  obsidian: {
+    accent: '#94A3B8',
+    hexBg: '#090a0d',
+    bg: 'bg-[#090a0d]',
+    heroSkin: '/skins/obsidian-hero.png',
+    footerSkin: '/skins/obsidian-footer.png',
+    topSkin: '/skins/obsidian-hero.png',
+    bottomSkin: '/skins/obsidian-footer.png',
+    heroGlow: 'from-slate-400/20 via-transparent to-transparent',
     cardBg: 'bg-[#111318]/85 backdrop-blur-xl border border-white/15 shadow-2xl shadow-black/80',
-    cardHover: 'hover:border-brand/40',
-    accentText: 'text-brand',
-    accentBorder: 'border-brand/30',
-    accentBg: 'bg-brand',
-    badgeTone: 'border-brand/25 bg-brand/10 text-brand',
-    statBorder: 'border-white/10 bg-white/[0.02]',
-    linkCardBg: 'bg-[#141720]/90 border border-white/10 hover:border-brand/40 hover:bg-[#1a1f2b]',
-    filmCardBg: 'bg-[#12141c]/80 border border-white/10 hover:border-brand/30',
-  },
-  neon: {
-    accent: '#06B6D4',
-    hexBg: '#060910',
-    bg: 'bg-[#060910]',
-    topSkin: '/skins/midnight-top.jpg',
-    bottomSkin: '/skins/heritage-bottom.jpg',
-    heroGlow: 'from-cyan-500/20 via-transparent to-transparent',
-    cardBg: 'bg-[#090e1a]/85 backdrop-blur-xl border border-cyan-500/25 shadow-2xl shadow-black/80',
-    cardHover: 'hover:border-cyan-500/40',
-    accentText: 'text-cyan-400',
-    accentBorder: 'border-cyan-500/30',
-    accentBg: 'bg-cyan-500',
-    badgeTone: 'border-cyan-500/25 bg-cyan-500/10 text-cyan-300',
-    statBorder: 'border-cyan-500/20 bg-cyan-500/[0.03]',
-    linkCardBg: 'bg-[#0c1424]/90 border border-cyan-500/20 hover:border-cyan-500/50 hover:bg-[#111c33]',
-    filmCardBg: 'bg-[#0a1120]/80 border border-cyan-500/15 hover:border-cyan-500/35',
-  },
-  minimal: {
-    accent: '#FFFFFF',
-    hexBg: '#09090b',
-    bg: 'bg-[#09090b]',
-    heroGlow: 'from-white/10 via-transparent to-transparent',
-    cardBg: 'bg-[#141416]/85 backdrop-blur-xl border border-white/20 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-white/35',
-    accentText: 'text-white',
+    accentText: 'text-slate-300',
     accentBorder: 'border-white/20',
     accentBg: 'bg-white text-black',
     badgeTone: 'border-white/20 bg-white/10 text-zinc-200',
     statBorder: 'border-white/10 bg-white/[0.02]',
-    linkCardBg: 'bg-[#18181c]/90 border border-white/15 hover:border-white/40 hover:bg-[#202026]',
-    filmCardBg: 'bg-[#141417]/80 border border-white/10 hover:border-white/25',
+    linkCardBg: 'bg-[#151821]/90 border border-white/15 hover:border-white/40 hover:bg-[#1c202c]',
+    filmCardBg: 'bg-[#111318]/80 border border-white/10 hover:border-white/25',
   },
 };
+
+// Map legacy preset names to the new canonical themes
+THEME_STYLES.muvi = THEME_STYLES.noir;
+THEME_STYLES.gold = THEME_STYLES.heritage;
+THEME_STYLES.midnight = THEME_STYLES.sapphire;
+THEME_STYLES.neon = THEME_STYLES.cyan;
+THEME_STYLES.minimal = THEME_STYLES.obsidian;
 
 const STREAMING_PROVIDERS = [
   { key: 'netflix', name: 'Netflix', icon: 'simple-icons:netflix', color: 'hover:text-red-500 hover:border-red-500/40' },
@@ -381,12 +422,21 @@ export default function FilmmakerPortfolio() {
   const bioLinks = (portfolio.custom_links || [])
     .filter((link) => link && !link._meta && typeof link.url === 'string' && link.url.trim())
     .map((link) => {
-      const platform = platformFor(link.platform) || detectPlatform(link.url) || null;
+      const platform =
+        platformFor(link.platform) ||
+        platformFor(link.title) ||
+        detectPlatform(link.url) ||
+        null;
+      let finalUrl = link.url.trim();
+      // If user typed a bare handle into url (e.g. "@endtoendtest" or "endtoendtest") and platform is known, convert to full url:
+      if (platform && !/^https?:\/\//i.test(finalUrl) && !/^[\w.-]+\.[a-z]{2,}\//i.test(finalUrl)) {
+        finalUrl = platform.handleToUrl(finalUrl.replace(/^@+/, ''));
+      }
       return {
-        key: link.id || link.url,
-        url: link.url.trim(),
-        title: link.title?.trim() || platform?.label || prettyUrl(link.url),
-        subtitle: handleFromUrl(link.url) || prettyUrl(link.url),
+        key: link.id || finalUrl,
+        url: finalUrl,
+        title: link.title?.trim() || platform?.label || prettyUrl(finalUrl),
+        subtitle: handleFromUrl(finalUrl) || prettyUrl(finalUrl),
         art: platform || GENERIC_LINK,
       };
     });
@@ -410,24 +460,20 @@ export default function FilmmakerPortfolio() {
       style={{ '--color-brand': accentColor, '--color-brand-hover': accentColor }}
     >
       {/* Top Cinema Skin Backdrop Graphic */}
-      {theme.topSkin && (
-        <div className="absolute top-0 inset-x-0 h-[360px] sm:h-[480px] lg:h-[560px] pointer-events-none overflow-hidden select-none z-0">
+      {(theme.heroSkin || theme.topSkin) && (
+        <div className="absolute top-0 inset-x-0 h-[520px] sm:h-[640px] lg:h-[740px] pointer-events-none overflow-hidden select-none z-0">
           <img
-            src={theme.topSkin}
+            src={theme.heroSkin || theme.topSkin}
             alt=""
-            className="w-full h-full object-cover object-top opacity-90"
+            className="w-full h-full object-cover object-top opacity-95"
           />
-          {/* Smooth blend downward into page background */}
+          {/* Subtle top edge blend for status bar / header */}
+          <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/40 to-transparent" />
+          {/* Smooth bottom fade into deep page background */}
           <div
-            className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--skin-bg)]"
+            className="absolute bottom-0 inset-x-0 h-44 bg-gradient-to-b from-transparent to-[var(--skin-bg)]"
             style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
           />
-          <div
-            className="absolute inset-0 bg-gradient-to-t from-[var(--skin-bg)] via-transparent to-black/30"
-            style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
-          />
-          {/* Radial spotlight center vignette */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_20%,rgba(0,0,0,0.65)_100%)]" />
         </div>
       )}
 
@@ -458,22 +504,20 @@ export default function FilmmakerPortfolio() {
       )}
 
       {/* Bottom Cinema Skin Backdrop Graphic */}
-      {theme.bottomSkin && (
-        <div className="absolute bottom-0 inset-x-0 h-[340px] sm:h-[440px] lg:h-[500px] pointer-events-none overflow-hidden select-none z-0">
+      {(theme.footerSkin || theme.bottomSkin) && (
+        <div className="absolute bottom-0 inset-x-0 h-[420px] sm:h-[500px] lg:h-[580px] pointer-events-none overflow-hidden select-none z-0">
           <img
-            src={theme.bottomSkin}
+            src={theme.footerSkin || theme.bottomSkin}
             alt=""
-            className="w-full h-full object-cover object-bottom opacity-85"
+            className="w-full h-full object-cover object-bottom opacity-95"
           />
-          {/* Smooth blend upward into page background */}
+          {/* Smooth top edge blend upward into deep page background */}
           <div
-            className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-[var(--skin-bg)]"
+            className="absolute top-0 inset-x-0 h-40 bg-gradient-to-t from-transparent to-[var(--skin-bg)]"
             style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
           />
-          <div
-            className="absolute inset-0 bg-gradient-to-b from-[var(--skin-bg)] via-transparent to-black/50"
-            style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
-          />
+          {/* Subtle bottom edge darken */}
+          <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
         </div>
       )}
 

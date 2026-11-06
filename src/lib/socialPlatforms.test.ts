@@ -109,6 +109,10 @@ describe('platformFor accepts the names already stored in the people table', () 
 
   it('is case insensitive and safe on junk', () => {
     expect(platformFor('InStaGram')?.key).toBe('instagram');
+    expect(platformFor('Instagram')?.key).toBe('instagram');
+    expect(platformFor('Snapchat')?.key).toBe('snapchat');
+    expect(platformFor('TikTok')?.key).toBe('tiktok');
+    expect(platformFor('LinkedIn')?.key).toBe('linkedin');
     expect(platformFor('myspace')).toBeNull();
     expect(platformFor(null)).toBeNull();
   });

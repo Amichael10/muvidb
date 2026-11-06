@@ -11,69 +11,24 @@ const THEME_OPTIONS = [
   {
     id: 'heritage',
     name: 'Nollywood Heritage',
-    tag: 'African Geometric & 35mm Celluloid',
+    tag: 'African Geometric & Vintage Camera',
     bg: '#0a0604',
-    cardBg: '#130a05',
+    cardBg: '#120a06',
     glowColor: 'rgba(255, 90, 31, 0.45)',
     accent: '#FF5A1F',
     ring: 'ring-brand',
     border: 'border-brand/50',
-    textAccent: 'text-brand',
-    buttonBg: '#FF5A1F',
-    buttonText: '#000000',
-    previewTop: '/skins/heritage-top.jpg',
-  },
-  {
-    id: 'gold',
-    name: 'Cinema Gold',
-    tag: 'Awards & Festival Laurels',
-    bg: '#0c0b09',
-    cardBg: '#181510',
-    glowColor: 'rgba(245, 158, 11, 0.35)',
-    accent: '#F59E0B',
-    ring: 'ring-amber-500',
-    border: 'border-amber-500/50',
     textAccent: 'text-amber-400',
-    buttonBg: '#F59E0B',
-    buttonText: '#000000',
-    previewTop: '/skins/gold-top.jpg',
-  },
-  {
-    id: 'velvet',
-    name: 'Royal Velvet',
-    tag: 'Red Carpet & Theatre Crimson',
-    bg: '#0d070a',
-    cardBg: '#1a0e14',
-    glowColor: 'rgba(225, 29, 72, 0.35)',
-    accent: '#E11D48',
-    ring: 'ring-rose-500',
-    border: 'border-rose-500/50',
-    textAccent: 'text-rose-400',
-    buttonBg: '#E11D48',
-    buttonText: '#ffffff',
-    previewTop: '/skins/velvet-top.jpg',
-  },
-  {
-    id: 'midnight',
-    name: 'Premiere Noir',
-    tag: '35mm Celluloid & Anamorphic Streak',
-    bg: '#08090c',
-    cardBg: '#141418',
-    glowColor: 'rgba(255, 90, 31, 0.35)',
-    accent: '#FF5A1F',
-    ring: 'ring-brand',
-    border: 'border-brand/40',
-    textAccent: 'text-brand',
     buttonBg: '#FF5A1F',
     buttonText: '#000000',
-    previewTop: '/skins/midnight-top.jpg',
+    previewTop: '/skins/heritage-hero.png',
   },
   {
-    id: 'muvi',
-    name: 'Muvi Cinema',
-    tag: 'African Cinema Noir + Orange',
-    bg: '#080A0D',
-    cardBg: '#12161D',
+    id: 'noir',
+    name: 'Muvi Noir',
+    tag: '35mm Celluloid & Amber Glow',
+    bg: '#08090b',
+    cardBg: '#101319',
     glowColor: 'rgba(255, 90, 31, 0.4)',
     accent: '#FF5A1F',
     ring: 'ring-brand',
@@ -81,36 +36,97 @@ const THEME_OPTIONS = [
     textAccent: 'text-brand',
     buttonBg: '#FF5A1F',
     buttonText: '#ffffff',
-    previewTop: '/skins/midnight-top.jpg',
+    previewTop: '/skins/noir-hero.png',
   },
   {
-    id: 'neon',
-    name: 'Cyber Indie',
-    tag: 'Cyan & Neon Blue',
-    bg: '#060910',
-    cardBg: '#0f1420',
-    glowColor: 'rgba(6, 182, 212, 0.4)',
-    accent: '#06b6d4',
-    ring: 'ring-cyan-500',
-    border: 'border-cyan-500/50',
+    id: 'cyan',
+    name: 'Cyber Neon',
+    tag: 'Electric Cyan & Lagos Nightlife',
+    bg: '#040a12',
+    cardBg: '#08121f',
+    glowColor: 'rgba(0, 229, 255, 0.4)',
+    accent: '#00E5FF',
+    ring: 'ring-cyan-400',
+    border: 'border-cyan-400/50',
     textAccent: 'text-cyan-400',
-    buttonBg: '#06b6d4',
-    buttonText: '#080b11',
-    previewTop: '/skins/midnight-top.jpg',
+    buttonBg: '#00E5FF',
+    buttonText: '#040a12',
+    previewTop: '/skins/cyan-hero.png',
   },
   {
-    id: 'minimal',
-    name: 'Editorial Monochrome',
-    tag: 'Monochrome B&W',
-    bg: '#09090b',
-    cardBg: '#1a1a1e',
-    glowColor: 'rgba(255, 255, 255, 0.3)',
-    accent: '#ffffff',
-    ring: 'ring-white',
-    border: 'border-white/50',
-    textAccent: 'text-zinc-100',
+    id: 'velvet',
+    name: 'Red Carpet Velvet',
+    tag: 'Crimson Premiere & Gold',
+    bg: '#0d0508',
+    cardBg: '#18080f',
+    glowColor: 'rgba(225, 29, 72, 0.4)',
+    accent: '#E11D48',
+    ring: 'ring-rose-500',
+    border: 'border-rose-500/50',
+    textAccent: 'text-rose-400',
+    buttonBg: '#E11D48',
+    buttonText: '#ffffff',
+    previewTop: '/skins/velvet-hero.png',
+  },
+  {
+    id: 'amethyst',
+    name: 'Imperial Amethyst',
+    tag: 'African Royalty & Deep Purple',
+    bg: '#0c0512',
+    cardBg: '#150821',
+    glowColor: 'rgba(168, 85, 247, 0.4)',
+    accent: '#A855F7',
+    ring: 'ring-purple-500',
+    border: 'border-purple-500/50',
+    textAccent: 'text-purple-400',
+    buttonBg: '#A855F7',
+    buttonText: '#ffffff',
+    previewTop: '/skins/amethyst-hero.png',
+  },
+  {
+    id: 'emerald',
+    name: 'Nollywood Emerald',
+    tag: 'Verdant Forest & African Gold',
+    bg: '#040f09',
+    cardBg: '#081810',
+    glowColor: 'rgba(16, 185, 129, 0.4)',
+    accent: '#10B981',
+    ring: 'ring-emerald-500',
+    border: 'border-emerald-500/50',
+    textAccent: 'text-emerald-400',
+    buttonBg: '#10B981',
+    buttonText: '#000000',
+    previewTop: '/skins/emerald-hero.png',
+  },
+  {
+    id: 'sapphire',
+    name: 'Midnight Sapphire',
+    tag: 'Deep Cinema Blue & 35mm',
+    bg: '#030714',
+    cardBg: '#070f24',
+    glowColor: 'rgba(59, 130, 246, 0.4)',
+    accent: '#3B82F6',
+    ring: 'ring-blue-500',
+    border: 'border-blue-500/50',
+    textAccent: 'text-blue-400',
+    buttonBg: '#3B82F6',
+    buttonText: '#ffffff',
+    previewTop: '/skins/sapphire-hero.png',
+  },
+  {
+    id: 'obsidian',
+    name: 'Obsidian Cinema',
+    tag: 'Minimal Slate & Gunmetal',
+    bg: '#090a0d',
+    cardBg: '#111318',
+    glowColor: 'rgba(255, 255, 255, 0.25)',
+    accent: '#94A3B8',
+    ring: 'ring-slate-400',
+    border: 'border-slate-400/50',
+    textAccent: 'text-slate-300',
     buttonBg: '#ffffff',
     buttonText: '#000000',
+    previewTop: '/skins/obsidian-hero.png',
   },
 ];
 
@@ -467,16 +483,21 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
       toast.error('Paste a link or handle first.');
       return;
     }
-    // A bare handle is fine when we know the platform — "rinaboyxx" under
-    // Instagram becomes the full profile URL.
     const targetPlatformKey = preset?.platformKey || newLink.platformKey;
-    const presetPlatform = targetPlatformKey ? platformFor(targetPlatformKey) : null;
-    const cleanUrl = presetPlatform
-      ? (resolveSocialUrl(presetPlatform.key, rawUrl) || (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`))
-      : (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
-    const matched = presetPlatform || detectPlatform(cleanUrl);
-    // Title is optional: the platform name is a better default than making
-    // someone type "Instagram" every time.
+    const presetPlatform = targetPlatformKey
+      ? platformFor(targetPlatformKey)
+      : platformFor(newLink.title) || platformFor(preset?.title);
+
+    const detected = detectPlatform(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+    const matched = presetPlatform || detected;
+
+    let cleanUrl = rawUrl;
+    if (matched) {
+      cleanUrl = resolveSocialUrl(matched.key, rawUrl) || (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+    } else {
+      cleanUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
+    }
+
     const title = (preset?.title ?? newLink.title).trim() || matched?.label || 'Link';
     const updated = [
       ...(portfolio.custom_links || []),
@@ -484,8 +505,6 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
         id: Date.now().toString(),
         title,
         url: cleanUrl,
-        // Recorded at save time so the public page does not have to re-detect,
-        // and so a later registry change cannot silently alter saved links.
         platform: matched?.key || null,
       },
     ];
@@ -1469,8 +1488,8 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <Icon
-                                icon={(platformFor(link.platform) || detectPlatform(link.url) || GENERIC_LINK).icon}
-                                className={`shrink-0 ${(platformFor(link.platform) || detectPlatform(link.url) || GENERIC_LINK).fg}`}
+                                icon={(platformFor(link.platform) || platformFor(link.title) || detectPlatform(link.url) || GENERIC_LINK).icon}
+                                className={`shrink-0 ${(platformFor(link.platform) || platformFor(link.title) || detectPlatform(link.url) || GENERIC_LINK).fg}`}
                                 width="16"
                               />
                               <div className="min-w-0">
@@ -1559,13 +1578,13 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
 
               {/* Skin Top Graphic Preview inside Phone */}
               {currentTheme.previewTop && (
-                <div className="absolute top-0 inset-x-0 h-32 pointer-events-none overflow-hidden z-0">
+                <div className="absolute top-0 inset-x-0 h-40 pointer-events-none overflow-hidden z-0">
                   <img
                     src={currentTheme.previewTop}
                     alt=""
-                    className="w-full h-full object-cover object-top opacity-60 mix-blend-screen"
+                    className="w-full h-full object-cover object-top opacity-85"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/90" />
                 </div>
               )}
 
@@ -1657,8 +1676,8 @@ export default function PortfolioEditorModal({ isOpen = true, onClose, person, o
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <Icon
-                          icon={(platformFor(link.platform) || detectPlatform(link.url) || GENERIC_LINK).icon}
-                          className={`shrink-0 ${(platformFor(link.platform) || detectPlatform(link.url) || GENERIC_LINK).fg}`}
+                          icon={(platformFor(link.platform) || platformFor(link.title) || detectPlatform(link.url) || GENERIC_LINK).icon}
+                          className={`shrink-0 ${(platformFor(link.platform) || platformFor(link.title) || detectPlatform(link.url) || GENERIC_LINK).fg}`}
                           width="13"
                         />
                         <span className="text-[10px] font-bold text-white truncate">{link.title}</span>

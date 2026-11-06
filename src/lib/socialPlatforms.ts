@@ -201,6 +201,7 @@ export const GENERIC_LINK: Pick<SocialPlatform, 'key' | 'label' | 'icon' | 'fg' 
 };
 
 const BY_KEY = new Map(SOCIAL_PLATFORMS.map((p) => [p.key, p]));
+const BY_LABEL = new Map(SOCIAL_PLATFORMS.map((p) => [p.label.toLowerCase(), p]));
 // Accept the names the people table already uses so stored values keep working.
 const KEY_ALIASES: Record<string, string> = {
   twitter: 'x',
@@ -214,10 +215,10 @@ const KEY_ALIASES: Record<string, string> = {
   fb: 'facebook',
 };
 
-export function platformFor(key?: string | null): SocialPlatform | null {
-  if (!key) return null;
-  const k = String(key).trim().toLowerCase();
-  return BY_KEY.get(k) || BY_KEY.get(KEY_ALIASES[k]) || null;
+export function platformFor(keyOrTitle?: string | null): SocialPlatform | null {
+  if (!keyOrTitle) return null;
+  const k = String(keyOrTitle).trim().toLowerCase();
+  return BY_KEY.get(k) || BY_LABEL.get(k) || BY_KEY.get(KEY_ALIASES[k]) || null;
 }
 
 function hostOf(value: string): string | null {
