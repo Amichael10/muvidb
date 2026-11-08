@@ -129,9 +129,7 @@ export function isStrictTheatricalPlay(title: string, rawText = ''): boolean {
     /\btheatrical drama\b/i.test(combined) ||
     /\bstage drama\b/i.test(combined) ||
     /\blive fantasy stage play\b/i.test(combined) ||
-    /\bopera\b/i.test(combined) ||
-    /\bpeppersoup\b/i.test(combined) ||
-    /\bpepper soup\b/i.test(combined);
+    /\bopera\b/i.test(combined);
 
   return hasTheatricalDesignation;
 }
@@ -455,10 +453,6 @@ export async function scrapeAriiyaTheatre(): Promise<DiscoveredPlay[]> {
 }
 
 // ── 2. TIX.AFRICA SCRAPER ────────────────────────────────────────────────────
-const KNOWN_TIX_THEATRICAL_URLS = [
-  'https://tix.africa/discover/peppersoup',
-];
-
 async function scrapeTixEventPage(url: string): Promise<DiscoveredPlay | null> {
   const data = await fcFetch('scrape', {
     url,
@@ -502,7 +496,7 @@ async function scrapeTixEventPage(url: string): Promise<DiscoveredPlay | null> {
   const performanceTime = timeMatch ? timeMatch[1].trim() : null;
 
   // Venue
-  let venue = 'The Vantage Barn @ The Grandeur, 17/69 Billings Way, Oregun, Ikeja';
+  let venue = 'Terra Kulture & MUSON Centre';
   const venueMatch = md.match(/location-white\.svg\)\s*[\r\n]+([^\r\n#\[]+)/i);
   if (venueMatch) {
     venue = venueMatch[1].trim();
@@ -542,15 +536,6 @@ async function scrapeTixEventPage(url: string): Promise<DiscoveredPlay | null> {
     }
   }
 
-  // If specific known play has verified pricing tiers
-  if (pricingTiers.length === 0 && url.includes('peppersoup')) {
-    pricingTiers.push(
-      { name: 'Regular', price: 15000, description: 'Regular ticket' },
-      { name: 'VIP Ticket', price: 40000, description: 'VIP ticket' },
-      { name: 'Corporate Table', price: 500000, description: 'Corporate table' }
-    );
-  }
-
   return {
     title,
     slug: slugify(title),
@@ -576,20 +561,6 @@ export async function scrapeTixAfricaTheatre(): Promise<DiscoveredPlay[]> {
   const results: DiscoveredPlay[] = [];
   const visitedUrls = new Set<string>();
 
-  // 1. Process known confirmed theatrical stage plays on Tix
-  for (const url of KNOWN_TIX_THEATRICAL_URLS) {
-    visitedUrls.add(url);
-    try {
-      const pageData = await scrapeTixEventPage(url);
-      if (pageData && isStrictTheatricalPlay(pageData.title, `${pageData.title} ${pageData.synopsis}`)) {
-        results.push(pageData);
-      }
-    } catch (err: any) {
-      console.warn(`[theatre_hubs] Error scraping known Tix play (${url}):`, err?.message || err);
-    }
-  }
-
-  // 2. Perform keyword searches for new stage plays
   try {
     const data = await fcFetch('search', {
       query: 'site:tix.africa stage play OR musical theatre OR drama',
