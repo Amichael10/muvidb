@@ -130,6 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         for (let i = 1; i <= filmChunks; i++) maps.push(`films-${i}`);
         for (let i = 1; i <= peopleChunks; i++) maps.push(`people-${i}`);
         maps.push(
+          'boxoffice',
           'watch',
           'companies',
           'cinemas',
@@ -138,7 +139,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'plays',
           'careers',
           'awards',
-          'tvshows'
+          'tvshows',
+          'creators'
         );
 
         const sitemapIndex = `<?xml version="1.0" encoding="UTF-8"?>
@@ -154,8 +156,8 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         const staticPages: { url: string; priority: string; changefreq: string }[] = [
           // Core discovery pages
           { url: '', priority: '1.0', changefreq: 'daily' },
+          { url: '/box-office', priority: '1.0', changefreq: 'daily' },
           { url: '/browse', priority: '0.9', changefreq: 'daily' },
-          { url: '/search', priority: '0.9', changefreq: 'daily' },
           { url: '/tv-shows', priority: '0.8', changefreq: 'daily' },
           // People & cast
           { url: '/people', priority: '0.9', changefreq: 'daily' },
@@ -178,6 +180,10 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           { url: '/watch/kava', priority: '0.7', changefreq: 'daily' },
           { url: '/watch/docuth', priority: '0.7', changefreq: 'daily' },
           { url: '/watch/cinema', priority: '0.7', changefreq: 'daily' },
+          // Tools & Brand Resources
+          { url: '/tools/title-checker', priority: '0.7', changefreq: 'weekly' },
+          { url: '/developers', priority: '0.6', changefreq: 'monthly' },
+          { url: '/brand', priority: '0.6', changefreq: 'monthly' },
           // Submissions & user actions
           { url: '/submit', priority: '0.7', changefreq: 'weekly' },
           { url: '/submit/film', priority: '0.6', changefreq: 'weekly' },
@@ -360,25 +366,23 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         const data = await withRetry(async () => {
           return await supabase
             .from('plays')
-            .select('id, title, slug, updated_at')
+            .select('id, title, slug, poster_url, updated_at')
             .limit(50000);
         });
 
         setSuccessHeaders();
-        return res.status(200).send(
-          urlset(
-            (data || [])
-              .map(
-                (p: any) => `  <url>
-    <loc>${baseUrl}/plays/${p.slug || p.id}</loc>
-    ${p.updated_at ? `<lastmod>${new Date(p.updated_at).toISOString()}</lastmod>` : ''}
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>`
-              )
-              .join('\n')
-          )
-        );
+        const urls: string[] = [];
+        for (const p of data || []) {
+          const loc = `${baseUrl}/plays/${p.slug || p.id}`;
+          const locBo = `${baseUrl}/plays/${p.slug || p.id}/box-office`;
+          const lastmod = p.updated_at ? `\n    <lastmod>${new Date(p.updated_at).toISOString()}</lastmod>` : '';
+          const imageTag = isValidImageUrl(p.poster_url)
+            ? `\n    <image:image>\n      <image:loc>${escapeXml(String(p.poster_url).trim())}</image:loc>\n      <image:title>${escapeXml(p.title)} Stage Poster</image:title>\n    </image:image>`
+            : '';
+          urls.push(`  <url>\n    <loc>${loc}</loc>${lastmod}\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>${imageTag}\n  </url>`);
+          urls.push(`  <url>\n    <loc>${locBo}</loc>${lastmod}\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>`);
+        }
+        return res.status(200).send(urlset(urls.join('\n'), true));
       }
 
       // 10. CAREERS SITEMAP (/sitemap-careers.xml)
@@ -479,7 +483,79 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         return res.status(200).send(urlset(tvUrls.join('\n'), true));
       }
 
-      return res.status(404).send('Sitemap not found');
+      // 14. BOX OFFICE SITEMAP (/sitemap-boxoffice.xml)
+      if (target === 'boxoffice') {
+        const [filmsBo, playsBo] = await Promise.all([
+          withRetry(async () => {
+            return await supabase
+              .from('films')
+              .select('id, title, slug, poster_url, updated_at')
+              .not('box_office_domestic', 'is', null)
+              .order('updated_at', { ascending: false })
+              .limit(10000);
+          }),
+          withRetry(async () => {
+            return await supabase
+              .from('plays')
+              .select('id, title, slug, poster_url, updated_at')
+              .not('box_office_domestic', 'is', null)
+              .order('updated_at', { ascending: false })
+              .limit(10000);
+          }),
+        ]);
+
+        const urls: string[] = [
+          `  <url>\n    <loc>${baseUrl}/box-office</loc>\n    <lastmod>${new Date().toISOString()}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>`
+        ];
+
+        for (const f of filmsBo || []) {
+          const loc = `${baseUrl}/films/${f.slug || f.id}/box-office`;
+          const lastmod = f.updated_at ? `\n    <lastmod>${new Date(f.updated_at).toISOString()}</lastmod>` : '';
+          const imageTag = isValidImageUrl(f.poster_url)
+            ? `\n    <image:image>\n      <image:loc>${escapeXml(String(f.poster_url).trim())}</image:loc>\n      <image:title>${escapeXml(f.title)} Box Office</image:title>\n    </image:image>`
+            : '';
+          urls.push(`  <url>\n    <loc>${loc}</loc>${lastmod}\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>${imageTag}\n  </url>`);
+        }
+
+        for (const p of playsBo || []) {
+          const loc = `${baseUrl}/plays/${p.slug || p.id}/box-office`;
+          const lastmod = p.updated_at ? `\n    <lastmod>${new Date(p.updated_at).toISOString()}</lastmod>` : '';
+          urls.push(`  <url>\n    <loc>${loc}</loc>${lastmod}\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`);
+        }
+
+        setSuccessHeaders();
+        return res.status(200).send(urlset(urls.join('\n'), true));
+      }
+
+      // 15. CREATORS & PORTFOLIOS SITEMAP (/sitemap-creators.xml)
+      if (target === 'creators') {
+        const creators = await withRetry(async () => {
+          return await supabase
+            .from('people')
+            .select('id, name, slug, photo_url, updated_at')
+            .or('film_count.gt.0,is_verified.eq.true')
+            .order('film_count', { ascending: false })
+            .limit(25000);
+        });
+
+        const urls: string[] = [];
+        for (const c of creators || []) {
+          const handle = c.slug || c.id;
+          const locAt = `${baseUrl}/@${handle}`;
+          const locPort = `${baseUrl}/portfolio/${handle}`;
+          const lastmod = c.updated_at ? `\n    <lastmod>${new Date(c.updated_at).toISOString()}</lastmod>` : '';
+          const imageTag = isValidImageUrl(c.photo_url)
+            ? `\n    <image:image>\n      <image:loc>${escapeXml(String(c.photo_url).trim())}</image:loc>\n      <image:title>${escapeXml(c.name)} Portfolio</image:title>\n    </image:image>`
+            : '';
+          urls.push(`  <url>\n    <loc>${locAt}</loc>${lastmod}\n    <changefreq>daily</changefreq>\n    <priority>0.85</priority>${imageTag}\n  </url>`);
+          urls.push(`  <url>\n    <loc>${locPort}</loc>${lastmod}\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>`);
+        }
+
+        setSuccessHeaders();
+        return res.status(200).send(urlset(urls.join('\n'), true));
+      }
+
+            return res.status(404).send('Sitemap not found');
     }
 
     return res.status(404).json({

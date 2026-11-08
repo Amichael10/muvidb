@@ -66,6 +66,7 @@ export async function sweepAndUpdatePlayStatuses(): Promise<{
   let upcomingCount = 0;
 
   const now = new Date();
+  const playsToUpdate: { id: string; title: string; slug: string; oldStatus: string; newStatus: string }[] = [];
 
   for (const play of plays || []) {
     const derived = derivePlayStatus(play, now);
@@ -75,18 +76,35 @@ export async function sweepAndUpdatePlayStatuses(): Promise<{
     else if (derived === 'upcoming') upcomingCount++;
 
     if (play.status !== derived) {
-      const { error: updErr } = await supabase
-        .from('plays')
-        .update({ status: derived, updated_at: now.toISOString() })
-        .eq('id', play.id);
-
-      if (!updErr) {
-        updatedCount++;
-        console.log(`[theatre_service] Transitioned play "${play.title}" (${play.slug}): ${play.status} -> ${derived}`);
-      } else {
-        console.error(`[theatre_service] Failed to update play status for "${play.title}":`, updErr.message);
-      }
+      playsToUpdate.push({
+        id: play.id,
+        title: play.title,
+        slug: play.slug,
+        oldStatus: play.status,
+        newStatus: derived,
+      });
     }
+  }
+
+  // Update in parallel batches of 10 for speed
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < playsToUpdate.length; i += BATCH_SIZE) {
+    const batch = playsToUpdate.slice(i, i + BATCH_SIZE);
+    await Promise.allSettled(
+      batch.map(async (item) => {
+        const { error: updErr } = await supabase
+          .from('plays')
+          .update({ status: item.newStatus, updated_at: now.toISOString() })
+          .eq('id', item.id);
+
+        if (!updErr) {
+          updatedCount++;
+          console.log(`[theatre_service] Transitioned play "${item.title}" (${item.slug}): ${item.oldStatus} -> ${item.newStatus}`);
+        } else {
+          console.error(`[theatre_service] Failed to update play status for "${item.title}":`, updErr.message);
+        }
+      })
+    );
   }
 
   return {

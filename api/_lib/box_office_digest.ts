@@ -27,12 +27,18 @@ export function parseMoney(str: string): number | null {
 }
 
 export async function fetchAndExtractDigest(): Promise<DigestEntry[]> {
-  const res = await fetch('https://filmintelligencedigest.substack.com/feed', {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) throw new Error(`Feed HTTP ${res.status}`);
-  const xml = await res.text();
+  let xml = '';
+  try {
+    const res = await fetch('https://filmintelligencedigest.substack.com/feed', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`Feed HTTP ${res.status}`);
+    xml = await res.text();
+  } catch (err: any) {
+    console.warn('[box_office_digest] Feed fetch failed or timed out:', err?.message || err);
+    return [];
+  }
   const items = xml.split('<item>').slice(1);
 
   const extractedData: DigestEntry[] = [];

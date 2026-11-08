@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabase } from '../_lib/supabase.js';
+import { handleCors } from '../_lib/cors.js';
 import { isValidAuth } from '../_lib/auth.js';
 import { runCastExtraction, runTitleCleanup } from '../_lib/ai_maintenance.js';
 import { runShowtimesSync, runVideosSync, runTMDBSync, purgeStaleUnmappedChannelVideos, refreshYouTubeViewCounts } from '../_lib/sync_service.js';
@@ -28,6 +29,7 @@ export const maxDuration = 300; // 5-minute timeout
 export const config = { maxDuration: 300 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (handleCors(req, res)) return;
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).end();
   
   // Auth Check
@@ -139,7 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = { ...(await runWhatsAppAlertQueue()), backfill, monitoring };
         break;
       }
-      case 'showtimes':      result = await runShowtimesSync(); break;
+      case 'showtimes':      result = await runShowtimesSync({ concurrency: 6 }); break;
       case 'cinema_cleanup': result = { task: 'cinema_cleanup', ...(await sweepStaleCinemas()) }; break;
       case 'videos':      
         return res.status(200).json({ 
@@ -173,7 +175,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'views':                result = await refreshYouTubeViewCounts({ maxBatches: 5 }); break;
       case 'comments': {
         const { runCommentMining } = await import('../_lib/comment_reviews.js');
-        result = await runCommentMining({ scan: 50, aiCap: 10 });
+        const aiCap = Number(req.query.aiCap) || 3;
+        const scan = Number(req.query.scan) || 30;
+        result = await runCommentMining({ scan, aiCap });
         break;
       }
       // One-off sweep: ratings mined before the engagement-bait filter landed

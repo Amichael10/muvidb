@@ -208,32 +208,45 @@ async function repairLinkedYouTubeFilms(
 /**
  * Syncs cinema showtimes from various adapters
  */
-export async function runShowtimesSync() {
-  // Scrape every enabled cinema (was capped at 15 with no ordering, so ~50 of 65
-  // never ran). Ordered by name for deterministic, resumable passes.
+export async function runShowtimesSync(options: { limit?: number; concurrency?: number } = {}) {
+  // Scrape every enabled cinema. Ordered by name for deterministic passes.
   const { data: cinemas } = await supabase.from('cinemas').select('*').eq('scrape_enabled', true).order('name');
   if (!cinemas) return { message: 'No cinemas to scrape' };
 
-  const results = [];
-  for (const cinema of cinemas) {
+  const targetCinemas = options.limit ? cinemas.slice(0, options.limit) : cinemas;
+  const concurrency = options.concurrency || 6;
+  const results: any[] = [];
+
+  const scrapeSingleCinema = async (cinema: any) => {
     try {
       const adapter = ADAPTERS[cinema.scrape_adapter];
       if (!adapter) {
-        results.push({ name: cinema.name, error: `No adapter configured for '${cinema.scrape_adapter || 'missing'}'` });
-        continue;
+        return { name: cinema.name, error: `No adapter configured for '${cinema.scrape_adapter || 'missing'}'` };
       }
-      const scraped = await adapter(cinema);
+      // 15-second timeout per cinema so one hanging site doesn't stall the run
+      const scraped = await Promise.race([
+        adapter(cinema),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Cinema scrape timed out (15s)')), 15000)
+        ),
+      ]);
       if (scraped.error) throw new Error(scraped.error);
       const stats = await upsertShowtimes(cinema.id, scraped.showtimes, cinema.scrape_adapter);
-      results.push({
+      return {
         name: cinema.name,
         raw_showtimes: scraped.showtimes.length,
         warnings: scraped.warnings || [],
         ...stats,
-      });
+      };
     } catch (e: any) {
-      results.push({ name: cinema.name, error: e.message });
+      return { name: cinema.name, error: e.message };
     }
+  };
+
+  for (let i = 0; i < targetCinemas.length; i += concurrency) {
+    const batch = targetCinemas.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map(scrapeSingleCinema));
+    results.push(...batchResults);
   }
 
   // After every scrape pass, run the hygiene sweep: expire last month's
