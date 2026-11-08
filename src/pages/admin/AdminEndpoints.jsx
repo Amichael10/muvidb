@@ -73,6 +73,22 @@ const ENDPOINTS_CATALOG = [
       'Syncs stage play productions, cast credits, performance runs, and ticketing links for Bolanle Austen-Peters Productions and Terra Kulture stage shows.',
     affected: 'plays, stage_credits, play_venues',
   },
+  {
+    id: 'utopia_theatre',
+    name: 'Utopia Theatre & Crucible Stage Sync',
+    category: 'theatre',
+    categoryLabel: 'Stage & Theatre',
+    categoryIcon: 'solar:masks-bold',
+    categoryColor: 'purple',
+    route: '/api/cron/sync?task=utopia_theatre',
+    method: 'POST',
+    schedule: 'Weekly / On-demand',
+    logSource: 'utopia_theatre',
+    triggerable: true,
+    description:
+      'Syncs African classical and diaspora stage repertoire from Utopia Theatre (Arts Council England NPO), Sheffield Theatres (Crucible/Studio), and Belgrade Theatre Coventry, including Crown of Blood, The Gods Are Not to Blame, and multi-currency box office estimates.',
+    affected: 'plays, stage_credits, companies',
+  },
 
   // ── 3. STREAMING PLATFORMS & YOUTUBE ──────────────────────────────────────
   {

@@ -39,6 +39,88 @@ export function getPlayDateLabel(play, fallback = 'Date TBA') {
   return time && label !== fallback ? `${label}, ${time}` : label;
 }
 
+export const NGN_PER_GBP = 2000;
+export const NGN_PER_USD = 1550;
+
+/**
+ * Format stage play box office with multi-currency support and estimation awareness.
+ * Example outputs:
+ * - For GBP £54,000 (Estimate):
+ *   {
+ *     primaryFormatted: '£54,000',
+ *     convertedFormatted: '~₦108M est.',
+ *     fullBadge: '£54,000 (~₦108M est.) Box Office',
+ *     shortBadge: '£54,000 (~₦108M est.)',
+ *     currencySymbol: '£',
+ *     isEstimate: true,
+ *     exchangeRateNote: '£1 ≈ ₦2,000 NGN est.'
+ *   }
+ */
+export function formatPlayBoxOffice(play) {
+  if (!play || !play.box_office_domestic || Number(play.box_office_domestic) <= 0) {
+    return null;
+  }
+
+  const rawAmount = Number(play.box_office_domestic);
+  const currency = (play.box_office_currency || 'NGN').toUpperCase();
+  const source = String(play.box_office_source || '').toLowerCase();
+  const isEstimate =
+    source.includes('est') ||
+    source.includes('project') ||
+    play.box_office_metrics?.is_estimate === true ||
+    play.box_office_metrics?.reporting_type === 'industry_projection';
+
+  if (currency === 'GBP') {
+    const primaryFormatted = `£${rawAmount.toLocaleString('en-GB')}`;
+    const estNgn = rawAmount * NGN_PER_GBP;
+    const estNgnMillion = (estNgn / 1_000_000).toFixed(estNgn >= 100_000_000 ? 0 : 1);
+    const convertedFormatted = `~₦${estNgnMillion}M est.`;
+    return {
+      amount: rawAmount,
+      currency: 'GBP',
+      currencySymbol: '£',
+      isEstimate,
+      primaryFormatted,
+      convertedFormatted,
+      fullBadge: `${primaryFormatted} (${convertedFormatted}) Box Office`,
+      shortBadge: `${primaryFormatted} (${convertedFormatted})`,
+      sourceLabel: play.box_office_source || 'Industry Estimation',
+    };
+  }
+
+  if (currency === 'USD') {
+    const primaryFormatted = `$${rawAmount.toLocaleString('en-US')}`;
+    const estNgn = rawAmount * NGN_PER_USD;
+    const estNgnMillion = (estNgn / 1_000_000).toFixed(estNgn >= 100_000_000 ? 0 : 1);
+    const convertedFormatted = `~₦${estNgnMillion}M est.`;
+    return {
+      amount: rawAmount,
+      currency: 'USD',
+      currencySymbol: '$',
+      isEstimate,
+      primaryFormatted,
+      convertedFormatted,
+      fullBadge: `${primaryFormatted} (${convertedFormatted}) Box Office`,
+      shortBadge: `${primaryFormatted} (${convertedFormatted})`,
+      sourceLabel: play.box_office_source || 'Industry Estimation',
+    };
+  }
+
+  // Default NGN
+  const primaryFormatted = `₦${rawAmount.toLocaleString('en-NG')}`;
+  return {
+    amount: rawAmount,
+    currency: 'NGN',
+    currencySymbol: '₦',
+    isEstimate,
+    primaryFormatted,
+    convertedFormatted: null,
+    fullBadge: isEstimate ? `${primaryFormatted} (Est.) Box Office` : `${primaryFormatted} Box Office`,
+    shortBadge: isEstimate ? `${primaryFormatted} (Est.)` : primaryFormatted,
+    sourceLabel: play.box_office_source || (isEstimate ? 'Industry Estimation' : 'Audited Theatre Gross'),
+  };
+}
+
 /**
  * Derive the accurate live status ('upcoming' | 'currently_running' | 'archived')
  * based on the run dates relative to the current reference date.

@@ -6,6 +6,7 @@ import ImageWithFallback from '../components/ui/ImageWithFallback';
 import SEO from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
 import { formatNaira } from '../utils/format';
+import { formatPlayBoxOffice } from '../lib/plays';
 
 
 
@@ -128,6 +129,7 @@ export default function PlayBoxOffice() {
   }, [play, tiers]);
 
   const domesticGross = Number(play?.box_office_domestic || play?.box_office_metrics?.gross_domestic_ngn || 0);
+  const boxOfficeInfo = useMemo(() => formatPlayBoxOffice(play), [play]);
 
   if (loading) {
     return (
@@ -258,15 +260,20 @@ export default function PlayBoxOffice() {
           <div className="p-5 rounded-2xl bg-brand/[0.07] border border-brand/25 shadow-sm space-y-2 col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-wider text-brand">
-                Gross Box Office
+                {boxOfficeInfo?.isEstimate ? 'Estimated Box Office' : 'Gross Box Office'}
               </span>
               <Icon icon="solar:ticket-sale-bold" className="text-brand text-base" />
             </div>
             <div className="text-2xl sm:text-3xl font-black font-heading text-brand tracking-tight">
-              ₦{domesticGross.toLocaleString('en-NG')}
+              {boxOfficeInfo?.primaryFormatted || `₦${domesticGross.toLocaleString('en-NG')}`}
             </div>
+            {boxOfficeInfo?.convertedFormatted && (
+              <div className="text-xs font-bold text-amber-400">
+                {boxOfficeInfo.convertedFormatted} <span className="text-[10px] text-text-muted font-normal">(@ ~£1 = ₦2,000)</span>
+              </div>
+            )}
             <div className="text-[11px] text-text-muted font-mono">
-              Verified live theatrical revenue
+              {boxOfficeInfo?.isEstimate ? 'Industry estimated live theatrical revenue' : 'Verified live theatrical revenue'}
             </div>
           </div>
 
@@ -318,6 +325,22 @@ export default function PlayBoxOffice() {
             </div>
           </div>
         </div>
+
+        {/* Subsidised Theatre / Industry Estimation Transparency Notice */}
+        {boxOfficeInfo?.isEstimate && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-3.5 text-xs text-amber-200/90 leading-relaxed shadow-sm">
+            <Icon icon="solar:info-circle-bold" className="text-xl text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-amber-300 text-sm">
+                Subsidised Repertoire &amp; Industry Estimation Notice
+              </p>
+              <p className="text-amber-200/80 leading-normal">
+                {play.box_office_metrics?.note ||
+                  'Unlike commercial cinema films which file weekly returns via Comscore or CEAN, subsidised non-profit repertoire theatres (such as Arts Council England National Portfolio Organisations) file consolidated accounts annually. Figures displayed reflect verified house capacities, ticket tiers, and attendance projections across the performance run.'}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* TICKET CATEGORIES & TIERS BREAKDOWN TABLE */}
         <div className="space-y-4">

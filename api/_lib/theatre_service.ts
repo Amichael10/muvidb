@@ -115,3 +115,50 @@ export async function sweepAndUpdatePlayStatuses(): Promise<{
     upcoming: upcomingCount,
   };
 }
+
+/**
+ * Sync Utopia Theatre productions and verify status & box office records
+ */
+export async function syncUtopiaTheatreProductions(): Promise<{
+  success: boolean;
+  total_productions: number;
+  updated_count: number;
+  productions: string[];
+}> {
+  const { data: plays, error } = await supabase
+    .from('plays')
+    .select('id, title, slug, run_start_date, run_end_date, year, status, box_office_domestic, box_office_currency')
+    .or('producer.ilike.%utopia%,venue.ilike.%crucible%,venue.ilike.%belgrade%');
+
+  if (error) {
+    console.error('[theatre_service] Failed to query Utopia Theatre productions:', error.message);
+    throw error;
+  }
+
+  const now = new Date();
+  let updatedCount = 0;
+  const productionTitles: string[] = [];
+
+  for (const play of plays || []) {
+    productionTitles.push(play.title);
+    const derivedStatus = derivePlayStatus(play, now);
+    if (play.status !== derivedStatus) {
+      const { error: updErr } = await supabase
+        .from('plays')
+        .update({ status: derivedStatus, updated_at: now.toISOString() })
+        .eq('id', play.id);
+
+      if (!updErr) {
+        updatedCount++;
+        console.log(`[theatre_service] Updated Utopia play "${play.title}": ${play.status} -> ${derivedStatus}`);
+      }
+    }
+  }
+
+  return {
+    success: true,
+    total_productions: (plays || []).length,
+    updated_count: updatedCount,
+    productions: productionTitles,
+  };
+}

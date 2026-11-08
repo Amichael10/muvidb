@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
-import { fetchPlayBySlug, getPlayDateLabel } from '../lib/plays';
+import { fetchPlayBySlug, getPlayDateLabel, formatPlayBoxOffice } from '../lib/plays';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { SuggestEditModal } from '../components/contribute/ContributeModals';
@@ -21,6 +21,7 @@ export default function PlayDetail() {
   const [showBoxOfficeModal, setShowBoxOfficeModal] = useState(false);
   const [showPlayEdit, setShowPlayEdit] = useState(false);
   const [showAdminBoxOffice, setShowAdminBoxOffice] = useState(false);
+  const boxOfficeInfo = useMemo(() => formatPlayBoxOffice(play), [play]);
 
   useEffect(() => {
     async function load() {
@@ -171,7 +172,12 @@ export default function PlayDetail() {
                       title="Click to view admissions, ticket tiers & venue breakdown"
                     >
                       <Icon icon="solar:ticket-sale-bold" className="text-sm group-hover:scale-110 transition-transform" />
-                      <span>₦{Number(play.box_office_domestic).toLocaleString()} Box Office</span>
+                      <span>{boxOfficeInfo?.fullBadge || `₦${Number(play.box_office_domestic).toLocaleString()} Box Office`}</span>
+                      {boxOfficeInfo?.isEstimate && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Est.
+                        </span>
+                      )}
                       <Icon icon="solar:alt-arrow-right-linear" className="text-xs opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
                     </Link>
                     {isAdmin && (
@@ -512,6 +518,8 @@ function AdminPlayBoxOfficeModal({ play, onClose, onUpdated }) {
 function PlayBoxOfficeModal({ play, playDateLabel, onClose, isAdmin = false }) {
   if (!play) return null;
 
+  const modalBoxOffice = useMemo(() => formatPlayBoxOffice(play), [play]);
+
   const tiers = useMemo(() => {
     if (!play) return [];
     const raw = play.box_office_metrics?.tier_breakdown || play.box_office_metrics?.tier_pricing || play.ticket_pricing;
@@ -586,11 +594,20 @@ function PlayBoxOfficeModal({ play, playDateLabel, onClose, isAdmin = false }) {
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 gap-3">
           <div className="p-4 rounded-xl bg-surface-2 border border-border/60 space-y-1">
-            <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Gross Revenue</span>
+            <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
+              {modalBoxOffice?.isEstimate ? 'Gross Revenue (Est.)' : 'Gross Revenue'}
+            </span>
             <p className="text-2xl font-black text-amber-400 font-heading">
-              ₦{Number(play.box_office_domestic || 0).toLocaleString()}
+              {modalBoxOffice?.primaryFormatted || `₦${Number(play.box_office_domestic || 0).toLocaleString()}`}
             </p>
-            <span className="text-[10px] text-text-muted font-mono block">Stage box office revenue</span>
+            {modalBoxOffice?.convertedFormatted && (
+              <span className="text-xs font-bold text-amber-300/80 block">
+                {modalBoxOffice.convertedFormatted}
+              </span>
+            )}
+            <span className="text-[10px] text-text-muted font-mono block">
+              {modalBoxOffice?.isEstimate ? 'Industry estimated live revenue' : 'Stage box office revenue'}
+            </span>
           </div>
 
           <div className="p-4 rounded-xl bg-surface-2 border border-border/60 space-y-1">

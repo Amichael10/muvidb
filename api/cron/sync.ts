@@ -10,7 +10,7 @@ import refreshVideosHandler from '../_lib/refresh_videos_handler.js';
 import mirrorImagesHandler from '../_lib/mirror_images_handler.js';
 import { classifyFilmKinds } from '../_lib/film_kind_classifier.js';
 import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
-import { sweepAndUpdatePlayStatuses } from '../_lib/theatre_service.js';
+import { sweepAndUpdatePlayStatuses, syncUtopiaTheatreProductions } from '../_lib/theatre_service.js';
 import { runYouTubeUploadWatch } from '../_lib/youtube_upload_notify.js';
 import { runCriticsSync } from '../_lib/critics_sync.js';
 import { runWhatsAppAlertQueue, backfillMovieWhatsAppAlertQueue } from '../_lib/whatsapp_alert_queue.js';
@@ -58,6 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { name: 'videos', fn: runVideosSync },
         { name: 'tmdb', fn: runTMDBSync },
         { name: 'theatre_status_sweep', fn: sweepAndUpdatePlayStatuses },
+        { name: 'utopia_theatre', fn: syncUtopiaTheatreProductions },
         ...(isSunday ? [{ name: 'critics', fn: runCriticsSync }] : []),
         { name: 'ai_maintenance', fn: runAIMaintenance },
         { name: 'social_plan', fn: () => planRollingSocialCalendar({ days: 7 }) }
@@ -166,6 +167,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = { task: 'purge_stale_buffer', status: 'disabled', deleted: 0, message: 'Purge script disabled per user policy: unmapped videos are preserved and never deleted.' };
         break;
       case 'theatre_status_sweep': result = await sweepAndUpdatePlayStatuses(); break;
+      case 'utopia_theatre':
+      case 'theatre_sync': {
+        const utopiaRes = await syncUtopiaTheatreProductions();
+        const sweepRes = await sweepAndUpdatePlayStatuses();
+        result = { task: 'utopia_theatre', utopia: utopiaRes, sweep: sweepRes };
+        break;
+      }
       case 'youtube_watch':
         return res.status(200).json({
           task: 'youtube_watch',

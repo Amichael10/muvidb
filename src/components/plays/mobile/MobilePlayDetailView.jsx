@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react';
 import ImageWithFallback from '../../ui/ImageWithFallback';
 import CriticReviewsSection from '../../film/CriticReviewsSection';
 import ReviewSection from '../../film/ReviewSection';
+import { formatPlayBoxOffice } from '../../../lib/plays';
 
 function formatBoxOffice(amount) {
   if (!amount || amount <= 0) return null;
@@ -28,7 +29,8 @@ export default function MobilePlayDetailView({
 
   const isRunning = play.status === 'currently_running';
   const isUpcoming = play.status === 'upcoming';
-  const boxOfficeStr = formatBoxOffice(play.box_office_domestic);
+  const boxOfficeInfo = formatPlayBoxOffice(play);
+  const boxOfficeStr = boxOfficeInfo?.shortBadge || null;
   const poster = play.poster_url || play.banner_url;
 
   return (
@@ -389,7 +391,7 @@ export default function MobilePlayDetailView({
             className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold uppercase tracking-wider active:scale-95 transition-all min-h-[46px]"
           >
             <Icon icon="solar:chart-square-bold" className="text-base" />
-            <span>Box Office</span>
+            <span>{boxOfficeInfo?.shortBadge ? `${boxOfficeInfo.shortBadge} Box Office` : 'Box Office'}</span>
           </Link>
         )}
       </div>
