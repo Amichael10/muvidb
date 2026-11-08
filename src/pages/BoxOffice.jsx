@@ -1143,7 +1143,7 @@ export default function BoxOffice() {
                       <th className="py-3.5 px-3">Film / YouTube Release</th>
                       <th className="py-3.5 px-3 hidden sm:table-cell">Year</th>
                       <th className="py-3.5 px-3 hidden md:table-cell">Director / Cast</th>
-                      <th className="py-3.5 px-3 text-right whitespace-nowrap min-w-[190px]">Est. AdSense Box Office</th>
+                      <th className="py-3.5 px-3 text-right whitespace-nowrap min-w-[190px]">Est. AdSense Earnings</th>
                       <th className="py-3.5 px-3 hidden lg:table-cell text-center whitespace-nowrap">Velocity & Pacing</th>
                       <th className="py-3.5 px-3 hidden sm:table-cell text-center">Watch</th>
                       <th className="py-3.5 pr-4 sm:pr-6 pl-3 text-right whitespace-nowrap min-w-[140px]">Lifetime Streams</th>
@@ -1228,7 +1228,7 @@ export default function BoxOffice() {
                             {directorName ? formatPersonName(directorName) : '—'}
                           </td>
 
-                          {/* Est. AdSense Box Office */}
+                          {/* Est. AdSense Earnings */}
                           <td className="py-3.5 px-3 text-right whitespace-nowrap min-w-[190px]">
                             <Link
                               to={`/films/${film.slug || film.id}/box-office`}

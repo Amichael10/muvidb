@@ -180,24 +180,11 @@ const UTOPIA_PLAYS = [
     poster_url: 'https://pub-8c78c05976804a2da51ca287d5c3b229.r2.dev/media/theatre/crown-of-blood/crown-of-blood-poster.png',
     banner_url: 'https://pub-8c78c05976804a2da51ca287d5c3b229.r2.dev/media/theatre/crown-of-blood/aderemi-and-oyebisi.jpg',
     synopsis: 'Set during the turbulent 19th-century Yoruba civil wars, Crown of Blood is a commanding African retelling of Shakespeare’s Macbeth. It follows General Aderemi who, fresh from defending the realm and elevated to Field Marshall, receives a prophecy from spiritual seers foretelling his ascension to the throne. Driven by his resolute wife Oyebisi and ruthless ambition, Aderemi embarks on a perilous quest for absolute power.',
-    box_office_domestic: 54000,
-    box_office_currency: 'GBP',
-    box_office_tickets_sold: 2420,
-    box_office_source: 'Crucible Sheffield & Belgrade Coventry Run (Industry Projection)',
-    box_office_metrics: {
-      is_estimate: true,
-      reporting_type: 'industry_projection',
-      gross_original: 54000,
-      currency_original: 'GBP',
-      exchange_rate: 2000,
-      gross_ngn_estimate: 108000000,
-      average_ticket_price: 22.3,
-      note: 'Arts Council England National Portfolio Organisation (NPO) production. Commercial box office figures in the UK subsidised sector are not reported to Comscore; figures represent verified house occupancy and yield estimates across Crucible and Belgrade runs.',
-      venues: [
-        { name: 'The Crucible Theatre, Sheffield', capacity: 980, admissions: 1820, dates: 'Feb 2–7, 2026' },
-        { name: 'Belgrade Theatre, Coventry', capacity: 250, admissions: 600, dates: 'Feb 11–14, 2026' }
-      ]
-    }
+    box_office_domestic: null,
+    box_office_currency: 'NGN',
+    box_office_tickets_sold: null,
+    box_office_source: null,
+    box_office_metrics: null
   },
   {
     title: 'The Gods Are Not to Blame',
@@ -217,18 +204,11 @@ const UTOPIA_PLAYS = [
     poster_url: 'https://www.utopiatheatre.co.uk/wp-content/uploads/2026/10/utopia-home-gods-poster.jpg',
     banner_url: 'https://www.utopiatheatre.co.uk/wp-content/uploads/2026/10/utopia-home-gods-poster.jpg',
     synopsis: 'Ola Rotimi’s timeless adaptation of Sophocles’ Oedipus Rex transposed into the ancient Yoruba Kingdom of Kutuje. Following King Odewale, who unknowingly fulfills a destiny sealed before birth, the tragedy interrogates royal duty, tribal identity, destiny, and the fallibility of mortal leadership.',
-    box_office_domestic: 18500,
-    box_office_currency: 'GBP',
-    box_office_tickets_sold: 950,
-    box_office_source: 'Sheffield Repertoire Run (Industry Projection)',
-    box_office_metrics: {
-      is_estimate: true,
-      gross_original: 18500,
-      currency_original: 'GBP',
-      exchange_rate: 2000,
-      gross_ngn_estimate: 37000000,
-      average_ticket_price: 19.5
-    }
+    box_office_domestic: null,
+    box_office_currency: 'NGN',
+    box_office_tickets_sold: null,
+    box_office_source: null,
+    box_office_metrics: null
   },
   {
     title: "Death and the King's Horseman (Sheffield Crucible)",
@@ -247,17 +227,11 @@ const UTOPIA_PLAYS = [
     source_url: 'https://www.utopiatheatre.co.uk/',
     poster_url: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/stage-kurunmi-ola-rotimi.jpg',
     synopsis: 'Wole Soyinka\'s Nobel Prize-winning masterpiece exploring the cosmic rupture that occurs when the British colonial administration violently interrupts Elesin Oba, the King\'s Horseman, from fulfilling his sacred duty of ritual suicide to accompany the deceased King into the afterlife.',
-    box_office_domestic: 42000,
-    box_office_currency: 'GBP',
-    box_office_tickets_sold: 1950,
-    box_office_source: 'Crucible Main House Run (Industry Projection)',
-    box_office_metrics: {
-      is_estimate: true,
-      gross_original: 42000,
-      currency_original: 'GBP',
-      exchange_rate: 2000,
-      gross_ngn_estimate: 84000000
-    }
+    box_office_domestic: null,
+    box_office_currency: 'NGN',
+    box_office_tickets_sold: null,
+    box_office_source: null,
+    box_office_metrics: null
   },
   {
     title: "Anna Hibiscus' Song",
@@ -276,17 +250,11 @@ const UTOPIA_PLAYS = [
     source_url: 'https://www.utopiatheatre.co.uk/',
     poster_url: 'https://www.utopiatheatre.co.uk/wp-content/uploads/2026/10/utopia-home-esther.jpg',
     synopsis: 'The acclaimed stage adaptation of Atinuke\'s popular children\'s book series. Set in wonderful Nigeria, Anna Hibiscus is so happy she feels she may burst with joy, and journeys through her extended family to discover the true essence of celebration, music, and home.',
-    box_office_domestic: 62000,
-    box_office_currency: 'GBP',
-    box_office_tickets_sold: 4100,
-    box_office_source: 'UK National Tour (Industry Projection)',
-    box_office_metrics: {
-      is_estimate: true,
-      gross_original: 62000,
-      currency_original: 'GBP',
-      exchange_rate: 2000,
-      gross_ngn_estimate: 124000000
-    }
+    box_office_domestic: null,
+    box_office_currency: 'NGN',
+    box_office_tickets_sold: null,
+    box_office_source: null,
+    box_office_metrics: null
   },
   {
     title: 'All Our Goals',
@@ -304,17 +272,11 @@ const UTOPIA_PLAYS = [
     genre: 'Contemporary Drama / Community Storytelling',
     source_url: 'https://www.utopiatheatre.co.uk/',
     synopsis: 'A vibrant exploration of identity, African diaspora youth, community aspirations, and shared resilience in Northern England, centering on dreams, sportsmanship, and cultural belonging.',
-    box_office_domestic: 12000,
-    box_office_currency: 'GBP',
-    box_office_tickets_sold: 720,
-    box_office_source: 'Sheffield Run (Industry Projection)',
-    box_office_metrics: {
-      is_estimate: true,
-      gross_original: 12000,
-      currency_original: 'GBP',
-      exchange_rate: 2000,
-      gross_ngn_estimate: 24000000
-    }
+    box_office_domestic: null,
+    box_office_currency: 'NGN',
+    box_office_tickets_sold: null,
+    box_office_source: null,
+    box_office_metrics: null
   },
   {
     title: "Esther's Revenge",
@@ -333,17 +295,11 @@ const UTOPIA_PLAYS = [
     source_url: 'https://www.utopiatheatre.co.uk/',
     poster_url: 'https://www.utopiatheatre.co.uk/wp-content/uploads/2026/10/utopia-home-esther.jpg',
     synopsis: 'Based on the sensational real-life 1953 trial in colonial Lagos, Esther Johnson shoots and kills her British lover Mark Collins after finding out he betrayed their shared plans for marriage and used her funds to marry another woman in England. An incisive interrogation of race, gender, imperial deceit, and justice.',
-    box_office_domestic: 28000,
-    box_office_currency: 'GBP',
-    box_office_tickets_sold: 1450,
-    box_office_source: 'Crucible & UK Tour (Industry Projection)',
-    box_office_metrics: {
-      is_estimate: true,
-      gross_original: 28000,
-      currency_original: 'GBP',
-      exchange_rate: 2000,
-      gross_ngn_estimate: 56000000
-    }
+    box_office_domestic: null,
+    box_office_currency: 'NGN',
+    box_office_tickets_sold: null,
+    box_office_source: null,
+    box_office_metrics: null
   },
   {
     title: "Here's What She Said to Me",
@@ -361,17 +317,11 @@ const UTOPIA_PLAYS = [
     genre: 'Drama / African Matriarchal Heritage',
     source_url: 'https://www.utopiatheatre.co.uk/',
     synopsis: 'Spanning across three generations of Nigerian women across London, Leeds, and Lagos, this intimate drama weaves memory, sisterhood, ritual music, and generational migration as a mother passes down wisdom to her daughter amidst personal and social upheavals.',
-    box_office_domestic: 35000,
-    box_office_currency: 'GBP',
-    box_office_tickets_sold: 1800,
-    box_office_source: 'Sheffield & Arcola London Tour (Industry Projection)',
-    box_office_metrics: {
-      is_estimate: true,
-      gross_original: 35000,
-      currency_original: 'GBP',
-      exchange_rate: 2000,
-      gross_ngn_estimate: 70000000
-    }
+    box_office_domestic: null,
+    box_office_currency: 'NGN',
+    box_office_tickets_sold: null,
+    box_office_source: null,
+    box_office_metrics: null
   },
   {
     title: 'Shadows in Different Shades',
@@ -389,17 +339,11 @@ const UTOPIA_PLAYS = [
     genre: 'Experimental African Drama',
     source_url: 'https://www.utopiatheatre.co.uk/',
     synopsis: 'An evocative multidisciplinary showcase of African oral tradition, spoken word, movement, and physical theatre investigating the nuanced layers of the African diaspora experience in the modern world.',
-    box_office_domestic: 8500,
-    box_office_currency: 'GBP',
-    box_office_tickets_sold: 480,
-    box_office_source: 'Crucible Studio (Industry Projection)',
-    box_office_metrics: {
-      is_estimate: true,
-      gross_original: 8500,
-      currency_original: 'GBP',
-      exchange_rate: 2000,
-      gross_ngn_estimate: 17000000
-    }
+    box_office_domestic: null,
+    box_office_currency: 'NGN',
+    box_office_tickets_sold: null,
+    box_office_source: null,
+    box_office_metrics: null
   },
   {
     title: 'Iyalode of Eti',
@@ -417,17 +361,11 @@ const UTOPIA_PLAYS = [
     genre: 'Yoruba Classical Tragedy / Jacobean Reimagining',
     source_url: 'https://www.utopiatheatre.co.uk/',
     synopsis: 'A magnificent Yoruba reimagining of John Webster’s Jacobean classic \'The Duchess of Malfi\'. Transposed to pre-colonial Yorubaland, a noble widow secretly weds beneath her station, igniting a lethal vortex of royal jealousy, sorcery, ancestral honor, and tragedy.',
-    box_office_domestic: 24000,
-    box_office_currency: 'GBP',
-    box_office_tickets_sold: 1200,
-    box_office_source: 'UK & Aké Festival Tour (Industry Projection)',
-    box_office_metrics: {
-      is_estimate: true,
-      gross_original: 24000,
-      currency_original: 'GBP',
-      exchange_rate: 2000,
-      gross_ngn_estimate: 48000000
-    }
+    box_office_domestic: null,
+    box_office_currency: 'NGN',
+    box_office_tickets_sold: null,
+    box_office_source: null,
+    box_office_metrics: null
   },
 ];
 

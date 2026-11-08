@@ -598,7 +598,7 @@ export default function FilmBoxOffice() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-xs sm:text-sm font-bold text-text-primary">
-                        Estimated AdSense Box Office
+                        Estimated AdSense Earnings
                       </h4>
                       <span className="text-[10px] font-bold text-brand bg-brand/10 px-2 py-0.5 rounded-full border border-brand/20">
                         ViewStats Economic Model
@@ -614,11 +614,11 @@ export default function FilmBoxOffice() {
 
             {/* 2. KEY METRICS KPI GRID */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Est. AdSense Box Office Gross */}
+              {/* Est. AdSense Earnings Gross */}
               <div className="p-5 rounded-2xl bg-brand/[0.07] border border-brand/25 shadow-sm space-y-2 col-span-2 sm:col-span-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-wider text-brand">
-                    Est. AdSense Box Office
+                    Est. AdSense Earnings
                   </span>
                   <Icon icon="solar:wallet-bold" className="text-brand text-base" />
                 </div>

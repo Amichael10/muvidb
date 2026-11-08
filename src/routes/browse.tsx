@@ -93,7 +93,7 @@ export async function loader({ request }: { request: Request }) {
     });
   }
 
-  return data({ films, seeded: true }, { headers: { 'Cache-Control': CACHE_OK } });
+  return data({ films, totalCount: count || 0, page, seeded: true }, { headers: { 'Cache-Control': CACHE_OK } });
 }
 
 export function meta() {

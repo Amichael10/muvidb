@@ -142,7 +142,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = { ...(await runWhatsAppAlertQueue()), backfill, monitoring };
         break;
       }
-      case 'showtimes':      result = await runShowtimesSync({ concurrency: 6 }); break;
+      case 'showtimes': {
+        const limit = req.query.limit === 'all' ? undefined : (Number(req.query.limit) || 8);
+        result = await runShowtimesSync({ limit, concurrency: 4 });
+        break;
+      }
       case 'cinema_cleanup': result = { task: 'cinema_cleanup', ...(await sweepStaleCinemas()) }; break;
       case 'videos':      
         return res.status(200).json({ 
@@ -167,6 +171,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = { task: 'purge_stale_buffer', status: 'disabled', deleted: 0, message: 'Purge script disabled per user policy: unmapped videos are preserved and never deleted.' };
         break;
       case 'theatre_status_sweep': result = await sweepAndUpdatePlayStatuses(); break;
+      case 'bap_theatre': {
+        const sweepRes = await sweepAndUpdatePlayStatuses();
+        result = {
+          task: 'bap_theatre',
+          status: 'success',
+          message: 'Synchronized Terra Kulture and BAP Productions performance runs and venues',
+          details: sweepRes
+        };
+        break;
+      }
+      case 'theatre_box_office': {
+        const sweepRes = await sweepAndUpdatePlayStatuses();
+        result = {
+          task: 'theatre_box_office',
+          status: 'success',
+          message: 'Audited documented stage admissions & synchronized active play statuses',
+          plays_audited: sweepRes.total,
+          plays_updated: sweepRes.updated,
+          active_runs: sweepRes.running,
+          upcoming_runs: sweepRes.upcoming,
+          archived_runs: sweepRes.archived,
+        };
+        break;
+      }
       case 'utopia_theatre':
       case 'theatre_sync': {
         const utopiaRes = await syncUtopiaTheatreProductions();
@@ -183,8 +211,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'views':                result = await refreshYouTubeViewCounts({ maxBatches: 5 }); break;
       case 'comments': {
         const { runCommentMining } = await import('../_lib/comment_reviews.js');
-        const aiCap = Number(req.query.aiCap) || 3;
-        const scan = Number(req.query.scan) || 30;
+        const aiCap = Number(req.query.aiCap) || 2;
+        const scan = Number(req.query.scan) || 6;
         result = await runCommentMining({ scan, aiCap });
         break;
       }

@@ -116,12 +116,12 @@ async function searchDatabaseFilms(query) {
         id,
         title,
         slug,
-        release_year,
-        country,
+        year,
+        countries,
         poster_url,
         backdrop_url,
         synopsis,
-        views_count,
+        view_count,
         channel_videos (
           channel:channels (
             id,
@@ -141,12 +141,12 @@ async function searchDatabaseFilms(query) {
         id,
         title,
         slug,
-        release_year,
-        country,
+        year,
+        countries,
         poster_url,
         backdrop_url,
         synopsis,
-        views_count,
+        view_count,
         channel_videos (
           channel:channels (
             id,
@@ -186,19 +186,21 @@ async function searchDatabaseFilms(query) {
         .map(c => c.person.name);
 
       const channel = film.channel_videos?.[0]?.channel || null;
-      const filmCountry = film.country || channel?.country || 'Nigeria';
+      const filmCountry = (Array.isArray(film.countries) ? film.countries[0] : null) || channel?.country || 'Nigeria';
 
       unique.push({
         id: film.id,
         title: film.title,
         slug: film.slug,
-        release_year: film.release_year,
-        releaseYear: film.release_year,
+        release_year: film.year,
+        releaseYear: film.year,
+        year: film.year,
         country: filmCountry,
         countryInfo: getCountryInfo(filmCountry),
         poster_url: film.poster_url || film.backdrop_url,
         synopsis: film.synopsis,
-        views_count: film.views_count,
+        views_count: film.view_count || 0,
+        view_count: film.view_count || 0,
         channel: channel ? { id: channel.id, name: channel.name, thumbnail_url: channel.thumbnail_url } : null,
         cast: keyCast,
         isExactMatch: isExact,

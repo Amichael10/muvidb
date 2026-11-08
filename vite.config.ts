@@ -264,6 +264,11 @@ export default defineConfig(({ mode, isSsrBuild }) => {
           changeOrigin: true,
           secure: true,
         },
+        '/api/cron': {
+          target: 'https://muvidb.com',
+          changeOrigin: true,
+          secure: true,
+        },
         // Cohere film/people rerank — Vercel function in prod; call Cohere
         // directly in vite so OCR + search name matching work locally.
         '/api/semantic-search': {

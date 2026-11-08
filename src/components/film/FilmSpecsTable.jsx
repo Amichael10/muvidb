@@ -236,26 +236,34 @@ export default function FilmSpecsTable({
             </span>
             <Icon icon="solar:arrow-right-up-linear" className="text-xs opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
           </button>
-          {/* Where a figure came from is an internal reconciliation detail,
-              so it stays on the admin's view of the page only. */}
           {isAdmin && (
             <span className="text-[10px] uppercase font-bold text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
               {film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN'}
             </span>
           )}
-          {isAdmin && onEditBoxOffice && (
+          {isAdmin && onEditBoxOffice ? (
             <button
               type="button"
               onClick={onEditBoxOffice}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-brand/10 hover:bg-brand/20 text-brand border border-brand/30 transition-colors cursor-pointer"
-              title="Edit Box Office Figures"
+              title="Admin: Edit Box Office Figures"
             >
               <Icon icon="solar:pen-bold" className="text-xs" />
               <span>Edit</span>
             </button>
-          )}
+          ) : onSuggestEdit ? (
+            <button
+              type="button"
+              onClick={onSuggestEdit}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 text-text-muted hover:text-brand border border-border transition-colors cursor-pointer"
+              title="Request change to box office figures"
+            >
+              <Icon icon="solar:pen-linear" className="text-xs" />
+              <span>Request Change</span>
+            </button>
+          ) : null}
         </span>
-      ) : isCinema ? (
+      ) : (
         <span className="inline-flex items-center gap-2 text-text-muted">
           <span className="italic">Not recorded yet</span>
           {isAdmin && onEditBoxOffice ? (
@@ -263,6 +271,7 @@ export default function FilmSpecsTable({
               type="button"
               onClick={onEditBoxOffice}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-brand/10 hover:bg-brand/20 text-brand border border-brand/30 transition-colors cursor-pointer"
+              title="Admin: Add Box Office Figures"
             >
               <Icon icon="solar:add-circle-bold" className="text-xs" />
               <span>Add Box Office</span>
@@ -272,13 +281,14 @@ export default function FilmSpecsTable({
               type="button"
               onClick={onSuggestEdit}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-surface-2 hover:bg-surface-3 text-brand border border-border transition-colors cursor-pointer"
+              title="Suggest box office figures or admissions for this film"
             >
               <Icon icon="solar:pen-bold" className="text-xs" />
               <span>Suggest Box Office</span>
             </button>
           ) : null}
         </span>
-      ) : null,
+      ),
     },
     {
       label: 'Estimated Earnings (YouTube)',
@@ -288,7 +298,7 @@ export default function FilmSpecsTable({
             <Link
               to={`/films/${film.slug || film.id}/box-office`}
               className="inline-flex items-center gap-1.5 font-bold text-brand hover:text-brand-hover transition-colors"
-              title="View Film YouTube Box Office Breakdown"
+              title="View Film YouTube Streaming & Earnings Breakdown"
             >
               <Icon icon="simple-icons:youtube" className="text-red-500 text-sm" />
               <span>{youtubeBoxOffice?.formattedNgn}</span>
@@ -296,7 +306,7 @@ export default function FilmSpecsTable({
               <Icon icon="solar:arrow-right-up-linear" className="text-xs text-text-muted" />
             </Link>
             <span className="text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
-              Est. AdSense Box Office
+              Estimated Earnings
             </span>
           </div>
           <div className="text-xs text-text-muted flex items-center gap-2 font-mono">

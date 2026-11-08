@@ -72,6 +72,13 @@ export default function Browse() {
     fetchGenres();
   }, []);
 
+  useEffect(() => {
+    if (loaderData?.seeded && loaderData?.totalCount != null) {
+      setTotalCount(loaderData.totalCount);
+      if (loaderData.films?.length) setFilms(loaderData.films);
+    }
+  }, [loaderData]);
+
   // Skip only the on-mount fetch when the loader already seeded results; every
   // later filter change still refetches through the normal client path.
   const skipInitialFetch = useRef(seeded && currentPage === 1);
