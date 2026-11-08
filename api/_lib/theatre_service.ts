@@ -202,44 +202,32 @@ export async function syncPartyVerseTicketingBoxOffice(): Promise<{
       const items = shopJson?.data?.items || [];
       if (!items.length) continue;
 
-      const capacity = play.box_office_metrics?.total_capacity || 800;
-      let totalRemaining = 0;
-      const tierBreakdown = items.map((it: any) => {
-        const price = Number(it.price || 0);
-        const qtyAvail = Number(it.quantityAvailable || 0);
-        totalRemaining += qtyAvail;
-        return {
-          id: it.id,
-          type: it.name,
-          priceNgn: price,
-          quantityAvailable: qtyAvail,
-        };
-      });
-
-      const ticketsSold = Math.max(0, capacity - totalRemaining);
-
-      const gross = play.box_office_domestic || 8070000;
-
+      // Only record verified platform data — NEVER invent gross or sales figures from assumptions
       await supabase
         .from('plays')
         .update({
-          box_office_domestic: gross,
-          box_office_tickets_sold: ticketsSold,
-          box_office_updated_at: new Date().toISOString(),
           box_office_metrics: {
             ...(play.box_office_metrics || {}),
             source: 'PartyVerse (pv.rsvp)',
             event_id: eventId,
-            tickets_sold: ticketsSold,
-            total_capacity: capacity,
-            gross_domestic_ngn: gross,
-            occupancy_rate_percent: Number(((ticketsSold / capacity) * 100).toFixed(1)),
+            tier_pricing: items.reduce((acc: any, it: any) => {
+              acc[it.name] = { price: Number(it.price || 0) };
+              return acc;
+            }, {}),
+            raw_inventory: {
+              total_capacity_stated: play.box_office_metrics?.total_capacity || 800,
+              quantity_available: items.reduce((acc: any, it: any) => {
+                acc[it.name] = Number(it.quantityAvailable || 0);
+                return acc;
+              }, {})
+            },
             last_synced_at: new Date().toISOString(),
+            note: 'Platform does not publish direct total sales amounts. Figures left unconfirmed.'
           }
         })
         .eq('id', play.id);
 
-      results.push({ slug: play.slug, tickets_sold: ticketsSold, gross });
+      results.push({ slug: play.slug, tickets_sold: 0, gross: 0 });
     } catch (e: any) {
       console.error(`[theatre_service] Error syncing play ${play.slug}:`, e.message);
     }
