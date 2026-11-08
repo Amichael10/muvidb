@@ -367,7 +367,7 @@ export default function BoxOffice() {
           activeSection === 'plays'
             ? 'Nollywood Stage Play Box Office & Admissions | MuviDB'
             : activeSection === 'youtube'
-            ? 'Nollywood YouTube Box Office & Viewership Tracker | MuviDB'
+            ? 'Nollywood YouTube Viewership & Estimated Earnings Tracker | MuviDB'
             : 'Nollywood Box Office Tracker | MuviDB'
         }
         description={
@@ -404,7 +404,7 @@ export default function BoxOffice() {
                 {activeSection === 'plays'
                   ? 'Stage Play Box Office'
                   : activeSection === 'youtube'
-                  ? 'YouTube Box Office'
+                  ? 'Estimated YouTube Earnings'
                   : 'Nollywood Box Office'}
               </h1>
               <p className="text-text-muted text-sm sm:text-base leading-relaxed">
@@ -521,7 +521,7 @@ export default function BoxOffice() {
               }`}
             >
               <Icon icon="solar:play-circle-bold" className="text-base text-red-500" />
-              <span>YouTube Box Office</span>
+              <span>Estimated Earnings (YouTube)</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
                 activeSection === 'youtube' ? 'bg-white/20 text-white' : 'bg-surface-2 text-text-muted'
               }`}>

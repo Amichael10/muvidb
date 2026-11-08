@@ -4,7 +4,6 @@ import { supabase } from '../../lib/supabase';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-hot-toast';
-import WhatsAppHealth from '../../components/admin/WhatsAppHealth';
 
 export default function AdminOverview() {
   const { user } = useAuth();
@@ -311,8 +310,6 @@ export default function AdminOverview() {
           </div>
         </div>
       </header>
-
-      {!isLimitedAdmin && <WhatsAppHealth />}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">

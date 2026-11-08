@@ -376,9 +376,9 @@ export default function FilmBoxOffice() {
   return (
     <div className="w-full bg-bg min-h-screen pb-24 text-text-primary font-sans">
       <SEO 
-        title={`${film.title} (${film.year || ''}) ${activeSection === 'youtube' ? 'YouTube Box Office & ViewStats Breakdown' : 'Box Office Breakdown'} | MuviDB`}
+        title={`${film.title} (${film.year || ''}) ${activeSection === 'youtube' ? 'Estimated Earnings & Streaming Analytics' : 'Box Office Breakdown'} | MuviDB`}
         description={activeSection === 'youtube' 
-          ? `Official YouTube streaming analytics, verified view tallies, and estimated AdSense box office earnings for ${film.title}.`
+          ? `Official YouTube streaming analytics, verified view tallies, and estimated AdSense earnings for ${film.title}.`
           : `Theatrical box office gross, weekly run numbers, admissions, and commercial performance breakdown for ${film.title}.`
         }
       />
@@ -401,7 +401,7 @@ export default function FilmBoxOffice() {
               className="inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
             >
               <Icon icon={activeSection === 'youtube' ? 'solar:play-circle-bold' : 'solar:ticket-bold'} className="text-sm" />
-              <span>{activeSection === 'youtube' ? 'YouTube Box Office Leaderboard' : 'Nollywood Cinema Tracker'}</span>
+              <span>{activeSection === 'youtube' ? 'Streaming Earnings Leaderboard' : 'Nollywood Cinema Tracker'}</span>
             </Link>
           </div>
         </div>
@@ -429,7 +429,7 @@ export default function FilmBoxOffice() {
                   <>
                     <span className="px-2.5 py-0.5 rounded-full bg-brand/15 border border-brand/30 text-brand text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5">
                       <Icon icon="simple-icons:youtube" className="text-red-500 text-xs" />
-                      <span>YouTube Box Office</span>
+                      <span>Estimated Earnings</span>
                     </span>
                     <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -1063,7 +1063,7 @@ export default function FilmBoxOffice() {
               <div className="flex items-center gap-2">
                 <Icon icon="solar:info-circle-bold" className="text-brand text-lg" />
                 <h3 className="text-sm sm:text-base font-bold text-text-primary">
-                  How Nollywood YouTube Box Office &amp; AdSense Revenue is Modeled
+                  How Nollywood Estimated YouTube Earnings &amp; AdSense Revenue is Modeled
                 </h3>
               </div>
               <p className="text-xs text-text-muted leading-relaxed">

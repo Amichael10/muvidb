@@ -113,6 +113,7 @@ export default [
       route('jobs', 'pages/admin/AdminJobs.jsx'),
       route('top10', 'pages/admin/AdminTop10.jsx'),
       route('automation', 'pages/admin/AdminAutomation.jsx'),
+      route('whatsapp', 'pages/admin/AdminWhatsApp.jsx'),
       route('title-search', 'pages/TitleChecker.jsx', { id: 'admin-title-search' }),
       route('title-checker', 'pages/TitleChecker.jsx', { id: 'admin-title-checker' }),
       route('countries', 'pages/admin/AdminCountries.jsx'),

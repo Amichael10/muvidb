@@ -11,6 +11,7 @@ export const CONTRIBUTION_TYPES = {
   NEW_CHANNEL: 'new_channel',
   EDIT_PERSON: 'edit_person',
   EDIT_FILM: 'edit_film',
+  EDIT_PLAY: 'edit_play',
   REPORT_LINK: 'report_link',
   REPORT_CHANNEL: 'report_channel',
 };
@@ -22,6 +23,7 @@ export const CONTRIBUTION_LABELS = {
   new_channel: 'New channel',
   edit_person: 'Person edit',
   edit_film: 'Film edit',
+  edit_play: 'Stage play edit',
   report_link: 'Broken/pirate link report',
   report_channel: 'Channel report',
 };
@@ -52,8 +54,25 @@ export const FILM_EDIT_FIELDS = [
   { key: 'runtime_minutes', label: 'Runtime (minutes)', kind: 'number', placeholder: 'e.g. 120' },
   { key: 'language', label: 'Language', kind: 'text', placeholder: 'e.g. Yoruba, English' },
   { key: 'countries', label: 'Countries', kind: 'text', placeholder: 'e.g. Nigeria, Ghana' },
+  { key: 'box_office_domestic', label: 'Box Office Gross (₦)', kind: 'number', placeholder: 'e.g. 150000000' },
+  { key: 'box_office_opening_weekend', label: 'Opening Weekend Gross (₦)', kind: 'number', placeholder: 'e.g. 45000000' },
+  { key: 'box_office_source', label: 'Box Office Source / Proof Link', kind: 'text', placeholder: 'e.g. CEAN official report, distributor release' },
   { key: 'trailer_youtube_id', label: 'Trailer YouTube ID', kind: 'text', placeholder: 'e.g. dQw4w9WgXcQ' },
   { key: 'tagline', label: 'Tagline', kind: 'text', placeholder: 'Short tagline' },
+];
+
+/** Stage play edit fields that can be proposed + selectively applied. */
+export const PLAY_EDIT_FIELDS = [
+  { key: 'title', label: 'Play Title', kind: 'text', placeholder: 'Correct title' },
+  { key: 'venue', label: 'Venue / Theatre', kind: 'text', placeholder: 'e.g. Terra Kulture, Sheffield Crucible' },
+  { key: 'city', label: 'City', kind: 'text', placeholder: 'e.g. Lagos, Sheffield, London' },
+  { key: 'playwright', label: 'Playwright', kind: 'text', placeholder: 'Playwright name' },
+  { key: 'director', label: 'Stage Director', kind: 'text', placeholder: 'Director name' },
+  { key: 'genre', label: 'Genre', kind: 'text', placeholder: 'e.g. Drama, Musical, Historical' },
+  { key: 'synopsis', label: 'Synopsis', kind: 'textarea', placeholder: 'Plot summary' },
+  { key: 'box_office_domestic', label: 'Stage Box Office Revenue (₦)', kind: 'number', placeholder: 'e.g. 54000000' },
+  { key: 'box_office_tickets_sold', label: 'Tickets Sold / Admissions', kind: 'number', placeholder: 'e.g. 2420' },
+  { key: 'box_office_source', label: 'Box Office Source / Proof Link', kind: 'text', placeholder: 'e.g. Ticket platform report, Press release' },
 ];
 
 // --- New-record submission schemas ----------------------------------------
@@ -443,6 +462,9 @@ async function submit({ type, target_table = null, target_id = null, payload = {
       } else if (target_table === 'people' && target_id) {
         const { data: p } = await supabase.from('people').select('name').eq('id', target_id).maybeSingle();
         if (p) targetTitle = p.name;
+      } else if (target_table === 'plays' && target_id) {
+        const { data: pl } = await supabase.from('plays').select('title, venue, city').eq('id', target_id).maybeSingle();
+        if (pl) targetTitle = `${pl.title}${pl.venue ? ` (${pl.venue})` : ''}`;
       }
 
       const { authHeaders } = await import('./apiAuth');
@@ -578,6 +600,24 @@ export function suggestFilmEdit({ filmId, fields, changes, image_path, note }) {
     type: CONTRIBUTION_TYPES.EDIT_FILM,
     target_table: 'films',
     target_id: filmId,
+    payload: {
+      fields: compact,
+      ...(freeText ? { note: freeText } : {}),
+      ...(freeText && !Object.keys(compact).length && !image_path ? { changes: freeText } : {}),
+    },
+    image_path,
+    note: freeText,
+  });
+}
+
+/** Suggest corrections/additions to an existing stage play (including theatre box office & admissions). */
+export function suggestPlayEdit({ playId, fields, changes, image_path, note }) {
+  const compact = compactFields(fields);
+  const freeText = (note || changes || '').trim() || null;
+  return submit({
+    type: CONTRIBUTION_TYPES.EDIT_PLAY,
+    target_table: 'plays',
+    target_id: playId,
     payload: {
       fields: compact,
       ...(freeText ? { note: freeText } : {}),

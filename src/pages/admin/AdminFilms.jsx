@@ -1414,7 +1414,8 @@ export default function AdminFilms() {
       const resolvedProds = await resolveCompanyList(productionCompanies, 'production');
       const resolvedDists = await resolveCompanyList(distributionCompanies, 'distributor');
       const distNames = resolvedDists.map(d => d.name).filter(Boolean);
-      const distributorJoined = distNames.length > 0 ? distNames.join(', ') : ((formData.distributor || '').trim() || null);
+      // If distribution companies were cleared by the admin, do not fall back to old formData.distributor
+      const distributorJoined = distNames.length > 0 ? distNames.join(', ') : null;
 
       const resolvedTitle = formData.title
         ? (formData.title === formData.title.toUpperCase() && formData.title !== formData.title.toLowerCase()
@@ -1513,7 +1514,7 @@ export default function AdminFilms() {
             }
             return baseStreaming;
           })(),
-          distributor: distributorJoined,
+          ...(distributorJoined ? { distributor: distributorJoined } : { distributor: null }),
           ...((formData.box_office_domestic || formData.box_office_worldwide) ? {
             box_office: {
               domestic: formData.box_office_domestic ? parseFloat(formData.box_office_domestic) : 0,
@@ -1817,8 +1818,7 @@ export default function AdminFilms() {
           });
           if (!alertResponse.ok) throw new Error(`WhatsApp queue returned HTTP ${alertResponse.status}`);
         } catch (waErr) {
-          console.warn('WhatsApp trigger error:', waErr);
-          toast.error('Film saved, but WhatsApp alerts could not be queued.');
+          console.warn('WhatsApp queue background notice:', waErr);
         }
       }
 

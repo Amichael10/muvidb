@@ -6,9 +6,13 @@ const WATCH_NAMES: Record<string, string> = {
   netflix: 'Netflix',
   prime_video: 'Prime Video',
   youtube: 'YouTube',
-  showmax: 'Showmax',
   kava: 'Kava',
   docuth: 'Docuth',
+  ebonylife: 'EbonyLife ON Plus',
+  circuits: 'Circuits.tv',
+  nollistream: 'NolliStream',
+  homitv: 'HomiTV',
+  filmporte: 'Filmporte',
   cinema: 'In Cinemas',
 };
 
@@ -123,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // 1. SITEMAP INDEX (/sitemap.xml)
       if (target === 'index') {
-        const filmChunks = 8; // 8 chunks of 5000 = up to 40,000 films
+        const filmChunks = 5; // 5 chunks of 5000 = 25,000 films capacity (matching current ~20,300 catalogue)
         const peopleChunks = 7; // 7 chunks of 5000 = up to 35,000 indexable people
 
         const maps: string[] = ['static'];
@@ -137,7 +141,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'channels',
           'critics',
           'plays',
-          'careers',
           'awards',
           'tvshows',
           'creators'
@@ -151,7 +154,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         return res.status(200).send(sitemapIndex);
       }
 
-      // 2. STATIC PAGES (/sitemap-static.xml) — Every page & feature on MubiDB
+      // 2. STATIC PAGES (/sitemap-static.xml) — Every page & feature on MuviDB
       if (target === 'static') {
         const staticPages: { url: string; priority: string; changefreq: string }[] = [
           // Core discovery pages
@@ -159,6 +162,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           { url: '/box-office', priority: '1.0', changefreq: 'daily' },
           { url: '/browse', priority: '0.9', changefreq: 'daily' },
           { url: '/tv-shows', priority: '0.8', changefreq: 'daily' },
+          { url: '/advanced-search', priority: '0.8', changefreq: 'weekly' },
           // People & cast
           { url: '/people', priority: '0.9', changefreq: 'daily' },
           { url: '/critics', priority: '0.8', changefreq: 'daily' },
@@ -171,14 +175,18 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           // Entertainment features
           { url: '/plays', priority: '0.8', changefreq: 'daily' },
           { url: '/awards', priority: '0.8', changefreq: 'weekly' },
-          // Streaming
+          // Streaming platforms
           { url: '/watch', priority: '0.8', changefreq: 'daily' },
           { url: '/watch/netflix', priority: '0.7', changefreq: 'daily' },
           { url: '/watch/prime_video', priority: '0.7', changefreq: 'daily' },
-          { url: '/watch/showmax', priority: '0.7', changefreq: 'daily' },
           { url: '/watch/youtube', priority: '0.7', changefreq: 'daily' },
           { url: '/watch/kava', priority: '0.7', changefreq: 'daily' },
           { url: '/watch/docuth', priority: '0.7', changefreq: 'daily' },
+          { url: '/watch/ebonylife', priority: '0.7', changefreq: 'daily' },
+          { url: '/watch/circuits', priority: '0.7', changefreq: 'daily' },
+          { url: '/watch/nollistream', priority: '0.7', changefreq: 'daily' },
+          { url: '/watch/homitv', priority: '0.7', changefreq: 'daily' },
+          { url: '/watch/filmporte', priority: '0.7', changefreq: 'daily' },
           { url: '/watch/cinema', priority: '0.7', changefreq: 'daily' },
           // Tools & Brand Resources
           { url: '/tools/title-checker', priority: '0.7', changefreq: 'weekly' },
@@ -195,7 +203,6 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           // Info pages
           { url: '/about', priority: '0.6', changefreq: 'monthly' },
           { url: '/contact', priority: '0.6', changefreq: 'monthly' },
-          { url: '/waitlist', priority: '0.5', changefreq: 'monthly' },
           { url: '/terms', priority: '0.3', changefreq: 'monthly' },
           { url: '/privacy', priority: '0.3', changefreq: 'monthly' },
         ];
@@ -258,17 +265,26 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
 
       // 5. COMPANIES SITEMAP (/sitemap-companies.xml)
       if (target === 'companies') {
-        const data = await withRetry(async () => {
-          return await supabase
-            .from('companies')
-            .select('id, name, slug, updated_at')
-            .limit(50000);
-        });
+        const BATCH_SIZE = 1000;
+        let allCompanies: any[] = [];
+        let fromOffset = 0;
+        while (fromOffset < 10000) {
+          const batch = await withRetry(async () => {
+            return await supabase
+              .from('companies')
+              .select('id, name, slug, updated_at')
+              .range(fromOffset, fromOffset + BATCH_SIZE - 1);
+          });
+          if (!batch || batch.length === 0) break;
+          allCompanies.push(...batch);
+          if (batch.length < BATCH_SIZE) break;
+          fromOffset += BATCH_SIZE;
+        }
 
         setSuccessHeaders();
         return res.status(200).send(
           urlset(
-            (data || [])
+            (allCompanies || [])
               .map(
                 (c: any) => `  <url>
     <loc>${baseUrl}/companies/${c.slug || c.id}</loc>
@@ -396,10 +412,8 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
         } catch {
           items = [];
         }
-        setSuccessHeaders();
-        return res.status(200).send(
-          urlset(
-            items
+        const careerUrls = items.length > 0
+          ? items
               .map(
                 (j: any) => `  <url>
     <loc>${baseUrl}/careers/${j.slug || j.id}</loc>
@@ -409,8 +423,15 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
   </url>`
               )
               .join('\n')
-          )
-        );
+          : `  <url>
+    <loc>${baseUrl}/careers</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`;
+
+        setSuccessHeaders();
+        return res.status(200).send(urlset(careerUrls));
       }
 
       // 11. WATCH PLATFORMS SITEMAP (/sitemap-watch.xml)
@@ -434,13 +455,21 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
 
       // 12. AWARDS SITEMAP (/sitemap-awards.xml) — awards hub + individual award programme pages
       if (target === 'awards') {
+        const orgIds = [
+          'amvca', 'amaa', 'afriff', 'tinff', 'binff', 'aiff', 'diyma', 'bon', 'zuff',
+          'golden-stars', 'kilaf', 'kadiff', 'ccff', 'lifacc', 'wriff', 'affif',
+          'oafp', 'ntff', 'ekoiff', 'asiff', 'biff', 'bcff', 'lifanima', 'eko-star',
+          'septimius', 'eloy', 'city-people', 'ambo', 'film-africa', 'reffa',
+          'sundance', 'tiff', 'venice', 'cannes', 'berlinale', 'bafta', 'oscars',
+          'golden-globes', 'eniff', 'cfif', 'tarina', 'afma', 'nafest'
+        ];
         const awardPages = [
-          { url: '/awards', priority: '0.8', changefreq: 'weekly' },
-          { url: '/awards/amvca', priority: '0.8', changefreq: 'weekly' },
-          { url: '/awards/amaa', priority: '0.8', changefreq: 'weekly' },
-          { url: '/awards/tinff', priority: '0.7', changefreq: 'monthly' },
-          { url: '/awards/golden-stars', priority: '0.7', changefreq: 'monthly' },
-          { url: '/awards/afriff', priority: '0.7', changefreq: 'monthly' },
+          { url: '/awards', priority: '0.9', changefreq: 'weekly' },
+          ...orgIds.map((code) => ({
+            url: `/awards/${code.toLowerCase()}`,
+            priority: '0.8',
+            changefreq: 'weekly',
+          })),
         ];
         setSuccessHeaders();
         return res.status(200).send(
@@ -461,16 +490,25 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
 
       // 13. TV SHOWS SITEMAP (/sitemap-tvshows.xml)
       if (target === 'tvshows') {
-        const data = await withRetry(async () => {
-          return await supabase
-            .from('films')
-            .select('id, title, slug, poster_url, updated_at, created_at')
-            .eq('content_type', 'series')
-            .order('updated_at', { ascending: false, nullsFirst: false })
-            .limit(20000);
-        });
+        const BATCH_SIZE = 1000;
+        let allShows: any[] = [];
+        let fromOffset = 0;
+        while (fromOffset < 10000) {
+          const batch = await withRetry(async () => {
+            return await supabase
+              .from('films')
+              .select('id, title, slug, poster_url, updated_at, created_at')
+              .eq('content_type', 'series')
+              .order('updated_at', { ascending: false, nullsFirst: false })
+              .range(fromOffset, fromOffset + BATCH_SIZE - 1);
+          });
+          if (!batch || batch.length === 0) break;
+          allShows.push(...batch);
+          if (batch.length < BATCH_SIZE) break;
+          fromOffset += BATCH_SIZE;
+        }
 
-        const tvUrls = (data || []).map((f: any) => {
+        const tvUrls = (allShows || []).map((f: any) => {
           const loc = `${baseUrl}/films/${f.slug || f.id}`;
           const lastmod = f.updated_at || f.created_at ? new Date(f.updated_at || f.created_at).toISOString() : new Date().toISOString();
           const imageTag = isValidImageUrl(f.poster_url)

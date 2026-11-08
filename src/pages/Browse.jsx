@@ -11,13 +11,20 @@ import { PLATFORMS, platformFilter } from '../lib/platforms';
 import { NFVCB_RATING_OPTIONS } from '../lib/contributions';
 import { AFRICAN_COUNTRY_NAMES } from '../utils/africanCountries';
 
+export const DEFAULT_GENRES = [
+  'Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime',
+  'Documentary', 'Drama', 'Epic', 'Family', 'Fantasy', 'History',
+  'Horror', 'Music', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War'
+];
+
 export default function Browse() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialGenre = searchParams.get('genre') || '';
   const initialCountry = searchParams.get('country') || '';
   const initialSort = searchParams.get('sort') || 'views';
-
   const initialPlatform = searchParams.get('platform') || '';
+  const currentPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const PAGE_SIZE = 48;
 
   // First page of results is server-rendered and edge-cached by the route loader
   // in src/routes/browse.tsx, so it's already in the HTML on first paint.
@@ -26,7 +33,8 @@ export default function Browse() {
 
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
   const [films, setFilms] = useState(loaderData?.films ?? []);
-  const [dbGenres, setDbGenres] = useState([]);
+  const [totalCount, setTotalCount] = useState(loaderData?.totalCount ?? 0);
+  const [dbGenres, setDbGenres] = useState(DEFAULT_GENRES);
   const [dbCountries, setDbCountries] = useState(AFRICAN_COUNTRY_NAMES);
   // Starts false when seeded, otherwise the server would render the skeleton and
   // SSR would buy us nothing.
@@ -66,7 +74,7 @@ export default function Browse() {
 
   // Skip only the on-mount fetch when the loader already seeded results; every
   // later filter change still refetches through the normal client path.
-  const skipInitialFetch = useRef(seeded);
+  const skipInitialFetch = useRef(seeded && currentPage === 1);
 
   useEffect(() => {
     setError(null);
@@ -75,7 +83,7 @@ export default function Browse() {
       return;
     }
     fetchFilms();
-  }, [selectedGenres, selectedCountries, selectedPlatform, selectedYear, selectedRatings, language, sortBy, debouncedSearchQuery]);
+  }, [selectedGenres, selectedCountries, selectedPlatform, selectedYear, selectedRatings, language, sortBy, debouncedSearchQuery, currentPage]);
 
   const fetchGenres = async () => {
     try {
@@ -83,14 +91,13 @@ export default function Browse() {
         supabase.from('genres').select('name').order('name'),
         supabase.from('countries').select('name').eq('continent', 'Africa').order('name')
       ]);
-      if (genresRes.error) throw genresRes.error;
-      if (countriesRes.error) throw countriesRes.error;
-      
-      setDbGenres((genresRes.data || []).map(g => g.name));
+      if (genresRes.data && genresRes.data.length > 0) {
+        setDbGenres(genresRes.data.map(g => g.name));
+      }
       const names = (countriesRes.data || []).map(c => c.name);
       setDbCountries(names.length ? names : AFRICAN_COUNTRY_NAMES);
     } catch (err) {
-      console.error('Error fetching filters:', err);
+      console.warn('Error fetching filters, using defaults:', err);
       setDbCountries(AFRICAN_COUNTRY_NAMES);
     }
   };
@@ -104,7 +111,7 @@ export default function Browse() {
         release_type, streaming_links, source, youtube_watch_url,
         film_genres!left(genres(name)),
         film_countries!left(countries(name))
-      `);
+      `, { count: 'exact' });
 
       if (selectedGenres.length > 0 && selectedCountries.length > 0) {
          query = supabase.from('films').select(`
@@ -113,7 +120,7 @@ export default function Browse() {
           release_type, streaming_links, source, youtube_watch_url,
           film_genres!inner(genres!inner(name)),
           film_countries!inner(countries!inner(name))
-        `);
+        `, { count: 'exact' });
         query = query.in('film_genres.genres.name', selectedGenres);
         query = query.in('film_countries.countries.name', selectedCountries);
       } else if (selectedGenres.length > 0) {
@@ -123,7 +130,7 @@ export default function Browse() {
           release_type, streaming_links, source, youtube_watch_url,
           film_genres!inner(genres!inner(name)),
           film_countries!left(countries(name))
-        `);
+        `, { count: 'exact' });
         query = query.in('film_genres.genres.name', selectedGenres);
       } else if (selectedCountries.length > 0) {
         query = supabase.from('films').select(`
@@ -132,7 +139,7 @@ export default function Browse() {
           release_type, streaming_links, source, youtube_watch_url,
           film_genres!left(genres(name)),
           film_countries!inner(countries!inner(name))
-        `);
+        `, { count: 'exact' });
         query = query.in('film_countries.countries.name', selectedCountries);
       }
 
@@ -162,11 +169,17 @@ export default function Browse() {
       
       const config = sortMap[sortBy] || sortMap.views;
       query = query.order(config.column, { ascending: config.ascending });
-      query = query.range(0, 49);
 
-      const { data, error: dbError } = await query;
+      const from = (currentPage - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      query = query.range(from, to);
+
+      const { data, count, error: dbError } = await query;
       
       if (dbError) throw dbError;
+      if (count != null) {
+        setTotalCount(count);
+      }
 
       const transformed = (data || []).map(f => {
         const relatedGenres = f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
@@ -186,27 +199,50 @@ export default function Browse() {
     }
   };
 
+  const resetPage = () => {
+    if (currentPage > 1) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('page');
+      setSearchParams(next);
+    }
+  };
+
+  const goToPage = (newPage) => {
+    const next = new URLSearchParams(searchParams);
+    if (newPage <= 1) {
+      next.delete('page');
+    } else {
+      next.set('page', String(newPage));
+    }
+    setSearchParams(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const nfvcbRatings = NFVCB_RATING_OPTIONS.map((o) => o.value);
   
   const toggleGenre = (genre) => {
+    resetPage();
     setSelectedGenres(prev => 
       prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
     );
   };
 
   const toggleCountry = (country) => {
+    resetPage();
     setSelectedCountries(prev => 
       prev.includes(country) ? prev.filter(c => c !== country) : [...prev, country]
     );
   };
 
   const toggleRating = (rating) => {
+    resetPage();
     setSelectedRatings(prev => 
       prev.includes(rating) ? prev.filter(r => r !== rating) : [...prev, rating]
     );
   };
 
   const clearAll = () => {
+    resetPage();
     setSelectedGenres([]);
     setSelectedCountries([]);
     setSelectedPlatform('');
@@ -235,6 +271,8 @@ export default function Browse() {
   const visibleCountries = countriesExpanded ? orderedCountries : countryPreview;
   const hiddenCountryCount = Math.max(0, orderedCountries.length - COUNTRY_PREVIEW);
 
+  const totalPages = Math.max(1, Math.ceil((totalCount || films.length) / PAGE_SIZE));
+
   return (
     <div className="min-h-screen bg-bg">
       <PageHeader
@@ -242,8 +280,8 @@ export default function Browse() {
         eyebrow="Browse"
         title="Movies"
         description="Explore the complete collection of Nollywood movies, from digital premieres to theatrical blockbusters."
-        count={films.length}
-        countLabel="titles in view"
+        count={totalCount > 0 ? totalCount : films.length}
+        countLabel={totalCount > 0 ? 'titles in catalogue' : 'titles in view'}
         actions={
           <div className="flex flex-col sm:flex-row md:flex-col lg:flex-row items-stretch sm:items-center md:items-stretch lg:items-center gap-3 w-full md:w-auto">
             <button
@@ -286,7 +324,14 @@ export default function Browse() {
 
             <div className="space-y-4">
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Sort By</h4>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all">
+              <select
+                value={sortBy}
+                onChange={(e) => {
+                  resetPage();
+                  setSortBy(e.target.value);
+                }}
+                className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
+              >
                 <option value="views">Most Viewed</option>
                 <option value="rating">Top Rated</option>
                 <option value="newest">Newest Arrivals</option>
@@ -298,7 +343,10 @@ export default function Browse() {
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Watch Platform</h4>
               <select
                 value={selectedPlatform}
-                onChange={(e) => setSelectedPlatform(e.target.value)}
+                onChange={(e) => {
+                  resetPage();
+                  setSelectedPlatform(e.target.value);
+                }}
                 className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
               >
                 <option value="">All Platforms</option>
@@ -358,7 +406,10 @@ export default function Browse() {
               <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Year</h4>
               <select
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
+                onChange={(e) => {
+                  resetPage();
+                  setSelectedYear(e.target.value);
+                }}
                 className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
               >
                 <option value="">Any year</option>
@@ -388,14 +439,20 @@ export default function Browse() {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => {
+                  resetPage();
+                  setSearchQuery(e.target.value);
+                }}
                 placeholder="Search movies by title..."
                 className="w-full h-12 bg-surface border border-border text-text-primary rounded-xl px-5 pl-11 text-sm focus:border-brand focus:outline-none transition-all shadow-md"
               />
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
+                  onClick={() => {
+                    resetPage();
+                    setSearchQuery('');
+                  }}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
                   aria-label="Clear search"
                 >
@@ -413,13 +470,89 @@ export default function Browse() {
                 ))}
               </div>
             ) : films.length > 0 ? (
-              <div className={`grid gap-4 sm:gap-6 md:gap-8 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
-                {films.map(film => (
-                  <div key={film.id} className={selectedPlatform === 'youtube' ? '' : 'flex justify-center'}>
-                    <FilmCard film={film} variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth={selectedPlatform === 'youtube'} />
+              <>
+                <div className={`grid gap-4 sm:gap-6 md:gap-8 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                  {films.map(film => (
+                    <div key={film.id} className={selectedPlatform === 'youtube' ? '' : 'flex justify-center'}>
+                      <FilmCard film={film} variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth={selectedPlatform === 'youtube'} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <p className="text-xs text-text-muted font-medium">
+                      Showing <span className="font-bold text-text-primary">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount || (currentPage * PAGE_SIZE))}</span> of <span className="font-bold text-text-primary">{(totalCount || films.length).toLocaleString()}</span> titles
+                    </p>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={currentPage === 1}
+                        onClick={() => goToPage(currentPage - 1)}
+                        className="px-3.5 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-primary hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                        aria-label="Previous page"
+                      >
+                        <Icon icon="solar:alt-arrow-left-linear" className="text-sm" />
+                        <span>Prev</span>
+                      </button>
+
+                      <div className="flex items-center gap-1 px-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                          .filter(p => {
+                            if (totalPages <= 7) return true;
+                            if (p === 1 || p === totalPages) return true;
+                            if (Math.abs(p - currentPage) <= 1) return true;
+                            return false;
+                          })
+                          .reduce((acc, p, idx, arr) => {
+                            if (idx > 0 && p - arr[idx - 1] > 1) {
+                              acc.push(-idx);
+                            }
+                            acc.push(p);
+                            return acc;
+                          }, [])
+                          .map((item) => {
+                            if (item < 0) {
+                              return (
+                                <span key={`ellipsis-${item}`} className="px-2 text-xs text-text-muted font-bold">
+                                  …
+                                </span>
+                              );
+                            }
+                            const isCurrent = item === currentPage;
+                            return (
+                              <button
+                                key={item}
+                                type="button"
+                                onClick={() => goToPage(item)}
+                                className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                  isCurrent
+                                    ? 'bg-brand text-black shadow-md shadow-brand/20 font-black'
+                                    : 'bg-surface hover:bg-surface-2 border border-border text-text-secondary hover:text-text-primary'
+                                }`}
+                              >
+                                {item}
+                              </button>
+                            );
+                          })}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={currentPage === totalPages}
+                        onClick={() => goToPage(currentPage + 1)}
+                        className="px-3.5 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-primary hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                        aria-label="Next page"
+                      >
+                        <span>Next</span>
+                        <Icon icon="solar:alt-arrow-right-linear" className="text-sm" />
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             ) : (
               <div className="bg-surface-2/10 border-2 border-dashed border-border rounded-xl p-32 text-center">
                 <p className="text-text-muted text-xs font-bold mb-6">No matching results found.</p>

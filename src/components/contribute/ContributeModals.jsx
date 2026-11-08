@@ -7,10 +7,12 @@ import {
   suggestNewPerson,
   suggestPersonEdit,
   suggestFilmEdit,
+  suggestPlayEdit,
   reportLink,
   reportChannel,
   PERSON_EDIT_FIELDS,
   FILM_EDIT_FIELDS,
+  PLAY_EDIT_FIELDS,
   compactFields,
 } from '../../lib/contributions';
 import { uploadContributionImage } from '../../lib/imageUpload';
@@ -212,10 +214,10 @@ export function SuggestPersonModal({ onClose }) {
 // Chip-based: pick only the fields you want to change. All optional; at least
 // one field / photo / note is required. Current values shown as hints.
 export function SuggestEditModal({ onClose, target, targetId, targetName, current = {} }) {
-  // target: 'person' | 'film'
+  // target: 'person' | 'film' | 'play'
   const { submitting, run } = useContributionSubmit(onClose);
-  const fieldDefs = target === 'person' ? PERSON_EDIT_FIELDS : FILM_EDIT_FIELDS;
-  const photoLabel = target === 'person' ? 'Photo' : 'Poster';
+  const fieldDefs = target === 'person' ? PERSON_EDIT_FIELDS : target === 'play' ? PLAY_EDIT_FIELDS : FILM_EDIT_FIELDS;
+  const photoLabel = target === 'person' ? 'Photo' : 'Poster / Artwork';
 
   const [open, setOpen] = useState({}); // fieldKey | 'photo' | 'note' → bool
   const [values, setValues] = useState({});
@@ -234,6 +236,8 @@ export function SuggestEditModal({ onClose, target, targetId, targetName, curren
     }
     if (target === 'person') {
       run(() => suggestPersonEdit({ personId: targetId, fields, image_path: imagePath, note }));
+    } else if (target === 'play') {
+      run(() => suggestPlayEdit({ playId: targetId, fields, image_path: imagePath, note }));
     } else {
       run(() => suggestFilmEdit({ filmId: targetId, fields, image_path: imagePath, note }));
     }

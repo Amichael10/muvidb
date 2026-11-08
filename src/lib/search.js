@@ -14,6 +14,7 @@
 import { supabase } from './supabase';
 import { searchPeopleByName, rankPeopleResults } from './peopleSearch';
 import { sortedNameKey } from './personNameMatch';
+import { PUBLIC_PERSON_COLUMNS } from './publicSelects';
 
 const FILM_FIELDS = `
   id, slug, title, poster_url, backdrop_url, year, language, runtime_minutes,
@@ -114,7 +115,7 @@ export async function searchAll(query) {
   const [peopleRows, companyRes, playRes] = await Promise.all([
     searchPeopleByName(query, {
       limit: 40,
-      select: '*',
+      select: Array.isArray(PUBLIC_PERSON_COLUMNS) ? PUBLIC_PERSON_COLUMNS.join(',') : PUBLIC_PERSON_COLUMNS,
     }).catch(() => []),
     supabase.from('companies').select('*').or(orIlike('name', terms)).limit(40),
     supabase

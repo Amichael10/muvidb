@@ -1,5 +1,6 @@
 User-agent: Googlebot
 Allow: /
+Allow: /search?q=
 Disallow: /search
 Disallow: /search/
 Disallow: /admin

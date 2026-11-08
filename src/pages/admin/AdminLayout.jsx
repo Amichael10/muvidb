@@ -81,6 +81,7 @@ export default function AdminLayout() {
     { path: '/admin/title-checker', label: 'Title Search', icon: 'solar:magnifer-zoom-in-bold', category: 'Catalog' },
     { path: '/admin/import', label: 'Import Hub', icon: 'solar:import-linear', category: 'System' },
     { path: '/admin/automation', label: 'Automation', icon: 'solar:server-square-linear', category: 'Automation' },
+    { path: '/admin/whatsapp', label: 'WhatsApp Alerts', icon: 'ri:whatsapp-fill', category: 'Automation' },
     { path: '/admin/endpoints', label: 'API & Endpoints', icon: 'solar:server-minimalistic-linear', category: 'System' },
     { path: '/admin/api-keys', label: 'Developer API', icon: 'solar:key-minimalistic-square-linear', category: 'System' },
   ], [isSuperAdmin, claimCount, cinemaCount]);

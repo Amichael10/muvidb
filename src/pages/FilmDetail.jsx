@@ -646,8 +646,28 @@ export default function FilmDetail() {
   }
 
   const trailerVideoId = youtubeId(film.trailer_youtube_id);
+  const domGross = Number(film.box_office_domestic || film.streaming_links?.box_office?.domestic || 0);
+  const currency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
+  const symbol = currency === 'NGN' ? '₦' : `${currency} `;
+  const formattedGross = domGross >= 1_000_000_000 
+    ? `${(domGross / 1_000_000_000).toFixed(2)} Billion` 
+    : domGross >= 1_000_000
+    ? `${(domGross / 1_000_000).toFixed(1)} Million`
+    : domGross > 0 ? domGross.toLocaleString('en-NG') : null;
+  const rawFormatted = domGross.toLocaleString('en-NG');
+  const sourceLabel = film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN';
+  const openingGross = Number(film.box_office_opening_weekend || film.streaming_links?.box_office?.opening_weekend || 0);
+
+  // A film has genuine YouTube Movie views ONLY if:
+  // 1. It is explicitly a YouTube movie (release_type === 'youtube'), OR
+  // 2. It has an active YouTube watch URL AND is not a theatrical cinema release.
+  // Trailer views on cinema movies are promotional and strictly excluded from movie stream metrics.
+  const isCinemaFilm = domGross > 0 || film.release_type === 'cinema' || Boolean(film.is_in_cinemas);
+  const isActualYoutubeMovie = film.release_type === 'youtube' || (Boolean(film.youtube_watch_url) && !isCinemaFilm);
   const isRealYoutubeUrl = (url) => typeof url === 'string' && (url.includes('youtube.com') || url.includes('youtu.be'));
-  const fullYoutubeUrl = (isRealYoutubeUrl(film.youtube_watch_url) ? film.youtube_watch_url : null) || (isFilmOnPlatform(film, 'youtube') ? getWatchUrl(film, 'youtube') : null);
+  const fullYoutubeUrl = isActualYoutubeMovie
+    ? ((isRealYoutubeUrl(film.youtube_watch_url) ? film.youtube_watch_url : null) || (isFilmOnPlatform(film, 'youtube') ? getWatchUrl(film, 'youtube') : null))
+    : null;
   const availablePlatforms = PLATFORMS.filter((platform) => {
     if (platform.id === 'cinema') return false;
     if (platform.id === 'youtube' && fullYoutubeUrl) return true;
@@ -680,24 +700,6 @@ export default function FilmDetail() {
     return `${remaining}m`;
   };
 
-  const domGross = Number(film.box_office_domestic || film.streaming_links?.box_office?.domestic || 0);
-  const currency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
-  const symbol = currency === 'NGN' ? '₦' : `${currency} `;
-  const formattedGross = domGross >= 1_000_000_000 
-    ? `${(domGross / 1_000_000_000).toFixed(2)} Billion` 
-    : domGross >= 1_000_000
-    ? `${(domGross / 1_000_000).toFixed(1)} Million`
-    : domGross > 0 ? domGross.toLocaleString('en-NG') : null;
-  const rawFormatted = domGross.toLocaleString('en-NG');
-  const sourceLabel = film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN';
-  const openingGross = Number(film.box_office_opening_weekend || film.streaming_links?.box_office?.opening_weekend || 0);
-
-  // A film has genuine YouTube Movie views ONLY if:
-  // 1. It is explicitly a YouTube movie (release_type === 'youtube'), OR
-  // 2. It has an active YouTube watch URL AND is not a theatrical cinema release.
-  // Trailer views on cinema movies are promotional and strictly excluded from movie stream metrics.
-  const isCinemaFilm = domGross > 0 || film.release_type === 'cinema' || Boolean(film.is_in_cinemas);
-  const isActualYoutubeMovie = film.release_type === 'youtube' || (Boolean(film.youtube_watch_url) && !isCinemaFilm);
   const showYoutubeViews = isActualYoutubeMovie && Boolean(film.view_count && Number(film.view_count) > 0);
 
   const youtubeBoxOffice = showYoutubeViews
@@ -1117,7 +1119,7 @@ export default function FilmDetail() {
               </div>
 
               {/* Commercial & Reach Performance Card (Box Office & YouTube Views) */}
-              {(domGross > 0 || showYoutubeViews || isAdmin) && (
+              {(domGross > 0 || showYoutubeViews || isCinemaFilm || isAdmin) && (
                 <div className="flex w-full lg:w-auto flex-col shrink-0">
                   {/* Case 1: Both Box Office AND Valid YouTube Stream (Rare Hybrid) */}
                   {domGross > 0 && showYoutubeViews ? (
@@ -1133,21 +1135,34 @@ export default function FilmDetail() {
                       </div>
                       <div className="grid grid-cols-2 gap-2 py-1">
                         {/* Box Office Tile */}
-                        <Link 
-                          to={`/films/${film.slug || film.id}/box-office`}
-                          className="p-2.5 rounded-lg bg-brand/[0.08] border border-brand/25 hover:border-brand/50 transition-all cursor-pointer group"
+                        <div 
+                          className="p-2.5 rounded-lg bg-brand/[0.08] border border-brand/25 transition-all"
                         >
-                          <div className="flex items-center gap-1 text-[10px] font-black text-brand uppercase mb-0.5">
-                            <Icon icon="solar:ticket-bold" className="text-xs" />
-                            <span>Box Office</span>
+                          <div className="flex items-center justify-between gap-1 text-[10px] font-black text-brand uppercase mb-0.5">
+                            <span className="flex items-center gap-1">
+                              <Icon icon="solar:ticket-bold" className="text-xs" />
+                              <span>Box Office</span>
+                            </span>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => setShowBoxOfficeModal(true)}
+                                className="text-brand hover:underline cursor-pointer"
+                                title="Edit"
+                              >
+                                Edit
+                              </button>
+                            )}
                           </div>
-                          <div className="text-base sm:text-lg font-black text-white font-heading leading-tight group-hover:text-brand">
-                            <span className="text-brand">{symbol}</span>{formattedGross}
-                          </div>
-                          <div className="text-[9px] text-white/50 uppercase tracking-wider mt-0.5 font-bold">
-                            Domestic
-                          </div>
-                        </Link>
+                          <Link to={`/films/${film.slug || film.id}/box-office`} className="block group">
+                            <div className="text-base sm:text-lg font-black text-white font-heading leading-tight group-hover:text-brand">
+                              <span className="text-brand">{symbol}</span>{formattedGross}
+                            </div>
+                            <div className="text-[9px] text-white/50 uppercase tracking-wider mt-0.5 font-bold">
+                              Domestic
+                            </div>
+                          </Link>
+                        </div>
 
                         {/* YouTube Stream Tile */}
                         <a
@@ -1174,31 +1189,61 @@ export default function FilmDetail() {
                     </div>
                   ) : domGross > 0 ? (
                     /* Case 2: Cinema Theatrical Release with Box Office */
-                    <Link
-                      to={`/films/${film.slug || film.id}/box-office`}
-                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-brand/30 backdrop-blur-xl shadow-2xl hover:border-brand/60 w-full lg:w-64 xl:w-72 text-left transition-all cursor-pointer group"
+                    <div
+                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-brand/30 backdrop-blur-xl shadow-2xl w-full lg:w-64 xl:w-72 text-left transition-all"
                     >
                       <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-brand uppercase tracking-widest mb-1.5">
                         <div className="flex items-center gap-1.5">
                           <Icon icon="solar:ticket-bold" className="text-brand text-sm" />
                           <span>Box Office</span>
                         </div>
-                        <span className="text-[10px] text-white/50 group-hover:text-brand transition-colors">
+                        <Link
+                          to={`/films/${film.slug || film.id}/box-office`}
+                          className="text-[10px] text-white/50 hover:text-brand transition-colors"
+                        >
                           Full Page →
-                        </span>
+                        </Link>
                       </div>
-                      <div className="my-auto py-1">
+                      <Link to={`/films/${film.slug || film.id}/box-office`} className="my-auto py-1 block group">
                         <p className="text-xl sm:text-2xl font-black text-white font-heading tracking-tight leading-none group-hover:text-brand transition-colors">
                           <span className="text-brand">{symbol}</span>{formattedGross}
                         </p>
                         <div className="text-[10px] sm:text-[11px] font-bold text-white/60 uppercase tracking-wider mt-1.5">
                           Domestic Gross
                         </div>
+                        <div className="text-[10px] text-white/40 font-medium mt-1">
+                          {openingGross > 0 ? `₦${(openingGross / 1_000_000).toFixed(1)}M Opening Weekend` : 'Theatrical Cinema Release'}
+                        </div>
+                      </Link>
+                      <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowBoxOfficeModal(true)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand/20 hover:bg-brand/30 text-brand text-xs font-bold border border-brand/40 transition-all cursor-pointer"
+                            title="Admin: Edit Box Office Figures"
+                          >
+                            <Icon icon="solar:pen-bold" className="text-xs" />
+                            <span>Edit Box Office</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowFilmEdit(true)}
+                            className="text-[11px] text-brand hover:underline inline-flex items-center gap-1 cursor-pointer font-semibold"
+                          >
+                            <Icon icon="solar:pen-linear" className="text-xs" />
+                            <span>Suggest Correction</span>
+                          </button>
+                        )}
+                        <Link
+                          to={`/films/${film.slug || film.id}/box-office`}
+                          className="text-[10px] text-white/40 hover:text-white transition-colors"
+                        >
+                          Breakdown →
+                        </Link>
                       </div>
-                      <div className="text-[10px] text-white/40 font-medium">
-                        {openingGross > 0 ? `₦${(openingGross / 1_000_000).toFixed(1)}M Opening Weekend` : 'Theatrical Cinema Release'}
-                      </div>
-                    </Link>
+                    </div>
                   ) : showYoutubeViews ? (
                     /* Case 3: YouTube Full Movie Release with Dedicated Streaming Box Office Page Link */
                     <Link 
@@ -1209,7 +1254,7 @@ export default function FilmDetail() {
                       <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-brand uppercase tracking-widest mb-1.5">
                         <div className="flex items-center gap-1.5">
                           <Icon icon="simple-icons:youtube" className="text-red-500 text-sm" />
-                          <span>YouTube Box Office</span>
+                          <span>Estimated Earnings</span>
                         </div>
                         <span className="inline-flex items-center gap-1 text-[10px] text-text-muted group-hover:text-brand transition-colors">
                           <span>View Breakdown</span>
@@ -1225,7 +1270,7 @@ export default function FilmDetail() {
                         <div className="text-[11px] text-white/70 font-semibold flex items-center gap-2">
                           <span>{youtubeBoxOffice?.formattedUsd}</span>
                           <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-2 text-text-muted border border-border">
-                            Est. AdSense Box Office
+                            Est. YouTube Earnings
                           </span>
                         </div>
                       </div>
@@ -1242,13 +1287,48 @@ export default function FilmDetail() {
                       </div>
                     </Link>
                   ) : (
-                    /* Case 4: Admin Shortcut to add Gross */
-                    <div
-                      onClick={() => setShowBoxOfficeModal(true)}
-                      className="h-full flex flex-col justify-center p-4 rounded-xl sm:rounded-2xl bg-black/40 border border-white/10 hover:border-brand/40 w-full lg:w-64 text-left transition-all cursor-pointer group"
-                    >
-                      <span className="text-[10px] font-black uppercase tracking-wider text-white/50">Box Office (Admin)</span>
-                      <span className="text-xs font-bold text-brand mt-1">+ Record Domestic Gross</span>
+                    /* Case 4: Theatrical Cinema Film with Pending / Unrecorded Gross */
+                    <div className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-white/15 backdrop-blur-xl shadow-2xl w-full lg:w-64 xl:w-72 text-left">
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-white/60 uppercase tracking-widest mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <Icon icon="solar:ticket-bold" className="text-brand text-sm" />
+                          <span>Theatrical Box Office</span>
+                        </div>
+                        {isAdmin && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand/15 text-brand border border-brand/30 font-bold uppercase">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <div className="my-auto py-1">
+                        <p className="text-base sm:text-lg font-bold text-white/80 font-heading">
+                          Not Reported Yet
+                        </p>
+                        <p className="text-[10px] text-white/40 mt-1">
+                          Official CEAN theatrical tracking
+                        </p>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-white/10">
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowBoxOfficeModal(true)}
+                            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand-hover transition-all cursor-pointer shadow-md shadow-brand/20"
+                          >
+                            <Icon icon="solar:add-circle-bold" className="text-sm" />
+                            <span>Add Box Office Figures</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowFilmEdit(true)}
+                            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white text-xs font-bold transition-all cursor-pointer"
+                          >
+                            <Icon icon="solar:pen-bold" className="text-xs text-brand" />
+                            <span>Suggest Box Office</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

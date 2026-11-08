@@ -38,6 +38,10 @@ export async function loader({ request }: { request: Request }) {
   const country = url.searchParams.get('country') || '';
   const platform = url.searchParams.get('platform') || '';
   const sort = url.searchParams.get('sort') || 'views';
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+  const PAGE_SIZE = 48;
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
 
   // Join strictness mirrors Browse.jsx: inner-join only the dimension actually
   // being filtered on, so unfiltered rows aren't dropped.
@@ -46,7 +50,7 @@ export async function loader({ request }: { request: Request }) {
     ? 'film_countries!inner(countries!inner(name))'
     : 'film_countries!left(countries(name))';
 
-  let query = supabaseServer.from('films').select(`${COLUMNS}, ${genreJoin}, ${countryJoin}`);
+  let query = supabaseServer.from('films').select(`${COLUMNS}, ${genreJoin}, ${countryJoin}`, { count: 'exact' });
   if (genre) query = query.in('film_genres.genres.name', [genre]);
   if (country) query = query.in('film_countries.countries.name', [country]);
 
@@ -55,14 +59,14 @@ export async function loader({ request }: { request: Request }) {
   query = query.or('source.neq.mubi,source.is.null,countries.cs.{"Nigeria"}');
 
   const cfg = SORTS[sort] || SORTS.views;
-  query = query.order(cfg.column, { ascending: cfg.ascending }).range(0, 49);
+  query = query.order(cfg.column, { ascending: cfg.ascending }).range(from, to);
 
-  const { data: rows, error } = await query;
+  const { data: rows, count, error } = await query;
 
   // A slow or failed DB must never break the page — fall back to the client
   // fetch Browse already does. Empty means "not seeded", not "no results".
   if (error || !rows) {
-    return data({ films: [], seeded: false }, { headers: { 'Cache-Control': CACHE_OK } });
+    return data({ films: [], totalCount: 0, page, seeded: false }, { headers: { 'Cache-Control': CACHE_OK } });
   }
 
   let films = rows.map((f: any) => {

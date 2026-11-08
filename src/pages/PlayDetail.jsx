@@ -4,6 +4,8 @@ import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { fetchPlayBySlug, getPlayDateLabel } from '../lib/plays';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
+import { SuggestEditModal } from '../components/contribute/ContributeModals';
 import SEO from '../components/SEO';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import CriticReviewsSection from '../components/film/CriticReviewsSection';
@@ -13,9 +15,12 @@ import MobilePlayDetailView from '../components/plays/mobile/MobilePlayDetailVie
 export default function PlayDetail() {
   const { slug } = useParams();
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'admin_limited';
   const [play, setPlay] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showBoxOfficeModal, setShowBoxOfficeModal] = useState(false);
+  const [showPlayEdit, setShowPlayEdit] = useState(false);
+  const [showAdminBoxOffice, setShowAdminBoxOffice] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -113,6 +118,9 @@ export default function PlayDetail() {
         play={play}
         playDateLabel={playDateLabel}
         uniquePerformers={uniquePerformers}
+        isAdmin={isAdmin}
+        onSuggestEdit={() => setShowPlayEdit(true)}
+        onEditBoxOffice={() => setShowAdminBoxOffice(true)}
       />
 
       {/* Desktop Stage Experience (>= md) */}
@@ -155,17 +163,48 @@ export default function PlayDetail() {
                 <span className="px-3 py-1 rounded-full bg-surface border border-border text-xs text-text-muted font-bold capitalize">
                   {play.status?.replace('_', ' ')}
                 </span>
-                {Boolean(play.box_office_domestic > 0) && (
-                  <Link
-                    to={`/plays/${play.slug || play.id}/box-office`}
-                    className="px-3.5 py-1.5 rounded-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-500/50 text-amber-400 text-xs font-bold tracking-wider inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer group"
-                    title="Click to view admissions, ticket tiers & venue breakdown"
+                {Boolean(play.box_office_domestic > 0) ? (
+                  <div className="inline-flex items-center gap-1.5">
+                    <Link
+                      to={`/plays/${play.slug || play.id}/box-office`}
+                      className="px-3.5 py-1.5 rounded-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-500/50 text-amber-400 text-xs font-bold tracking-wider inline-flex items-center gap-2 shadow-sm transition-all cursor-pointer group"
+                      title="Click to view admissions, ticket tiers & venue breakdown"
+                    >
+                      <Icon icon="solar:ticket-sale-bold" className="text-sm group-hover:scale-110 transition-transform" />
+                      <span>₦{Number(play.box_office_domestic).toLocaleString()} Box Office</span>
+                      <Icon icon="solar:alt-arrow-right-linear" className="text-xs opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                    </Link>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminBoxOffice(true)}
+                        className="p-1.5 rounded-full bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 transition-colors cursor-pointer"
+                        title="Edit Play Box Office"
+                      >
+                        <Icon icon="solar:pen-bold" className="text-xs" />
+                      </button>
+                    )}
+                  </div>
+                ) : isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminBoxOffice(true)}
+                    className="px-3 py-1 rounded-full bg-brand/15 border border-brand/30 text-brand text-xs font-bold inline-flex items-center gap-1 hover:bg-brand/25 transition-colors cursor-pointer"
                   >
-                    <Icon icon="solar:ticket-sale-bold" className="text-sm group-hover:scale-110 transition-transform" />
-                    <span>₦{Number(play.box_office_domestic).toLocaleString()} Box Office</span>
-                    <Icon icon="solar:alt-arrow-right-linear" className="text-xs opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-                  </Link>
-                )}
+                    <Icon icon="solar:add-circle-bold" className="text-xs" />
+                    <span>Add Box Office Figures</span>
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => setShowPlayEdit(true)}
+                  className="px-3 py-1 rounded-full bg-surface-2 hover:bg-surface-3 border border-border text-text-secondary hover:text-text-primary text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer ml-auto"
+                  title="Suggest edits or updates for this stage production"
+                >
+                  <Icon icon="solar:pen-linear" className="text-xs text-brand" />
+                  <span>Suggest Edit</span>
+                </button>
               </div>
 
               <h1 className="text-3xl sm:text-5xl font-extrabold text-text-primary mb-4">
@@ -303,10 +342,169 @@ export default function PlayDetail() {
         <PlayBoxOfficeModal
           play={play}
           playDateLabel={playDateLabel}
-          isAdmin={user?.role === 'admin' || user?.role === 'admin_limited'}
+          isAdmin={isAdmin}
           onClose={() => setShowBoxOfficeModal(false)}
         />
       )}
+
+      {/* Suggest Edit / Change Request Modal */}
+      {showPlayEdit && (
+        <SuggestEditModal
+          target="play"
+          targetId={play.id}
+          targetName={play.title}
+          current={{
+            title: play.title,
+            venue: play.venue,
+            city: play.city,
+            playwright: play.playwright,
+            director: play.director,
+            genre: play.genre,
+            synopsis: play.synopsis,
+            box_office_domestic: play.box_office_domestic,
+            box_office_tickets_sold: play.box_office_tickets_sold,
+            box_office_source: play.box_office_source,
+          }}
+          onClose={() => setShowPlayEdit(false)}
+        />
+      )}
+
+      {/* Admin Play Box Office Edit Modal */}
+      {showAdminBoxOffice && (
+        <AdminPlayBoxOfficeModal
+          play={play}
+          onClose={() => setShowAdminBoxOffice(false)}
+          onUpdated={(updatedPlay) => {
+            setPlay((prev) => ({
+              ...prev,
+              ...updatedPlay,
+            }));
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AdminPlayBoxOfficeModal({ play, onClose, onUpdated }) {
+  const [gross, setGross] = useState(play.box_office_domestic != null ? String(play.box_office_domestic) : '');
+  const [tickets, setTickets] = useState(play.box_office_tickets_sold != null ? String(play.box_office_tickets_sold) : '');
+  const [currency, setCurrency] = useState(play.box_office_currency || 'NGN');
+  const [source, setSource] = useState(play.box_office_source || 'Official Venue Reporting');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const parsedGross = gross ? Number(String(gross).replace(/[^0-9.]/g, '')) : null;
+      const parsedTickets = tickets ? Number(String(tickets).replace(/[^0-9]/g, '')) : null;
+
+      const { data, error } = await supabase
+        .from('plays')
+        .update({
+          box_office_domestic: parsedGross,
+          box_office_tickets_sold: parsedTickets,
+          box_office_currency: currency,
+          box_office_source: source.trim() || 'Official Venue Reporting',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', play.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      toast.success('Stage play box office updated successfully!');
+      if (onUpdated) onUpdated(data);
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Could not update play box office.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className="relative w-full max-w-md rounded-2xl bg-surface border border-border shadow-2xl p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between border-b border-border pb-3">
+          <div>
+            <h3 className="text-lg font-black text-text-primary">Edit Stage Play Box Office</h3>
+            <p className="text-xs text-text-muted mt-0.5">{play.title}</p>
+          </div>
+          <button type="button" onClick={onClose} className="p-1 rounded-lg text-text-muted hover:text-text-primary cursor-pointer">
+            <Icon icon="solar:close-circle-bold" className="text-2xl" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-text-secondary block mb-1">Total Gross Revenue</label>
+            <input
+              type="text"
+              value={gross}
+              onChange={(e) => setGross(e.target.value)}
+              placeholder="e.g. 54000000 or ₦54,000,000"
+              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-text-secondary block mb-1">Tickets Sold / Admissions</label>
+              <input
+                type="number"
+                value={tickets}
+                onChange={(e) => setTickets(e.target.value)}
+                placeholder="e.g. 2420"
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-text-secondary block mb-1">Currency</label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:outline-none"
+              >
+                <option value="NGN">NGN (₦)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-text-secondary block mb-1">Source / Verification Proof</label>
+            <input
+              type="text"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              placeholder="e.g. Ticket Tailor report, Press Release"
+              className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-brand text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-brand-hover transition-colors disabled:opacity-50 cursor-pointer shadow-md shadow-brand/20"
+            >
+              {saving ? 'Saving…' : 'Save Figures'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-3 rounded-xl bg-surface-2 hover:bg-surface-3 text-text-secondary text-sm font-bold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

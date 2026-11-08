@@ -17,6 +17,9 @@ export default function MobilePlayDetailView({
   play,
   playDateLabel = '',
   uniquePerformers = [],
+  isAdmin = false,
+  onSuggestEdit = null,
+  onEditBoxOffice = null,
 }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'ensemble' | 'reviews'
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
@@ -77,14 +80,45 @@ export default function MobilePlayDetailView({
             <span className="px-2.5 py-0.5 rounded-md bg-brand/20 border border-brand/40 text-brand uppercase tracking-wider backdrop-blur-sm">
               {play.genre || 'Stage Play'}
             </span>
-            {boxOfficeStr && (
-              <Link
-                to={`/plays/${play.slug || play.id}/box-office`}
-                className="px-2.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center gap-1"
+            {boxOfficeStr ? (
+              <div className="inline-flex items-center gap-1">
+                <Link
+                  to={`/plays/${play.slug || play.id}/box-office`}
+                  className="px-2.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center gap-1"
+                >
+                  <Icon icon="solar:ticket-sale-bold" className="text-xs" />
+                  <span>{boxOfficeStr} Box Office</span>
+                </Link>
+                {isAdmin && onEditBoxOffice && (
+                  <button
+                    type="button"
+                    onClick={onEditBoxOffice}
+                    className="p-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                    title="Edit Box Office"
+                  >
+                    <Icon icon="solar:pen-bold" className="text-[10px]" />
+                  </button>
+                )}
+              </div>
+            ) : isAdmin && onEditBoxOffice ? (
+              <button
+                type="button"
+                onClick={onEditBoxOffice}
+                className="px-2.5 py-0.5 rounded-md bg-brand/20 border border-brand/40 text-brand flex items-center gap-1"
               >
-                <Icon icon="solar:ticket-sale-bold" className="text-xs" />
-                <span>{boxOfficeStr} Box Office</span>
-              </Link>
+                <Icon icon="solar:add-circle-bold" className="text-xs" />
+                <span>+ Box Office</span>
+              </button>
+            ) : null}
+            {onSuggestEdit && (
+              <button
+                type="button"
+                onClick={onSuggestEdit}
+                className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-white flex items-center gap-1 text-[10px]"
+              >
+                <Icon icon="solar:pen-linear" className="text-xs text-brand" />
+                <span>Suggest Edit</span>
+              </button>
             )}
             {playDateLabel && (
               <span className="px-2 py-0.5 rounded-md bg-white/10 text-text-secondary backdrop-blur-sm">
