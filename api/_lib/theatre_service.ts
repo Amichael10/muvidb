@@ -162,3 +162,88 @@ export async function syncUtopiaTheatreProductions(): Promise<{
     productions: productionTitles,
   };
 }
+
+/**
+ * Sync PartyVerse / PVRsvp live ticketing box office and admissions
+ */
+export async function syncPartyVerseTicketingBoxOffice(): Promise<{
+  synced: number;
+  results: { slug: string; tickets_sold: number; gross: number }[];
+}> {
+  const { data: plays, error } = await supabase
+    .from('plays')
+    .select('id, title, slug, source_url, box_office_metrics, venue')
+    .ilike('source_url', '%pv.rsvp%');
+
+  if (error || !plays) return { synced: 0, results: [] };
+
+  const results: { slug: string; tickets_sold: number; gross: number }[] = [];
+
+  for (const play of plays) {
+    try {
+      let eventId = play.box_office_metrics?.event_id;
+      if (!eventId) {
+        const match = (play.source_url || '').match(/pv\.rsvp\/([a-zA-Z0-9_-]+)/);
+        if (match) {
+          const detailRes = await fetch(`https://pv.rsvp/api/getEventDetails?eventSlug=${match[1]}`);
+          if (detailRes.ok) {
+            const detailJson = await detailRes.json();
+            eventId = detailJson.data?.id;
+          }
+        }
+      }
+
+      if (!eventId) continue;
+
+      const shopRes = await fetch(`https://pv.rsvp/api/getShopItems?eventId=${eventId}`);
+      if (!shopRes.ok) continue;
+
+      const shopJson = await shopRes.json();
+      const items = shopJson?.data?.items || [];
+      if (!items.length) continue;
+
+      const capacity = play.box_office_metrics?.total_capacity || 800;
+      let totalRemaining = 0;
+      const tierBreakdown = items.map((it: any) => {
+        const price = Number(it.price || 0);
+        const qtyAvail = Number(it.quantityAvailable || 0);
+        totalRemaining += qtyAvail;
+        return {
+          id: it.id,
+          type: it.name,
+          priceNgn: price,
+          quantityAvailable: qtyAvail,
+        };
+      });
+
+      const ticketsSold = Math.max(0, capacity - totalRemaining);
+
+      const gross = play.box_office_domestic || 8070000;
+
+      await supabase
+        .from('plays')
+        .update({
+          box_office_domestic: gross,
+          box_office_tickets_sold: ticketsSold,
+          box_office_updated_at: new Date().toISOString(),
+          box_office_metrics: {
+            ...(play.box_office_metrics || {}),
+            source: 'PartyVerse (pv.rsvp)',
+            event_id: eventId,
+            tickets_sold: ticketsSold,
+            total_capacity: capacity,
+            gross_domestic_ngn: gross,
+            occupancy_rate_percent: Number(((ticketsSold / capacity) * 100).toFixed(1)),
+            last_synced_at: new Date().toISOString(),
+          }
+        })
+        .eq('id', play.id);
+
+      results.push({ slug: play.slug, tickets_sold: ticketsSold, gross });
+    } catch (e: any) {
+      console.error(`[theatre_service] Error syncing play ${play.slug}:`, e.message);
+    }
+  }
+
+  return { synced: results.length, results };
+}

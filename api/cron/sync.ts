@@ -10,7 +10,7 @@ import refreshVideosHandler from '../_lib/refresh_videos_handler.js';
 import mirrorImagesHandler from '../_lib/mirror_images_handler.js';
 import { classifyFilmKinds } from '../_lib/film_kind_classifier.js';
 import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
-import { sweepAndUpdatePlayStatuses, syncUtopiaTheatreProductions } from '../_lib/theatre_service.js';
+import { sweepAndUpdatePlayStatuses, syncUtopiaTheatreProductions, syncPartyVerseTicketingBoxOffice } from '../_lib/theatre_service.js';
 import { runYouTubeUploadWatch } from '../_lib/youtube_upload_notify.js';
 import { runCriticsSync } from '../_lib/critics_sync.js';
 import { runWhatsAppAlertQueue, backfillMovieWhatsAppAlertQueue } from '../_lib/whatsapp_alert_queue.js';
@@ -183,15 +183,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       case 'theatre_box_office': {
         const sweepRes = await sweepAndUpdatePlayStatuses();
+        const pvRes = await syncPartyVerseTicketingBoxOffice();
         result = {
           task: 'theatre_box_office',
           status: 'success',
-          message: 'Audited documented stage admissions & synchronized active play statuses',
+          message: 'Audited documented stage admissions & synchronized active play statuses and ticketing platforms',
           plays_audited: sweepRes.total,
           plays_updated: sweepRes.updated,
           active_runs: sweepRes.running,
           upcoming_runs: sweepRes.upcoming,
           archived_runs: sweepRes.archived,
+          ticketing_synced: pvRes.synced,
+          ticketing_results: pvRes.results,
         };
         break;
       }

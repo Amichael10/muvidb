@@ -10,6 +10,7 @@ import SEO from '../components/SEO';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import CriticReviewsSection from '../components/film/CriticReviewsSection';
 import ReviewSection from '../components/film/ReviewSection';
+import PlayGallerySection from '../components/plays/PlayGallerySection';
 import MobilePlayDetailView from '../components/plays/mobile/MobilePlayDetailView';
 
 export default function PlayDetail() {
@@ -23,16 +24,16 @@ export default function PlayDetail() {
   const [showAdminBoxOffice, setShowAdminBoxOffice] = useState(false);
   const boxOfficeInfo = useMemo(() => formatPlayBoxOffice(play), [play]);
 
-  useEffect(() => {
-    async function load() {
-      if (!slug) return;
-      setLoading(true);
-      const data = await fetchPlayBySlug(slug);
-      setPlay(data);
-      setLoading(false);
-    }
-    load();
+  const loadPlay = React.useCallback(async () => {
+    if (!slug) return;
+    const data = await fetchPlayBySlug(slug);
+    setPlay(data);
   }, [slug]);
+
+  useEffect(() => {
+    setLoading(true);
+    loadPlay().finally(() => setLoading(false));
+  }, [loadPlay]);
 
   const rawCredits = play?.credits || [];
   const playDateLabel = play ? getPlayDateLabel(play, '') : '';
@@ -119,9 +120,11 @@ export default function PlayDetail() {
         play={play}
         playDateLabel={playDateLabel}
         uniquePerformers={uniquePerformers}
+        images={play.images || []}
         isAdmin={isAdmin}
         onSuggestEdit={() => setShowPlayEdit(true)}
         onEditBoxOffice={() => setShowAdminBoxOffice(true)}
+        onImagesUpdated={loadPlay}
       />
 
       {/* Desktop Stage Experience (>= md) */}
@@ -334,6 +337,14 @@ export default function PlayDetail() {
             </div>
           )}
         </section>
+
+        {/* Stage Show Gallery & Production Stills */}
+        <PlayGallerySection
+          play={play}
+          images={play.images || []}
+          isAdmin={isAdmin}
+          onImagesUpdated={loadPlay}
+        />
 
         {/* Critic Reviews Section */}
         <CriticReviewsSection playId={play.id} user={user} />

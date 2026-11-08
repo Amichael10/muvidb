@@ -224,10 +224,23 @@ export async function fetchPlayBySlug(slug) {
     console.error('Error fetching stage credits:', credError);
   }
 
+  // Fetch gallery photos and production stills for this play
+  const { data: images, error: imgError } = await supabase
+    .from('play_images')
+    .select('*')
+    .eq('play_id', play.id)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (imgError) {
+    console.error('Error fetching play images:', imgError);
+  }
+
   return {
     ...play,
     status: derivePlayStatus(play),
-    credits: credits || []
+    credits: credits || [],
+    images: images || []
   };
 }
 
@@ -390,3 +403,65 @@ export async function deleteStageCredit(creditId) {
   if (error) throw error;
   return true;
 }
+
+/**
+ * Fetch stage gallery images / production stills for a play
+ */
+export async function fetchPlayImages(playId) {
+  if (!playId) return [];
+  const { data, error } = await supabase
+    .from('play_images')
+    .select('*')
+    .eq('play_id', playId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching play images:', error);
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Add a new image to a play's gallery (Admin)
+ */
+export async function addPlayImage(imageData) {
+  const { data, error } = await supabase
+    .from('play_images')
+    .insert(imageData)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Delete a play image (Admin)
+ */
+export async function deletePlayImage(imageId) {
+  const { error } = await supabase
+    .from('play_images')
+    .delete()
+    .eq('id', imageId);
+
+  if (error) throw error;
+  return true;
+}
+
+/**
+ * Update a play image (Admin)
+ */
+export async function updatePlayImage(imageId, updates) {
+  const { data, error } = await supabase
+    .from('play_images')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', imageId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+

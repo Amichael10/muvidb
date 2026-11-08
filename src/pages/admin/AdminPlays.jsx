@@ -7,6 +7,7 @@ import { authHeaders } from '../../lib/apiAuth';
 import ImageField from '../../components/admin/ImageField';
 import Drawer from '../../components/admin/Drawer';
 import CriticReviewsEditor from '../../components/admin/CriticReviewsEditor';
+import PlayImagesEditor from '../../components/admin/PlayImagesEditor';
 import SEO from '../../components/SEO';
 
 const BLANK_INSTAGRAM_IMPORT = {
@@ -1501,6 +1502,13 @@ export default function AdminPlays() {
                   </span>
                 </div>
                 <CriticReviewsEditor playId={editingPlay.id} />
+              </div>
+            )}
+
+            {/* Play Gallery Photos & Production Stills */}
+            {editingPlay?.id && (
+              <div className="pt-6 border-t border-border space-y-4">
+                <PlayImagesEditor playId={editingPlay.id} onUpdated={loadData} />
               </div>
             )}
 

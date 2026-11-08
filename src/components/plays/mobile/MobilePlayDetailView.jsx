@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import ImageWithFallback from '../../ui/ImageWithFallback';
+import PlayGallerySection from '../PlayGallerySection';
 import CriticReviewsSection from '../../film/CriticReviewsSection';
 import ReviewSection from '../../film/ReviewSection';
 import { formatPlayBoxOffice } from '../../../lib/plays';
@@ -18,9 +19,11 @@ export default function MobilePlayDetailView({
   play,
   playDateLabel = '',
   uniquePerformers = [],
+  images = [],
   isAdmin = false,
   onSuggestEdit = null,
   onEditBoxOffice = null,
+  onImagesUpdated = null,
 }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'ensemble' | 'reviews'
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
@@ -274,6 +277,14 @@ export default function MobilePlayDetailView({
                 </div>
               </div>
             )}
+
+            {/* Stage Show Gallery & Production Stills */}
+            <PlayGallerySection
+              play={play}
+              images={images}
+              isAdmin={isAdmin}
+              onImagesUpdated={onImagesUpdated}
+            />
           </div>
         )}
 
