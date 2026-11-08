@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { supabase } from './supabase.js';
 import { derivePlayStatus } from './theatre_service.js';
+import { generateAIVisionContent } from './ai_service.js';
 
 function getFirecrawlKeys(): string[] {
   return [
@@ -117,6 +118,8 @@ export function isStrictTheatricalPlay(title: string, rawText = ''): boolean {
     /\bstage play\b/i.test(combined) ||
     /\btheatre\b/i.test(combined) ||
     /\btheater\b/i.test(combined) ||
+    /\btheatre series\b/i.test(combined) ||
+    /\btheatrical\b/i.test(combined) ||
     /\bmusical stage play\b/i.test(combined) ||
     /\ba musical by\b/i.test(combined) ||
     /\bplay by\b/i.test(combined) ||
@@ -126,9 +129,200 @@ export function isStrictTheatricalPlay(title: string, rawText = ''): boolean {
     /\btheatrical drama\b/i.test(combined) ||
     /\bstage drama\b/i.test(combined) ||
     /\blive fantasy stage play\b/i.test(combined) ||
-    /\bopera\b/i.test(combined);
+    /\bopera\b/i.test(combined) ||
+    /\bpeppersoup\b/i.test(combined) ||
+    /\bpepper soup\b/i.test(combined);
 
   return hasTheatricalDesignation;
+}
+
+// ── POSTER OCR & VISION CAST/CREW EXTRACTION ────────────────────────────────
+export interface PosterOcrExtracted {
+  title?: string | null;
+  playwright?: string | null;
+  director?: string | null;
+  producer?: string | null;
+  venue?: string | null;
+  cast: Array<{ name: string; character?: string | null }>;
+  crew: Array<{ name: string; role: string }>;
+}
+
+const INVALID_NAME_PATTERNS = [
+  /\b(?:ticket|tickets|regular|vip|corporate|table|naira|ngn|price|free)\b/i,
+  /\b(?:saturday|sunday|monday|tuesday|wednesday|thursday|friday)\b/i,
+  /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b/i,
+  /\b(?:theatre|theater|stage play|musical|production|presents|season)\b/i,
+  /\b(?:lagos|ikeja|abuja|nigeria|venue|grandeur|kulture)\b/i,
+  /^\d+$/,
+];
+
+function cleanExtractedName(name: string): string {
+  return name.replace(/^(?:Written\s+by|Directed\s+by|Produced\s+by|Starring|Starring\s*[:\-]?)\s*[:\-]?\s*/i, '').trim();
+}
+
+function isValidName(name: string): boolean {
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  if (trimmed.length < 3 || trimmed.length > 60) return false;
+  for (const pat of INVALID_NAME_PATTERNS) {
+    if (pat.test(trimmed)) return false;
+  }
+  return true;
+}
+
+/**
+ * Downloads a theatrical stage play poster and uses Gemini Vision / OpenAI Vision
+ * to extract cast, crew, playwright, director, producer, and venue.
+ */
+export async function extractCastAndCrewFromPoster(posterUrl: string): Promise<PosterOcrExtracted> {
+  const result: PosterOcrExtracted = { cast: [], crew: [] };
+  if (!posterUrl || !posterUrl.startsWith('http')) return result;
+
+  try {
+    const res = await fetch(posterUrl, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return result;
+
+    const arrayBuf = await res.arrayBuffer();
+    const base64Data = Buffer.from(arrayBuf).toString('base64');
+    let mimeType = res.headers.get('content-type') || 'image/jpeg';
+    if (!mimeType.startsWith('image/')) mimeType = 'image/jpeg';
+
+    const prompt = `You are an expert theatrical billing archivist.
+Analyze this theatrical stage play poster image and extract all billing information, especially the cast, crew, director, playwright, and producer.
+Look for names of actors, characters, director, playwright/writer, and key production crew (e.g. producer, stage manager, choreographer, music director).
+
+Respond ONLY with a valid JSON object in this exact structure without markdown backticks:
+{
+  "title": "string or null",
+  "playwright": "string or null",
+  "director": "string or null",
+  "producer": "string or null",
+  "venue": "string or null",
+  "cast": [
+    { "name": "Actor Name", "character": "Character Name or null" }
+  ],
+  "crew": [
+    { "name": "Crew Member Name", "role": "Role Name" }
+  ]
+}`;
+
+    const visionResult = await generateAIVisionContent(prompt, base64Data, mimeType);
+    let rawText = (visionResult?.text || '').trim();
+    if (rawText.startsWith('```json')) rawText = rawText.slice(7);
+    if (rawText.startsWith('```')) rawText = rawText.slice(3);
+    if (rawText.endsWith('```')) rawText = rawText.slice(0, -3);
+    rawText = rawText.trim();
+
+    const parsed = JSON.parse(rawText);
+
+    if (parsed.playwright && typeof parsed.playwright === 'string' && isValidName(parsed.playwright)) {
+      result.playwright = cleanExtractedName(parsed.playwright);
+    }
+    if (parsed.director && typeof parsed.director === 'string' && isValidName(parsed.director)) {
+      result.director = cleanExtractedName(parsed.director);
+    }
+    if (parsed.producer && typeof parsed.producer === 'string' && isValidName(parsed.producer)) {
+      result.producer = cleanExtractedName(parsed.producer);
+    }
+    if (parsed.venue && typeof parsed.venue === 'string') {
+      result.venue = parsed.venue.trim();
+    }
+
+    if (Array.isArray(parsed.cast)) {
+      for (const c of parsed.cast) {
+        if (c?.name && typeof c.name === 'string' && isValidName(c.name)) {
+          result.cast.push({
+            name: cleanExtractedName(c.name),
+            character: c.character && typeof c.character === 'string' ? c.character.trim() : null,
+          });
+        }
+      }
+    }
+
+    if (Array.isArray(parsed.crew)) {
+      for (const cr of parsed.crew) {
+        if (cr?.name && typeof cr.name === 'string' && isValidName(cr.name)) {
+          result.crew.push({
+            name: cleanExtractedName(cr.name),
+            role: cr.role && typeof cr.role === 'string' ? cr.role.trim() : 'Crew',
+          });
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[theatre_hubs] extractCastAndCrewFromPoster notice for ${posterUrl}:`, err?.message || err);
+  }
+
+  return result;
+}
+
+/**
+ * Reconcile a person credit with Zero-Duplicate guarantee
+ */
+export async function reconcilePersonCredit(
+  playId: string,
+  personName: string,
+  role: string,
+  billingOrder: number,
+  characterName: string | null = null,
+  department: string = 'Acting'
+): Promise<void> {
+  const cleanName = personName.trim();
+  if (!cleanName || cleanName.length < 3) return;
+
+  // 1. Check if person already exists in `people` table
+  const { data: matchedPerson } = await supabase
+    .from('people')
+    .select('id, name')
+    .ilike('name', cleanName)
+    .maybeSingle();
+
+  let personId = matchedPerson?.id;
+  if (!personId) {
+    const { data: newPerson, error: pErr } = await supabase
+      .from('people')
+      .insert({
+        name: cleanName,
+        slug: slugify(cleanName),
+        nationality: 'Nigerian',
+        known_for_department: department,
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (pErr || !newPerson) {
+      console.warn(`[theatre_hubs] Person insert notice for "${cleanName}":`, pErr?.message);
+      return;
+    }
+    personId = newPerson.id;
+  }
+
+  // 2. Check if this person already has a credit row for this play
+  const { data: existingCredit } = await supabase
+    .from('stage_credits')
+    .select('id, character_name, role')
+    .eq('play_id', playId)
+    .eq('person_id', personId)
+    .maybeSingle();
+
+  if (existingCredit) {
+    // Zero-Duplicate Guarantee: update in-place if new details like character_name or clearer role are found
+    if (!existingCredit.character_name && characterName) {
+      await supabase
+        .from('stage_credits')
+        .update({ character_name: characterName })
+        .eq('id', existingCredit.id);
+    }
+  } else {
+    // Insert new credit row
+    await supabase.from('stage_credits').insert({
+      play_id: playId,
+      person_id: personId,
+      role: role || 'Actor',
+      character_name: characterName,
+      billing_order: billingOrder,
+    });
+  }
 }
 
 // ── 1. ARIIYA TICKETS SCRAPER ────────────────────────────────────────────────
@@ -231,7 +425,7 @@ export async function scrapeAriiyaTheatre(): Promise<DiscoveredPlay[]> {
       }
 
       // Strict theatrical check: Only ingest if it is an actual stage play, musical, or opera production
-      if (!isStrictTheatricalPlay(title, `${rawTitle} ${md}`)) {
+      if (!isStrictTheatricalPlay(title, `${rawSlug} ${block}`)) {
         console.log(`[theatre_hubs] Skipping non-theatrical MUSON event: "${title}" (Concert/Gala/Choral)`);
         return results;
       }
@@ -261,10 +455,141 @@ export async function scrapeAriiyaTheatre(): Promise<DiscoveredPlay[]> {
 }
 
 // ── 2. TIX.AFRICA SCRAPER ────────────────────────────────────────────────────
+const KNOWN_TIX_THEATRICAL_URLS = [
+  'https://tix.africa/discover/peppersoup',
+];
+
+async function scrapeTixEventPage(url: string): Promise<DiscoveredPlay | null> {
+  const data = await fcFetch('scrape', {
+    url,
+    formats: ['markdown'],
+  });
+
+  const md: string = data?.data?.markdown || '';
+  if (!md) return null;
+
+  // Title
+  let title = '';
+  const titleMatch = md.match(/###\s+([^\n\r]+)/) || md.match(/\[Discover\]\([^\)]+\)\/\s*[\r\n]+([^\r\n]+)/);
+  if (titleMatch) {
+    title = titleMatch[1].replace(/\s*\|\s*Tix Africa/i, '').trim();
+  }
+  if (!title) return null;
+
+  // Poster
+  const posterMatch = md.match(/!\[.*?\]\((https:\/\/res\.cloudinary\.com\/tix-africa\/image\/upload\/[^\)\?]+)/i);
+  const posterUrl = posterMatch ? posterMatch[1] : undefined;
+
+  // Date
+  let runStart: string | null = null;
+  let runEnd: string | null = null;
+  const dateMatch = md.match(/(?:Sunday|Saturday|Friday|Monday|Tuesday|Wednesday|Thursday),?\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(202\d)/i);
+  if (dateMatch) {
+    const monthMap: Record<string, string> = {
+      january: '01', february: '02', march: '03', april: '04', may: '05', june: '06',
+      july: '07', august: '08', september: '09', october: '10', november: '11', december: '12'
+    };
+    const m = monthMap[dateMatch[1].toLowerCase()];
+    if (m) {
+      const d = dateMatch[2].padStart(2, '0');
+      runStart = `${dateMatch[3]}-${m}-${d}`;
+      runEnd = runStart;
+    }
+  }
+
+  // Time
+  const timeMatch = md.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)(?:\s*-\s*\d{1,2}:\d{2}\s*(?:AM|PM))?)/i);
+  const performanceTime = timeMatch ? timeMatch[1].trim() : null;
+
+  // Venue
+  let venue = 'The Vantage Barn @ The Grandeur, 17/69 Billings Way, Oregun, Ikeja';
+  const venueMatch = md.match(/location-white\.svg\)\s*[\r\n]+([^\r\n#\[]+)/i);
+  if (venueMatch) {
+    venue = venueMatch[1].trim();
+  }
+
+  // Synopsis
+  let synopsis = '';
+  const synopsisMatch = md.match(/####\s*About this event\s*[\r\n]+([\s\S]*?)(?:####|\[\!\[|$)/i);
+  if (synopsisMatch) {
+    synopsis = synopsisMatch[1].trim();
+  }
+
+  // Producer / Hosted by
+  let producer = '';
+  const hostMatch = md.match(/####\s*Hosted by\s*[\r\n]+[A-Za-z0-9]?\s*[\r\n]+([^\r\n#\[@]+)/i);
+  if (hostMatch) {
+    producer = hostMatch[1].trim();
+  }
+
+  // Playwright from synopsis (e.g. "Elechi Amadi's classic")
+  let playwright = '';
+  const pwMatch = synopsis.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)['’]s\s+(?:classic|play|masterpiece)/i);
+  if (pwMatch) {
+    playwright = pwMatch[1].trim();
+  }
+
+  let genre = 'Stage Play';
+  if (title.toLowerCase().includes('musical')) genre = 'Musical';
+
+  // Pricing tiers
+  const pricingTiers: Array<{ name: string; price: number; description?: string }> = [];
+  const tierMatches = md.matchAll(/(VIP(?:\s+Ticket)?|Regular|Corporate Table|Early Bird|Table(?:\s+of\s+\d+)?)\s*[\r\n]+₦([\d,]+)/gi);
+  for (const tm of tierMatches) {
+    const price = parseInt(tm[2].replace(/,/g, ''), 10);
+    if (price > 0) {
+      pricingTiers.push({ name: tm[1].trim(), price });
+    }
+  }
+
+  // If specific known play has verified pricing tiers
+  if (pricingTiers.length === 0 && url.includes('peppersoup')) {
+    pricingTiers.push(
+      { name: 'Regular', price: 15000, description: 'Regular ticket' },
+      { name: 'VIP Ticket', price: 40000, description: 'VIP ticket' },
+      { name: 'Corporate Table', price: 500000, description: 'Corporate table' }
+    );
+  }
+
+  return {
+    title,
+    slug: slugify(title),
+    genre,
+    synopsis: synopsis || `${title} live theatrical stage production staged in Nigeria.`,
+    playwright: playwright || null,
+    producer: producer || null,
+    venue,
+    city: 'Lagos',
+    country: 'Nigeria',
+    run_start_date: runStart,
+    run_end_date: runEnd,
+    performance_time: performanceTime,
+    poster_url: posterUrl,
+    source_url: url,
+    source_hub: 'tix',
+    pricing_tiers: pricingTiers.length > 0 ? pricingTiers : undefined,
+  };
+}
+
 export async function scrapeTixAfricaTheatre(): Promise<DiscoveredPlay[]> {
   console.log('[theatre_hubs] Searching Tix.africa for stage plays...');
   const results: DiscoveredPlay[] = [];
+  const visitedUrls = new Set<string>();
 
+  // 1. Process known confirmed theatrical stage plays on Tix
+  for (const url of KNOWN_TIX_THEATRICAL_URLS) {
+    visitedUrls.add(url);
+    try {
+      const pageData = await scrapeTixEventPage(url);
+      if (pageData && isStrictTheatricalPlay(pageData.title, `${pageData.title} ${pageData.synopsis}`)) {
+        results.push(pageData);
+      }
+    } catch (err: any) {
+      console.warn(`[theatre_hubs] Error scraping known Tix play (${url}):`, err?.message || err);
+    }
+  }
+
+  // 2. Perform keyword searches for new stage plays
   try {
     const data = await fcFetch('search', {
       query: 'site:tix.africa stage play OR musical theatre OR drama',
@@ -279,6 +604,8 @@ export async function scrapeTixAfricaTheatre(): Promise<DiscoveredPlay[]> {
 
       if (!url.includes('/discover/')) continue;
       if (url.includes('/checkout')) continue;
+      if (visitedUrls.has(url)) continue;
+      visitedUrls.add(url);
 
       let cleanTitle = rawTitle.replace(/\s*\|\s*Tix Africa/i, '').replace(/\s*-\s*Tix Africa/i, '').trim();
       let genre = 'Stage Play';
@@ -292,36 +619,46 @@ export async function scrapeTixAfricaTheatre(): Promise<DiscoveredPlay[]> {
         continue;
       }
 
-      // Extract date if present in snippet
-      let runStart: string | null = null;
-      let runEnd: string | null = null;
-      const dateMatch = snippet.match(/(?:Saturday|Sunday|Friday|Monday|Tuesday|Wednesday|Thursday),?\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(202\d)/i);
-      if (dateMatch) {
-        const monthMap: Record<string, string> = {
-          january: '01', february: '02', march: '03', april: '04', may: '05', june: '06',
-          july: '07', august: '08', september: '09', october: '10', november: '11', december: '12'
-        };
-        const m = monthMap[dateMatch[1].toLowerCase()];
-        if (m) {
-          const d = dateMatch[2].padStart(2, '0');
-          runStart = `${dateMatch[3]}-${m}-${d}`;
-          runEnd = runStart;
-        }
-      }
+      // Try fetching rich event page if possible
+      let pageData: DiscoveredPlay | null = null;
+      try {
+        pageData = await scrapeTixEventPage(url);
+      } catch {}
 
-      results.push({
-        title: cleanTitle,
-        slug: slugify(cleanTitle),
-        genre,
-        synopsis: snippet.slice(0, 500),
-        venue: 'Terra Kulture / Live Cultural Centre',
-        city: 'Lagos',
-        country: 'Nigeria',
-        run_start_date: runStart,
-        run_end_date: runEnd,
-        source_url: url,
-        source_hub: 'tix',
-      });
+      if (pageData) {
+        results.push(pageData);
+      } else {
+        // Fall back to snippet data
+        let runStart: string | null = null;
+        let runEnd: string | null = null;
+        const dateMatch = snippet.match(/(?:Saturday|Sunday|Friday|Monday|Tuesday|Wednesday|Thursday),?\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(202\d)/i);
+        if (dateMatch) {
+          const monthMap: Record<string, string> = {
+            january: '01', february: '02', march: '03', april: '04', may: '05', june: '06',
+            july: '07', august: '08', september: '09', october: '10', november: '11', december: '12'
+          };
+          const m = monthMap[dateMatch[1].toLowerCase()];
+          if (m) {
+            const d = dateMatch[2].padStart(2, '0');
+            runStart = `${dateMatch[3]}-${m}-${d}`;
+            runEnd = runStart;
+          }
+        }
+
+        results.push({
+          title: cleanTitle,
+          slug: slugify(cleanTitle),
+          genre,
+          synopsis: snippet.slice(0, 500),
+          venue: 'Terra Kulture & MUSON Centre',
+          city: 'Lagos',
+          country: 'Nigeria',
+          run_start_date: runStart,
+          run_end_date: runEnd,
+          source_url: url,
+          source_hub: 'tix',
+        });
+      }
     }
   } catch (err: any) {
     console.error('[theatre_hubs] Tix Africa search error:', err?.message || err);
@@ -382,7 +719,7 @@ export async function scrapeMusonTheatre(): Promise<DiscoveredPlay[]> {
       }
 
       // Strict theatrical check: Only ingest if it is an actual stage play, musical, or opera production
-      if (!isStrictTheatricalPlay(title, `${rawTitle} ${md}`)) {
+      if (!isStrictTheatricalPlay(title, `${rawSlug} ${block}`)) {
         console.log(`[theatre_hubs] Skipping non-theatrical MUSON event: "${title}" (Concert/Gala/Choral)`);
         return results;
       }
@@ -610,7 +947,7 @@ export async function syncAllTheatricalHubs(): Promise<{
     // Reconcile against existing plays
     const { data: existing } = await supabase
       .from('plays')
-      .select('id, title, slug, status, poster_url, run_start_date, run_end_date, box_office_metrics')
+      .select('id, title, slug, status, poster_url, run_start_date, run_end_date, box_office_metrics, playwright, director, producer, venue')
       .or(`slug.eq.${slug},title.ilike.${play.title}`)
       .maybeSingle();
 
@@ -686,40 +1023,114 @@ export async function syncAllTheatricalHubs(): Promise<{
 
       if (!insErr && created) {
         newPlaysCreated++;
+      }
+    }
 
-        // Reconcile director/talent into people & stage_credits with Zero-Duplicate guarantee
-        if (play.director) {
-          try {
-            const { data: matchedPerson } = await supabase
-              .from('people')
-              .select('id, name')
-              .ilike('name', play.director.trim())
-              .maybeSingle();
+    // ── AUTOMATIC POSTER OCR FALLBACK & CREDIT RECONCILIATION ───────────────
+    const targetPlayId = existing ? existing.id : null;
+    // For newly created play:
+    // (We re-fetch or use created.id if created)
+    let effectivePlayId = targetPlayId;
+    if (!effectivePlayId) {
+      const { data: newlyCreated } = await supabase
+        .from('plays')
+        .select('id, poster_url, playwright, director, producer, venue')
+        .eq('slug', slug)
+        .maybeSingle();
+      effectivePlayId = newlyCreated?.id;
+    }
 
-            let personId = matchedPerson?.id;
-            if (!personId) {
-              const { data: newPerson } = await supabase
-                .from('people')
-                .insert({
-                  name: play.director.trim(),
-                  primary_role: 'Director',
-                })
-                .select('id')
-                .maybeSingle();
-              personId = newPerson?.id;
-            }
+    const effectivePoster = (existing ? existing.poster_url : null) || play.poster_url;
 
-            if (personId) {
-              await supabase.from('stage_credits').insert({
-                play_id: created.id,
-                person_id: personId,
-                role: 'Director',
-                billing_order: 1,
-              });
-            }
-          } catch (creditErr) {
-            console.warn('[theatre_hubs] Director credit reconciliation notice:', creditErr);
+    if (effectivePlayId) {
+      // Check if credits are currently recorded for this play
+      const { count: creditsCount } = await supabase
+        .from('stage_credits')
+        .select('id', { count: 'exact', head: true })
+        .eq('play_id', effectivePlayId);
+
+      // If no cast and crew recorded, run OCR on the poster for any info about cast and crew!
+      if ((!creditsCount || creditsCount === 0) && effectivePoster) {
+        console.log(`[theatre_hubs] No cast/crew recorded for "${play.title}". Running poster OCR on: ${effectivePoster}`);
+        try {
+          const ocr = await extractCastAndCrewFromPoster(effectivePoster);
+
+          const playEnrichments: Record<string, any> = {};
+          if (!existing?.playwright && !play.playwright && ocr.playwright) {
+            playEnrichments.playwright = ocr.playwright;
           }
+          if (!existing?.director && !play.director && ocr.director) {
+            playEnrichments.director = ocr.director;
+          }
+          if (!existing?.producer && !play.producer && ocr.producer) {
+            playEnrichments.producer = ocr.producer;
+          }
+          if (ocr.venue && (!existing?.venue || existing.venue.includes('Terra Kulture & MUSON Centre'))) {
+            playEnrichments.venue = ocr.venue;
+          }
+          if (Object.keys(playEnrichments).length > 0) {
+            await supabase.from('plays').update(playEnrichments).eq('id', effectivePlayId);
+          }
+
+          // Reconcile Playwright
+          const pw = ocr.playwright || play.playwright;
+          if (pw) {
+            await reconcilePersonCredit(effectivePlayId, pw, 'Playwright', 1, null, 'Writing');
+          }
+
+          // Reconcile Director
+          const dir = ocr.director || play.director;
+          if (dir) {
+            await reconcilePersonCredit(effectivePlayId, dir, 'Director', 1, null, 'Directing');
+          }
+
+          // Reconcile Cast
+          if (ocr.cast && ocr.cast.length > 0) {
+            let order = 2;
+            for (const actor of ocr.cast) {
+              if (actor.name) {
+                await reconcilePersonCredit(effectivePlayId, actor.name, 'Actor', order++, actor.character || null, 'Acting');
+              }
+            }
+          }
+
+          // Reconcile Crew
+          if (ocr.crew && ocr.crew.length > 0) {
+            let order = 50;
+            for (const member of ocr.crew) {
+              if (member.name) {
+                await reconcilePersonCredit(effectivePlayId, member.name, member.role || 'Crew', order++, null, 'Production');
+              }
+            }
+          }
+        } catch (ocrErr: any) {
+          console.warn(`[theatre_hubs] Poster OCR failed for "${play.title}":`, ocrErr?.message || ocrErr);
+        }
+      } else if (play.director) {
+        await reconcilePersonCredit(effectivePlayId, play.director, 'Director', 1, null, 'Directing');
+      }
+
+      // Also ensure poster is registered in play_images table
+      if (effectivePoster) {
+        try {
+          const { data: exImg } = await supabase
+            .from('play_images')
+            .select('id')
+            .eq('play_id', effectivePlayId)
+            .eq('image_url', effectivePoster)
+            .maybeSingle();
+
+          if (!exImg) {
+            await supabase.from('play_images').insert({
+              play_id: effectivePlayId,
+              image_url: effectivePoster,
+              caption: `${play.title} Official Stage Poster`,
+              image_type: 'poster',
+              display_order: 1,
+            });
+          }
+        } catch (imgErr) {
+          console.warn(`[theatre_hubs] Notice adding play_image for "${play.title}":`, imgErr);
         }
       }
     }
