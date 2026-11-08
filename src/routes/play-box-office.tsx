@@ -28,7 +28,7 @@ export function meta({ data: d }: { data: any }) {
   const playTitle = d?.play?.title || 'Stage Play';
   return [
     { title: `${playTitle} – Theatrical Box Office & Admissions | MuviDB` },
-    { name: 'description', content: `Live theatrical box office, admissions, ticket categories, and pricing tiers for ${playTitle}.` },
+    { name: 'description', content: `Live theatrical box office, admissions, venue, and performance breakdown for ${playTitle}.` },
     { property: 'og:title', content: `${playTitle} Box Office | MuviDB` },
   ];
 }

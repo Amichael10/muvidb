@@ -624,7 +624,7 @@ export default function BoxOffice() {
           </span>
           <span className="italic">
             {activeSection === 'plays'
-              ? 'Click any box office gross to view tickets, admission tiers, and venue details'
+              ? 'Click any box office gross to view admissions, venue, and performance breakdown'
               : activeSection === 'cinema'
               ? 'Click any gross figure to open the detailed circuit run'
               : 'Click any movie title to view credits, reviews, and streaming links'}
@@ -1004,7 +1004,7 @@ export default function BoxOffice() {
                             <Link
                               to={`/plays/${play.slug || play.id}/box-office`}
                               className="inline-flex flex-col items-end cursor-pointer group/btn"
-                              title="Click to view admissions, ticket categories, and performance breakdown"
+                              title="Click to view admissions, venue, and performance breakdown"
                             >
                               <span className="font-heading font-black text-sm text-purple-400 group-hover/btn:underline decoration-purple-400/50 underline-offset-2 flex items-center gap-1">
                                 <span>{formatNaira(gross)}</span>

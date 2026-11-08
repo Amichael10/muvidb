@@ -620,10 +620,15 @@ function PlayBoxOfficeModal({ play, playDateLabel, onClose, isAdmin = false }) {
           </div>
         </div>
 
-        {/* Ticket Categories & Pricing Tiers */}
-        {tiers.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">Ticket Categories & Pricing</h4>
+        {/* Ticket Categories & Pricing Tiers — internal defense audit, Admin Only */}
+        {isAdmin && tiers.length > 0 && (
+          <div className="space-y-2 p-3.5 rounded-xl bg-[#14120b] border border-amber-900/40">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-[11px] font-bold text-amber-500 uppercase tracking-wider">
+                Internal Audit: Ticket Categories & Pricing (Admin Only)
+              </h4>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono">Defensibility Record</span>
+            </div>
             <div className="divide-y divide-border/40 rounded-xl border border-border overflow-hidden bg-surface-2/40">
               {tiers.map((tier, idx) => (
                 <div key={idx} className="p-3 flex items-center justify-between text-xs">

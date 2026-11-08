@@ -161,7 +161,7 @@ export default function PlayBoxOffice() {
     <div className="w-full bg-bg min-h-screen pb-24 text-text-primary">
       <SEO 
         title={`${play.title} Theatrical Box Office & Admissions | MuviDB`}
-        description={`Live theatrical box office gross, ticket categories, and admissions breakdown for ${play.title}.`}
+        description={`Live theatrical box office gross, admissions, venue, and performance breakdown for ${play.title}.`}
       />
 
       {/* Breadcrumb / Back Bar */}
@@ -342,39 +342,39 @@ export default function PlayBoxOffice() {
           </div>
         )}
 
-        {/* TICKET CATEGORIES & TIERS BREAKDOWN TABLE */}
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-0.5 bg-brand rounded-full inline-block" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand">
-                  Admission Categories
-                </span>
+        {/* TICKET CATEGORIES & TIERS BREAKDOWN TABLE (INTERNAL AUDIT - ADMIN ONLY) */}
+        {isAdmin && tiers.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-0.5 bg-amber-500 rounded-full inline-block" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">
+                    Internal Defense &amp; Verification Audit (Private · Admin Only)
+                  </span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold font-heading text-text-primary tracking-tight mt-1">
+                  Ticket Categories &amp; Pricing Tiers
+                </h2>
               </div>
-              <h2 className="text-xl sm:text-2xl font-bold font-heading text-text-primary tracking-tight mt-1">
-                Ticket Categories &amp; Pricing Tiers
-              </h2>
+              <p className="text-xs text-text-muted">
+                Private record preserved internally to defend headline admissions and box office figures.
+              </p>
             </div>
-            <p className="text-xs text-text-muted">
-              Live ticketing tiers, prices per seat category, and recorded attendee numbers.
-            </p>
-          </div>
 
-          <div className="rounded-2xl border border-border overflow-hidden bg-surface shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-surface-2/60 text-text-muted font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-3.5 pl-4 sm:pl-6 pr-3">Category / Tier</th>
-                    <th className="py-3.5 px-3 text-right">Price per Ticket</th>
-                    <th className="py-3.5 px-3 text-right">Tickets Sold</th>
-                    <th className="py-3.5 pr-4 sm:pr-6 pl-3 text-right">Category Revenue</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {tiers.length > 0 ? (
-                    tiers.map((tier, idx) => {
+            <div className="rounded-2xl border border-amber-500/20 overflow-hidden bg-surface shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-2/60 text-text-muted font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-3.5 pl-4 sm:pl-6 pr-3">Category / Tier</th>
+                      <th className="py-3.5 px-3 text-right">Price per Ticket</th>
+                      <th className="py-3.5 px-3 text-right">Tickets Sold</th>
+                      <th className="py-3.5 pr-4 sm:pr-6 pl-3 text-right">Category Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {tiers.map((tier, idx) => {
                       const tierPrice = Number(tier.price || 0);
                       const tierSold = tier.sold != null ? Number(tier.sold) : null;
                       const tierRevenue = tier.gross != null ? Number(tier.gross) : (tierSold != null ? tierPrice * tierSold : null);
@@ -396,37 +396,29 @@ export default function PlayBoxOffice() {
                           </td>
                         </tr>
                       );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-text-muted">
-                        <Icon icon="solar:ticket-linear" className="text-2xl mx-auto mb-2 opacity-50" />
-                        <p className="text-sm font-semibold text-text-primary">Standard Admission</p>
-                        <p className="text-xs text-text-muted mt-0.5">Total box office revenue is registered as single general admission.</p>
+                    })}
+
+                    {/* TOTAL SUMMARY ROW */}
+                    <tr className="bg-surface-2/80 font-black text-text-primary border-t border-border">
+                      <td className="py-4 pl-4 sm:pl-6 pr-3 uppercase tracking-wider text-xs">
+                        Total Production Box Office
+                      </td>
+                      <td className="py-4 px-3 text-right text-text-muted">
+                        Full Run
+                      </td>
+                      <td className="py-4 px-3 text-right font-mono text-purple-400">
+                        {totalSold > 0 ? `${totalSold.toLocaleString()} tickets` : '—'}
+                      </td>
+                      <td className="py-4 pr-4 sm:pr-6 pl-3 text-right font-mono text-base text-brand">
+                        ₦{domesticGross.toLocaleString('en-NG')}
                       </td>
                     </tr>
-                  )}
-
-                  {/* TOTAL SUMMARY ROW */}
-                  <tr className="bg-surface-2/80 font-black text-text-primary border-t border-border">
-                    <td className="py-4 pl-4 sm:pl-6 pr-3 uppercase tracking-wider text-xs">
-                      Total Production Box Office
-                    </td>
-                    <td className="py-4 px-3 text-right text-text-muted">
-                      Full Run
-                    </td>
-                    <td className="py-4 px-3 text-right font-mono text-purple-400">
-                      {totalSold > 0 ? `${totalSold.toLocaleString()} tickets` : '—'}
-                    </td>
-                    <td className="py-4 pr-4 sm:pr-6 pl-3 text-right font-mono text-base text-brand">
-                      ₦{domesticGross.toLocaleString('en-NG')}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* SHOWTIMES & SESSION BREAKDOWN */}
         {sessions.length > 0 && (
