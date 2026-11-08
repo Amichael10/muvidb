@@ -11,6 +11,7 @@ import mirrorImagesHandler from '../_lib/mirror_images_handler.js';
 import { classifyFilmKinds } from '../_lib/film_kind_classifier.js';
 import { runPeopleCutoutJob } from '../_lib/people_cutouts.js';
 import { sweepAndUpdatePlayStatuses, syncUtopiaTheatreProductions, syncPartyVerseTicketingBoxOffice } from '../_lib/theatre_service.js';
+import { syncAllTheatricalHubs } from '../_lib/theatre_hubs_scraper.js';
 import { runYouTubeUploadWatch } from '../_lib/youtube_upload_notify.js';
 import { runCriticsSync } from '../_lib/critics_sync.js';
 import { runWhatsAppAlertQueue, backfillMovieWhatsAppAlertQueue } from '../_lib/whatsapp_alert_queue.js';
@@ -58,6 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { name: 'videos', fn: runVideosSync },
         { name: 'tmdb', fn: runTMDBSync },
         { name: 'theatre_status_sweep', fn: sweepAndUpdatePlayStatuses },
+        { name: 'theatre_hubs_sync', fn: syncAllTheatricalHubs },
         { name: 'utopia_theatre', fn: syncUtopiaTheatreProductions },
         ...(isSunday ? [{ name: 'critics', fn: runCriticsSync }] : []),
         { name: 'ai_maintenance', fn: runAIMaintenance },
@@ -171,6 +173,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         result = { task: 'purge_stale_buffer', status: 'disabled', deleted: 0, message: 'Purge script disabled per user policy: unmapped videos are preserved and never deleted.' };
         break;
       case 'theatre_status_sweep': result = await sweepAndUpdatePlayStatuses(); break;
+      case 'theatre_hubs_sync':
+      case 'theatre_hubs': {
+        const hubsRes = await syncAllTheatricalHubs();
+        const sweepRes = await sweepAndUpdatePlayStatuses();
+        result = {
+          task: 'theatre_hubs_sync',
+          status: 'success',
+          message: 'Synchronized live theatrical hubs (Tix.africa, Ariiya, MUSON, Anthill, Nairabox)',
+          ...hubsRes,
+          sweep: sweepRes,
+        };
+        break;
+      }
       case 'bap_theatre': {
         const sweepRes = await sweepAndUpdatePlayStatuses();
         result = {

@@ -342,83 +342,9 @@ export default function PlayBoxOffice() {
           </div>
         )}
 
-        {/* TICKET CATEGORIES & TIERS BREAKDOWN TABLE (INTERNAL AUDIT - ADMIN ONLY) */}
-        {isAdmin && tiers.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-0.5 bg-amber-500 rounded-full inline-block" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">
-                    Internal Defense &amp; Verification Audit (Private · Admin Only)
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold font-heading text-text-primary tracking-tight mt-1">
-                  Ticket Categories &amp; Pricing Tiers
-                </h2>
-              </div>
-              <p className="text-xs text-text-muted">
-                Private record preserved internally to defend headline admissions and box office figures.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-amber-500/20 overflow-hidden bg-surface shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-border bg-surface-2/60 text-text-muted font-bold uppercase tracking-wider text-[10px]">
-                      <th className="py-3.5 pl-4 sm:pl-6 pr-3">Category / Tier</th>
-                      <th className="py-3.5 px-3 text-right">Price per Ticket</th>
-                      <th className="py-3.5 px-3 text-right">Tickets Sold</th>
-                      <th className="py-3.5 pr-4 sm:pr-6 pl-3 text-right">Category Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {tiers.map((tier, idx) => {
-                      const tierPrice = Number(tier.price || 0);
-                      const tierSold = tier.sold != null ? Number(tier.sold) : null;
-                      const tierRevenue = tier.gross != null ? Number(tier.gross) : (tierSold != null ? tierPrice * tierSold : null);
-
-                      return (
-                        <tr key={idx} className="hover:bg-surface-2/40 transition-colors">
-                          <td className="py-3.5 pl-4 sm:pl-6 pr-3 font-bold text-text-primary flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-brand" />
-                            <span className="capitalize">{tier.name || `Tier ${idx + 1}`}</span>
-                          </td>
-                          <td className="py-3.5 px-3 text-right font-mono font-bold text-brand">
-                            {tierPrice > 0 ? `₦${tierPrice.toLocaleString('en-NG')}` : 'Free / Complimentary'}
-                          </td>
-                          <td className="py-3.5 px-3 text-right text-text-secondary font-mono">
-                            {tierSold != null ? `${tierSold.toLocaleString()} tickets` : '—'}
-                          </td>
-                          <td className="py-3.5 pr-4 sm:pr-6 pl-3 text-right font-mono font-bold text-text-primary">
-                            {tierRevenue != null && tierRevenue > 0 ? `₦${tierRevenue.toLocaleString('en-NG')}` : '—'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {/* TOTAL SUMMARY ROW */}
-                    <tr className="bg-surface-2/80 font-black text-text-primary border-t border-border">
-                      <td className="py-4 pl-4 sm:pl-6 pr-3 uppercase tracking-wider text-xs">
-                        Total Production Box Office
-                      </td>
-                      <td className="py-4 px-3 text-right text-text-muted">
-                        Full Run
-                      </td>
-                      <td className="py-4 px-3 text-right font-mono text-purple-400">
-                        {totalSold > 0 ? `${totalSold.toLocaleString()} tickets` : '—'}
-                      </td>
-                      <td className="py-4 pr-4 sm:pr-6 pl-3 text-right font-mono text-base text-brand">
-                        ₦{domesticGross.toLocaleString('en-NG')}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* TICKET CATEGORIES & TIERS BREAKDOWN TABLE HIDDEN PER POLICY
+            Raw tier data is preserved inside play.box_office_metrics for internal defense,
+            never rendered publicly or in standard admin view without session/date categorization. */}
 
         {/* SHOWTIMES & SESSION BREAKDOWN */}
         {sessions.length > 0 && (

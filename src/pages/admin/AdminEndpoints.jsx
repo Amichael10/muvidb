@@ -89,6 +89,22 @@ const ENDPOINTS_CATALOG = [
       'Syncs African classical and diaspora stage repertoire from Utopia Theatre (Arts Council England NPO), Sheffield Theatres (Crucible/Studio), and Belgrade Theatre Coventry, including Crown of Blood, The Gods Are Not to Blame, and multi-currency box office estimates.',
     affected: 'plays, stage_credits, companies',
   },
+  {
+    id: 'theatre_hubs_sync',
+    name: 'Theatrical Hubs Periodic Scraper (Tix, Ariiya, Nairabox, MUSON, Anthill)',
+    category: 'theatre',
+    categoryLabel: 'Stage & Theatre',
+    categoryIcon: 'solar:masks-bold',
+    categoryColor: 'purple',
+    route: '/api/cron/sync?task=theatre_hubs_sync',
+    method: 'POST',
+    schedule: 'Daily at 05:00 UTC / On-demand',
+    logSource: 'theatre_hubs_sync',
+    triggerable: true,
+    description:
+      'Discovers and ingests upcoming, running, and past stage plays and musicals across Tix.africa, Ariiya Tickets, Nairabox, MUSON Centre, and Anthill Studios Immersive Theatre with zero-duplicate actor reconciliation.',
+    affected: 'plays, stage_credits, play_images',
+  },
 
   // ── 3. STREAMING PLATFORMS & YOUTUBE ──────────────────────────────────────
   {
@@ -665,13 +681,25 @@ export default function AdminEndpoints() {
       // Refresh logs to capture the recorded entry
       fetchLogs();
     } catch (err) {
-      toast.error(`Error running ${endpoint.name}: ${err.message}`, { id: endpoint.id });
+      const isFailedFetch = err.message === 'Failed to fetch';
+      const errorMessage = isFailedFetch
+        ? 'Network or edge proxy timeout. For intensive sync tasks, the operation continues running in the background on the server. Please check the Sync Logs below or refresh in a moment.'
+        : err.message;
+
+      toast.error(`Error running ${endpoint.name}: ${isFailedFetch ? 'Proxy timeout (check logs below)' : err.message}`, { id: endpoint.id });
       setActiveLogModal({
         endpoint,
         status: 'error',
         duration_ms: Date.now() - startTime,
-        error: err.message,
+        error: errorMessage,
         timestamp: new Date().toISOString(),
+        data: isFailedFetch
+          ? {
+              status: 'edge_proxy_timeout_or_network_disconnect',
+              note: 'The browser or edge proxy closed the connection while the background worker continued processing on the server. Look for recorded outcomes in the Sync Logs section.',
+              route: endpoint.route,
+            }
+          : {},
       });
       fetchLogs();
     } finally {

@@ -631,33 +631,7 @@ function PlayBoxOfficeModal({ play, playDateLabel, onClose, isAdmin = false }) {
           </div>
         </div>
 
-        {/* Ticket Categories & Pricing Tiers — internal defense audit, Admin Only */}
-        {isAdmin && tiers.length > 0 && (
-          <div className="space-y-2 p-3.5 rounded-xl bg-[#14120b] border border-amber-900/40">
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="text-[11px] font-bold text-amber-500 uppercase tracking-wider">
-                Internal Audit: Ticket Categories & Pricing (Admin Only)
-              </h4>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono">Defensibility Record</span>
-            </div>
-            <div className="divide-y divide-border/40 rounded-xl border border-border overflow-hidden bg-surface-2/40">
-              {tiers.map((tier, idx) => (
-                <div key={idx} className="p-3 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-bold text-text-primary block">{tier.name}</span>
-                    <span className="text-[11px] text-text-muted">₦{tier.price.toLocaleString()} per ticket</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-bold text-amber-400 block">{tier.sold.toLocaleString()} sold</span>
-                    <span className="text-[10px] text-text-muted">
-                      ₦{(tier.gross > 0 ? tier.gross : (tier.price * tier.sold)).toLocaleString()} total
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         {/* Venue & Location */}
         <div className="p-4 rounded-xl bg-surface-2/50 border border-border/60 space-y-2 text-xs">

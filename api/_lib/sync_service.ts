@@ -223,11 +223,11 @@ export async function runShowtimesSync(options: { limit?: number; concurrency?: 
       if (!adapter) {
         return { name: cinema.name, error: `No adapter configured for '${cinema.scrape_adapter || 'missing'}'` };
       }
-      // 15-second timeout per cinema so one hanging site doesn't stall the run
+      // 8-second timeout per cinema so unresponsive cinema sites fail fast without stalling the run
       const scraped = await Promise.race([
         adapter(cinema),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Cinema scrape timed out (15s)')), 15000)
+          setTimeout(() => reject(new Error('Cinema scrape timed out (8s)')), 8000)
         ),
       ]);
       if (scraped.error) throw new Error(scraped.error);
