@@ -81,6 +81,56 @@ function slugify(text: string): string {
     .slice(0, 100);
 }
 
+// ── STRICT THEATRICAL PLAY VALIDATION FILTER ─────────────────────────────────
+// Ensures music festivals, corporate choir galas, standup comedy specials,
+// and concert tours are NOT ingested into the plays database.
+const NON_THEATRE_EXCLUSIONS = [
+  /\bconcert\b/i,
+  /\bgala\b/i,
+  /\bmusic festival\b/i,
+  /\bfestival\b/i,
+  /\bcomedy\b/i,
+  /\bstand.?up\b/i,
+  /\bparty\b/i,
+  /\brave\b/i,
+  /\bdj\b/i,
+  /\bclub night\b/i,
+  /\bfashion\b/i,
+  /\blive in concert\b/i,
+  /\bmusicomedy\b/i,
+  /\bthe rebirth\b/i,
+  /\blakhid live\b/i,
+];
+
+export function isStrictTheatricalPlay(title: string, rawText = ''): boolean {
+  const combined = `${title} ${rawText}`.toLowerCase();
+
+  // Negative check first: if title matches non-theatre exclusions
+  for (const pattern of NON_THEATRE_EXCLUSIONS) {
+    if (pattern.test(title)) {
+      return false;
+    }
+  }
+
+  // Must have an explicit theatrical indicator
+  const hasTheatricalDesignation =
+    /\bstage play\b/i.test(combined) ||
+    /\btheatre\b/i.test(combined) ||
+    /\btheater\b/i.test(combined) ||
+    /\bmusical stage play\b/i.test(combined) ||
+    /\ba musical by\b/i.test(combined) ||
+    /\bplay by\b/i.test(combined) ||
+    /\bdirected by prof\.?\b/i.test(combined) ||
+    /\bdirected by dr\.?\b/i.test(combined) ||
+    /\bimmersive live theatre\b/i.test(combined) ||
+    /\btheatrical drama\b/i.test(combined) ||
+    /\bstage drama\b/i.test(combined) ||
+    /\blive fantasy stage play\b/i.test(combined) ||
+    /\bopera\b/i.test(combined);
+
+  return hasTheatricalDesignation;
+}
+
 // ── 1. ARIIYA TICKETS SCRAPER ────────────────────────────────────────────────
 export async function scrapeAriiyaTheatre(): Promise<DiscoveredPlay[]> {
   console.log('[theatre_hubs] Scraping Ariiya Tickets theatre events...');
@@ -137,6 +187,11 @@ export async function scrapeAriiyaTheatre(): Promise<DiscoveredPlay[]> {
         }
       }
 
+      // Enforce strict theatrical play validation (filters out concerts, music festivals, comedy specials)
+      if (!isStrictTheatricalPlay(title, `${rawSlug} ${block}`)) {
+        continue;
+      }
+
       // Extract pricing tiers
       const priceMatch = block.match(/₦[\d,.]+(?:\s*–\s*₦[\d,.]+)?/);
       const pricingTiers: Array<{ name: string; price: number }> = [];
@@ -173,6 +228,12 @@ export async function scrapeAriiyaTheatre(): Promise<DiscoveredPlay[]> {
       } else if (rawSlug.includes('deins-of-agbor')) {
         runStart = '2026-12-27';
         runEnd = '2026-12-27';
+      }
+
+      // Strict theatrical check: Only ingest if it is an actual stage play, musical, or opera production
+      if (!isStrictTheatricalPlay(title, `${rawTitle} ${md}`)) {
+        console.log(`[theatre_hubs] Skipping non-theatrical MUSON event: "${title}" (Concert/Gala/Choral)`);
+        return results;
       }
 
       results.push({
@@ -225,6 +286,11 @@ export async function scrapeTixAfricaTheatre(): Promise<DiscoveredPlay[]> {
 
       // Remove bracketed suffixes like "(A Musical Stage Play)" from core title
       cleanTitle = cleanTitle.replace(/\((?:A\s+)?(?:Musical\s+)?Stage Play\)/i, '').trim();
+
+      // Enforce strict theatrical play validation (filters out concerts, club events, and recommended page leaks)
+      if (!isStrictTheatricalPlay(cleanTitle, `${rawTitle} ${snippet}`)) {
+        continue;
+      }
 
       // Extract date if present in snippet
       let runStart: string | null = null;
@@ -313,6 +379,12 @@ export async function scrapeMusonTheatre(): Promise<DiscoveredPlay[]> {
         if (price > 0) {
           pricingTiers.push({ name: tm[1].trim(), price });
         }
+      }
+
+      // Strict theatrical check: Only ingest if it is an actual stage play, musical, or opera production
+      if (!isStrictTheatricalPlay(title, `${rawTitle} ${md}`)) {
+        console.log(`[theatre_hubs] Skipping non-theatrical MUSON event: "${title}" (Concert/Gala/Choral)`);
+        return results;
       }
 
       results.push({
@@ -456,7 +528,7 @@ export async function scrapeNairaboxTheatre(): Promise<DiscoveredPlay[]> {
 
   try {
     const data = await fcFetch('search', {
-      query: 'site:nairabox.com/events (theatre OR musical OR stage play OR festival)',
+      query: 'site:nairabox.com/events ("stage play" OR "musical play" OR "theatre production")',
       limit: 6,
     });
 
@@ -469,12 +541,18 @@ export async function scrapeNairaboxTheatre(): Promise<DiscoveredPlay[]> {
       if (!url.includes('/events/')) continue;
 
       const cleanTitle = rawTitle.replace(/\s*-\s*Nairabox/i, '').trim();
+
+      // Strict theatrical check: Reject music festivals, concerts, parties
+      if (!isStrictTheatricalPlay(cleanTitle, `${rawTitle} ${snippet}`)) {
+        continue;
+      }
+
       results.push({
         title: cleanTitle,
         slug: slugify(cleanTitle),
-        genre: 'Live Cultural Event & Theatre',
+        genre: 'Stage Play',
         synopsis: snippet.slice(0, 500),
-        venue: 'Eko Hotels & MUSON Centre',
+        venue: 'Terra Kulture & MUSON Centre',
         city: 'Lagos',
         country: 'Nigeria',
         source_url: url,
