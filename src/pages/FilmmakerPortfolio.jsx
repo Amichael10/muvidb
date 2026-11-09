@@ -2,7 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { toast } from 'react-hot-toast';
-import { fetchPortfolioByHandle, formatVideoEmbed, computePortfolioMetrics, formatCurrencyShort, formatViewsShort } from '../lib/portfolioClient';
+import {
+  fetchPortfolioByHandle,
+  formatVideoEmbed,
+  computePortfolioMetrics,
+  formatCurrencyShort,
+  formatViewsShort,
+} from '../lib/portfolioClient';
 import ImageWithFallback from '../components/ui/ImageWithFallback';
 import { formatFilmTitle, toTitleCase } from '../utils/format';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
@@ -18,9 +24,7 @@ import {
 } from '../lib/socialPlatforms';
 
 /**
- * MuviDB brand orange. Not Tailwind's `amber` — that is a different, yellower
- * hue that had been hardcoded across this page, which is why portfolios all
- * looked yellow regardless of the theme their creator picked.
+ * MuviDB brand orange.
  */
 const BRAND_ACCENT = '#FF5A1F';
 
@@ -29,8 +33,7 @@ const LEGACY_DEFAULT_ACCENT = '#f59e0b';
 
 /**
  * `accent` is injected as the --color-brand CSS variable on the page root, so
- * every `brand` utility below it (bg-brand, text-brand, border-brand/30 ...)
- * resolves to the creator's chosen colour automatically.
+ * every `brand` utility below it resolves to the creator's chosen colour automatically.
  */
 const THEME_STYLES = {
   heritage: {
@@ -42,7 +45,7 @@ const THEME_STYLES = {
     topSkin: '/skins/heritage-hero.png',
     bottomSkin: '/skins/heritage-footer.png',
     heroGlow: 'from-amber-500/25 via-orange-600/10 to-transparent',
-    cardBg: 'bg-[#120a06]/85 backdrop-blur-xl border border-amber-500/25 shadow-2xl shadow-black/80',
+    cardBg: 'bg-[#120a06]/90 backdrop-blur-xl border border-amber-500/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-amber-500/40',
     accentText: 'text-amber-400',
     accentBorder: 'border-amber-500/30',
@@ -61,7 +64,7 @@ const THEME_STYLES = {
     topSkin: '/skins/noir-hero.png',
     bottomSkin: '/skins/noir-footer.png',
     heroGlow: 'from-[#FF5A1F]/25 via-transparent to-transparent',
-    cardBg: 'bg-[#101319]/85 backdrop-blur-xl border border-brand/25 shadow-2xl shadow-black/80',
+    cardBg: 'bg-[#101319]/90 backdrop-blur-xl border border-brand/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-brand/40',
     accentText: 'text-brand',
     accentBorder: 'border-brand/30',
@@ -80,7 +83,7 @@ const THEME_STYLES = {
     topSkin: '/skins/cyan-hero.png',
     bottomSkin: '/skins/cyan-footer.png',
     heroGlow: 'from-cyan-500/25 via-transparent to-transparent',
-    cardBg: 'bg-[#08121f]/85 backdrop-blur-xl border border-cyan-400/25 shadow-2xl shadow-black/80',
+    cardBg: 'bg-[#08121f]/90 backdrop-blur-xl border border-cyan-400/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-cyan-400/40',
     accentText: 'text-cyan-400',
     accentBorder: 'border-cyan-400/30',
@@ -99,7 +102,7 @@ const THEME_STYLES = {
     topSkin: '/skins/velvet-hero.png',
     bottomSkin: '/skins/velvet-footer.png',
     heroGlow: 'from-rose-500/25 via-transparent to-transparent',
-    cardBg: 'bg-[#18080f]/85 backdrop-blur-xl border border-rose-500/25 shadow-2xl shadow-black/80',
+    cardBg: 'bg-[#18080f]/90 backdrop-blur-xl border border-rose-500/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-rose-500/40',
     accentText: 'text-rose-400',
     accentBorder: 'border-rose-500/30',
@@ -118,7 +121,7 @@ const THEME_STYLES = {
     topSkin: '/skins/amethyst-hero.png',
     bottomSkin: '/skins/amethyst-footer.png',
     heroGlow: 'from-purple-500/25 via-transparent to-transparent',
-    cardBg: 'bg-[#150821]/85 backdrop-blur-xl border border-purple-500/25 shadow-2xl shadow-black/80',
+    cardBg: 'bg-[#150821]/90 backdrop-blur-xl border border-purple-500/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-purple-500/40',
     accentText: 'text-purple-400',
     accentBorder: 'border-purple-500/30',
@@ -137,7 +140,7 @@ const THEME_STYLES = {
     topSkin: '/skins/emerald-hero.png',
     bottomSkin: '/skins/emerald-footer.png',
     heroGlow: 'from-emerald-500/25 via-transparent to-transparent',
-    cardBg: 'bg-[#081810]/85 backdrop-blur-xl border border-emerald-500/25 shadow-2xl shadow-black/80',
+    cardBg: 'bg-[#081810]/90 backdrop-blur-xl border border-emerald-500/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-emerald-500/40',
     accentText: 'text-emerald-400',
     accentBorder: 'border-emerald-500/30',
@@ -156,7 +159,7 @@ const THEME_STYLES = {
     topSkin: '/skins/sapphire-hero.png',
     bottomSkin: '/skins/sapphire-footer.png',
     heroGlow: 'from-blue-500/25 via-transparent to-transparent',
-    cardBg: 'bg-[#070f24]/85 backdrop-blur-xl border border-blue-500/25 shadow-2xl shadow-black/80',
+    cardBg: 'bg-[#070f24]/90 backdrop-blur-xl border border-blue-500/25 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-blue-500/40',
     accentText: 'text-blue-400',
     accentBorder: 'border-blue-500/30',
@@ -175,7 +178,7 @@ const THEME_STYLES = {
     topSkin: '/skins/obsidian-hero.png',
     bottomSkin: '/skins/obsidian-footer.png',
     heroGlow: 'from-slate-400/20 via-transparent to-transparent',
-    cardBg: 'bg-[#111318]/85 backdrop-blur-xl border border-white/15 shadow-2xl shadow-black/80',
+    cardBg: 'bg-[#111318]/90 backdrop-blur-xl border border-white/15 shadow-2xl shadow-black/80',
     cardHover: 'hover:border-white/35',
     accentText: 'text-slate-300',
     accentBorder: 'border-white/20',
@@ -187,33 +190,43 @@ const THEME_STYLES = {
   },
 };
 
-// Map legacy preset names to the new canonical themes
+// Map legacy preset names to canonical themes
 THEME_STYLES.muvi = THEME_STYLES.noir;
 THEME_STYLES.gold = THEME_STYLES.heritage;
 THEME_STYLES.midnight = THEME_STYLES.sapphire;
 THEME_STYLES.neon = THEME_STYLES.cyan;
 THEME_STYLES.minimal = THEME_STYLES.obsidian;
 
-const STREAMING_PROVIDERS = [
-  { key: 'netflix', name: 'Netflix', icon: 'simple-icons:netflix', color: 'hover:text-red-500 hover:border-red-500/40' },
-  { key: 'amazon', name: 'Prime', icon: 'simple-icons:primevideo', color: 'hover:text-blue-400 hover:border-blue-500/40' },
-  { key: 'prime_video', name: 'Prime', icon: 'simple-icons:primevideo', color: 'hover:text-blue-400 hover:border-blue-500/40' },
-  { key: 'youtube', name: 'YouTube', icon: 'simple-icons:youtube', color: 'hover:text-red-500 hover:border-red-500/40' },
-  { key: 'cinema', name: 'In Theatres', icon: 'solar:ticket-bold', color: 'hover:text-yellow-400 hover:border-yellow-500/40' },
-  { key: 'showmax', name: 'Showmax', icon: 'solar:play-circle-bold', color: 'hover:text-blue-500 hover:border-blue-500/40' },
-  { key: 'iroko', name: 'iROKO', icon: 'solar:tv-bold', color: 'hover:text-emerald-400 hover:border-emerald-500/40' },
-];
+function getYouTubeVideoId(url) {
+  if (!url) return null;
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|(?:embed|v|shorts)\/))([\w-]{11})/i);
+  return match ? match[1] : null;
+}
 
 export default function FilmmakerPortfolio() {
   const params = useParams();
   const location = useLocation();
+
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('all');
+
+  // Active top-level sub-tab: 'overview' | 'credits' | 'links'
+  const [portfolioViewTab, setPortfolioViewTab] = useState('overview');
+
+  // Filmography department filter tab
+  const [activeFilmographyTab, setActiveFilmographyTab] = useState('all');
+
+  // Modals & player states
+  const [isPlayingReel, setIsPlayingReel] = useState(false);
+  const [metricsInfoOpen, setMetricsInfoOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [passportModalOpen, setPassportModalOpen] = useState(false);
-  useBodyScrollLock(contactModalOpen || passportModalOpen);
+  const [howItWorksModalOpen, setHowItWorksModalOpen] = useState(false);
+  const [showAllFilmography, setShowAllFilmography] = useState(false);
+
+  useBodyScrollLock(contactModalOpen || passportModalOpen || howItWorksModalOpen);
+
   const [inquirySent, setInquirySent] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({
     name: '',
@@ -222,7 +235,6 @@ export default function FilmmakerPortfolio() {
     budget: '',
     message: '',
   });
-  const [showAllFilmography, setShowAllFilmography] = useState(false);
 
   const handle = useMemo(() => {
     const raw =
@@ -246,8 +258,7 @@ export default function FilmmakerPortfolio() {
   }, [data, metrics, allFilms, stageCredits, person]);
 
   // Dynamically compute department tabs based ONLY on what this creator has actually done.
-  // If they have never directed or produced, those tabs will not appear.
-  const availableTabs = useMemo(() => {
+  const availableFilmographyTabs = useMemo(() => {
     if (!data) return [{ id: 'all', label: 'All' }];
     const tabs = [{ id: 'all', label: 'All' }];
     const allRoles = allFilms.flatMap((f) => (f.roles || []).map((r) => String(r).toLowerCase()));
@@ -272,10 +283,10 @@ export default function FilmmakerPortfolio() {
   }, [data, allFilms, stageCredits]);
 
   useEffect(() => {
-    if (availableTabs.length > 0 && !availableTabs.some((t) => t.id === activeTab)) {
-      setActiveTab('all');
+    if (availableFilmographyTabs.length > 0 && !availableFilmographyTabs.some((t) => t.id === activeFilmographyTab)) {
+      setActiveFilmographyTab('all');
     }
-  }, [availableTabs, activeTab]);
+  }, [availableFilmographyTabs, activeFilmographyTab]);
 
   useEffect(() => {
     let isMounted = true;
@@ -286,15 +297,15 @@ export default function FilmmakerPortfolio() {
       .then((res) => {
         if (!isMounted) return;
         if (!res) {
-          setError(`No portfolio found for @${handle}`);
+          setError(`No creator link found for @${handle}`);
         } else {
           setData(res);
-          document.title = `${res.person.name} | Official Creator Link | MuviDB`;
+          document.title = `${res.person.name} | Creator Link | MuviDB`;
         }
       })
       .catch((err) => {
         if (!isMounted) return;
-        setError(err.message || 'Failed to load portfolio.');
+        setError(err.message || 'Failed to load creator link.');
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -306,11 +317,32 @@ export default function FilmmakerPortfolio() {
   }, [handle]);
 
   const copyPortfolioLink = () => {
-    const url = window.location.href;
+    const url = `${window.location.origin}/@${handle}`;
     navigator.clipboard.writeText(url);
     toast.success('Creator Link copied to clipboard!', {
       style: { background: '#1c1c1f', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' },
     });
+  };
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/@${handle}`;
+    const shareData = {
+      title: `${person?.name || 'Creator'} | MuviDB Creator Link`,
+      text: `Check out ${person?.name || 'this creator'}'s official portfolio and filmography on MuviDB.`,
+      url,
+    };
+    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          copyPortfolioLink();
+        }
+      }
+    } else {
+      copyPortfolioLink();
+    }
   };
 
   const handleSendInquiry = (e) => {
@@ -338,29 +370,71 @@ export default function FilmmakerPortfolio() {
     }, 1200);
   };
 
+  // Construct stylized roles string e.g. "Actor • Producer • Director"
+  const rolesList = useMemo(() => {
+    if (!person) return 'Filmmaker';
+    const roleSet = new Set();
+
+    if (Array.isArray(person.roles) && person.roles.length > 0) {
+      person.roles.forEach((r) => {
+        if (r) roleSet.add(toTitleCase(String(r).trim()));
+      });
+    }
+
+    (allFilms || []).forEach((f) => {
+      (f.roles || []).forEach((r) => {
+        const lower = String(r).toLowerCase();
+        if (lower.includes('direct')) roleSet.add('Director');
+        else if (lower.includes('produc')) roleSet.add('Producer');
+        else if (lower.includes('act') || lower.includes('cast')) roleSet.add('Actor');
+        else if (lower.includes('writ') || lower.includes('screen')) roleSet.add('Writer');
+        else if (lower.includes('cinemat') || lower.includes('dp')) roleSet.add('Cinematographer');
+      });
+    });
+
+    if (stageCredits && stageCredits.length > 0) {
+      roleSet.add('Theatre');
+    }
+
+    const arr = Array.from(roleSet);
+    if (arr.length > 0) {
+      const priority = ['Actor', 'Producer', 'Director', 'Writer', 'Cinematographer', 'Theatre'];
+      arr.sort((a, b) => {
+        const idxA = priority.indexOf(a);
+        const idxB = priority.indexOf(b);
+        return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+      });
+      return arr.slice(0, 3).join(' • ');
+    }
+
+    return 'Filmmaker';
+  }, [person, allFilms, stageCredits]);
+
+  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] text-white flex flex-col items-center justify-center p-6">
-        <div className="relative w-16 h-16 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full border-2 border-brand/20 animate-ping" />
-          <div className="w-10 h-10 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      <div className="min-h-screen bg-[#08090b] text-white flex flex-col items-center justify-center p-6">
+        <div className="relative w-14 h-14 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full border-2 border-[#FF5A1F]/20 animate-ping" />
+          <div className="w-9 h-9 rounded-full border-2 border-[#FF5A1F] border-t-transparent animate-spin" />
         </div>
         <p className="mt-4 text-xs font-mono uppercase tracking-[0.2em] text-zinc-500">
-          Loading Cinema Portfolio...
+          Loading Creator Link...
         </p>
       </div>
     );
   }
 
+  // Not found or error state
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] text-white flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-brand mb-4">
+      <div className="min-h-screen bg-[#08090b] text-white flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-[#FF5A1F] mb-4">
           <Icon icon="solar:clapperboard-broken" width="32" />
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-zinc-100">Filmmaker Portfolio Not Found</h1>
+        <h1 className="text-xl font-bold tracking-tight text-zinc-100">Creator Link Not Found</h1>
         <p className="mt-2 text-sm text-zinc-400 max-w-sm">
-          {error || `We couldn't locate an active portfolio under @${handle}.`}
+          {error || `We couldn't locate an active creator link under @${handle}.`}
         </p>
         <div className="mt-6 flex items-center gap-3">
           <Link
@@ -371,42 +445,29 @@ export default function FilmmakerPortfolio() {
           </Link>
           <Link
             to="/claim"
-            className="rounded-full bg-brand text-black px-5 py-2.5 text-xs font-bold hover:bg-brand transition"
+            className="rounded-full bg-brand text-black px-5 py-2.5 text-xs font-bold hover:brightness-110 transition"
           >
-            Claim Your Portfolio
+            Claim Your Creator Link
           </Link>
         </div>
       </div>
     );
   }
 
-  const { portfolio, featuredFilms, media, settings = {} } = data;
+  const { portfolio, featuredFilms = [], settings = {} } = data;
   const showMetrics = settings.show_metrics !== false;
   const showBoxOffice = settings.show_box_office !== false;
   const showYoutubeViews = settings.show_youtube_views !== false;
 
-  const hasCommercialToDisplay =
-    showMetrics &&
-    ((showBoxOffice && (computedMetrics?.totalBoxOffice || 0) > 0) ||
-     (showBoxOffice && (computedMetrics?.totalStageBoxOffice || 0) > 0) ||
-     (showYoutubeViews && (computedMetrics?.totalViews || 0) > 0));
-
-  const theme = THEME_STYLES[portfolio.theme_preset] || THEME_STYLES.heritage || THEME_STYLES.midnight;
-  // A creator can store a free-form accent_color; fall back to the preset's
-  // colour, then to the MuviDB brand. Previously none of this was read at all.
-  //
-  // '#f59e0b' is skipped on purpose: it is the column default from the original
-  // migration, so EVERY portfolio carries it whether or not anyone chose it.
-  // Treating it as a real choice is what kept these pages amber instead of
-  // MuviDB orange. A creator who genuinely wants amber can pick the gold theme.
+  const theme = THEME_STYLES[portfolio.theme_preset] || THEME_STYLES.heritage || THEME_STYLES.noir;
   const storedAccent = String(portfolio.accent_color || '').trim().toLowerCase();
   const creatorPicked = /^#[0-9a-f]{6}$/i.test(storedAccent) && storedAccent !== LEGACY_DEFAULT_ACCENT;
   const accentColor = creatorPicked ? storedAccent : (theme.accent || BRAND_ACCENT);
-  const embedUrl = formatVideoEmbed(portfolio.featured_reel_url);
 
-  // Every social the person has, in registry order, resolved to a real URL.
-  // Previously only Instagram and YouTube were rendered, so twitter/tiktok/
-  // facebook were fetched from the people table and silently dropped.
+  const embedUrl = formatVideoEmbed(portfolio.featured_reel_url);
+  const ytVideoId = getYouTubeVideoId(portfolio.featured_reel_url);
+
+  // Resolved social links
   const socialLinks = SOCIAL_PLATFORMS
     .map((platform) => {
       const stored = person.socials?.[platform.key]
@@ -416,9 +477,7 @@ export default function FilmmakerPortfolio() {
     })
     .filter(Boolean);
 
-  // custom_links doubles as a store for a `_meta: 'layout'` config row. The
-  // editor filters it out; this page did not, and the row has no `url`, so
-  // `link.url.replace(...)` threw and took the whole page down.
+  // Custom bio links added by the filmmaker
   const bioLinks = (portfolio.custom_links || [])
     .filter((link) => link && !link._meta && typeof link.url === 'string' && link.url.trim())
     .map((link) => {
@@ -428,7 +487,6 @@ export default function FilmmakerPortfolio() {
         detectPlatform(link.url) ||
         null;
       let finalUrl = link.url.trim();
-      // If user typed a bare handle into url (e.g. "@endtoendtest" or "endtoendtest") and platform is known, convert to full url:
       if (platform && !/^https?:\/\//i.test(finalUrl) && !/^[\w.-]+\.[a-z]{2,}\//i.test(finalUrl)) {
         finalUrl = platform.handleToUrl(finalUrl.replace(/^@+/, ''));
       }
@@ -441,14 +499,148 @@ export default function FilmmakerPortfolio() {
       };
     });
 
-  // Filter filmography tabs
+  // Top 3 featured titles (guarantee 3 cards if creator has films)
+  const topFeaturedTitles = [
+    ...featuredFilms,
+    ...allFilms.filter((f) => !featuredFilms.some((ff) => ff.id === f.id)),
+  ].slice(0, 3);
+
+  // Showreel preview thumbnail
+  const reelThumbnail =
+    ytVideoId
+      ? `https://img.youtube.com/vi/${ytVideoId}/hqdefault.jpg`
+      : topFeaturedTitles[0]?.backdrop_url ||
+        topFeaturedTitles[0]?.poster_url ||
+        person.photo_url;
+
+  // Dynamic Career Impact Metric Cards
+  const activeMetricCards = [];
+  if (showMetrics) {
+    if (showYoutubeViews && (computedMetrics?.totalViews || 0) > 0) {
+      activeMetricCards.push({
+        id: 'youtube',
+        label: 'Combined YouTube Views',
+        value: computedMetrics.formattedViews,
+        desc1: 'Across credited films and productions on YouTube',
+        descMulti: 'Audience reach across credited titles',
+        icon: 'simple-icons:youtube',
+        iconColor: 'text-[#FF0000]',
+        badgeBg: 'bg-red-500/10',
+        glowWave: 'from-red-600/30',
+      });
+    }
+
+    if (showBoxOffice && (computedMetrics?.totalBoxOffice || 0) > 0) {
+      activeMetricCards.push({
+        id: 'cinema',
+        label: 'Cinema Box Office',
+        value: computedMetrics.formattedBoxOffice,
+        desc1: 'Total grosses from credited films',
+        descMulti: 'Total grosses from credited films',
+        icon: 'solar:clapperboard-play-bold',
+        iconColor: 'text-amber-400',
+        badgeBg: 'bg-amber-500/10',
+        glowWave: 'from-amber-600/30',
+      });
+    }
+
+    if (showBoxOffice && (computedMetrics?.totalStageBoxOffice || 0) > 0) {
+      activeMetricCards.push({
+        id: 'stage',
+        label: 'Stage Box Office',
+        value: computedMetrics.formattedStageBoxOffice,
+        desc1: 'Total ticket grosses from stage productions',
+        descMulti: 'Total ticket grosses from stage productions',
+        icon: 'solar:masks-bold',
+        iconColor: 'text-orange-400',
+        badgeBg: 'bg-orange-500/10',
+        glowWave: 'from-orange-600/30',
+      });
+    }
+  }
+
+  // Official links list for the Overview tab
+  const overviewOfficialLinks = [];
+  const ig = socialLinks.find((s) => s.platform.key === 'instagram');
+  if (ig) {
+    overviewOfficialLinks.push({
+      key: 'instagram',
+      title: 'Instagram',
+      url: ig.url,
+      icon: 'simple-icons:instagram',
+      iconColor: 'text-[#E4405F]',
+      badgeBg: 'bg-[#E4405F]/15',
+    });
+  }
+
+  const yt = socialLinks.find((s) => s.platform.key === 'youtube');
+  if (yt) {
+    overviewOfficialLinks.push({
+      key: 'youtube',
+      title: 'YouTube',
+      url: yt.url,
+      icon: 'simple-icons:youtube',
+      iconColor: 'text-[#FF0000]',
+      badgeBg: 'bg-red-500/15',
+    });
+  }
+
+  // Other social networks
+  socialLinks.forEach(({ platform, url }) => {
+    if (platform.key !== 'instagram' && platform.key !== 'youtube') {
+      overviewOfficialLinks.push({
+        key: platform.key,
+        title: platform.label,
+        url,
+        icon: platform.icon,
+        iconColor: 'text-white',
+        badgeBg: 'bg-white/10',
+      });
+    }
+  });
+
+  // Custom bio links
+  bioLinks.forEach((b) => {
+    overviewOfficialLinks.push({
+      key: b.key,
+      title: b.title,
+      url: b.url,
+      icon: b.art.icon || 'solar:link-bold',
+      iconColor: 'text-brand',
+      badgeBg: 'bg-brand/10',
+    });
+  });
+
+  // MuviDB Full Profile link
+  overviewOfficialLinks.push({
+    key: 'portfolio',
+    title: 'Portfolio',
+    url: `/people/${person.slug || person.id}`,
+    icon: 'solar:globe-bold',
+    iconColor: 'text-cyan-400',
+    badgeBg: 'bg-cyan-500/15',
+    isInternal: true,
+  });
+
+  // Booking inquiry
+  overviewOfficialLinks.push({
+    key: 'booking',
+    title: 'Booking',
+    action: () => setContactModalOpen(true),
+    icon: 'solar:letter-bold',
+    iconColor: 'text-brand',
+    badgeBg: 'bg-brand/15',
+    isAction: true,
+  });
+
+  // Filter filmography credits
   const filteredFilms = (allFilms || []).filter((film) => {
-    if (activeTab === 'all') return true;
+    if (activeFilmographyTab === 'all') return true;
     const lowerRoles = (film.roles || []).map((r) => String(r).toLowerCase());
-    if (activeTab === 'directing') return lowerRoles.some((r) => r.includes('direct'));
-    if (activeTab === 'producing') return lowerRoles.some((r) => r.includes('produc'));
-    if (activeTab === 'writing') return lowerRoles.some((r) => r.includes('writ') || r.includes('screen'));
-    if (activeTab === 'acting') return lowerRoles.some((r) => r.includes('act') || r.includes('cast'));
+    if (activeFilmographyTab === 'directing') return lowerRoles.some((r) => r.includes('direct'));
+    if (activeFilmographyTab === 'producing') return lowerRoles.some((r) => r.includes('produc'));
+    if (activeFilmographyTab === 'writing') return lowerRoles.some((r) => r.includes('writ') || r.includes('screen'));
+    if (activeFilmographyTab === 'acting') return lowerRoles.some((r) => r.includes('act') || r.includes('cast'));
     return true;
   });
 
@@ -461,76 +653,72 @@ export default function FilmmakerPortfolio() {
     >
       {/* Top Cinema Skin Backdrop Graphic */}
       {(theme.heroSkin || theme.topSkin) && (
-        <div className="absolute top-0 inset-x-0 h-[520px] sm:h-[640px] lg:h-[740px] pointer-events-none overflow-hidden select-none z-0">
+        <div className="absolute top-0 inset-x-0 h-[480px] sm:h-[600px] pointer-events-none overflow-hidden select-none z-0">
           <img
             src={theme.heroSkin || theme.topSkin}
             alt=""
-            className="w-full h-full object-cover object-top opacity-95"
+            className="w-full h-full object-cover object-top opacity-90"
           />
-          {/* Subtle top edge blend for status bar / header */}
-          <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/40 to-transparent" />
-          {/* Smooth bottom fade into deep page background */}
+          <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/50 to-transparent" />
           <div
-            className="absolute bottom-0 inset-x-0 h-44 bg-gradient-to-b from-transparent to-[var(--skin-bg)]"
-            style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
+            className="absolute bottom-0 inset-x-0 h-40 bg-gradient-to-b from-transparent to-[var(--skin-bg)]"
+            style={{ '--skin-bg': theme.hexBg || '#08090b' }}
           />
         </div>
-      )}
-
-      {/* Side Decorative African Pattern Strips (Ultra-Wide screens) */}
-      {theme.patternStrip && (
-        <>
-          <div
-            className="hidden 2xl:block fixed top-0 bottom-0 left-0 w-28 pointer-events-none opacity-20 mix-blend-screen z-0"
-            style={{
-              backgroundImage: `url(${theme.patternStrip})`,
-              backgroundRepeat: 'repeat-y',
-              backgroundSize: '100% auto',
-              maskImage: 'linear-gradient(to right, black, transparent)',
-              WebkitMaskImage: 'linear-gradient(to right, black, transparent)',
-            }}
-          />
-          <div
-            className="hidden 2xl:block fixed top-0 bottom-0 right-0 w-28 pointer-events-none opacity-20 mix-blend-screen transform scale-x-[-1] z-0"
-            style={{
-              backgroundImage: `url(${theme.patternStrip})`,
-              backgroundRepeat: 'repeat-y',
-              backgroundSize: '100% auto',
-              maskImage: 'linear-gradient(to right, black, transparent)',
-              WebkitMaskImage: 'linear-gradient(to right, black, transparent)',
-            }}
-          />
-        </>
       )}
 
       {/* Bottom Cinema Skin Backdrop Graphic */}
       {(theme.footerSkin || theme.bottomSkin) && (
-        <div className="absolute bottom-0 inset-x-0 h-[420px] sm:h-[500px] lg:h-[580px] pointer-events-none overflow-hidden select-none z-0">
+        <div className="absolute bottom-0 inset-x-0 h-[380px] sm:h-[460px] pointer-events-none overflow-hidden select-none z-0">
           <img
             src={theme.footerSkin || theme.bottomSkin}
             alt=""
-            className="w-full h-full object-cover object-bottom opacity-95"
+            className="w-full h-full object-cover object-bottom opacity-90"
           />
-          {/* Smooth top edge blend upward into deep page background */}
           <div
-            className="absolute top-0 inset-x-0 h-40 bg-gradient-to-t from-transparent to-[var(--skin-bg)]"
-            style={{ '--skin-bg': theme.hexBg || '#0a0604' }}
+            className="absolute top-0 inset-x-0 h-36 bg-gradient-to-t from-transparent to-[var(--skin-bg)]"
+            style={{ '--skin-bg': theme.hexBg || '#08090b' }}
           />
-          {/* Subtle bottom edge darken */}
-          <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
         </div>
       )}
 
-      {/* Main Container - Elevated Above Skin Backdrop Artwork */}
-      <main className="relative z-10 max-w-4xl mx-auto px-4 py-8 lg:py-14 space-y-12">
-        {/* Profile Card / Hero Identity */}
-        <section className={`relative rounded-3xl ${theme.cardBg || 'border border-white/10 bg-zinc-950/80'} p-6 lg:p-8 backdrop-blur-xl overflow-hidden shadow-2xl`}>
-          <div className={`absolute -top-32 -right-32 w-80 h-80 rounded-full bg-gradient-to-b ${theme.heroGlow} blur-3xl pointer-events-none`} />
+      {/* Main Content Container: Mobile-First linktree width */}
+      <main className="relative z-10 max-w-md sm:max-w-xl mx-auto px-4 py-4 sm:py-6 pb-20 space-y-4">
+        {/* Standalone Brand Header (Logo on left, "How it works" on right) */}
+        <header className="flex items-center justify-between py-2">
+          <Link to="/" className="flex items-center group select-none">
+            <img
+              src="/images/MuviDB Brand/White Wordmark.svg"
+              alt="MuviDB - Every Film. Every Credit."
+              className="h-7 sm:h-8 object-contain group-hover:opacity-90 transition-opacity"
+            />
+          </Link>
 
-          <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
-            {/* Generously Sized Headshot with Prestige Ring */}
+          <button
+            type="button"
+            onClick={() => setHowItWorksModalOpen(true)}
+            className="rounded-full bg-brand text-white px-3.5 py-1.5 text-xs font-bold hover:brightness-110 active:scale-95 transition shadow-sm"
+          >
+            How it works
+          </button>
+        </header>
+
+        {/* Profile Identity Card */}
+        <section
+          className={`relative rounded-3xl ${
+            theme.cardBg || 'border border-white/10 bg-zinc-950/80'
+          } p-4 sm:p-5 backdrop-blur-xl shadow-xl overflow-hidden`}
+        >
+          {/* Subtle Ambient Glow */}
+          <div
+            className={`absolute -top-20 -right-20 w-56 h-56 rounded-full bg-gradient-to-b ${theme.heroGlow} blur-3xl opacity-40 pointer-events-none`}
+          />
+
+          {/* Top Row: Avatar on Left + Details on Right */}
+          <div className="relative flex items-start gap-3.5 sm:gap-4">
+            {/* Square Rounded Headshot */}
             <div className="relative shrink-0">
-              <div className="w-36 h-36 sm:w-40 sm:h-40 lg:w-48 lg:h-48 rounded-3xl overflow-hidden border-2 border-white/20 shadow-2xl bg-zinc-900 relative group">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border border-white/20 shadow-md bg-zinc-900 group">
                 <ImageWithFallback
                   src={person.photo_url}
                   alt={person.name}
@@ -538,417 +726,443 @@ export default function FilmmakerPortfolio() {
                 />
               </div>
               {person.is_verified && (
-                <div className="absolute -bottom-2 -right-2 w-9 h-9 rounded-full bg-brand text-black flex items-center justify-center shadow-xl border-2 border-black" title="Verified Creator">
-                  <Icon icon="solar:verified-check-bold" width="20" />
+                <div
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brand text-black flex items-center justify-center shadow-md border-2 border-black"
+                  title="Verified Creator"
+                >
+                  <Icon icon="solar:verified-check-bold" width="13" />
                 </div>
               )}
             </div>
 
-            {/* Name, Tagline & Badges */}
+            {/* Name, Roles, Bio & Share */}
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-2">
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${theme.badgeTone}`}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-                  {person.availability_status === 'available' ? 'Available for Bookings' : 'Filmmaker'}
-                </span>
-                {person.nationality && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium border border-white/10 bg-white/5 text-zinc-300">
-                    <Icon icon="solar:map-point-wave-bold" width="12" />
-                    {person.nationality}
+              <div className="flex items-center justify-between gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
+                  {person.name}
+                </h1>
+
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                  <span className="hidden sm:inline-block text-[11px] font-mono text-zinc-400">
+                    @{handle}
                   </span>
-                )}
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white transition active:scale-90"
+                    title="Share Creator Link"
+                  >
+                    <Icon icon="solar:share-linear" width="16" />
+                  </button>
+                </div>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white">
-                {person.name}
-              </h1>
-
-              <p className="mt-1.5 text-sm sm:text-base font-medium text-zinc-300 max-w-xl">
-                {portfolio.tagline || person.bio || 'Director, Screenwriter & Creative Producer.'}
+              {/* Roles String */}
+              <p className="text-xs sm:text-sm font-medium text-zinc-400 mt-0.5 truncate">
+                {rolesList}
               </p>
 
-              {/* Brand icon row — appears the moment a social is added. */}
-              {socialLinks.length > 0 && (
-                <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  {socialLinks.map(({ platform, url }) => (
-                    <a
-                      key={platform.key}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={platform.label}
-                      title={platform.label}
-                      className="w-9 h-9 rounded-full grid place-items-center text-white/90 border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/25 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200"
-                    >
-                      <Icon icon={platform.icon} width="17" />
-                    </a>
-                  ))}
-                </div>
-              )}
-
-              {/* Stats Bar */}
-              <div className="mt-5 flex items-center justify-center sm:justify-start gap-6 text-xs text-zinc-400 border-t border-white/5 pt-4">
-                <div>
-                  <span className="block text-lg font-black text-white">{allFilms.length}</span>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Films & Credits</span>
-                </div>
-                {person.awards?.length > 0 && (
-                  <div>
-                    <span className="block text-lg font-black text-brand">{person.awards.length}</span>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Festival Awards</span>
-                  </div>
-                )}
-                <div>
-                  <span className="block text-lg font-black text-white">
-                    {allFilms.filter(f => f.roles.some(r => r.toLowerCase().includes('direct'))).length || 1}
-                  </span>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Directorial Titles</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-6 flex flex-wrap items-center justify-center sm:justify-start gap-3">
-                <button
-                  onClick={() => setContactModalOpen(true)}
-                  className="rounded-full bg-brand text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-brand transition flex items-center gap-2 shadow-lg shadow-brand/20 active:scale-95"
-                >
-                  <Icon icon="solar:letter-bold" width="16" />
-                  <span>Work Inquiry</span>
-                </button>
-
-                <button
-                  onClick={() => setPassportModalOpen(true)}
-                  className="rounded-full border border-white/20 bg-white/5 hover:bg-white/10 px-5 py-2.5 text-xs font-bold text-white transition flex items-center gap-2 hover:border-brand/40 shadow-sm"
-                  title="Customize & Export PDF Casting CV"
-                >
-                  <Icon icon="solar:document-text-bold" width="16" className="text-brand" />
-                  <span>Export PDF CV</span>
-                </button>
-
-                {portfolio.epk_pdf_url && (
-                  <a
-                    href={portfolio.epk_pdf_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full border border-white/20 bg-white/5 hover:bg-white/10 px-5 py-2.5 text-xs font-bold text-white transition flex items-center gap-2"
-                  >
-                    <Icon icon="solar:download-minimalistic-linear" width="16" />
-                    <span>Download EPK</span>
-                  </a>
-                )}
-
-                <button
-                  onClick={copyPortfolioLink}
-                  className="rounded-full border border-white/10 bg-white/5 hover:bg-white/10 p-2.5 text-zinc-400 hover:text-white transition"
-                  title="Copy Creator Link"
-                >
-                  <Icon icon="solar:copy-bold" width="16" />
-                </button>
-              </div>
+              {/* Bio Paragraph */}
+              <p className="text-xs text-zinc-300 leading-relaxed mt-2 line-clamp-3 sm:line-clamp-4">
+                {portfolio.tagline || person.bio || 'Filmmaker, Director & Creative Producer.'}
+              </p>
             </div>
+          </div>
+
+          {/* Primary Action CTAs: Work Inquiry, Export CV & EPK */}
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setContactModalOpen(true)}
+              className="flex-1 rounded-full bg-brand text-black font-extrabold py-2.5 px-4 text-xs uppercase tracking-wider hover:brightness-110 active:scale-95 transition flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
+            >
+              <Icon icon="solar:letter-bold" width="16" />
+              <span>Work Inquiry</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPassportModalOpen(true)}
+              className="flex-1 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 hover:border-brand/40 text-white font-bold py-2.5 px-4 text-xs transition flex items-center justify-center gap-2 active:scale-95 shadow-sm"
+              title="Customize & Export PDF Casting CV"
+            >
+              <Icon icon="solar:document-text-bold" width="16" className="text-brand" />
+              <span>Export CV</span>
+            </button>
+
+            {portfolio.epk_pdf_url && (
+              <a
+                href={portfolio.epk_pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full border border-white/20 bg-white/5 hover:bg-white/10 hover:border-brand/40 text-white font-bold py-2.5 px-3.5 text-xs transition flex items-center justify-center gap-1.5 active:scale-95 shadow-sm shrink-0"
+                title="Download Electronic Press Kit"
+              >
+                <Icon icon="solar:download-minimalistic-linear" width="15" className="text-brand" />
+                <span className="hidden sm:inline">EPK</span>
+              </a>
+            )}
           </div>
         </section>
 
-        {/* Commercial Footprint (Cinema Box Office, Theatre Box Office & YouTube Views) */}
-        {hasCommercialToDisplay && (
-          <section className={`relative rounded-3xl ${theme.cardBg || 'border border-white/10 bg-zinc-950/80'} p-6 sm:p-7 backdrop-blur-xl overflow-hidden shadow-xl`}>
-            {/* Ambient Background Glow */}
-            <div className={`absolute top-0 right-0 w-80 h-80 rounded-full bg-gradient-to-b ${theme.heroGlow} blur-3xl opacity-20 pointer-events-none`} />
-
-            {/* Section Header */}
-            <div className="relative border-b border-white/5 pb-4">
-              <div className="flex items-center gap-2">
-                <Icon icon="solar:chart-square-bold" width="18" className="text-brand" />
-                <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-300 font-bold">
-                  Commercial Footprint
-                </h2>
+        {/* Showreel Section (Interactive video or Banner Preview) */}
+        {portfolio.featured_reel_url && (
+          <section>
+            {isPlayingReel ? (
+              <div className="relative aspect-[16/8] sm:aspect-[16/7] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-xl">
+                <iframe
+                  src={`${embedUrl}&autoplay=1`}
+                  title={`${person.name} Showreel`}
+                  className="w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsPlayingReel(false)}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white/80 hover:text-white transition"
+                  title="Close player"
+                >
+                  <Icon icon="solar:close-circle-bold" width="20" />
+                </button>
               </div>
-              <p className="text-xs text-zinc-400 mt-1">
-                Documented theatrical box office milestones and verified digital viewership
-              </p>
-            </div>
+            ) : (
+              <div
+                onClick={() => setIsPlayingReel(true)}
+                className="relative aspect-[16/8] sm:aspect-[16/7] rounded-2xl overflow-hidden border border-white/15 shadow-xl group cursor-pointer bg-zinc-900"
+              >
+                <img
+                  src={reelThumbnail}
+                  alt={`${person.name} Showreel`}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
 
-            {/* Metric Highlights Grid - Strictly Commercial & Audience Figures */}
-            <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {showBoxOffice && (computedMetrics?.totalBoxOffice || 0) > 0 && (
-                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.04] p-5 flex flex-col justify-between hover:border-amber-500/50 transition">
-                  <div className="flex items-center justify-between text-zinc-400">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400">
-                      Cinema Box Office
-                    </span>
-                    <Icon icon="solar:ticket-bold" width="16" className="text-amber-400" />
+                {/* Center Play Button */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-black/50 border border-white/30 backdrop-blur-md flex items-center justify-center text-white shadow-xl group-hover:scale-110 group-hover:bg-brand group-hover:border-transparent group-hover:text-black transition-all duration-300">
+                    <Icon icon="solar:play-bold" width="20" className="ml-0.5" />
                   </div>
-                  <div className="mt-3">
-                    <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
-                      {computedMetrics.formattedBoxOffice}
-                    </div>
-                    <p className="text-xs text-zinc-300 font-medium mt-1">
-                      Documented Cinema Box Office
+                </div>
+
+                {/* Bottom Left Info */}
+                <div className="absolute bottom-3 left-3 right-16 flex items-start gap-2">
+                  <span className="w-1 h-6 bg-brand rounded-full shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-white tracking-tight leading-snug truncate">
+                      Showreel
+                    </h4>
+                    <p className="text-[11px] text-zinc-300 truncate">
+                      Career highlights, directing & acting
                     </p>
                   </div>
                 </div>
-              )}
 
-              {showBoxOffice && (computedMetrics?.totalStageBoxOffice || 0) > 0 && (
-                <div className="rounded-2xl border border-purple-500/30 bg-purple-500/[0.04] p-5 flex flex-col justify-between hover:border-purple-500/50 transition">
-                  <div className="flex items-center justify-between text-zinc-400">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-400">
-                      Theatre Box Office
-                    </span>
-                    <Icon icon="solar:masks-bold" width="16" className="text-purple-400" />
-                  </div>
-                  <div className="mt-3">
-                    <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
-                      {computedMetrics.formattedStageBoxOffice}
-                    </div>
-                    <p className="text-xs text-zinc-300 font-medium mt-1">
-                      Documented Theatre Box Office
-                    </p>
-                  </div>
+                {/* Bottom Right Duration Badge */}
+                <div className="absolute bottom-3 right-3">
+                  <span className="rounded bg-black/70 backdrop-blur-md px-2 py-0.5 text-[10px] font-mono font-medium text-white border border-white/10">
+                    Showreel
+                  </span>
                 </div>
-              )}
-
-              {showYoutubeViews && (computedMetrics?.totalViews || 0) > 0 && (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/[0.04] p-5 flex flex-col justify-between hover:border-red-500/50 transition">
-                  <div className="flex items-center justify-between text-zinc-400">
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-red-400">
-                      Audience Reach
-                    </span>
-                    <Icon icon="simple-icons:youtube" width="16" className="text-red-400" />
-                  </div>
-                  <div className="mt-3">
-                    <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
-                      {computedMetrics.formattedViews}
-                    </div>
-                    <p className="text-xs text-zinc-300 font-medium mt-1">
-                      Combined YouTube Views
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </section>
         )}
 
-        {/* Featured Video / Showreel Section */}
-        {embedUrl && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
+        {/* Dynamic Career Impact Section */}
+        {activeMetricCards.length > 0 && (
+          <section className="space-y-2">
+            {/* Header */}
+            <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:videocamera-record-bold" className="text-brand" width="18" />
-                <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Featured Showreel</h2>
+                <span className="w-1 h-5 bg-brand rounded-full shrink-0" />
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                  Career Impact
+                </h3>
               </div>
-              <span className="text-[10px] font-mono text-zinc-500 uppercase">Cinema 1080p</span>
+
+              <button
+                type="button"
+                onClick={() => setMetricsInfoOpen(!metricsInfoOpen)}
+                className="text-zinc-500 hover:text-zinc-300 p-1 transition"
+                title="About Career Impact"
+              >
+                <Icon icon="solar:info-circle-linear" width="16" />
+              </button>
             </div>
 
-            <div className="relative aspect-video rounded-3xl overflow-hidden border border-white/15 shadow-2xl bg-black">
-              <iframe
-                src={embedUrl}
-                title={`${person.name} Showreel`}
-                className="w-full h-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            </div>
-          </section>
-        )}
-
-        {/* The Director's Showcase (Featured Films - 3 on a Straight Line) */}
-        {featuredFilms.length > 0 && (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Icon icon="solar:stars-bold" className="text-brand" width="18" />
-                <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Featured Showcase</h2>
+            {/* Informational Dropdown Tooltip */}
+            {metricsInfoOpen && (
+              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-xs text-zinc-300 leading-relaxed mb-2">
+                Documented theatrical box office milestones from cinema exhibitors and verified digital viewership across credited productions.
               </div>
-              <span className="text-xs text-zinc-500">{Math.min(featuredFilms.length, 3)} Curated Titles</span>
-            </div>
+            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {featuredFilms.slice(0, 3).map((film) => {
-                const links = film.streaming_links || {};
-                const availableProviders = STREAMING_PROVIDERS.filter((p) => Boolean(links[p.key]));
+            {/* Dynamic Grid Layout */}
+            {activeMetricCards.length === 1 && (
+              /* 1 Metric: Full-Width Single Card */
+              <div
+                className={`rounded-2xl ${
+                  theme.cardBg || 'bg-white/[0.04] border border-white/10'
+                } p-5 relative overflow-hidden shadow-lg`}
+              >
+                <div className="flex items-center gap-2 text-zinc-300 text-xs font-semibold mb-2">
+                  <Icon
+                    icon={activeMetricCards[0].icon}
+                    className={activeMetricCards[0].iconColor}
+                    width="16"
+                  />
+                  <span>{activeMetricCards[0].label}</span>
+                </div>
 
-                return (
-                  <article
-                    key={film.id}
-                    className={`group relative rounded-2xl ${theme.cardBg || 'border border-white/10 bg-zinc-950/70'} ${theme.cardHover || 'hover:border-brand/40'} transition duration-300 overflow-hidden flex flex-col justify-between`}
+                <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-mono">
+                  {activeMetricCards[0].value}
+                </div>
+
+                <p className="text-xs text-zinc-400 mt-1.5">
+                  {activeMetricCards[0].desc1}
+                </p>
+
+                {/* Subtle corner wave */}
+                <div
+                  className={`absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-gradient-to-tl ${activeMetricCards[0].glowWave} to-transparent blur-2xl pointer-events-none opacity-40`}
+                />
+              </div>
+            )}
+
+            {activeMetricCards.length === 2 && (
+              /* 2 Metrics: 2-Column Grid */
+              <div className="grid grid-cols-2 gap-3">
+                {activeMetricCards.map((card) => (
+                  <div
+                    key={card.id}
+                    className={`rounded-2xl ${
+                      theme.cardBg || 'bg-white/[0.04] border border-white/10'
+                    } p-4 relative overflow-hidden shadow-lg flex flex-col justify-between`}
                   >
-                    {/* Backdrop / Poster Top */}
-                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-zinc-900">
+                    <div>
+                      <div className="flex items-center gap-2 text-zinc-300 text-xs font-semibold mb-2">
+                        <Icon icon={card.icon} className={card.iconColor} width="16" />
+                        <span className="truncate">{card.label}</span>
+                      </div>
+
+                      <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-mono">
+                        {card.value}
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-zinc-400 mt-2 line-clamp-2">
+                      {card.descMulti}
+                    </p>
+
+                    {/* Subtle glow wave in corner */}
+                    <div
+                      className={`absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-tl ${card.glowWave} to-transparent blur-xl pointer-events-none opacity-40`}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeMetricCards.length === 3 && (
+              /* 3 Metrics: 3-Column Compact Grid */
+              <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                {activeMetricCards.map((card) => (
+                  <div
+                    key={card.id}
+                    className={`rounded-2xl ${
+                      theme.cardBg || 'bg-white/[0.04] border border-white/10'
+                    } p-3 sm:p-3.5 relative overflow-hidden shadow-lg flex flex-col justify-between`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-1.5 text-zinc-300 text-[11px] font-semibold mb-1.5">
+                        <Icon icon={card.icon} className={`${card.iconColor} shrink-0`} width="14" />
+                        <span className="truncate">{card.label}</span>
+                      </div>
+
+                      <div className="text-lg sm:text-2xl font-extrabold text-white tracking-tight font-mono">
+                        {card.value}
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-zinc-400 mt-1.5 line-clamp-2 leading-tight">
+                      {card.descMulti}
+                    </p>
+
+                    <div
+                      className={`absolute -bottom-4 -right-4 w-16 h-16 rounded-full bg-gradient-to-tl ${card.glowWave} to-transparent blur-lg pointer-events-none opacity-40`}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Segmented Navigation Tabs */}
+        <nav className="border-b border-white/10 pt-2 pb-0 flex items-center justify-around">
+          <button
+            type="button"
+            onClick={() => setPortfolioViewTab('overview')}
+            className={`py-2.5 px-4 text-xs sm:text-sm font-bold relative transition ${
+              portfolioViewTab === 'overview' ? 'text-white' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <span>Overview</span>
+            {portfolioViewTab === 'overview' && (
+              <span className="absolute bottom-0 inset-x-2 h-0.5 bg-brand rounded-full" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPortfolioViewTab('credits')}
+            className={`py-2.5 px-4 text-xs sm:text-sm font-bold relative transition ${
+              portfolioViewTab === 'credits' ? 'text-white' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <span>Credits</span>
+            {portfolioViewTab === 'credits' && (
+              <span className="absolute bottom-0 inset-x-2 h-0.5 bg-brand rounded-full" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPortfolioViewTab('links')}
+            className={`py-2.5 px-4 text-xs sm:text-sm font-bold relative transition ${
+              portfolioViewTab === 'links' ? 'text-white' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <span>Links</span>
+            {portfolioViewTab === 'links' && (
+              <span className="absolute bottom-0 inset-x-2 h-0.5 bg-brand rounded-full" />
+            )}
+          </button>
+        </nav>
+
+        {/* TAB 1: OVERVIEW */}
+        {portfolioViewTab === 'overview' && (
+          <div className="space-y-6 pt-1">
+            {/* Featured Titles */}
+            {topFeaturedTitles.length > 0 && (
+              <section className="space-y-3">
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                  Featured Titles
+                </h3>
+
+                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                  {topFeaturedTitles.map((film) => (
+                    <Link
+                      key={film.id}
+                      to={`/film/${film.slug}`}
+                      className="group relative aspect-[2/3] rounded-2xl overflow-hidden border border-white/10 bg-zinc-900 shadow-lg cursor-pointer block"
+                    >
                       <ImageWithFallback
-                        src={film.backdrop_url || film.poster_url}
+                        src={film.poster_url || film.backdrop_url}
                         alt={film.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
 
-                      {film.year && (
-                        <span className="absolute top-2.5 right-2.5 rounded-md bg-black/70 backdrop-blur-md px-2 py-0.5 text-[10px] font-mono font-bold text-zinc-200 border border-white/10">
-                          {film.year}
-                        </span>
-                      )}
-
-                      <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1 z-10">
-                        {showMetrics && showBoxOffice && film.box_office_domestic > 0 && (
-                          <span className="rounded-md bg-black/80 backdrop-blur-md px-1.5 py-0.5 text-[9px] font-mono font-bold text-white border border-brand/40 shadow-sm flex items-center gap-1">
-                            <Icon icon="solar:ticket-bold" width="10" className="text-brand" />
-                            <span>{formatCurrencyShort(film.box_office_domestic)}</span>
-                          </span>
-                        )}
-                        {showMetrics && showYoutubeViews && film.view_count > 0 && (
-                          <span className="rounded-md bg-black/80 backdrop-blur-md px-1.5 py-0.5 text-[9px] font-mono font-bold text-white border border-red-500/40 shadow-sm flex items-center gap-1">
-                            <Icon icon="simple-icons:youtube" width="10" className="text-red-500" />
-                            <span>{formatViewsShort(film.view_count)}</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="absolute bottom-2.5 left-3 right-3">
-                        <span className="text-[9px] font-mono uppercase tracking-wider text-brand font-bold block mb-0.5 truncate">
-                          {film.roles.join(' • ')}
-                        </span>
-                        <h3 className="text-sm font-bold text-white tracking-tight leading-snug truncate">
+                      {/* Overlaid Film Title */}
+                      <div className="absolute bottom-2.5 inset-x-2 text-center">
+                        <span className="block font-heading text-xs sm:text-sm font-black tracking-wide text-white uppercase drop-shadow-md line-clamp-2 leading-tight">
                           {formatFilmTitle(film.title)}
-                        </h3>
+                        </span>
                       </div>
-                    </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
 
-                    {/* Synopsis & Watch Bar */}
-                    <div className="p-3.5 flex-1 flex flex-col justify-between gap-3">
-                      {film.synopsis ? (
-                        <p className="text-[11px] text-zinc-400 leading-relaxed line-clamp-2">
-                          {film.synopsis}
-                        </p>
-                      ) : (
-                        <p className="text-[11px] text-zinc-600 italic">No synopsis available.</p>
-                      )}
+            {/* Official Links */}
+            <section className="space-y-3">
+              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                Official Links
+              </h3>
 
-                      {/* Where to Watch Buttons */}
-                      <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1 flex-wrap min-w-0">
-                          {availableProviders.length > 0 ? (
-                            availableProviders.slice(0, 2).map((prov) => (
-                              <a
-                                key={prov.key}
-                                href={links[prov.key]}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-white/10 bg-white/5 text-[10px] font-medium text-zinc-300 transition ${prov.color}`}
-                                title={`Watch on ${prov.name}`}
-                              >
-                                <Icon icon={prov.icon} width="11" />
-                                <span className="truncate max-w-[65px]">{prov.name}</span>
-                              </a>
-                            ))
-                          ) : (
-                            <span className="text-[10px] text-zinc-500 font-mono">In Catalogue</span>
-                          )}
-                        </div>
-
-                        <Link
-                          to={`/film/${film.slug}`}
-                          className="shrink-0 text-[11px] font-bold text-brand hover:underline flex items-center gap-1"
+              <div className="space-y-2.5">
+                {overviewOfficialLinks.map((link) => {
+                  const cardContent = (
+                    <div
+                      className={`w-full rounded-2xl ${
+                        theme.linkCardBg ||
+                        'bg-white/[0.04] border border-white/5 hover:border-white/20 hover:bg-white/[0.08]'
+                      } p-3 sm:p-3.5 flex items-center justify-between transition group shadow-sm cursor-pointer`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className={`w-9 h-9 rounded-xl ${
+                            link.badgeBg || 'bg-white/5'
+                          } border border-white/10 flex items-center justify-center shrink-0`}
                         >
-                          <span>Details</span>
-                          <Icon icon="solar:arrow-right-linear" width="11" />
-                        </Link>
+                          <Icon icon={link.icon} className={link.iconColor} width="18" />
+                        </div>
+                        <span className="text-xs sm:text-sm font-semibold text-white group-hover:text-brand transition truncate">
+                          {link.title}
+                        </span>
                       </div>
+
+                      <Icon
+                        icon="solar:alt-arrow-right-linear"
+                        width="16"
+                        className="text-zinc-500 group-hover:text-white group-hover:translate-x-0.5 transition shrink-0 ml-2"
+                      />
                     </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
+                  );
+
+                  if (link.isAction) {
+                    return (
+                      <button
+                        key={link.key}
+                        type="button"
+                        onClick={link.action}
+                        className="w-full text-left"
+                      >
+                        {cardContent}
+                      </button>
+                    );
+                  }
+
+                  if (link.isInternal) {
+                    return (
+                      <Link key={link.key} to={link.url} className="block w-full">
+                        {cardContent}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <a
+                      key={link.key}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full"
+                    >
+                      {cardContent}
+                    </a>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
         )}
 
-        {/* Linktree-Style Custom Links / Press Section */}
-        {(bioLinks.length > 0 || socialLinks.length > 0) && (
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Icon icon="solar:link-bold" className="text-brand" width="18" />
-              <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Links</h2>
-            </div>
-
-            <div className="space-y-2.5">
-              {/* Custom links first: these are what the creator chose to feature. */}
-              {bioLinks.map((link) => (
-                <a
-                  key={link.key}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`group relative flex items-stretch overflow-hidden rounded-2xl ${theme.linkCardBg || 'border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25'} hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200`}
-                >
-                  <span className={`w-16 sm:w-20 shrink-0 grid place-items-center ${link.art.tint} ${link.art.fg}`}>
-                    <Icon icon={link.art.icon} width="24" />
-                  </span>
-                  <span className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-4">
-                    <span className="min-w-0">
-                      <span className="block text-sm font-bold text-white truncate group-hover:text-brand transition">
-                        {link.title}
-                      </span>
-                      <span className="block text-[11px] text-zinc-500 truncate">{link.subtitle}</span>
-                    </span>
-                    <Icon
-                      icon="solar:arrow-right-up-linear"
-                      className="shrink-0 text-zinc-600 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all"
-                      width="18"
-                    />
-                  </span>
-                </a>
-              ))}
-
-              {/* Then every verified social, driven entirely by the registry. */}
-              {socialLinks.map(({ platform, url }) => (
-                <a
-                  key={platform.key}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`group relative flex items-stretch overflow-hidden rounded-2xl ${theme.linkCardBg || 'border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25'} hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/70 transition-all duration-200`}
-                >
-                  <span className={`w-16 sm:w-20 shrink-0 grid place-items-center ${platform.tint} ${platform.fg}`}>
-                    <Icon icon={platform.icon} width="24" />
-                  </span>
-                  <span className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-4">
-                    <span className="min-w-0">
-                      <span className="block text-sm font-bold text-white truncate group-hover:text-brand transition">
-                        {platform.label}
-                      </span>
-                      <span className="block text-[11px] text-zinc-500 truncate">
-                        {handleFromUrl(url) || prettyUrl(url)}
-                      </span>
-                    </span>
-                    <Icon
-                      icon="solar:arrow-right-up-linear"
-                      className="shrink-0 text-zinc-600 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all"
-                      width="18"
-                    />
-                  </span>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Complete Verified Filmography Timeline */}
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Icon icon="solar:clapperboard-play-bold" className="text-brand" width="18" />
-              <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-400">Complete Filmography</h2>
-            </div>
-
-            {/* Department Filter Tabs (Only shown if creator has performed multiple roles) */}
-            {availableTabs.length > 1 && (
-              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10 self-start sm:self-auto">
-                {availableTabs.map((tab) => (
+        {/* TAB 2: CREDITS */}
+        {portfolioViewTab === 'credits' && (
+          <div className="space-y-4 pt-1">
+            {/* Department Filter Sub-Tabs */}
+            {availableFilmographyTabs.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10">
+                {availableFilmographyTabs.map((tab) => (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => setActiveFilmographyTab(tab.id)}
                     className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition ${
-                      activeTab === tab.id
+                      activeFilmographyTab === tab.id
                         ? 'bg-brand text-black shadow-sm font-bold'
                         : 'text-zinc-400 hover:text-white'
                     }`}
@@ -958,181 +1172,281 @@ export default function FilmmakerPortfolio() {
                 ))}
               </div>
             )}
-          </div>
 
-          <div className={`rounded-2xl ${theme.cardBg || 'border border-white/10 bg-zinc-950/60'} divide-y divide-white/5 overflow-hidden`}>
-            {activeTab === 'stage' ? (
-              stageCredits.length > 0 ? (
-                stageCredits.map((stg, idx) => {
-                  const play = stg.plays || stg.play || {};
-                  return (
-                    <Link
-                      key={stg.id || idx}
-                      to={play.slug ? `/play/${play.slug}` : `/plays`}
-                      className="p-4 flex items-center justify-between gap-4 hover:bg-white/[0.03] transition group"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-10 h-14 rounded-lg overflow-hidden bg-purple-950/40 border border-purple-500/30 shrink-0 flex items-center justify-center text-purple-300">
-                          {play.poster_url ? (
-                            <ImageWithFallback src={play.poster_url} alt={play.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <Icon icon="solar:mask-hamsa-bold" width="20" />
-                          )}
+            {/* Filmography Credit List */}
+            <div
+              className={`rounded-2xl ${
+                theme.cardBg || 'border border-white/10 bg-zinc-950/60'
+              } divide-y divide-white/5 overflow-hidden`}
+            >
+              {activeFilmographyTab === 'stage' ? (
+                stageCredits.length > 0 ? (
+                  stageCredits.map((stg, idx) => {
+                    const play = stg.plays || stg.play || {};
+                    return (
+                      <Link
+                        key={stg.id || idx}
+                        to={play.slug ? `/play/${play.slug}` : `/plays`}
+                        className="p-3.5 flex items-center justify-between gap-3 hover:bg-white/[0.03] transition group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-14 rounded-lg overflow-hidden bg-purple-950/40 border border-purple-500/30 shrink-0 flex items-center justify-center text-purple-300">
+                            {play.poster_url ? (
+                              <ImageWithFallback
+                                src={play.poster_url}
+                                alt={play.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Icon icon="solar:mask-hamsa-bold" width="20" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-white group-hover:text-brand transition truncate flex items-center gap-2">
+                              <span>{formatFilmTitle(play.title || 'Stage Production')}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold uppercase tracking-wider">
+                                Stage
+                              </span>
+                            </p>
+                            <p className="text-xs text-zinc-400">
+                              {stg.role_name || 'Performer'} {play.venue_name ? `· ${play.venue_name}` : ''}
+                            </p>
+                          </div>
                         </div>
 
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-white group-hover:text-brand transition truncate flex items-center gap-2">
-                            <span>{formatFilmTitle(play.title || 'Stage Production')}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold uppercase tracking-wider">
-                              Stage
-                            </span>
-                          </p>
-                          <p className="text-xs text-zinc-400">
-                            {stg.role_name || 'Performer'} {play.venue_name ? `· ${play.venue_name}` : ''}
-                          </p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {play.year && <span className="text-xs font-mono text-zinc-500">{play.year}</span>}
+                          <Icon
+                            icon="solar:alt-arrow-right-linear"
+                            className="text-zinc-600 group-hover:text-white transition"
+                            width="16"
+                          />
                         </div>
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <div className="p-8 text-center text-xs text-zinc-500 font-mono">
+                    No verified stage credits listed.
+                  </div>
+                )
+              ) : displayedFilms.length > 0 ? (
+                displayedFilms.map((film) => (
+                  <Link
+                    key={film.id}
+                    to={`/film/${film.slug}`}
+                    className="p-3.5 flex items-center justify-between gap-3 hover:bg-white/[0.03] transition group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-14 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shrink-0">
+                        <ImageWithFallback
+                          src={film.poster_url}
+                          alt={film.title}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        {play.year && <span className="text-xs font-mono text-zinc-500">{play.year}</span>}
-                        <Icon icon="solar:alt-arrow-right-linear" className="text-zinc-600 group-hover:text-white transition" width="16" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white group-hover:text-brand transition truncate">
+                          {formatFilmTitle(film.title)}
+                        </p>
+                        <p className="text-xs text-zinc-400 truncate">
+                          {film.roles.join(', ')}
+                        </p>
                       </div>
-                    </Link>
-                  );
-                })
-              ) : (
-                <div className="p-8 text-center text-xs text-zinc-500 font-mono">
-                  No verified stage credits listed.
-                </div>
-              )
-            ) : displayedFilms.length > 0 ? (
-              displayedFilms.map((film) => (
-                <Link
-                  key={film.id}
-                  to={`/film/${film.slug}`}
-                  className="p-4 flex items-center justify-between gap-4 hover:bg-white/[0.03] transition group"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-10 h-14 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shrink-0">
-                      <ImageWithFallback
-                        src={film.poster_url}
-                        alt={film.title}
-                        className="w-full h-full object-cover"
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {showMetrics && showBoxOffice && film.box_office_domestic > 0 && (
+                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.04] border border-brand/30 text-[10px] font-mono font-bold text-brand">
+                          <Icon icon="solar:ticket-bold" width="11" />
+                          <span>{formatCurrencyShort(film.box_office_domestic)}</span>
+                        </span>
+                      )}
+                      {showMetrics && showYoutubeViews && film.view_count > 0 && (
+                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.04] border border-red-500/30 text-[10px] font-mono font-bold text-red-400">
+                          <Icon icon="simple-icons:youtube" width="11" />
+                          <span>{formatViewsShort(film.view_count)}</span>
+                        </span>
+                      )}
+                      {film.year && <span className="text-xs font-mono text-zinc-500">{film.year}</span>}
+                      <Icon
+                        icon="solar:alt-arrow-right-linear"
+                        className="text-zinc-600 group-hover:text-white transition"
+                        width="16"
                       />
                     </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="p-8 text-center text-xs text-zinc-500 font-mono">
+                  No credits found under {activeFilmographyTab}.
+                </div>
+              )}
 
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-white group-hover:text-brand transition truncate">
-                        {formatFilmTitle(film.title)}
-                      </p>
-                      <p className="text-xs text-zinc-400">
-                        {film.roles.join(', ')}
-                      </p>
+              {/* Show All Toggle */}
+              {activeFilmographyTab !== 'stage' && filteredFilms.length > 5 && (
+                <div className="p-3 bg-zinc-950/80 text-center border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllFilmography(!showAllFilmography)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-zinc-300 hover:text-white hover:bg-white/5 border border-white/10 transition"
+                  >
+                    <span>
+                      {showAllFilmography ? 'Show Top 5 Only' : `View All ${filteredFilms.length} Credits`}
+                    </span>
+                    <Icon
+                      icon={showAllFilmography ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'}
+                      width="14"
+                    />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: LINKS */}
+        {portfolioViewTab === 'links' && (
+          <div className="space-y-4 pt-1">
+            {/* Direct Professional Inquiry & Actions */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setContactModalOpen(true)}
+                className="rounded-2xl bg-brand text-black font-black p-3.5 text-xs uppercase tracking-wider hover:brightness-110 transition flex items-center justify-center gap-2 shadow-lg shadow-brand/20 active:scale-95"
+              >
+                <Icon icon="solar:letter-bold" width="16" />
+                <span>Work Inquiry</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPassportModalOpen(true)}
+                className="rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 p-3.5 text-xs font-bold text-white transition flex items-center justify-center gap-2 hover:border-brand/40 shadow-sm active:scale-95"
+              >
+                <Icon icon="solar:document-text-bold" width="16" className="text-brand" />
+                <span>Export PDF CV</span>
+              </button>
+            </div>
+
+            {portfolio.epk_pdf_url && (
+              <a
+                href={portfolio.epk_pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 p-3.5 text-xs font-bold text-white transition flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Icon icon="solar:download-minimalistic-linear" width="16" className="text-brand" />
+                  <span>Download Electronic Press Kit (EPK)</span>
+                </div>
+                <Icon icon="solar:arrow-right-up-linear" width="14" className="text-zinc-400" />
+              </a>
+            )}
+
+            {/* Custom Links List */}
+            {bioLinks.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 block">
+                  Featured Links
+                </span>
+                {bioLinks.map((link) => (
+                  <a
+                    key={link.key}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`w-full rounded-2xl ${
+                      theme.linkCardBg ||
+                      'bg-white/[0.04] border border-white/5 hover:border-white/20'
+                    } p-3.5 flex items-center justify-between group transition shadow-sm`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                        <Icon icon={link.art.icon || 'solar:link-bold'} className="text-brand" width="16" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-xs sm:text-sm font-semibold text-white group-hover:text-brand transition truncate">
+                          {link.title}
+                        </span>
+                        <span className="block text-[10px] text-zinc-500 truncate">{link.subtitle}</span>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                    {showMetrics && showBoxOffice && film.box_office_domestic > 0 && (
-                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.04] border border-brand/30 text-[10px] font-mono font-bold text-brand">
-                        <Icon icon="solar:ticket-bold" width="11" />
-                        <span>{formatCurrencyShort(film.box_office_domestic)}</span>
-                      </span>
-                    )}
-                    {showMetrics && showYoutubeViews && film.view_count > 0 && (
-                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.04] border border-red-500/30 text-[10px] font-mono font-bold text-red-400">
-                        <Icon icon="simple-icons:youtube" width="11" />
-                        <span>{formatViewsShort(film.view_count)}</span>
-                      </span>
-                    )}
-                    {film.year && (
-                      <span className="text-xs font-mono text-zinc-500">{film.year}</span>
-                    )}
-                    <Icon icon="solar:alt-arrow-right-linear" className="text-zinc-600 group-hover:text-white transition" width="16" />
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <div className="p-8 text-center text-xs text-zinc-500 font-mono">
-                No credits found under {activeTab}.
+                    <Icon
+                      icon="solar:arrow-right-up-linear"
+                      width="16"
+                      className="text-zinc-500 group-hover:text-white transition shrink-0 ml-2"
+                    />
+                  </a>
+                ))}
               </div>
             )}
 
-            {/* Expand / Collapse Top 5 Limit */}
-            {activeTab !== 'stage' && filteredFilms.length > 5 && (
-              <div className="p-3 bg-zinc-950/80 text-center border-t border-white/5">
-                <button
-                  type="button"
-                  onClick={() => setShowAllFilmography(!showAllFilmography)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-zinc-300 hover:text-white hover:bg-white/5 border border-white/10 transition"
-                >
-                  <span>{showAllFilmography ? 'Show Top 5 Only' : `View All ${filteredFilms.length} Credits`}</span>
-                  <Icon
-                    icon={showAllFilmography ? 'solar:alt-arrow-up-linear' : 'solar:alt-arrow-down-linear'}
-                    width="14"
-                  />
-                </button>
+            {/* Social Links List */}
+            {socialLinks.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 block">
+                  Official Channels
+                </span>
+                {socialLinks.map(({ platform, url }) => (
+                  <a
+                    key={platform.key}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`w-full rounded-2xl ${
+                      theme.linkCardBg ||
+                      'bg-white/[0.04] border border-white/5 hover:border-white/20'
+                    } p-3.5 flex items-center justify-between group transition shadow-sm`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                        <Icon icon={platform.icon} className="text-white" width="16" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-xs sm:text-sm font-semibold text-white group-hover:text-brand transition truncate">
+                          {platform.label}
+                        </span>
+                        <span className="block text-[10px] text-zinc-500 truncate">
+                          {handleFromUrl(url) || prettyUrl(url)}
+                        </span>
+                      </div>
+                    </div>
+                    <Icon
+                      icon="solar:arrow-right-up-linear"
+                      width="16"
+                      className="text-zinc-500 group-hover:text-white transition shrink-0 ml-2"
+                    />
+                  </a>
+                ))}
               </div>
             )}
           </div>
-        </section>
+        )}
 
-        {/* Linktree-style Signature MuviDB Actions & Footer */}
-        <footer className="pt-10 pb-20 border-t border-white/10 text-center space-y-5">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto">
-            <Link
-              to={`/people/${person.slug || person.id}`}
-              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 hover:bg-white/10 px-5 py-3 text-xs font-bold text-white transition hover:scale-[1.02] shadow-lg whitespace-nowrap"
-            >
-              <Icon icon="solar:user-bold" className="text-brand" width="16" />
-              <span>View on MuviDB</span>
-              <Icon icon="solar:arrow-right-up-linear" width="14" className="text-zinc-400" />
-            </Link>
-
+        {/* Minimal Linktree-Style Footer */}
+        <footer className="pt-10 pb-12 text-center space-y-3">
+          <div className="flex items-center justify-center gap-3">
             <Link
               to="/claim"
-              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 rounded-2xl bg-brand text-black font-black px-6 py-3 text-xs uppercase tracking-wider hover:brightness-110 transition hover:scale-[1.02] shadow-lg shadow-brand/20 whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-bold text-brand transition shadow-sm"
             >
-              <Icon icon="solar:shield-check-bold" width="16" />
-              <span>Claim Your Profile</span>
+              <Icon icon="solar:shield-check-bold" width="14" />
+              <span>Claim Your Creator Link</span>
             </Link>
           </div>
 
-          <div className="pt-2 text-center">
-            <p className="text-[11px] text-zinc-500 font-mono tracking-wider">
-              Powered by{' '}
-              <Link to="/" className="text-zinc-300 hover:text-white font-bold underline underline-offset-2">
-                MuviDB
-              </Link>{' '}
-              — The living record of African film & theatre.
-            </p>
-          </div>
+          <p className="text-[11px] text-zinc-500 font-mono tracking-wider">
+            Powered by{' '}
+            <Link to="/" className="text-zinc-300 hover:text-white font-bold underline underline-offset-2">
+              MuviDB
+            </Link>{' '}
+            — The living record of African film & theatre.
+          </p>
         </footer>
       </main>
-
-      {/* Floating Linktree-style Bottom Brand Bar */}
-      <div className="fixed bottom-4 inset-x-0 z-40 pointer-events-none flex justify-center px-4">
-        <div className="pointer-events-auto flex items-center gap-3 px-4 py-2 rounded-full border border-white/20 bg-black/80 backdrop-blur-xl shadow-2xl text-xs text-white">
-          <Link to="/" className="flex items-center gap-1.5 font-black tracking-wider hover:text-brand transition">
-            <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
-            <span className="text-[11px] font-mono uppercase tracking-widest text-zinc-200">MuviDB</span>
-          </Link>
-          <span className="h-3 w-px bg-white/20" />
-          <Link
-            to={`/people/${person.slug || person.id}`}
-            className="text-[11px] text-zinc-300 hover:text-white font-medium transition flex items-center gap-1"
-          >
-            <span>Full Profile</span>
-            <Icon icon="solar:arrow-right-up-linear" width="12" />
-          </Link>
-          <span className="h-3 w-px bg-white/20" />
-          <Link
-            to="/claim"
-            className="text-[11px] text-brand hover:text-brand font-bold transition flex items-center gap-1"
-          >
-            <span>Claim Your Creator Link</span>
-          </Link>
-        </div>
-      </div>
 
       {/* Direct Work Inquiry Modal */}
       {contactModalOpen && (
@@ -1258,7 +1572,7 @@ export default function FilmmakerPortfolio() {
                 <button
                   type="submit"
                   disabled={inquirySent}
-                  className="rounded-full bg-brand text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-brand transition flex items-center gap-2"
+                  className="rounded-full bg-brand text-black px-6 py-2.5 text-xs font-black uppercase tracking-wider hover:brightness-110 transition flex items-center gap-2"
                 >
                   <Icon icon="solar:plain-bold" width="14" />
                   <span>{inquirySent ? 'Opening Mail...' : 'Send Inquiry'}</span>
@@ -1273,7 +1587,7 @@ export default function FilmmakerPortfolio() {
       {passportModalOpen && (
         <CareerPassportModal
           person={{ ...person, claimed: true }}
-          credits={allFilms.map(f => ({
+          credits={allFilms.map((f) => ({
             id: f.id,
             role: f.roles?.[0] || 'Contributor',
             character_name: '',
@@ -1284,6 +1598,95 @@ export default function FilmmakerPortfolio() {
           personalized
           onClose={() => setPassportModalOpen(false)}
         />
+      )}
+
+      {/* "How It Works" Informational Modal */}
+      {howItWorksModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-lenis-prevent="true"
+          style={{ overscrollBehavior: 'contain' }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overscroll-contain"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setHowItWorksModalOpen(false);
+          }}
+        >
+          <div
+            data-lenis-prevent="true"
+            style={{ overscrollBehavior: 'contain' }}
+            className="w-full max-w-md rounded-3xl border border-white/15 bg-zinc-950 p-6 sm:p-7 shadow-2xl relative overscroll-contain text-left"
+          >
+            <button
+              onClick={() => setHowItWorksModalOpen(false)}
+              className="absolute top-5 right-5 text-zinc-400 hover:text-white p-1"
+            >
+              <Icon icon="solar:close-circle-bold" width="22" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+              <span className="text-[10px] font-mono uppercase tracking-widest text-brand">
+                MuviDB Creator Link
+              </span>
+            </div>
+
+            <h3 className="text-xl font-bold text-white tracking-tight">
+              How Creator Links Work
+            </h3>
+            <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+              The verified bio link designed specifically for African filmmakers, actors, directors, and cinema practitioners.
+            </p>
+
+            <div className="mt-5 space-y-3.5">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0 border border-brand/20">
+                  <Icon icon="solar:verified-check-bold" width="16" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Audited Filmography & Credits</h4>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Your credits are backed by the official MuviDB database, preventing impersonation and uncredited omissions.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/20">
+                  <Icon icon="solar:ticket-bold" width="16" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Documented Commercial Impact</h4>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Showcase certified cinema box office totals and audited YouTube viewership to studios, investors, and casting directors.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center shrink-0 border border-cyan-500/20">
+                  <Icon icon="solar:letter-bold" width="16" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Direct Bookings & Inquiries</h4>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Producers and brands contact you directly with project type and budget range, eliminating commission friction.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between gap-3">
+              <Link
+                to="/claim"
+                onClick={() => setHowItWorksModalOpen(false)}
+                className="w-full rounded-full bg-brand text-black text-center py-2.5 text-xs font-bold hover:brightness-110 transition shadow-lg shadow-brand/20"
+              >
+                Claim Your Creator Link
+              </Link>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -250,30 +250,85 @@ export async function signedContributionUrl(path) {
 }
 
 // On approval: download the quarantined file, re-encode it again (defence in
-// depth, in the trusted admin's browser), publish to the public film-images
-// bucket, and return the public URL. Returns null on failure.
-// `folder` is typically 'people' (portrait) or 'posters' (film art).
+// depth, in the trusted admin's browser), publish to the public storage bucket,
+// and return the public URL. Returns null on failure.
+// `folder` is typically 'posters' (film art), 'people' (portrait), or 'channels'.
 export async function publishContributionImage(path, folder = 'people') {
   if (!path) return null;
-  const { data, error } = await supabase.storage.from('contributions').download(path);
-  if (error || !data) return null;
 
-  let clean;
+  let blob = null;
+
+  // 1. Try direct download from 'contributions' bucket
   try {
-    clean = await reencodeToWebp(data);
-  } catch {
+    const { data, error } = await supabase.storage.from('contributions').download(path);
+    if (!error && data) {
+      blob = data;
+    } else if (error) {
+      console.warn('[publishContributionImage] Direct download failed, attempting signed URL fallback:', error);
+    }
+  } catch (err) {
+    console.warn('[publishContributionImage] Direct download exception:', err);
+  }
+
+  // 2. Fallback to signed URL download if direct download failed
+  if (!blob) {
+    try {
+      const signedUrl = await signedContributionUrl(path);
+      if (signedUrl) {
+        const resp = await fetch(signedUrl);
+        if (resp.ok) {
+          blob = await resp.blob();
+        } else {
+          console.error('[publishContributionImage] Fetch from signed URL failed with status:', resp.status);
+        }
+      }
+    } catch (err) {
+      console.error('[publishContributionImage] Signed URL fetch exception:', err);
+    }
+  }
+
+  if (!blob) {
+    console.error('[publishContributionImage] Could not download image data from contributions:', path);
     return null;
   }
 
-  const safeFolder = String(folder || 'people').replace(/[^a-z0-9_-]/gi, '') || 'people';
-  const dest = `${safeFolder}/${crypto.randomUUID()}.webp`;
-  const { error: upErr } = await supabase.storage
-    .from('film-images')
-    .upload(dest, clean, { contentType: 'image/webp', upsert: true });
-  if (upErr) return null;
+  // 3. Re-encode through canvas for security (metadata strip & normalization)
+  let clean = blob;
+  try {
+    clean = await reencodeToWebp(blob);
+  } catch (encErr) {
+    console.warn('[publishContributionImage] Canvas re-encode failed, using original quarantined blob:', encErr);
+  }
 
   const base = import.meta.env.VITE_SUPABASE_URL || '';
-  return `${base}/storage/v1/object/public/film-images/${dest}`;
+  const fileUuid = crypto.randomUUID();
+  const targetBucket = (folder === 'posters' || folder === 'people' || folder === 'backdrops') ? folder : 'film-images';
+
+  // 4. Try upload to target bucket (e.g. 'posters' or 'people')
+  const fileName = `${fileUuid}.webp`;
+  const { error: upErr1 } = await supabase.storage
+    .from(targetBucket)
+    .upload(fileName, clean, { contentType: 'image/webp', upsert: true });
+
+  if (!upErr1) {
+    return `${base}/storage/v1/object/public/${targetBucket}/${fileName}`;
+  }
+
+  console.warn(`[publishContributionImage] Upload to ${targetBucket} failed, trying film-images bucket:`, upErr1);
+
+  // 5. Fallback upload to 'film-images' bucket with safeFolder prefix
+  const safeFolder = String(folder || 'posters').replace(/[^a-z0-9_-]/gi, '') || 'posters';
+  const dest = `${safeFolder}/${fileUuid}.webp`;
+  const { error: upErr2 } = await supabase.storage
+    .from('film-images')
+    .upload(dest, clean, { contentType: 'image/webp', upsert: true });
+
+  if (!upErr2) {
+    return `${base}/storage/v1/object/public/film-images/${dest}`;
+  }
+
+  console.error('[publishContributionImage] All storage upload attempts failed:', upErr2);
+  return null;
 }
 
 export async function deleteContributionImage(path) {

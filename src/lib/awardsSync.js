@@ -286,6 +286,24 @@ export const KNOWN_CATEGORIES_BY_ORG = {
     'Best Actor',
     'Best Indigenous Film'
   ],
+  IIFF: [
+    'Best Feature Film – Nigeria',
+    'Best Nigerian Film',
+    'Best Feature Film – International',
+    'Best Short Film – Nigeria',
+    'Best Short Film – International',
+    'Best Documentary',
+    'Best Animation',
+    'Best Student Film',
+    'Best Director',
+    'Best Actor',
+    'Best Actress',
+    'Best Cinematography',
+    'Best Screenplay',
+    'Best Editing',
+    'Best Sound Design',
+    'Official Selection'
+  ],
   AFRIFF: [
     'Official Selection (Opening Film)',
     'Official Selection (Closing Film)',

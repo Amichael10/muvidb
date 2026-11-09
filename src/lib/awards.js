@@ -8,6 +8,7 @@ export const AWARD_LOGOS = {
   AMVCA: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-amvca.png',
   AMAA: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-amaa.png',
   AFRIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-afriff.jpg',
+  IIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-iiff.png',
   TINFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-tinff.webp',
   BINFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-binff.jpg',
   AIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-aiff.jpg',
@@ -87,6 +88,33 @@ export const AWARD_ORGS = [
     submitUrl: 'https://reffaawards.com/',
     submitLabel: 'REFFA Official Portal',
     tags: ['Accra', 'Ghana', 'Pan-African', 'Festival', 'Awards', 'Storytelling', 'Student Cinema'],
+  },
+  {
+    id: 'IIFF',
+    label: 'IIFF',
+    full: 'Ìbàdàn International Film Festival',
+    tagline: 'Celebrating African Cinema & Creative Storytelling in Oyo State',
+    category: 'festival',
+    location: 'Ibadan, Oyo State, Nigeria',
+    frequency: 'Annual (September)',
+    founded: 2022,
+    accent: '#F59E0B',
+    about:
+      'Founded in 2022, the Ìbàdàn International Film Festival (IIFF) is Oyo State’s premier annual film festival and awards platform. Hosted in the historic city of Ibadan, IIFF celebrates Nollywood, African cinema, and international storytelling through masterclasses, screenings, panel discussions, and competitive awards honoring emerging and established filmmakers.',
+    when:
+      'Held annually over three days in September in Ibadan, Oyo State, Nigeria.',
+    submissions:
+      'Filmmakers submit entries through FilmFreeway across feature films (Nigeria and International), short films, documentaries, student projects, and animations.',
+    entryPlan: {
+      fees: 'Standard / Student festival submissions on FilmFreeway',
+      eligibility: 'Narrative features, documentaries, shorts, animations, and student films by Nigerian and international filmmakers.',
+      formats: 'HD / 4K secure digital screener with English subtitles.',
+      categoriesCount: '15+ Competitive Festival Categories',
+      platform: 'FilmFreeway & IIFF Official Portal',
+    },
+    submitUrl: 'https://www.iiff.ng/',
+    submitLabel: 'IIFF Official Portal',
+    tags: ['Ibadan', 'Oyo State', 'Film Festival', 'Nollywood', 'African Cinema', 'Student Film', 'Short Film', 'Documentary'],
   },
   {
     id: 'AMVCA',
@@ -1561,6 +1589,7 @@ export function normOrg(raw) {
   if (upper.includes('BON') || upper.includes('BEST OF NOLLYWOOD')) return 'BON';
   if (upper.includes('LIFACC') || upper.includes('LAGOS INTERNATIONAL FILM AND CINEMA')) return 'LIFACC';
   if (upper.includes('ASIFF') || upper.includes('SMARTPHONE') || upper.includes('SMARTFILM')) return 'ASIFF';
+  if (upper.includes('IIFF') || upper.includes('IBADAN INTERNATIONAL') || upper.includes('IBADAN FILM')) return 'IIFF';
   if (upper.includes('EKOIFF') || upper.includes('EKO INTERNATIONAL FILM')) return 'EKOIFF';
   if (upper.includes('BIFF') || upper.includes('BAYELSA INTERNATIONAL') || upper.includes('BAYELSA FILM')) return 'BIFF';
   if (upper.includes('BCFF') || upper.includes('BENIN CITY FILM') || upper.includes('BENIN FILM')) return 'BCFF';
