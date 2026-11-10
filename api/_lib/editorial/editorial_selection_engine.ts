@@ -286,9 +286,9 @@ export function shouldSuppressCalendarSlot(input: {
 }): string | null {
   if (input.status && input.status !== 'planned') return null;
   const intent = getSeriesIntent(input.seriesSlug);
-  const isDailyProfile = intent === 'people' || intent === 'crew';
+  const isProfile = intent === 'people' || intent === 'crew' || ['actor_spotlight', 'you_know_the_face', 'behind_the_camera', 'filmography'].includes(input.seriesSlug);
   if (input.seriesAlreadyUsedToday) return 'Duplicate content series on the same day';
-  if (isDailyProfile && input.dailyPeopleCount >= 1) return 'Only one professional/profile feature is allowed per day';
-  if (intent === 'people' && input.weeklyPeopleCount >= 2) return 'Weekly professional/profile feature limit reached';
+  if (isProfile && input.dailyPeopleCount >= 1) return 'Only one professional/profile feature is allowed per day';
+  if (isProfile && input.weeklyPeopleCount >= 1) return 'Only one spotlight/profile feature is allowed per week';
   return null;
 }

@@ -1,4 +1,7 @@
 import 'dotenv/config';
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+dotenv.config();
 import { supabase } from '../api/_lib/supabase.js';
 import { resolveEligibleCandidate } from '../api/_lib/editorial/auto_scheduler.js';
 import { approveEditorialSlot, generateAndAttachReelForContentItem, scheduleContentItem } from '../api/_lib/social_studio.js';
@@ -32,7 +35,8 @@ export async function preRenderUpcomingReels(daysAhead: number = 7, startTomorro
 
   const reelSlots = (slots || []).filter(s => {
     const slug = (s.social_content_series as any)?.slug;
-    return slug === 'new_and_upcoming' || slug === 'where_to_watch';
+    const isReelSlug = slug === 'new_and_upcoming' || slug === 'where_to_watch';
+    return isReelSlug && s.status !== 'skipped' && s.status !== 'published';
   });
 
   console.log(`[auto_render_reels] Found ${reelSlots.length} reel slots to check.`);
@@ -145,6 +149,7 @@ export async function preRenderUpcomingReels(daysAhead: number = 7, startTomorro
         candidateType,
         scheduledDate: slot.scheduled_date,
         scheduledTime: slot.scheduled_time,
+        platforms: ['instagram', 'threads', 'facebook', 'tiktok'],
       },
       SYSTEM_ACTOR,
     );

@@ -229,6 +229,17 @@ export default function AutoPilotReviewModal({
 
       // Select default angle based on series
       const slug = slotSeriesSlug;
+      const isReel = slug === 'where_to_watch' || slug === 'new_and_upcoming';
+      if (isReel) {
+        setSelectedPlatforms(['instagram', 'threads', 'facebook', 'tiktok']);
+        setPlatformRatios({ instagram: '9:16', tiktok: '9:16', facebook: '9:16', threads: '9:16' });
+        setActivePlatformTab('instagram');
+      } else {
+        setSelectedPlatforms(['instagram', 'threads', 'facebook']);
+        setPlatformRatios({ instagram: '4:5', tiktok: '9:16', facebook: '1:1', threads: '1:1' });
+        setActivePlatformTab('instagram');
+      }
+
       let initialAngle = 'streaming_alert';
       if (slug.includes('critic')) initialAngle = 'critic_debate';
       else if (slug.includes('upcoming') || slug.includes('announcement')) initialAngle = 'dynamic_story';
@@ -467,6 +478,7 @@ export default function AutoPilotReviewModal({
 
   const displayImage = candidate?.imageUrl;
   const seriesSlug = (series?.slug || '').toLowerCase();
+  const isReelSeries = seriesSlug === 'where_to_watch' || seriesSlug === 'new_and_upcoming';
   const isPerson = candidate?.type === 'person' ||
     series?.category === 'people' ||
     series?.category === 'craft' ||
@@ -735,6 +747,66 @@ export default function AutoPilotReviewModal({
                     className="h-full w-full object-contain"
                   />
                 )
+              ) : isReelSeries ? (
+                <div className="relative flex h-full w-full flex-col justify-between overflow-hidden bg-gradient-to-b from-black via-zinc-950 to-black p-5 text-white">
+                  {displayImage && (
+                    <img
+                      src={displayImage}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover opacity-35 blur-sm scale-110 pointer-events-none"
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/45 to-black/95 pointer-events-none" />
+
+                  {/* Top Reel Header */}
+                  <div className="relative z-10 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 rounded-full bg-rose-500/25 border border-rose-500/40 px-3 py-1 backdrop-blur-md shadow-sm">
+                      <Icon icon="solar:videocamera-record-bold" width="13" className="text-rose-400 animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-rose-300">
+                        9:16 Video Reel
+                      </span>
+                    </div>
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] font-mono font-bold text-white/80">
+                      1080×1920
+                    </span>
+                  </div>
+
+                  {/* Center Visual Mockup */}
+                  <div className="relative z-10 my-auto flex flex-col items-center text-center px-2">
+                    <div className="relative h-60 w-40 overflow-hidden rounded-2xl border-2 border-white/20 shadow-2xl">
+                      <img
+                        src={displayImage}
+                        alt={candidate?.name}
+                        className="h-full w-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                      <div className="absolute bottom-2 left-2 right-2">
+                        <span className="block text-[10px] font-black uppercase tracking-wider text-white drop-shadow">
+                          {series.slug === 'where_to_watch' ? 'Now Streaming' : 'New Release'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <h3 className="mt-3.5 text-sm font-black tracking-tight text-white drop-shadow-md max-w-[240px] truncate">
+                      {candidate?.name || 'Featured Title'}
+                    </h3>
+                    <p className="mt-0.5 text-[11px] text-white/70 font-medium max-w-[240px] line-clamp-2 leading-snug">
+                      {candidate?.subtext || candidate?.data?.watchAvailability || 'Watch on verified channels'}
+                    </p>
+
+                    <div className="mt-3 flex items-center gap-1.5 rounded-full bg-brand/20 border border-brand/30 px-2.5 py-1 text-[9px] font-bold text-brand backdrop-blur-md">
+                      <Icon icon="solar:music-note-2-bold" width="11" />
+                      <span>Trending Soundtrack Attached</span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Note */}
+                  <div className="relative z-10 text-center">
+                    <p className="text-[9px] text-white/50 leading-tight">
+                      🎬 Auto-rendered 9:16 vertical reel with title motion & audio beat sync.
+                    </p>
+                  </div>
+                </div>
               ) : isPlay || candidate?.templateSlug === 'poster-only' ? (
                 <img
                   src={displayImage}

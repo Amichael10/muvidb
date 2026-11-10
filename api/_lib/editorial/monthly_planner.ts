@@ -6,21 +6,30 @@ const BASE_TIMES = ['09:00:00', '12:00:00', '15:00:00', '18:00:00', '20:30:00'];
 const RELEASE_TIMES = ['08:00:00', '11:00:00', '16:30:00', '21:00:00'];
 
 const ROTATION = [
-  // 0: Sunday (Audience Pulse morning & evening; 3 planned cycles midday)
-  ['audience_pulse', 'new_and_upcoming', 'behind_the_camera', 'filmography', 'audience_pulse'],
-  // 1: Monday
-  ['audience_pulse', 'whats_on_stage', 'where_to_watch', 'you_know_the_face', 'audience_pulse'],
-  // 2: Tuesday
-  ['audience_pulse', 'critics_say', 'by_the_numbers', 'behind_the_camera', 'audience_pulse'],
-  // 3: Wednesday
-  ['audience_pulse', 'new_and_upcoming', 'filmography', 'one_film_two_takes', 'audience_pulse'],
-  // 4: Thursday
+  // 0: Sunday (Audience Pulse morning & evening; Weekend Watchlist & Critics midday)
+  ['audience_pulse', 'new_and_upcoming', 'weekend_watchlist', 'critics_say', 'audience_pulse'],
+  // 1: Monday (Stage, Streaming Alert, Nollywood Debate)
+  ['audience_pulse', 'whats_on_stage', 'where_to_watch', 'film_conversation', 'audience_pulse'],
+  // 2: Tuesday (Critics, By The Numbers, One Film Two Takes)
+  ['audience_pulse', 'critics_say', 'by_the_numbers', 'one_film_two_takes', 'audience_pulse'],
+  // 3: Wednesday (New & Upcoming, Now Streaming, Debate)
+  ['audience_pulse', 'new_and_upcoming', 'where_to_watch', 'film_conversation', 'audience_pulse'],
+  // 4: Thursday (Critics, Now Streaming, Weekend Watchlist)
   ['audience_pulse', 'critics_say', 'where_to_watch', 'weekend_watchlist', 'audience_pulse'],
-  // 5: Friday
-  ['audience_pulse', 'whats_on_stage', 'you_know_the_face', 'one_film_two_takes', 'audience_pulse'],
-  // 6: Saturday
-  ['audience_pulse', 'filmography', 'by_the_numbers', 'behind_the_camera', 'audience_pulse'],
+  // 5: Friday (Stage, Now Streaming, THE SINGLE WEEKLY SPOTLIGHT at 18:00)
+  ['audience_pulse', 'whats_on_stage', 'where_to_watch', 'you_know_the_face', 'audience_pulse'],
+  // 6: Saturday (New & Upcoming, By The Numbers, Nollywood Debate)
+  ['audience_pulse', 'new_and_upcoming', 'by_the_numbers', 'film_conversation', 'audience_pulse'],
 ] as const;
+
+export const SPOTLIGHT_SERIES_SLUGS = new Set(['actor_spotlight', 'you_know_the_face', 'behind_the_camera', 'filmography']);
+
+export function getWeekKey(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() - day + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 type CalendarInsert = {
   planner_key: string;
@@ -121,7 +130,7 @@ export async function planRollingSocialCalendar(options: {
       .lte('release_date', endDate)
       .order('release_date', { ascending: true }),
     supabase.from('social_calendar').select('planner_key').like('planner_key', 'release:%'),
-    supabase.from('social_calendar').select('planner_key,status,selection_locked')
+    supabase.from('social_calendar').select('planner_key,status,selection_locked,scheduled_date,series_id,social_content_series(slug)')
       .like('planner_key', 'base:%')
       .in('status', ['published', 'approved', 'draft_ready', 'subject_selected']),
     supabase.from('social_content_items')
@@ -138,6 +147,16 @@ export async function planRollingSocialCalendar(options: {
   const publishedFilmIds = new Set((publishedContentRows || []).map(row => row.source_entity_id));
   const lockedBaseKeys = new Set((existingBaseRows || []).map(row => row.planner_key));
 
+  // Enforce strictly ONE spotlight per week rule: track existing active spotlights across calendar weeks
+  const weeklySpotlightCount = new Map<string, number>();
+  for (const row of existingBaseRows || []) {
+    const slug = (row as any)?.social_content_series?.slug;
+    if (slug && SPOTLIGHT_SERIES_SLUGS.has(slug) && row.scheduled_date) {
+      const wk = getWeekKey(row.scheduled_date);
+      weeklySpotlightCount.set(wk, (weeklySpotlightCount.get(wk) || 0) + 1);
+    }
+  }
+
   const seriesIds = new Map((series || []).map(row => [row.slug, row.id]));
   const upcomingSeriesId = seriesIds.get('new_and_upcoming');
   if (!upcomingSeriesId) throw new Error('Active new_and_upcoming series is required');
@@ -147,8 +166,26 @@ export async function planRollingSocialCalendar(options: {
     const day = new Date(startDay.getTime() + offset * DAY_MS);
     const scheduledDate = dateOnly(day);
     const slugs = ROTATION[day.getUTCDay()];
-    slugs.forEach((slug, index) => {
-      const seriesId = seriesIds.get(slug);
+    slugs.forEach((initialSlug, index) => {
+      let slug: string = initialSlug;
+      const wk = getWeekKey(scheduledDate);
+
+      // Strict enforcement: only ONE spotlight per calendar week
+      if (SPOTLIGHT_SERIES_SLUGS.has(slug)) {
+        const count = weeklySpotlightCount.get(wk) || 0;
+        if (count >= 1) {
+          // A spotlight is already scheduled/approved for this week.
+          // Substitute extra spotlight slots with Nollywood Debate / Conversation.
+          slug = 'film_conversation';
+        } else {
+          // Single spotlight slot: alternate between actor spotlight and behind the camera across alternating weeks
+          const weekNum = Math.floor(new Date(`${scheduledDate}T12:00:00Z`).getTime() / (7 * 86_400_000));
+          slug = weekNum % 2 === 0 ? 'you_know_the_face' : 'behind_the_camera';
+          weeklySpotlightCount.set(wk, count + 1);
+        }
+      }
+
+      const seriesId = seriesIds.get(slug) || seriesIds.get('film_conversation');
       if (!seriesId) return;
       const plannerKey = `base:${scheduledDate}:${index + 1}`;
       if (lockedBaseKeys.has(plannerKey)) return;

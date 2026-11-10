@@ -2502,17 +2502,29 @@ export default function AdminSocialStudio() {
                                 <span className="font-mono text-[9px] font-bold text-text-muted">
                                   {slot.scheduled_time?.slice(0, 5) || '11:00'}
                                 </span>
-                                <span
-                                  className={`rounded px-1 text-[8px] font-black uppercase ${
-                                    isPublished
-                                      ? 'bg-emerald-500/20 text-emerald-400'
-                                      : isScheduled
-                                        ? 'bg-amber-500/20 text-amber-400'
-                                        : 'bg-brand/20 text-brand'
-                                  }`}
-                                >
-                                  {isPublished ? 'Live' : isScheduled ? 'Sched' : 'Plan'}
-                                </span>
+                                <div className="flex items-center gap-1">
+                                  {(series.slug === 'where_to_watch' || series.slug === 'new_and_upcoming') && (
+                                    <span className="rounded bg-rose-500/20 px-1 text-[7px] font-black uppercase text-rose-300">
+                                      Reel
+                                    </span>
+                                  )}
+                                  {['you_know_the_face', 'behind_the_camera', 'filmography', 'actor_spotlight'].includes(series.slug) && (
+                                    <span className="rounded bg-indigo-500/20 px-1 text-[7px] font-black uppercase text-indigo-300">
+                                      6-Slide
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`rounded px-1 text-[8px] font-black uppercase ${
+                                      isPublished
+                                        ? 'bg-emerald-500/20 text-emerald-400'
+                                        : isScheduled
+                                          ? 'bg-amber-500/20 text-amber-400'
+                                          : 'bg-brand/20 text-brand'
+                                    }`}
+                                  >
+                                    {isPublished ? 'Live' : isScheduled ? 'Sched' : 'Plan'}
+                                  </span>
+                                </div>
                               </div>
 
                               <div className="mt-1 flex items-center gap-1.5">
@@ -2593,12 +2605,25 @@ export default function AdminSocialStudio() {
                         </Pill>
                       </div>
 
-                      {/* Series Badge */}
-                      <div className="mt-3 flex items-center gap-1.5 text-brand">
-                        <Icon icon={icon} width="16" />
-                        <span className="text-xs font-black uppercase tracking-wider truncate">
-                          {series.name || 'Editorial Series'}
-                        </span>
+                      {/* Series Badge + Format Badge */}
+                      <div className="mt-3 flex items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5 text-brand min-w-0">
+                          <Icon icon={icon} width="16" className="shrink-0" />
+                          <span className="text-xs font-black uppercase tracking-wider truncate">
+                            {series.name || 'Editorial Series'}
+                          </span>
+                        </div>
+                        {(series.slug === 'where_to_watch' || series.slug === 'new_and_upcoming') ? (
+                          <span className="shrink-0 rounded-md bg-rose-500/20 border border-rose-500/30 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-rose-300 flex items-center gap-1">
+                            <Icon icon="solar:videocamera-record-bold" width="10" />
+                            9:16 Reel
+                          </span>
+                        ) : ['you_know_the_face', 'behind_the_camera', 'filmography', 'actor_spotlight'].includes(series.slug) ? (
+                          <span className="shrink-0 rounded-md bg-indigo-500/20 border border-indigo-500/30 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1">
+                            <Icon icon="solar:gallery-wide-bold" width="10" />
+                            6-Slide
+                          </span>
+                        ) : null}
                       </div>
 
                       {/* Auto-Assigned Candidate Box */}

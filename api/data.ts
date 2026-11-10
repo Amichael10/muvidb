@@ -98,6 +98,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { handleContributionNotifications } = await import('./_lib/contribution_notification_handler.js');
       return handleContributionNotifications(req, res);
     }
+    if (key === 'publish-contribution-image') {
+      const { handlePublishContributionImage } = await import('./_lib/publish_contribution_image_handler.js');
+      return handlePublishContributionImage(req, res);
+    }
     if (key === 'company-claims') {
       const { handleCompanyClaims } = await import('./_lib/company_claims_handler.js');
       return handleCompanyClaims(req, res);

@@ -123,9 +123,9 @@ describe('editorial selection engine', () => {
       status: 'planned',
       seriesSlug: 'filmography',
       dailyPeopleCount: 0,
-      weeklyPeopleCount: 2,
+      weeklyPeopleCount: 1,
       seriesAlreadyUsedToday: false,
-    })).toContain('Weekly');
+    })).toContain('one spotlight');
   });
 
   it('rejects old movies from previous years from streaming series', () => {

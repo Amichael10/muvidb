@@ -3612,8 +3612,6 @@ export async function getEditorialCalendar(days = 7, shuffleOffset = 0, startDat
       const isDailyProfileSeries = intent === 'people' || intent === 'crew';
       if (isDailyProfileSeries && candidate) {
         peopleByDate.set(dateKey, (peopleByDate.get(dateKey) || 0) + 1);
-      }
-      if (intent === 'people' && candidate) {
         peopleByWeek.set(week, (peopleByWeek.get(week) || 0) + 1);
       }
       const candidateContentType = candidate ? defaultContentTypeForSeries(slug, candidate.type) : null;
@@ -3766,9 +3764,11 @@ export async function approveEditorialSlot(
   }
   const isStagePlay = (input.candidateType === 'play' || (contentType as string) === 'theatre_spotlight' || (contentType as string) === 'whats_on_stage') && seriesSlug !== 'critics_say';
   const templateSlug = isStagePlay ? 'poster-only' : (input.templateSlug || defaultTemplateSlugForSeries(seriesSlug, input.candidateType));
-  // Editorial slots are rendered graphics, so TikTok is not a default
-  // destination. An explicit `input.platforms` still wins.
-  const platforms = input.platforms && input.platforms.length ? input.platforms : defaultPlatformsFor('graphic');
+  const isReelRequiredSeries = contentType === 'upcoming_movie' || contentType === 'where_to_watch';
+  // Reel-required editorial slots include TikTok and video destinations; graphics omit TikTok by default.
+  const platforms = input.platforms && input.platforms.length
+    ? input.platforms
+    : defaultPlatformsFor(isReelRequiredSeries ? 'video' : 'graphic');
 
   // Validate live theatre productions: reject archived / passed stage plays for upcoming listings
   if (isStagePlay) {
@@ -3892,7 +3892,6 @@ export async function approveEditorialSlot(
   }
 
   // 3b. Editorial Rule: New & Upcoming and Now Streaming must ALWAYS be 9:16 Video Reels (+ trending audio)
-  const isReelRequiredSeries = contentType === 'upcoming_movie' || contentType === 'where_to_watch';
   const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
   let hasVideoAsset = false;

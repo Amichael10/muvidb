@@ -287,7 +287,11 @@ function actorBody(snapshot: ActorSpotlightSnapshot, contentType?: string | null
 
   const titles = snapshot.knownFor.map(film => film.title).filter(Boolean);
   if (titles.length) {
-    lines.push(`From standout performances in ${joinTitles(titles)}, ${snapshot.name} continues to deliver unforgettable Nollywood cinema.`);
+    lines.push(
+      isBehindCamera
+        ? `From penning standout hits like ${joinTitles(titles)}, ${snapshot.name} continues to deliver unforgettable Nollywood cinema.`
+        : `From standout performances in ${joinTitles(titles)}, ${snapshot.name} continues to deliver unforgettable Nollywood cinema.`
+    );
   }
 
   const bio = firstUsableCopy(snapshot.bio);

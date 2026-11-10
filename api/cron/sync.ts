@@ -62,6 +62,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { name: 'theatre_hubs_sync', fn: syncAllTheatricalHubs },
         { name: 'utopia_theatre', fn: syncUtopiaTheatreProductions },
         ...(isSunday ? [{ name: 'critics', fn: runCriticsSync }] : []),
+        { name: 'box_office_digest', fn: async () => {
+          const { runBoxOfficeDigestSync } = await import('../_lib/box_office_digest.js');
+          return runBoxOfficeDigestSync();
+        }},
         { name: 'ai_maintenance', fn: runAIMaintenance },
         { name: 'social_plan', fn: () => planRollingSocialCalendar({ days: 7 }) }
       ];

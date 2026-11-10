@@ -197,6 +197,43 @@ THEME_STYLES.midnight = THEME_STYLES.sapphire;
 THEME_STYLES.neon = THEME_STYLES.cyan;
 THEME_STYLES.minimal = THEME_STYLES.obsidian;
 
+/**
+ * Flowing curved wave graphic for Career Impact metric cards,
+ * matching the signature MuviDB visual aesthetic.
+ */
+function MetricWave({ color = '#FF5A1F' }) {
+  return (
+    <svg
+      className="absolute bottom-0 right-0 w-32 sm:w-36 h-20 pointer-events-none opacity-40 overflow-visible select-none"
+      viewBox="0 0 140 80"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M0 65 C 45 65, 80 45, 140 10"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+      <path
+        d="M20 75 C 60 75, 95 55, 140 25"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        opacity="0.55"
+      />
+      <path
+        d="M40 80 C 80 80, 110 65, 140 40"
+        stroke={color}
+        strokeWidth="1"
+        strokeLinecap="round"
+        opacity="0.3"
+      />
+    </svg>
+  );
+}
+
 function getYouTubeVideoId(url) {
   if (!url) return null;
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|(?:embed|v|shorts)\/))([\w-]{11})/i);
@@ -526,7 +563,9 @@ export default function FilmmakerPortfolio() {
         icon: 'simple-icons:youtube',
         iconColor: 'text-[#FF0000]',
         badgeBg: 'bg-red-500/10',
+        waveColor: '#FF3B30',
         glowWave: 'from-red-600/30',
+        fontClass: 'font-mono font-extrabold',
       });
     }
 
@@ -540,7 +579,9 @@ export default function FilmmakerPortfolio() {
         icon: 'solar:clapperboard-play-bold',
         iconColor: 'text-amber-400',
         badgeBg: 'bg-amber-500/10',
+        waveColor: '#F59E0B',
         glowWave: 'from-amber-600/30',
+        fontClass: 'font-serif font-bold',
       });
     }
 
@@ -554,7 +595,9 @@ export default function FilmmakerPortfolio() {
         icon: 'solar:masks-bold',
         iconColor: 'text-orange-400',
         badgeBg: 'bg-orange-500/10',
+        waveColor: '#FB923C',
         glowWave: 'from-orange-600/30',
+        fontClass: 'font-serif font-bold',
       });
     }
   }
@@ -622,7 +665,7 @@ export default function FilmmakerPortfolio() {
     isInternal: true,
   });
 
-  // Booking inquiry
+  // Booking / Work inquiry
   overviewOfficialLinks.push({
     key: 'booking',
     title: 'Booking',
@@ -632,6 +675,29 @@ export default function FilmmakerPortfolio() {
     badgeBg: 'bg-brand/15',
     isAction: true,
   });
+
+  // Export CV
+  overviewOfficialLinks.push({
+    key: 'cv',
+    title: 'Export CV',
+    action: () => setPassportModalOpen(true),
+    icon: 'solar:document-text-bold',
+    iconColor: 'text-amber-400',
+    badgeBg: 'bg-amber-500/15',
+    isAction: true,
+  });
+
+  // Download EPK (if provided)
+  if (portfolio.epk_pdf_url) {
+    overviewOfficialLinks.push({
+      key: 'epk',
+      title: 'Download EPK',
+      url: portfolio.epk_pdf_url,
+      icon: 'solar:download-minimalistic-linear',
+      iconColor: 'text-rose-400',
+      badgeBg: 'bg-rose-500/15',
+    });
+  }
 
   // Filter filmography credits
   const filteredFilms = (allFilms || []).filter((film) => {
@@ -769,39 +835,22 @@ export default function FilmmakerPortfolio() {
             </div>
           </div>
 
-          {/* Primary Action CTAs: Work Inquiry, Export CV & EPK */}
-          <div className="mt-4 flex items-center gap-2">
+          {/* Short Link Pill (Frosted Glass as in Image 5) */}
+          <div className="mt-4 rounded-full bg-white/[0.06] border border-white/10 px-4 py-2.5 flex items-center justify-between text-xs backdrop-blur-md shadow-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Icon icon="solar:link-minimalistic-2-bold" className="text-brand shrink-0" width="16" />
+              <span className="font-mono text-zinc-200 text-xs sm:text-sm font-semibold truncate">
+                muvidb.com/@{handle}
+              </span>
+            </div>
             <button
               type="button"
-              onClick={() => setContactModalOpen(true)}
-              className="flex-1 rounded-full bg-brand text-black font-extrabold py-2.5 px-4 text-xs uppercase tracking-wider hover:brightness-110 active:scale-95 transition flex items-center justify-center gap-2 shadow-lg shadow-brand/20"
+              onClick={copyPortfolioLink}
+              className="p-1 text-zinc-400 hover:text-white transition active:scale-90 shrink-0 flex items-center gap-1"
+              title="Copy creator link"
             >
-              <Icon icon="solar:letter-bold" width="16" />
-              <span>Work Inquiry</span>
+              <Icon icon="solar:copy-linear" width="16" />
             </button>
-
-            <button
-              type="button"
-              onClick={() => setPassportModalOpen(true)}
-              className="flex-1 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 hover:border-brand/40 text-white font-bold py-2.5 px-4 text-xs transition flex items-center justify-center gap-2 active:scale-95 shadow-sm"
-              title="Customize & Export PDF Casting CV"
-            >
-              <Icon icon="solar:document-text-bold" width="16" className="text-brand" />
-              <span>Export CV</span>
-            </button>
-
-            {portfolio.epk_pdf_url && (
-              <a
-                href={portfolio.epk_pdf_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full border border-white/20 bg-white/5 hover:bg-white/10 hover:border-brand/40 text-white font-bold py-2.5 px-3.5 text-xs transition flex items-center justify-center gap-1.5 active:scale-95 shadow-sm shrink-0"
-                title="Download Electronic Press Kit"
-              >
-                <Icon icon="solar:download-minimalistic-linear" width="15" className="text-brand" />
-                <span className="hidden sm:inline">EPK</span>
-              </a>
-            )}
           </div>
         </section>
 
@@ -829,40 +878,36 @@ export default function FilmmakerPortfolio() {
             ) : (
               <div
                 onClick={() => setIsPlayingReel(true)}
-                className="relative aspect-[16/8] sm:aspect-[16/7] rounded-2xl overflow-hidden border border-white/15 shadow-xl group cursor-pointer bg-zinc-900"
+                className="relative rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-r from-[#171513] via-[#1a1715] to-[#121110] shadow-xl group cursor-pointer"
               >
-                <img
-                  src={reelThumbnail}
-                  alt={`${person.name} Showreel`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
-
-                {/* Center Play Button */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-black/50 border border-white/30 backdrop-blur-md flex items-center justify-center text-white shadow-xl group-hover:scale-110 group-hover:bg-brand group-hover:border-transparent group-hover:text-black transition-all duration-300">
-                    <Icon icon="solar:play-bold" width="20" className="ml-0.5" />
-                  </div>
-                </div>
-
-                {/* Bottom Left Info */}
-                <div className="absolute bottom-3 left-3 right-16 flex items-start gap-2">
-                  <span className="w-1 h-6 bg-brand rounded-full shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-white tracking-tight leading-snug truncate">
-                      Showreel
-                    </h4>
-                    <p className="text-[11px] text-zinc-300 truncate">
-                      Career highlights, directing & acting
+                <div className="flex items-center justify-between min-h-[135px] sm:min-h-[150px]">
+                  {/* Left Info & CTA */}
+                  <div className="flex-1 p-4 sm:p-5 z-10 min-w-0">
+                    <span className="block text-[10px] font-mono font-bold tracking-widest text-zinc-400 uppercase">
+                      SHOWREEL
+                    </span>
+                    <h3 className="text-base sm:text-lg font-bold text-white tracking-tight mt-0.5 truncate">
+                      {person.name}
+                    </h3>
+                    <p className="text-xs sm:text-sm font-serif italic text-zinc-400 mb-3 truncate">
+                      Director's Reel
                     </p>
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-brand hover:brightness-110 text-white font-bold px-3.5 py-1.5 text-xs shadow-md active:scale-95 transition">
+                      <Icon icon="solar:play-bold" width="13" />
+                      <span>Watch Showreel</span>
+                    </div>
                   </div>
-                </div>
 
-                {/* Bottom Right Duration Badge */}
-                <div className="absolute bottom-3 right-3">
-                  <span className="rounded bg-black/70 backdrop-blur-md px-2 py-0.5 text-[10px] font-mono font-medium text-white border border-white/10">
-                    Showreel
-                  </span>
+                  {/* Right Photo with Gradient Blend */}
+                  <div className="relative w-36 sm:w-48 h-[135px] sm:h-[150px] shrink-0 overflow-hidden">
+                    <img
+                      src={reelThumbnail}
+                      alt={`${person.name} Showreel`}
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#171513] via-[#171513]/40 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                  </div>
                 </div>
               </div>
             )}
@@ -915,7 +960,7 @@ export default function FilmmakerPortfolio() {
                   <span>{activeMetricCards[0].label}</span>
                 </div>
 
-                <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-mono">
+                <div className={`text-3xl sm:text-4xl text-white tracking-tight ${activeMetricCards[0].fontClass || 'font-mono font-extrabold'}`}>
                   {activeMetricCards[0].value}
                 </div>
 
@@ -923,7 +968,10 @@ export default function FilmmakerPortfolio() {
                   {activeMetricCards[0].desc1}
                 </p>
 
-                {/* Subtle corner wave */}
+                {/* Flowing wave graphic */}
+                <MetricWave color={activeMetricCards[0].waveColor || '#FF5A1F'} />
+
+                {/* Subtle corner glow */}
                 <div
                   className={`absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-gradient-to-tl ${activeMetricCards[0].glowWave} to-transparent blur-2xl pointer-events-none opacity-40`}
                 />
@@ -946,7 +994,7 @@ export default function FilmmakerPortfolio() {
                         <span className="truncate">{card.label}</span>
                       </div>
 
-                      <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-mono">
+                      <div className={`text-2xl sm:text-3xl text-white tracking-tight ${card.fontClass || 'font-mono font-extrabold'}`}>
                         {card.value}
                       </div>
                     </div>
@@ -954,6 +1002,9 @@ export default function FilmmakerPortfolio() {
                     <p className="text-[11px] text-zinc-400 mt-2 line-clamp-2">
                       {card.descMulti}
                     </p>
+
+                    {/* Flowing wave graphic */}
+                    <MetricWave color={card.waveColor || '#FF5A1F'} />
 
                     {/* Subtle glow wave in corner */}
                     <div
@@ -980,7 +1031,7 @@ export default function FilmmakerPortfolio() {
                         <span className="truncate">{card.label}</span>
                       </div>
 
-                      <div className="text-lg sm:text-2xl font-extrabold text-white tracking-tight font-mono">
+                      <div className={`text-lg sm:text-2xl text-white tracking-tight ${card.fontClass || 'font-mono font-extrabold'}`}>
                         {card.value}
                       </div>
                     </div>
@@ -988,6 +1039,9 @@ export default function FilmmakerPortfolio() {
                     <p className="text-[10px] text-zinc-400 mt-1.5 line-clamp-2 leading-tight">
                       {card.descMulti}
                     </p>
+
+                    {/* Flowing wave graphic */}
+                    <MetricWave color={card.waveColor || '#FF5A1F'} />
 
                     <div
                       className={`absolute -bottom-4 -right-4 w-16 h-16 rounded-full bg-gradient-to-tl ${card.glowWave} to-transparent blur-lg pointer-events-none opacity-40`}
@@ -999,44 +1053,44 @@ export default function FilmmakerPortfolio() {
           </section>
         )}
 
-        {/* Segmented Navigation Tabs */}
-        <nav className="border-b border-white/10 pt-2 pb-0 flex items-center justify-around">
+        {/* Segmented Navigation Tabs (Matching Image 5) */}
+        <nav className="rounded-full bg-[#1c1c1e]/90 border border-white/5 p-1 flex items-center justify-between shadow-inner">
           <button
             type="button"
             onClick={() => setPortfolioViewTab('overview')}
-            className={`py-2.5 px-4 text-xs sm:text-sm font-bold relative transition ${
+            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-full transition flex flex-col items-center justify-center relative ${
               portfolioViewTab === 'overview' ? 'text-white' : 'text-zinc-400 hover:text-white'
             }`}
           >
             <span>Overview</span>
             {portfolioViewTab === 'overview' && (
-              <span className="absolute bottom-0 inset-x-2 h-0.5 bg-brand rounded-full" />
+              <span className="w-10 h-0.5 bg-brand rounded-full mt-0.5" />
             )}
           </button>
 
           <button
             type="button"
             onClick={() => setPortfolioViewTab('credits')}
-            className={`py-2.5 px-4 text-xs sm:text-sm font-bold relative transition ${
+            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-full transition flex flex-col items-center justify-center relative ${
               portfolioViewTab === 'credits' ? 'text-white' : 'text-zinc-400 hover:text-white'
             }`}
           >
             <span>Credits</span>
             {portfolioViewTab === 'credits' && (
-              <span className="absolute bottom-0 inset-x-2 h-0.5 bg-brand rounded-full" />
+              <span className="w-10 h-0.5 bg-brand rounded-full mt-0.5" />
             )}
           </button>
 
           <button
             type="button"
             onClick={() => setPortfolioViewTab('links')}
-            className={`py-2.5 px-4 text-xs sm:text-sm font-bold relative transition ${
+            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-full transition flex flex-col items-center justify-center relative ${
               portfolioViewTab === 'links' ? 'text-white' : 'text-zinc-400 hover:text-white'
             }`}
           >
             <span>Links</span>
             {portfolioViewTab === 'links' && (
-              <span className="absolute bottom-0 inset-x-2 h-0.5 bg-brand rounded-full" />
+              <span className="w-10 h-0.5 bg-brand rounded-full mt-0.5" />
             )}
           </button>
         </nav>

@@ -209,16 +209,28 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
             <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">Weekly Run Tracking</h4>
             <div className="divide-y divide-border/40 rounded-xl border border-border overflow-hidden bg-surface-2/40">
               {weeklyHistory.map((week, idx) => (
-                <div key={idx} className="p-3 flex items-center justify-between text-xs">
+                <div key={idx} className="p-3 flex items-center justify-between text-xs hover:bg-surface-2/60 transition-colors">
                   <div>
-                    <span className="font-bold text-text-primary block">{week.label || (week.date ? '' : `Week ${idx + 1}`)}</span>
-                    <span className="text-[11px] text-text-muted">{week.date || ''}</span>
+                    <span className="font-bold text-text-primary block">{week.label || `Week ${week.week || (idx + 1)}`}</span>
+                    <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                      <span>{week.date || ''}</span>
+                      {week.locations ? (
+                        <span className="text-[10px] bg-surface px-1.5 py-0.5 rounded border border-border/60">
+                          {week.locations} screens
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="text-right">
                     <span className="font-bold text-brand block">{formatNaira(week.gross)}</span>
-                    {week.admissions ? (
-                      <span className="text-[10px] text-text-muted">{Number(week.admissions).toLocaleString()} admissions</span>
-                    ) : null}
+                    <div className="flex items-center justify-end gap-1.5 text-[10px] text-text-muted">
+                      {week.cumulative ? (
+                        <span className="font-mono">Total: {formatNaira(week.cumulative)}</span>
+                      ) : null}
+                      {week.admissions ? (
+                        <span>• {Number(week.admissions).toLocaleString()} adm.</span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               ))}

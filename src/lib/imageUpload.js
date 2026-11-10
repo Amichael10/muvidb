@@ -256,9 +256,37 @@ export async function signedContributionUrl(path) {
 export async function publishContributionImage(path, folder = 'people') {
   if (!path) return null;
 
+  // 1. Primary: Use server-side endpoint with service-role permissions (no RLS or CORS issues)
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (token) {
+      const resp = await fetch('/api/data?key=publish-contribution-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ path, folder }),
+      });
+
+      if (resp.ok) {
+        const result = await resp.json().catch(() => ({}));
+        if (result?.url) {
+          return result.url;
+        }
+      } else {
+        const errJson = await resp.json().catch(() => ({}));
+        console.warn('[publishContributionImage] Server publish API returned status:', resp.status, errJson?.error);
+      }
+    }
+  } catch (apiErr) {
+    console.warn('[publishContributionImage] Server publish API exception, attempting client fallback:', apiErr);
+  }
+
   let blob = null;
 
-  // 1. Try direct download from 'contributions' bucket
+  // 2. Client Fallback: Try direct download from 'contributions' bucket
   try {
     const { data, error } = await supabase.storage.from('contributions').download(path);
     if (!error && data) {
@@ -270,10 +298,11 @@ export async function publishContributionImage(path, folder = 'people') {
     console.warn('[publishContributionImage] Direct download exception:', err);
   }
 
-  // 2. Fallback to signed URL download if direct download failed
+  // 3. Fallback to signed URL download if direct download failed
+  let signedUrl = null;
   if (!blob) {
     try {
-      const signedUrl = await signedContributionUrl(path);
+      signedUrl = await signedContributionUrl(path);
       if (signedUrl) {
         const resp = await fetch(signedUrl);
         if (resp.ok) {
@@ -287,12 +316,39 @@ export async function publishContributionImage(path, folder = 'people') {
     }
   }
 
+  // 4. Fallback: If fetch(signedUrl) failed (e.g. CORS), extract via HTML Image element
+  if (!blob && signedUrl) {
+    try {
+      blob = await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return resolve(null);
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((b) => resolve(b), 'image/webp', 0.9);
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = signedUrl;
+      });
+    } catch (canvasFallbackErr) {
+      console.warn('[publishContributionImage] Canvas image extraction failed:', canvasFallbackErr);
+    }
+  }
+
   if (!blob) {
     console.error('[publishContributionImage] Could not download image data from contributions:', path);
     return null;
   }
 
-  // 3. Re-encode through canvas for security (metadata strip & normalization)
+  // 5. Re-encode through canvas for security (metadata strip & normalization)
   let clean = blob;
   try {
     clean = await reencodeToWebp(blob);
@@ -304,11 +360,11 @@ export async function publishContributionImage(path, folder = 'people') {
   const fileUuid = crypto.randomUUID();
   const targetBucket = (folder === 'posters' || folder === 'people' || folder === 'backdrops') ? folder : 'film-images';
 
-  // 4. Try upload to target bucket (e.g. 'posters' or 'people')
+  // 6. Try upload to target bucket (e.g. 'posters' or 'people')
   const fileName = `${fileUuid}.webp`;
   const { error: upErr1 } = await supabase.storage
     .from(targetBucket)
-    .upload(fileName, clean, { contentType: 'image/webp', upsert: true });
+    .upload(fileName, clean, { contentType: 'image/webp', upsert: false });
 
   if (!upErr1) {
     return `${base}/storage/v1/object/public/${targetBucket}/${fileName}`;
@@ -316,12 +372,12 @@ export async function publishContributionImage(path, folder = 'people') {
 
   console.warn(`[publishContributionImage] Upload to ${targetBucket} failed, trying film-images bucket:`, upErr1);
 
-  // 5. Fallback upload to 'film-images' bucket with safeFolder prefix
+  // 7. Fallback upload to 'film-images' bucket with safeFolder prefix
   const safeFolder = String(folder || 'posters').replace(/[^a-z0-9_-]/gi, '') || 'posters';
   const dest = `${safeFolder}/${fileUuid}.webp`;
   const { error: upErr2 } = await supabase.storage
     .from('film-images')
-    .upload(dest, clean, { contentType: 'image/webp', upsert: true });
+    .upload(dest, clean, { contentType: 'image/webp', upsert: false });
 
   if (!upErr2) {
     return `${base}/storage/v1/object/public/film-images/${dest}`;
