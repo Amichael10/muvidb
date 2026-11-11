@@ -424,8 +424,8 @@ export async function scrapeAriiyaTheatre(): Promise<DiscoveredPlay[]> {
 
       // Strict theatrical check: Only ingest if it is an actual stage play, musical, or opera production
       if (!isStrictTheatricalPlay(title, `${rawSlug} ${block}`)) {
-        console.log(`[theatre_hubs] Skipping non-theatrical MUSON event: "${title}" (Concert/Gala/Choral)`);
-        return results;
+        console.log(`[theatre_hubs] Skipping non-theatrical Ariiya event: "${title}" (Concert/Comedy/Party)`);
+        continue;
       }
 
       results.push({
@@ -690,7 +690,7 @@ export async function scrapeMusonTheatre(): Promise<DiscoveredPlay[]> {
       }
 
       // Strict theatrical check: Only ingest if it is an actual stage play, musical, or opera production
-      if (!isStrictTheatricalPlay(title, `${rawSlug} ${block}`)) {
+      if (!isStrictTheatricalPlay(title, md)) {
         console.log(`[theatre_hubs] Skipping non-theatrical MUSON event: "${title}" (Concert/Gala/Choral)`);
         return results;
       }

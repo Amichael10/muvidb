@@ -205,7 +205,7 @@ export async function handleContributionNotifications(req: VercelRequest, res: V
       if (item.target_table === 'films' && item.target_id) {
         const { data: film } = await supabase
           .from('films')
-          .select('title, year, slug')
+          .select('id, title, year, slug')
           .eq('id', item.target_id)
           .maybeSingle();
         if (film) {
@@ -215,7 +215,7 @@ export async function handleContributionNotifications(req: VercelRequest, res: V
       } else if (item.target_table === 'people' && item.target_id) {
         const { data: person } = await supabase
           .from('people')
-          .select('name, slug')
+          .select('id, name, slug')
           .eq('id', item.target_id)
           .maybeSingle();
         if (person) {

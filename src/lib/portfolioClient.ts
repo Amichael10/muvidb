@@ -7,6 +7,11 @@ export interface CustomLink {
   url: string;
   category?: 'press' | 'festival' | 'tickets' | 'social' | 'other';
   icon?: string;
+  _meta?: string;
+  show_metrics?: boolean;
+  show_box_office?: boolean;
+  show_youtube_views?: boolean;
+  filmography_order?: string[];
 }
 
 export interface PortfolioFilm {
@@ -19,7 +24,7 @@ export interface PortfolioFilm {
   synopsis: string | null;
   roles: string[];
   release_type?: string;
-  streaming_links?: Record<string, string>;
+  streaming_links?: Record<string, any>;
   is_featured?: boolean;
   box_office_domestic?: number | null;
   box_office_worldwide?: number | null;
