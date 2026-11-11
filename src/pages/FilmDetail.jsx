@@ -1246,34 +1246,38 @@ export default function FilmDetail() {
                     </div>
                   ) : showYoutubeViews ? (
                     /* Case 3: YouTube Full Movie Release with Dedicated Streaming Box Office Page Link */
-                    <Link 
-                      to={`/films/${film.slug || film.id}/box-office`}
-                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-brand/30 backdrop-blur-xl shadow-2xl hover:border-brand/60 hover:bg-black/80 w-full lg:w-72 xl:w-80 text-left transition-all cursor-pointer group"
-                      title="Click to view full YouTube streaming & ViewStats breakdown page"
+                    <div 
+                      className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-brand/30 backdrop-blur-xl shadow-2xl hover:border-brand/60 hover:bg-black/80 w-full lg:w-72 xl:w-80 text-left transition-all group"
                     >
-                      <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-brand uppercase tracking-widest mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <Icon icon="simple-icons:youtube" className="text-red-500 text-sm" />
-                          <span>Estimated Earnings</span>
-                        </div>
-                        <span className="inline-flex items-center gap-1 text-[10px] text-text-muted group-hover:text-brand transition-colors">
-                          <span>View Breakdown</span>
-                          <Icon icon="solar:arrow-right-up-linear" className="text-xs" />
-                        </span>
-                      </div>
-                      <div className="my-auto py-1 space-y-1">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <p className="text-xl sm:text-2xl font-black text-brand font-heading tracking-tight leading-none group-hover:underline decoration-brand/50 underline-offset-2">
-                            {youtubeBoxOffice?.formattedNgn}
-                          </p>
-                        </div>
-                        <div className="text-[11px] text-white/70 font-semibold flex items-center gap-2">
-                          <span>{youtubeBoxOffice?.formattedUsd}</span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-2 text-text-muted border border-border">
-                            Est. YouTube Earnings
+                      <Link
+                        to={`/films/${film.slug || film.id}/box-office`}
+                        className="block cursor-pointer"
+                        title="Click to view full YouTube streaming & ViewStats breakdown page"
+                      >
+                        <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-brand uppercase tracking-widest mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <Icon icon="simple-icons:youtube" className="text-red-500 text-sm" />
+                            <span>Estimated Earnings</span>
+                          </div>
+                          <span className="inline-flex items-center gap-1 text-[10px] text-text-muted group-hover:text-brand transition-colors">
+                            <span>View Breakdown</span>
+                            <Icon icon="solar:arrow-right-up-linear" className="text-xs" />
                           </span>
                         </div>
-                      </div>
+                        <div className="my-auto py-1 space-y-1">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <p className="text-xl sm:text-2xl font-black text-brand font-heading tracking-tight leading-none group-hover:underline decoration-brand/50 underline-offset-2">
+                              {youtubeBoxOffice?.formattedNgn}
+                            </p>
+                          </div>
+                          <div className="text-[11px] text-white/70 font-semibold flex items-center gap-2">
+                            <span>{youtubeBoxOffice?.formattedUsd}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface-2 text-text-muted border border-border">
+                              Est. YouTube Earnings
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
                       <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px]">
                         <span className="font-mono text-white/90 font-bold">
                           {formatViewCount(film.view_count)} views
@@ -1285,7 +1289,20 @@ export default function FilmDetail() {
                           </span>
                         )}
                       </div>
-                    </Link>
+                      {isAdmin && (
+                        <div className="pt-2 mt-2 border-t border-white/10">
+                          <button
+                            type="button"
+                            onClick={() => setShowBoxOfficeModal(true)}
+                            className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 text-xs font-bold border border-amber-500/30 transition-all cursor-pointer"
+                            title="Admin: Add Theatrical Cinema Box Office Figures"
+                          >
+                            <Icon icon="solar:ticket-bold" className="text-xs" />
+                            <span>+ Add Cinema Box Office</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     /* Case 4: Theatrical Cinema Film with Pending / Unrecorded Gross */
                     <div className="h-full flex flex-col justify-between p-4 sm:p-4.5 rounded-xl sm:rounded-2xl bg-black/60 border border-white/15 backdrop-blur-xl shadow-2xl w-full lg:w-64 xl:w-72 text-left">

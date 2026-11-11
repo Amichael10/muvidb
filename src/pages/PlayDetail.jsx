@@ -409,6 +409,42 @@ function AdminPlayBoxOfficeModal({ play, onClose, onUpdated }) {
   const [currency, setCurrency] = useState(play.box_office_currency || 'NGN');
   const [source, setSource] = useState(play.box_office_source || 'Official Venue Reporting');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const hasExistingFigures = play.box_office_domestic != null || play.box_office_tickets_sold != null;
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete all box office figures for "${play.title}"?`)) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase
+        .from('plays')
+        .update({
+          box_office_domestic: null,
+          box_office_tickets_sold: null,
+          box_office_currency: null,
+          box_office_source: null,
+          box_office_updated_at: null,
+          box_office_metrics: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', play.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      toast.success('Stage play box office deleted successfully!');
+      if (onUpdated) onUpdated(data);
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Could not delete play box office.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -504,21 +540,56 @@ function AdminPlayBoxOfficeModal({ play, onClose, onUpdated }) {
             />
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 bg-brand text-white font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-brand-hover transition-colors disabled:opacity-50 cursor-pointer shadow-md shadow-brand/20"
-            >
-              {saving ? 'Saving…' : 'Save Figures'}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-3 rounded-xl bg-surface-2 hover:bg-surface-3 text-text-secondary text-sm font-bold transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-border">
+            {hasExistingFigures ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={saving || deleting}
+                className="px-3.5 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Completely remove box office figures from this stage play"
+              >
+                {deleting ? (
+                  <>
+                    <Icon icon="solar:spinner-linear" className="animate-spin" width="16" />
+                    <span>Deleting…</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="solar:trash-bin-trash-bold" width="16" />
+                    <span>Delete Figures</span>
+                  </>
+                )}
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving || deleting}
+                className="px-4 py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 text-text-secondary text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || deleting}
+                className="px-5 py-2.5 bg-brand text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 hover:bg-brand-hover transition-colors disabled:opacity-50 cursor-pointer shadow-md shadow-brand/20"
+              >
+                {saving ? (
+                  <>
+                    <Icon icon="solar:spinner-linear" className="animate-spin" width="16" />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="solar:check-circle-bold" width="16" />
+                    <span>Save Figures</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>

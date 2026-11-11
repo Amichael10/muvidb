@@ -47,13 +47,69 @@ export default function AdminBoxOfficeModal({ film, onClose, onUpdated }) {
   const [currency, setCurrency] = useState(currentCurrency);
   const [source, setSource] = useState(currentSource);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const hasExistingFigures = Boolean(currentDomestic || currentWorldwide || currentOpening);
 
   const parsedDom = parseAmount(domestic);
   const parsedWw = parseAmount(worldwide);
   const parsedOpen = parseAmount(openingWeekend);
 
+  const handleDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete and completely remove box office figures for "${film.title}"?`)) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const now = new Date().toISOString();
+      const existingStreaming = typeof film.streaming_links === 'object' && film.streaming_links !== null
+        ? { ...film.streaming_links }
+        : {};
+      delete existingStreaming.box_office;
+
+      const payload = {
+        box_office_domestic: null,
+        box_office_worldwide: null,
+        box_office_opening_weekend: null,
+        box_office_currency: null,
+        box_office_source: null,
+        box_office_updated_at: null,
+        streaming_links: existingStreaming,
+        updated_at: now
+      };
+
+      const { data, error } = await supabase
+        .from('films')
+        .update(payload)
+        .eq('id', film.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Box office figures deleted successfully.');
+      if (onUpdated) onUpdated(data);
+      onClose();
+    } catch (err) {
+      console.error('Error deleting box office:', err);
+      toast.error(err.message || 'Failed to delete box office figures');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
+
+    if (!parsedDom && !parsedWw && !parsedOpen) {
+      if (hasExistingFigures) {
+        return handleDelete();
+      }
+      toast.error('Please enter a valid box office amount.');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -154,7 +210,6 @@ export default function AdminBoxOfficeModal({ film, onClose, onUpdated }) {
                 onChange={(e) => setDomestic(e.target.value)}
                 placeholder="e.g. 550,000,000 or 550m or 1.2b"
                 className="w-full bg-surface-2 border border-border text-text-primary rounded-xl px-4 py-3 text-sm focus:border-brand focus:outline-none placeholder-text-muted transition-all font-mono"
-                required
               />
             </div>
             <p className="text-text-muted text-[11px]">
@@ -238,32 +293,56 @@ export default function AdminBoxOfficeModal({ film, onClose, onUpdated }) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-6 border-t border-border">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="px-4 py-2.5 rounded-xl border border-border text-text-secondary hover:text-text-primary text-xs font-bold transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-colors shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {saving ? (
-                <>
-                  <Icon icon="solar:spinner-linear" className="animate-spin" width="16" />
-                  <span>Saving…</span>
-                </>
-              ) : (
-                <>
-                  <Icon icon="solar:check-circle-bold" width="16" />
-                  <span>Save Figures</span>
-                </>
-              )}
-            </button>
+          <div className="flex items-center justify-between gap-3 pt-6 border-t border-border">
+            {hasExistingFigures ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={saving || deleting}
+                className="px-3.5 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Completely remove box office figures from this film"
+              >
+                {deleting ? (
+                  <>
+                    <Icon icon="solar:spinner-linear" className="animate-spin" width="16" />
+                    <span>Deleting…</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="solar:trash-bin-trash-bold" width="16" />
+                    <span>Delete Figures</span>
+                  </>
+                )}
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving || deleting}
+                className="px-4 py-2.5 rounded-xl border border-border text-text-secondary hover:text-text-primary text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || deleting}
+                className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-colors shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <Icon icon="solar:spinner-linear" className="animate-spin" width="16" />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="solar:check-circle-bold" width="16" />
+                    <span>Save Figures</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>
