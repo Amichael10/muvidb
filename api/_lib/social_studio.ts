@@ -2828,9 +2828,20 @@ export async function scheduleContentItem(
 
   for (const variant of variants) {
     if (getSocialPublishMode() === 'live') {
-      const connectionId = await resolveDestinationConnection(item.destination_id, variant.platform, item.content_type);
-      const { error: routeError } = await supabase.from('social_platform_variants').update({ connection_id: connectionId }).eq('id', variant.id);
-      if (routeError) throw routeError;
+      try {
+        const connectionId = await resolveDestinationConnection(item.destination_id, variant.platform, item.content_type);
+        const { error: routeError } = await supabase.from('social_platform_variants').update({ connection_id: connectionId }).eq('id', variant.id);
+        if (routeError) throw routeError;
+      } catch (connErr: any) {
+        console.warn(`[social_studio] Platform "${variant.platform}" connection requires attention: ${connErr?.message || connErr}.`);
+        await supabase
+          .from('social_platform_variants')
+          .update({
+            status: 'error',
+            error_message: connErr?.message || 'Connection requires reconnection'
+          })
+          .eq('id', variant.id);
+      }
     }
     const isCarousel = variant.platform_options?.post_format === 'carousel';
     const urls = isCarousel && Array.isArray(variant.platform_options?.carousel_asset_urls)
@@ -3926,10 +3937,14 @@ export async function approveEditorialSlot(
       ? new Date(Date.now() + 10_000).toISOString()
       : new Date(targetMs).toISOString();
 
-    scheduledItem = await scheduleContentItem(
-      { contentItemId: draft.contentItem.id, scheduledFor: effectiveScheduledFor },
-      actor,
-    );
+    try {
+      scheduledItem = await scheduleContentItem(
+        { contentItemId: draft.contentItem.id, scheduledFor: effectiveScheduledFor },
+        actor,
+      );
+    } catch (schedErr: any) {
+      console.warn(`[social_studio] Warning during auto-scheduling of draft ${draft.contentItem.id}:`, schedErr?.message || schedErr);
+    }
   }
 
   // 5. Link to calendar slot

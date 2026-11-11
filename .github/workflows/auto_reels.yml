@@ -30,6 +30,7 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
       R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+      SOCIAL_TOKEN_ENCRYPTION_KEY: ${{ secrets.SOCIAL_TOKEN_ENCRYPTION_KEY }}
       SOCIAL_STUDIO_ENABLED: 'true'
       SOCIAL_PUBLISH_MODE: 'live'
 

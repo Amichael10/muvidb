@@ -141,22 +141,26 @@ export async function preRenderUpcomingReels(daysAhead: number = 7, startTomorro
         .eq('id', slot.id);
     }
 
-    // Approve slot and generate draft + reel
-    const approvalResult = await approveEditorialSlot(
-      {
-        slotId: slot.id,
-        candidateId,
-        candidateType,
-        scheduledDate: slot.scheduled_date,
-        scheduledTime: slot.scheduled_time,
-        platforms: ['instagram', 'threads', 'facebook', 'tiktok'],
-      },
-      SYSTEM_ACTOR,
-    );
+    try {
+      // Approve slot and generate draft + reel
+      const approvalResult = await approveEditorialSlot(
+        {
+          slotId: slot.id,
+          candidateId,
+          candidateType,
+          scheduledDate: slot.scheduled_date,
+          scheduledTime: slot.scheduled_time,
+          platforms: ['instagram', 'threads', 'facebook', 'tiktok'],
+        },
+        SYSTEM_ACTOR,
+      );
 
-    const draftId = approvalResult.draft?.contentItem?.id || approvalResult.contentItem?.id;
-    console.log(`[auto_render_reels] Successfully approved and rendered reel for "${candidateName}"! Draft ID: ${draftId}`);
-    claimedCandidateIds.add(candidateId);
+      const draftId = approvalResult.draft?.contentItem?.id || approvalResult.contentItem?.id;
+      console.log(`[auto_render_reels] Successfully approved and rendered reel for "${candidateName}"! Draft ID: ${draftId}`);
+      claimedCandidateIds.add(candidateId);
+    } catch (err: any) {
+      console.error(`[auto_render_reels] Failed to approve/render reel for "${candidateName}" (${slot.id}):`, err?.message || err);
+    }
   }
 
   console.log('\n[auto_render_reels] Completed reel pre-rendering scan.');
