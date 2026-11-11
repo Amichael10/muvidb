@@ -252,18 +252,6 @@ export default function BoxOfficeBreakdownModal({ film, onClose, isAdmin: propIs
           </div>
         )}
 
-        {/* Source & Verification Footer — Restricted to Admins only */}
-        {isAdmin && (
-          <div className="pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-text-muted bg-surface-2/30 -mx-6 -mb-6 p-4 rounded-b-2xl">
-            <div className="flex items-center gap-1.5">
-              <Icon icon="solar:shield-check-bold" className="text-emerald-400 text-sm" />
-              <span>Verified Source (Admin): <strong className="text-text-primary">{source}</strong></span>
-            </div>
-            {sourceIssue && (
-              <span className="text-[11px] text-text-muted italic truncate max-w-xs">{sourceIssue}</span>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

@@ -39,7 +39,7 @@ export default function AdminBoxOfficeModal({ film, onClose, onUpdated }) {
   const currentWorldwide = film.box_office_worldwide || film.streaming_links?.box_office?.worldwide || '';
   const currentOpening = film.box_office_opening_weekend || '';
   const currentCurrency = film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN';
-  const currentSource = film.box_office_source || film.streaming_links?.box_office?.source || 'CEAN Official';
+  const currentSource = film.box_office_source || film.streaming_links?.box_office?.source || '';
 
   const [domestic, setDomestic] = useState(currentDomestic ? String(currentDomestic) : '');
   const [worldwide, setWorldwide] = useState(currentWorldwide ? String(currentWorldwide) : '');
@@ -123,7 +123,7 @@ export default function AdminBoxOfficeModal({ film, onClose, onUpdated }) {
         worldwide: parsedWw,
         opening_weekend: parsedOpen,
         currency,
-        source: source.trim() || 'CEAN Official',
+        source: source.trim() || null,
         updated_at: now
       };
 
@@ -132,7 +132,7 @@ export default function AdminBoxOfficeModal({ film, onClose, onUpdated }) {
         box_office_worldwide: parsedWw,
         box_office_opening_weekend: parsedOpen,
         box_office_currency: currency,
-        box_office_source: source.trim() || 'CEAN Official',
+        box_office_source: source.trim() || null,
         box_office_updated_at: now,
         streaming_links: {
           ...existingStreaming,
@@ -280,13 +280,13 @@ export default function AdminBoxOfficeModal({ film, onClose, onUpdated }) {
 
             <div className="space-y-1.5">
               <label className="text-text-secondary text-xs font-bold uppercase tracking-wider block">
-                Data Source / Verification
+                Private Internal Reference (Never Shown Publicly)
               </label>
               <input
                 type="text"
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
-                placeholder="e.g. CEAN Official"
+                placeholder="e.g. Internal record (hidden from public)"
                 className="w-full bg-surface-2 border border-border text-text-primary rounded-xl px-4 py-3 text-sm focus:border-brand focus:outline-none placeholder-text-muted"
               />
             </div>

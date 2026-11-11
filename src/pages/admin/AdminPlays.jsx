@@ -667,11 +667,6 @@ export default function AdminPlays() {
                       {Number(play.box_office_tickets_sold || 0) > 0 && (
                         <span className="text-amber-400/80 font-normal">({Number(play.box_office_tickets_sold).toLocaleString()} tix)</span>
                       )}
-                      {play.box_office_source && (
-                        <span className="text-[9px] uppercase tracking-wider text-amber-400/60 font-black ml-1">
-                          • {play.box_office_source}
-                        </span>
-                      )}
                     </div>
                   )}
 

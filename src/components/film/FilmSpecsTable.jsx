@@ -236,11 +236,6 @@ export default function FilmSpecsTable({
             </span>
             <Icon icon="solar:arrow-right-up-linear" className="text-xs opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
           </button>
-          {isAdmin && (
-            <span className="text-[10px] uppercase font-bold text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
-              {film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN'}
-            </span>
-          )}
           {isAdmin && onEditBoxOffice ? (
             <button
               type="button"

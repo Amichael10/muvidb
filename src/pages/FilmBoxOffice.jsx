@@ -1325,24 +1325,6 @@ export default function FilmBoxOffice() {
           </>
         )}
 
-        {/* ADMIN-ONLY SOURCE CITATION RECORD */}
-        {isAdmin && (
-          <div className="p-4 rounded-xl bg-surface-2 border border-border/80 flex items-start gap-3">
-            <Icon icon="solar:shield-check-bold" className="text-emerald-400 text-lg shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  Admin Internal Record
-                </span>
-                <span className="text-xs font-bold text-text-primary">Verified Attribution</span>
-              </div>
-              <p className="text-xs text-text-muted font-mono leading-relaxed">
-                Source: {source}
-              </p>
-            </div>
-          </div>
-        )}
-
       </main>
 
       {showBoxOfficeModal && film && (

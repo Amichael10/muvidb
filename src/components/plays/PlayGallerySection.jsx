@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import PlayPhotoLightboxModal from './PlayPhotoLightboxModal';
@@ -26,7 +26,33 @@ export default function PlayGallerySection({
   const [isDragging, setIsDragging] = useState(false);
   const [brokenImageIds, setBrokenImageIds] = useState(new Set());
   const [saving, setSaving] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
   const fileInputRef = useRef(null);
+  const sliderRef = useRef(null);
+
+  const checkScroll = useCallback(() => {
+    if (sliderRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = sliderRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, [images, checkScroll]);
+
+  const scroll = (direction) => {
+    if (sliderRef.current) {
+      const { clientWidth } = sliderRef.current;
+      const scrollAmount = direction === 'left' ? -clientWidth * 0.75 : clientWidth * 0.75;
+      sliderRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   const [newImage, setNewImage] = useState({
     url: '',
@@ -177,7 +203,7 @@ export default function PlayGallerySection({
   return (
     <section className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-brand mb-1">
             Production Media & Stills
@@ -191,22 +217,60 @@ export default function PlayGallerySection({
           </h2>
         </div>
 
-        {isAdmin && (
-          <button
-            type="button"
-            onClick={() => {
-              resetForm();
-              setShowAddModal(true);
-            }}
-            className="px-3.5 py-1.5 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Icon icon="solar:add-circle-bold" className="text-base" />
-            <span>Add Photo</span>
-          </button>
-        )}
+        {/* Action Controls: Fullscreen View, Slider Nav Arrows, Add Photo */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {images.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setActiveLightboxIndex(0)}
+              className="px-3.5 py-1.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border/80 hover:border-brand/50 text-text-primary text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer group"
+              title="Open full screen lightbox gallery"
+            >
+              <Icon icon="solar:maximize-square-bold" className="text-sm text-brand group-hover:scale-110 transition-transform" />
+              <span>Full Screen View</span>
+            </button>
+          )}
+
+          {images.length > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => scroll('left')}
+                disabled={!canScrollLeft}
+                className="w-8 h-8 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border/80 flex items-center justify-center text-text-primary transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                aria-label="Scroll left"
+              >
+                <Icon icon="solar:alt-arrow-left-linear" className="text-base" />
+              </button>
+              <button
+                type="button"
+                onClick={() => scroll('right')}
+                disabled={!canScrollRight}
+                className="w-8 h-8 rounded-xl bg-surface-2 hover:bg-surface-3 border border-border/80 flex items-center justify-center text-text-primary transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                aria-label="Scroll right"
+              >
+                <Icon icon="solar:alt-arrow-right-linear" className="text-base" />
+              </button>
+            </div>
+          )}
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setShowAddModal(true);
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Icon icon="solar:add-circle-bold" className="text-base" />
+              <span>Add Photo</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Gallery Grid or Admin Empty State */}
+      {/* Gallery Slider or Admin Empty State */}
       {images.length === 0 ? (
         isAdmin && (
           <div className="p-8 rounded-2xl bg-surface border border-dashed border-border/80 text-center space-y-3">
@@ -231,78 +295,120 @@ export default function PlayGallerySection({
           </div>
         )
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-          {images.map((img, idx) => {
-            const isBroken = brokenImageIds.has(img.id);
+        <div className="relative group/slider -mx-4 sm:mx-0">
+          {/* Edge Gradients for Desktop */}
+          <div
+            className={`absolute top-0 left-0 bottom-0 w-16 z-10 bg-gradient-to-r from-bg to-transparent pointer-events-none transition-opacity duration-300 hidden md:block ${
+              canScrollLeft ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+          <div
+            className={`absolute top-0 right-0 bottom-0 w-16 z-10 bg-gradient-to-l from-bg to-transparent pointer-events-none transition-opacity duration-300 hidden md:block ${
+              canScrollRight ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
 
-            return (
-              <div
-                key={img.id || idx}
-                onClick={() => !isBroken && setActiveLightboxIndex(idx)}
-                className="group relative rounded-2xl border border-border/80 hover:border-brand/60 bg-surface overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/5 flex flex-col"
-              >
-                <div className="relative aspect-[4/3] bg-surface-2 overflow-hidden flex items-center justify-center">
-                  {isBroken ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-surface-2/80 text-text-muted">
-                      <Icon icon="solar:gallery-broken-bold" className="w-8 h-8 text-amber-500/60 mb-1" />
-                      <span className="text-[10px] font-bold text-text-secondary">Image Unavailable</span>
-                      <span className="text-[9px] text-text-muted line-clamp-1 mt-0.5">Link could not be loaded</span>
+          {/* Horizontal Slider Track */}
+          <div
+            ref={sliderRef}
+            onScroll={checkScroll}
+            className="flex overflow-x-auto gap-3.5 sm:gap-4 py-2 px-4 sm:px-0 scrollbar-none snap-x snap-mandatory scroll-smooth overscroll-x-contain"
+          >
+            {images.map((img, idx) => {
+              const isBroken = brokenImageIds.has(img.id);
+
+              return (
+                <div
+                  key={img.id || idx}
+                  onClick={() => !isBroken && setActiveLightboxIndex(idx)}
+                  className="w-72 sm:w-80 md:w-96 shrink-0 snap-start group relative rounded-2xl border border-border/80 hover:border-brand/60 bg-surface overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand/5 flex flex-col select-none"
+                >
+                  <div className="relative aspect-[16/10] bg-surface-2 overflow-hidden flex items-center justify-center">
+                    {isBroken ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-surface-2/80 text-text-muted">
+                        <Icon icon="solar:gallery-broken-bold" className="w-8 h-8 text-amber-500/60 mb-1" />
+                        <span className="text-[10px] font-bold text-text-secondary">Image Unavailable</span>
+                        <span className="text-[9px] text-text-muted line-clamp-1 mt-0.5">Link could not be loaded</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={img.url}
+                        alt={img.caption || `${play?.title} production still`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        loading="lazy"
+                        onError={() => {
+                          setBrokenImageIds((prev) => new Set([...prev, img.id]));
+                        }}
+                      />
+                    )}
+
+                    {/* Gradient vignette */}
+                    {!isBroken && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                    )}
+
+                    {/* Type Badge */}
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10 pointer-events-none">
+                      <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-black/75 text-amber-300 backdrop-blur-md border border-white/10 shadow-sm">
+                        {img.image_type?.replace(/_/g, ' ') || 'Still'}
+                      </span>
+                      {img.is_primary && (
+                        <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-brand text-white shadow-sm">
+                          Key Art
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    <img
-                      src={img.url}
-                      alt={img.caption || `${play?.title} production still`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                      onError={() => {
-                        setBrokenImageIds((prev) => new Set([...prev, img.id]));
-                      }}
-                    />
-                  )}
 
-                  {/* Gradient vignette */}
-                  {!isBroken && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
-                  )}
+                    {/* Top Right Action Overlay: Full Screen Icon & Admin Delete */}
+                    <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-20">
+                      {!isBroken && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveLightboxIndex(idx);
+                          }}
+                          className="p-1.5 rounded-lg bg-black/70 hover:bg-black text-white/90 hover:text-white backdrop-blur-md border border-white/15 transition-all cursor-pointer shadow-md hover:scale-105"
+                          title="Full Screen View"
+                          aria-label="Full Screen View"
+                        >
+                          <Icon icon="solar:maximize-square-bold" className="text-sm" />
+                        </button>
+                      )}
 
-                  {/* Badge */}
-                  <div className="absolute top-2 left-2 flex gap-1 z-10">
-                    <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-black/70 text-amber-300 backdrop-blur-xs border border-white/10">
-                      {img.image_type?.replace(/_/g, ' ') || 'Still'}
-                    </span>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteImage(e, img.id)}
+                          className="p-1.5 rounded-lg bg-red-950/90 hover:bg-red-800 text-red-200 backdrop-blur-md border border-red-500/30 transition-all cursor-pointer shadow-md hover:scale-105"
+                          title="Delete image"
+                        >
+                          <Icon icon="solar:trash-bin-trash-bold" className="text-sm" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Center Zoom Hint on Hover */}
+                    {!isBroken && (
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                        <div className="px-3 py-1.5 rounded-xl bg-black/80 backdrop-blur-md border border-white/20 text-white text-xs font-semibold shadow-xl scale-95 group-hover:scale-100 transition-transform flex items-center gap-1.5">
+                          <Icon icon="solar:maximize-square-bold" className="text-sm text-brand" />
+                          <span>Full Screen View</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Admin Delete Action */}
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleDeleteImage(e, img.id)}
-                      className="absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-red-950/90 hover:bg-red-800 text-red-200 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity cursor-pointer shadow-md"
-                      title="Delete image"
-                    >
-                      <Icon icon="solar:trash-bin-trash-bold" className="text-xs" />
-                    </button>
-                  )}
-
-                  {/* Center Zoom Icon on Hover */}
-                  {!isBroken && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                      <div className="p-2.5 rounded-full bg-brand text-white shadow-lg scale-90 group-hover:scale-100 transition-transform">
-                        <Icon icon="solar:magnifer-zoom-in-bold" className="text-lg" />
-                      </div>
+                  {/* Caption Footer */}
+                  {img.caption && (
+                    <div className="p-3 bg-surface border-t border-border/40 text-xs font-medium text-text-secondary line-clamp-1">
+                      {img.caption}
                     </div>
                   )}
                 </div>
-
-                {/* Caption Footer */}
-                {img.caption && (
-                  <div className="p-2.5 bg-surface border-t border-border/40 text-[11px] font-medium text-text-secondary line-clamp-1">
-                    {img.caption}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 

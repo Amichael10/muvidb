@@ -407,7 +407,7 @@ function AdminPlayBoxOfficeModal({ play, onClose, onUpdated }) {
   const [gross, setGross] = useState(play.box_office_domestic != null ? String(play.box_office_domestic) : '');
   const [tickets, setTickets] = useState(play.box_office_tickets_sold != null ? String(play.box_office_tickets_sold) : '');
   const [currency, setCurrency] = useState(play.box_office_currency || 'NGN');
-  const [source, setSource] = useState(play.box_office_source || 'Official Venue Reporting');
+  const [source, setSource] = useState(play.box_office_source || '');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -459,7 +459,7 @@ function AdminPlayBoxOfficeModal({ play, onClose, onUpdated }) {
           box_office_domestic: parsedGross,
           box_office_tickets_sold: parsedTickets,
           box_office_currency: currency,
-          box_office_source: source.trim() || 'Official Venue Reporting',
+          box_office_source: source.trim() || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', play.id)
@@ -530,12 +530,12 @@ function AdminPlayBoxOfficeModal({ play, onClose, onUpdated }) {
           </div>
 
           <div>
-            <label className="text-xs font-bold text-text-secondary block mb-1">Source / Verification Proof</label>
+            <label className="text-xs font-bold text-text-secondary block mb-1">Private Internal Reference (Never Shown Publicly)</label>
             <input
               type="text"
               value={source}
               onChange={(e) => setSource(e.target.value)}
-              placeholder="e.g. Ticket Tailor report, Press Release"
+              placeholder="e.g. Internal tracking (hidden from public)"
               className="w-full bg-surface-2 border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary focus:border-brand focus:outline-none"
             />
           </div>
@@ -715,16 +715,6 @@ function PlayBoxOfficeModal({ play, playDateLabel, onClose, isAdmin = false }) {
             </div>
           </div>
         </div>
-
-        {/* Source verification footer — visible ONLY to admins */}
-        {isAdmin && (
-          <div className="pt-3 border-t border-border flex items-center justify-between text-xs text-text-muted bg-surface-2/30 -mx-6 -mb-6 p-4 rounded-b-2xl">
-            <div className="flex items-center gap-1.5">
-              <Icon icon="solar:shield-check-bold" className="text-emerald-400 text-sm" />
-              <span>Verified Source (Admin): <strong className="text-text-primary">{play.box_office_source || 'Immersia'}</strong></span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── MOBILE STICKY BOTTOM ACTION DOCK (md:hidden) ── */}

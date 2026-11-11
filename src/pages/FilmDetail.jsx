@@ -655,7 +655,6 @@ export default function FilmDetail() {
     ? `${(domGross / 1_000_000).toFixed(1)} Million`
     : domGross > 0 ? domGross.toLocaleString('en-NG') : null;
   const rawFormatted = domGross.toLocaleString('en-NG');
-  const sourceLabel = film.box_office_source || film.streaming_links?.box_office?.source || 'Verified CEAN';
   const openingGross = Number(film.box_office_opening_weekend || film.streaming_links?.box_office?.opening_weekend || 0);
 
   // A film has genuine YouTube Movie views ONLY if:

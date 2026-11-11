@@ -96,14 +96,32 @@ export default function PlayPhotoLightboxModal({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
-          aria-label="Close photo preview"
-        >
-          <Icon icon="solar:close-circle-bold" className="text-2xl" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen?.().catch(() => {});
+              } else {
+                document.exitFullscreen?.().catch(() => {});
+              }
+            }}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+            title="Toggle Browser Fullscreen"
+            aria-label="Toggle Fullscreen"
+          >
+            <Icon icon="solar:maximize-square-bold" className="text-xl" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+            aria-label="Close photo preview"
+          >
+            <Icon icon="solar:close-circle-bold" className="text-2xl" />
+          </button>
+        </div>
       </div>
 
       {/* Main Image View */}
