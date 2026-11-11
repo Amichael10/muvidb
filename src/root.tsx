@@ -175,8 +175,9 @@ function AppChrome({ children }: { children: ReactNode }) {
   // always had this check; it was missed when the SSR layout was introduced,
   // which is why /@handle showed two navs and two footers.
   const isPortfolioPath = location.pathname.startsWith('/@') || location.pathname.startsWith('/portfolio/');
+  const isMirrorPath = location.pathname.startsWith('/mirror');
 
-  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath || isPortfolioPath;
+  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath || isPortfolioPath || isMirrorPath;
 
   return (
     <div className="min-h-screen flex flex-col bg-bg text-text-primary">
