@@ -56,6 +56,7 @@ const ClaimProfile = lazyWithRetry(() => import('./pages/ClaimProfile'));
 
 const PersonDetail = lazyWithRetry(() => import('./pages/PersonDetailV2'));
 const FilmmakerPortfolio = lazyWithRetry(() => import('./pages/FilmmakerPortfolio'));
+const LumiMirrorPreview = lazyWithRetry(() => import('./pages/LumiMirrorPreview'));
 const Showtimes = lazyWithRetry(() => import('./pages/Showtimes'));
 const BoxOffice = lazyWithRetry(() => import('./pages/BoxOffice'));
 const FilmBoxOffice = lazyWithRetry(() => import('./pages/FilmBoxOffice'));
@@ -184,7 +185,7 @@ function Layout({ children }) {
   const isWaitlistPath = location.pathname === '/waitlist';
   const isPortfolioPath = location.pathname.startsWith('/@') || location.pathname.startsWith('/portfolio/');
   
-  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath || isPortfolioPath;
+  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath || isPortfolioPath || location.pathname.startsWith('/mirror');
   
   return (
     <div className="min-h-screen flex flex-col bg-bg text-text-primary">
@@ -358,6 +359,11 @@ export default function App() {
                 <Route path="/portfolio/:handle" element={<FilmmakerPortfolio />} />
                 <Route path="/@:handle" element={<FilmmakerPortfolio />} />
                 <Route path="/@*" element={<FilmmakerPortfolio />} />
+                {/* Lumi Mirror (Isolated Mirra-grade preview) */}
+                <Route path="/mirror-preview/:handle" element={<LumiMirrorPreview />} />
+                <Route path="/mirror-preview" element={<LumiMirrorPreview />} />
+                <Route path="/mirror-demo" element={<LumiMirrorPreview />} />
+                <Route path="/mirror/:handle" element={<LumiMirrorPreview />} />
                 <Route path="/showtimes" element={<Showtimes />} />
                 <Route path="/box-office" element={<BoxOffice />} />
                 <Route path="/cinemas" element={<Cinemas />} />
