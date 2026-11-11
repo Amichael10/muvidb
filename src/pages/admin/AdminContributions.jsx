@@ -8,6 +8,7 @@ import {
   CONTRIBUTION_LABELS,
   PERSON_EDIT_FIELDS,
   FILM_EDIT_FIELDS,
+  PLAY_EDIT_FIELDS,
   SUBMIT_KINDS,
   GENDER_OPTIONS,
   NFVCB_RATING_OPTIONS,
@@ -34,14 +35,16 @@ const TYPE_STYLE = {
   new_channel: { icon: 'solar:videocamera-record-bold', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
   edit_person: { icon: 'solar:pen-2-bold', color: 'text-blue-500', bg: 'bg-blue-500/10' },
   edit_film: { icon: 'solar:pen-2-bold', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  edit_play: { icon: 'solar:masks-line-bold', color: 'text-purple-500', bg: 'bg-purple-500/10' },
   report_link: { icon: 'solar:flag-bold', color: 'text-red-500', bg: 'bg-red-500/10' },
   report_channel: { icon: 'solar:flag-bold', color: 'text-red-500', bg: 'bg-red-500/10' },
+  report_play: { icon: 'solar:flag-bold', color: 'text-red-500', bg: 'bg-red-500/10' },
 };
 
 /** Types whose payload is a flat map that creates a brand-new record. */
 const CREATE_TYPES = new Set(['new_person', 'new_film', 'new_channel']);
 /** Types whose payload nests the proposal under `fields`. */
-const EDIT_TYPES = new Set(['edit_person', 'edit_film']);
+const EDIT_TYPES = new Set(['edit_person', 'edit_film', 'edit_play']);
 
 // The field definitions behind each contribution type. These are the very same
 // arrays the public forms are rendered from, so a review row gets the real
@@ -53,6 +56,7 @@ const SCHEMA_FIELDS = {
   new_channel: SUBMIT_KINDS.channel.fields,
   edit_person: PERSON_EDIT_FIELDS,
   edit_film: FILM_EDIT_FIELDS,
+  edit_play: PLAY_EDIT_FIELDS,
 };
 
 // Keys the older single-screen "suggest a person" modal still sends. They are
@@ -77,7 +81,7 @@ function fieldDef(type, key) {
 }
 
 function imageLabel(type) {
-  if (type === 'new_film' || type === 'edit_film') return 'Poster';
+  if (type === 'new_film' || type === 'edit_film' || type === 'edit_play') return 'Poster';
   if (type === 'new_channel') return 'Channel avatar';
   return 'Photo';
 }
@@ -797,7 +801,7 @@ export default function AdminContributions() {
         if (insErr) throw insErr;
         appliedSummary = `Created channel with: ${Object.keys(insert).join(', ')}`;
         if (unusable.length) notes.push(`no column for: ${unusable.join(', ')}`);
-      } else if (item.type === 'edit_person' || item.type === 'edit_film') {
+      } else if (item.type === 'edit_person' || item.type === 'edit_film' || item.type === 'edit_play') {
         const { hasImage, legacyNote, isStructured } = proposedParts(item);
 
         if (!isStructured && legacyNote) {
@@ -825,6 +829,14 @@ export default function AdminContributions() {
           const coerced = coerceFilmUpdate(picked);
           update = coerced.update;
           if (coerced.skipped.length) notes.push(`not applied (bad value): ${coerced.skipped.join(', ')}`);
+        } else if (item.type === 'edit_play') {
+          update = { ...picked };
+          if (update.box_office_domestic != null) {
+            update.box_office_domestic = Number(String(update.box_office_domestic).replace(/[^0-9.]/g, '')) || null;
+          }
+          if (update.box_office_tickets_sold != null) {
+            update.box_office_tickets_sold = Number(String(update.box_office_tickets_sold).replace(/[^0-9]/g, '')) || null;
+          }
         } else {
           update = { ...picked };
           if (update.youtube_channel_id) {
@@ -871,16 +883,16 @@ export default function AdminContributions() {
         }
 
         if (wantImage) {
-          const folder = item.type === 'edit_film' ? 'posters' : 'people';
+          const folder = item.type === 'edit_film' || item.type === 'edit_play' ? 'posters' : 'people';
           const url = await publishContributionImage(item.image_path, folder);
           if (!url) throw new Error('Could not publish the uploaded image.');
-          if (item.type === 'edit_film') update.poster_url = url;
+          if (item.type === 'edit_film' || item.type === 'edit_play') update.poster_url = url;
           else update.photo_url = url;
         }
 
         if (!Object.keys(update).length) throw new Error('Nothing left to apply after validation.');
 
-        const table = item.type === 'edit_film' ? 'films' : 'people';
+        const table = item.type === 'edit_film' ? 'films' : item.type === 'edit_play' ? 'plays' : 'people';
         const { error: upErr } = await supabase.from(table).update(update).eq('id', item.target_id);
         if (upErr) throw upErr;
 
@@ -962,6 +974,10 @@ export default function AdminContributions() {
     if (item.target_table === 'people') return `/people/${item.target_id}`;
     if (item.target_table === 'channels' || item.target_table === 'youtube_channels') {
       return `/channels/${item.target_id}`;
+    }
+    if (item.target_table === 'plays' || item.target_table === 'play') {
+      const slug = targets.plays?.[item.target_id]?.slug || item.target_id;
+      return `/plays/${slug}`;
     }
     return null;
   };
