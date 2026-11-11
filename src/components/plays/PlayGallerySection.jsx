@@ -22,8 +22,7 @@ export default function PlayGallerySection({
   const [activeLightboxIndex, setActiveLightboxIndex] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [uploadMode, setUploadMode] = useState('upload'); // 'upload' | 'url'
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [filePreview, setFilePreview] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]); // Array of { file, preview, name, size }
   const [isDragging, setIsDragging] = useState(false);
   const [brokenImageIds, setBrokenImageIds] = useState(new Set());
   const [saving, setSaving] = useState(false);
@@ -41,28 +40,46 @@ export default function PlayGallerySection({
     return null;
   }
 
-  function handleFileChosen(file) {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please choose a valid image file (JPEG, PNG, WebP).');
-      return;
-    }
-    if (file.size > 15 * 1024 * 1024) {
-      toast.error('Image size must be under 15 MB.');
-      return;
+  function handleFilesChosen(files) {
+    if (!files || files.length === 0) return;
+    const chosen = Array.from(files);
+    const valid = [];
+
+    for (const file of chosen) {
+      if (!file.type.startsWith('image/')) {
+        toast.error(`"${file.name}" is not a valid image file.`);
+        continue;
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        toast.error(`"${file.name}" exceeds 15 MB.`);
+        continue;
+      }
+      valid.push({
+        file,
+        preview: URL.createObjectURL(file),
+        name: file.name,
+        size: file.size,
+      });
     }
 
-    setSelectedFile(file);
-    const objectUrl = URL.createObjectURL(file);
-    setFilePreview(objectUrl);
+    if (valid.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...valid]);
+    }
+  }
+
+  function removeFile(index) {
+    setSelectedFiles((prev) => {
+      const target = prev[index];
+      if (target?.preview) URL.revokeObjectURL(target.preview);
+      return prev.filter((_, i) => i !== index);
+    });
   }
 
   function resetForm() {
-    setSelectedFile(null);
-    if (filePreview) {
-      URL.revokeObjectURL(filePreview);
-      setFilePreview(null);
-    }
+    selectedFiles.forEach((item) => {
+      if (item.preview) URL.revokeObjectURL(item.preview);
+    });
+    setSelectedFiles([]);
     setNewImage({ url: '', caption: '', image_type: 'production_still', is_primary: false });
     setUploadMode('upload');
   }
@@ -70,22 +87,42 @@ export default function PlayGallerySection({
   async function handleAddImage(e) {
     e.preventDefault();
 
-    let finalUrl = '';
-
     setSaving(true);
     try {
       if (uploadMode === 'upload') {
-        if (!selectedFile) {
-          toast.error('Please select an image file to upload.');
+        if (selectedFiles.length === 0) {
+          toast.error('Please select at least one photo file to upload.');
           setSaving(false);
           return;
         }
 
-        const uploadRes = await uploadAdminImage(selectedFile, 'film-images');
-        if (uploadRes.error) {
-          throw new Error(uploadRes.error);
+        let uploadedCount = 0;
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const item = selectedFiles[i];
+          const uploadRes = await uploadAdminImage(item.file, 'film-images');
+          if (uploadRes.error) {
+            toast.error(`Failed to upload ${item.name}: ${uploadRes.error}`);
+            continue;
+          }
+
+          await addPlayImage({
+            play_id: play.id,
+            url: uploadRes.url,
+            caption: newImage.caption.trim() || null,
+            image_type: newImage.image_type || 'production_still',
+            is_primary: i === 0 && !!newImage.is_primary,
+            sort_order: images.length + i + 1,
+          });
+          uploadedCount++;
         }
-        finalUrl = uploadRes.url;
+
+        if (uploadedCount > 0) {
+          toast.success(
+            uploadedCount === 1
+              ? 'Photo uploaded to stage gallery successfully!'
+              : `${uploadedCount} photos uploaded to stage gallery successfully!`
+          );
+        }
       } else {
         const urlStr = newImage.url.trim();
         if (!urlStr) {
@@ -94,26 +131,25 @@ export default function PlayGallerySection({
           return;
         }
 
-        // Warn if an HTML viewer page link like ibb.co was entered instead of direct image
-        if (urlStr.includes('ibb.co/') && !urlStr.includes('i.ibb.co/')) {
-          toast.error('The link entered is an ImgBB page, not a direct image. Please use "Upload File" tab to upload directly.');
+        // Warn if an HTML viewer page link or expiring service like ibb.co was entered
+        if (urlStr.includes('ibb.co')) {
+          toast.error('ImgBB links expire quickly and fail cross-origin loading. Please use "Upload Photo File" tab to upload your photo file directly.');
           setSaving(false);
           return;
         }
 
-        finalUrl = urlStr;
+        await addPlayImage({
+          play_id: play.id,
+          url: urlStr,
+          caption: newImage.caption.trim() || null,
+          image_type: newImage.image_type || 'production_still',
+          is_primary: !!newImage.is_primary,
+          sort_order: images.length + 1,
+        });
+
+        toast.success('Gallery photo added successfully!');
       }
 
-      await addPlayImage({
-        play_id: play.id,
-        url: finalUrl,
-        caption: newImage.caption.trim() || null,
-        image_type: newImage.image_type || 'production_still',
-        is_primary: !!newImage.is_primary,
-        sort_order: images.length + 1,
-      });
-
-      toast.success(uploadMode === 'upload' ? 'Photo uploaded to gallery successfully!' : 'Gallery photo added successfully!');
       resetForm();
       setShowAddModal(false);
       if (onImagesUpdated) onImagesUpdated();
@@ -342,10 +378,17 @@ export default function PlayGallerySection({
             <form onSubmit={handleAddImage} className="space-y-4">
               {uploadMode === 'upload' ? (
                 /* File Upload Dropzone */
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-text-secondary block">
-                    Select Photo File <span className="text-brand">*</span>
-                  </label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-text-secondary block">
+                      Select Photos <span className="text-brand">*</span>
+                    </label>
+                    {selectedFiles.length > 0 && (
+                      <span className="text-[11px] font-bold text-brand">
+                        {selectedFiles.length} photo{selectedFiles.length > 1 ? 's' : ''} selected
+                      </span>
+                    )}
+                  </div>
                   <div
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -355,11 +398,11 @@ export default function PlayGallerySection({
                     onDrop={(e) => {
                       e.preventDefault();
                       setIsDragging(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) handleFileChosen(file);
+                      const files = e.dataTransfer.files;
+                      if (files && files.length > 0) handleFilesChosen(files);
                     }}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                    className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
                       isDragging
                         ? 'border-brand bg-brand/10'
                         : 'border-border/80 hover:border-brand/60 bg-surface-2/60'
@@ -368,39 +411,59 @@ export default function PlayGallerySection({
                     <input
                       ref={fileInputRef}
                       type="file"
+                      multiple
                       accept="image/png,image/jpeg,image/webp,image/jpg"
                       className="hidden"
                       onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileChosen(file);
+                        const files = e.target.files;
+                        if (files && files.length > 0) handleFilesChosen(files);
                       }}
                     />
 
-                    {filePreview ? (
-                      <div className="space-y-2">
-                        <div className="relative w-full aspect-[16/9] max-h-48 rounded-lg overflow-hidden bg-black/50 mx-auto border border-border">
-                          <img
-                            src={filePreview}
-                            alt="Upload preview"
-                            className="w-full h-full object-contain"
-                          />
+                    {selectedFiles.length > 0 ? (
+                      <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
+                          {selectedFiles.map((item, idx) => (
+                            <div key={idx} className="relative aspect-[4/3] rounded-lg overflow-hidden bg-black/60 border border-border group/preview">
+                              <img
+                                src={item.preview}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeFile(idx)}
+                                className="absolute top-1 right-1 p-1 rounded-full bg-black/80 hover:bg-red-600 text-white text-xs cursor-pointer shadow-md transition-colors"
+                                title="Remove photo"
+                              >
+                                <Icon icon="solar:close-circle-bold" className="text-sm" />
+                              </button>
+                              <div className="absolute bottom-0 inset-x-0 p-1 bg-black/70 text-[9px] font-mono text-white/80 truncate">
+                                {(item.size / 1024).toFixed(0)} KB
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between pt-1">
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedFile(null);
-                              if (filePreview) URL.revokeObjectURL(filePreview);
-                              setFilePreview(null);
-                            }}
-                            className="absolute top-2 right-2 p-1 rounded-full bg-black/80 hover:bg-black text-white text-xs cursor-pointer shadow-md"
-                            title="Remove photo"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-[11px] font-bold text-brand hover:underline inline-flex items-center gap-1 cursor-pointer"
                           >
-                            <Icon icon="solar:close-circle-bold" className="text-lg" />
+                            <Icon icon="solar:add-circle-bold" />
+                            <span>Add more photos</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              selectedFiles.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
+                              setSelectedFiles([]);
+                            }}
+                            className="text-[11px] font-bold text-text-muted hover:text-red-400 cursor-pointer"
+                          >
+                            Clear all
                           </button>
                         </div>
-                        <p className="text-[11px] font-mono text-text-muted truncate">
-                          {selectedFile?.name} ({(selectedFile?.size ? selectedFile.size / 1024 : 0).toFixed(0)} KB)
-                        </p>
                       </div>
                     ) : (
                       <div className="space-y-2 py-3">
@@ -409,10 +472,10 @@ export default function PlayGallerySection({
                         </div>
                         <div>
                           <p className="text-xs font-bold text-text-primary">
-                            Click to select photo or drag and drop
+                            Click to select photos or drag &amp; drop
                           </p>
                           <p className="text-[11px] text-text-muted mt-0.5">
-                            JPEG, PNG, or WebP (optimized &amp; stored permanently)
+                            JPEG, PNG, or WebP · You can select multiple photos at once
                           </p>
                         </div>
                       </div>
@@ -499,12 +562,16 @@ export default function PlayGallerySection({
                   {saving ? (
                     <>
                       <Icon icon="solar:spinner-linear" className="animate-spin text-sm" />
-                      <span>{uploadMode === 'upload' ? 'Uploading…' : 'Adding…'}</span>
+                      <span>{uploadMode === 'upload' ? (selectedFiles.length > 1 ? `Uploading ${selectedFiles.length} Photos…` : 'Uploading…') : 'Adding…'}</span>
                     </>
                   ) : (
                     <>
                       <Icon icon="solar:check-circle-bold" className="text-sm" />
-                      <span>{uploadMode === 'upload' ? 'Upload Photo' : 'Add to Gallery'}</span>
+                      <span>
+                        {uploadMode === 'upload'
+                          ? (selectedFiles.length > 1 ? `Upload ${selectedFiles.length} Photos` : 'Upload Photo')
+                          : 'Add to Gallery'}
+                      </span>
                     </>
                   )}
                 </button>

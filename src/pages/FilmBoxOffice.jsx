@@ -14,6 +14,7 @@ import {
   USD_TO_NGN,
 } from '../lib/youtubeBoxOffice';
 import YouTubeBoxOfficeChart from '../components/film/YouTubeBoxOfficeChart';
+import AdminBoxOfficeModal from '../components/film/AdminBoxOfficeModal';
 
 
 
@@ -28,6 +29,7 @@ export default function FilmBoxOffice() {
   const [film, setFilm] = useState(loaderData?.film ?? null);
   const [loading, setLoading] = useState(!loaderData?.film);
   const [error, setError] = useState(null);
+  const [showBoxOfficeModal, setShowBoxOfficeModal] = useState(false);
 
   useEffect(() => {
     if (loaderData?.film) {
@@ -396,6 +398,18 @@ export default function FilmBoxOffice() {
           </button>
 
           <div className="flex items-center gap-3">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowBoxOfficeModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                title="Admin: Add, edit or delete box office figures"
+              >
+                <Icon icon="solar:pen-bold" className="text-xs" />
+                <span>{domestic > 0 ? 'Edit / Delete Figures' : '+ Add Box Office Figures'}</span>
+              </button>
+            )}
+
             <Link
               to={activeSection === 'youtube' ? '/box-office?section=youtube' : '/box-office'}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
@@ -1109,7 +1123,19 @@ export default function FilmBoxOffice() {
                   <span className="text-[10px] font-black uppercase tracking-wider text-brand">
                     Lifetime Domestic Gross
                   </span>
-                  <Icon icon="solar:ticket-bold" className="text-brand text-base" />
+                  <div className="flex items-center gap-1.5">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setShowBoxOfficeModal(true)}
+                        className="text-[10px] font-bold text-brand hover:underline cursor-pointer"
+                        title="Edit box office figures"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    <Icon icon="solar:ticket-bold" className="text-brand text-base" />
+                  </div>
                 </div>
                 <div className="text-2xl sm:text-3xl font-black font-heading text-brand tracking-tight">
                   {formatNaira(domestic)}
@@ -1318,6 +1344,19 @@ export default function FilmBoxOffice() {
         )}
 
       </main>
+
+      {showBoxOfficeModal && film && (
+        <AdminBoxOfficeModal
+          film={film}
+          onClose={() => setShowBoxOfficeModal(false)}
+          onUpdated={(updatedFilm) => {
+            setFilm((prev) => ({
+              ...prev,
+              ...updatedFilm,
+            }));
+          }}
+        />
+      )}
     </div>
   );
 }
