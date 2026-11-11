@@ -9,6 +9,7 @@ import { supabase } from '../../supabase.js';
 import { uploadToR2 } from '../../r2.js';
 import type { UpcomingMovieSnapshot } from '../content/snapshots.js';
 import { recommendInstagramAudioForContent, type InstagramAudioTrack } from '../platforms/instagram-audio.js';
+import { CURATED_AUDIO_CATALOG } from '../platforms/audio-catalog.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -383,6 +384,7 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
 
   let audioStreamUrl = options.audioStreamUrl;
   let recommendedAudio: InstagramAudioTrack | null = null;
+  let candidateAudioTracks: InstagramAudioTrack[] = [];
   if (!audioStreamUrl) {
     try {
       const rec = await recommendInstagramAudioForContent({
@@ -390,11 +392,20 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
         genres: snap.genres,
         synopsis: snap.synopsis || (snap as any).overview,
         contentType: options.seriesLabel === 'Now Streaming' ? 'where_to_watch' : 'upcoming_movie',
+        requirePlayableStream: true,
       });
       if (rec.recommended?.previewUrl) {
         audioStreamUrl = rec.recommended.previewUrl;
         recommendedAudio = rec.recommended;
         console.log(`[reel-generator] Selected trending audio for "${snap.title}": "${rec.recommended.title}" by ${rec.recommended.artist}`);
+      }
+      if (rec.alternatives?.length) {
+        candidateAudioTracks = rec.alternatives.filter(a => Boolean(a.previewUrl && !a.previewUrl.includes('instagram.com/reels/audio')));
+        if (!audioStreamUrl && candidateAudioTracks.length > 0) {
+          audioStreamUrl = candidateAudioTracks[0].previewUrl;
+          recommendedAudio = candidateAudioTracks[0];
+          console.log(`[reel-generator] Selected alternative trending audio for "${snap.title}": "${candidateAudioTracks[0].title}" by ${candidateAudioTracks[0].artist}`);
+        }
       }
     } catch (audioErr: any) {
       console.warn(`[reel-generator] Audio recommendation warning for "${snap.title}":`, audioErr?.message);
@@ -489,16 +500,50 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
     }
 
     let audioFilePath: string | null = null;
+    const downloadQueue: { url: string; track?: InstagramAudioTrack }[] = [];
     if (audioStreamUrl && !audioStreamUrl.includes('instagram.com/reels/audio')) {
+      downloadQueue.push({ url: audioStreamUrl, track: recommendedAudio || undefined });
+    }
+    for (const alt of candidateAudioTracks) {
+      if (alt.previewUrl && !alt.previewUrl.includes('instagram.com/reels/audio')) {
+        downloadQueue.push({ url: alt.previewUrl, track: alt });
+      }
+    }
+    // Also include verified playable tracks from curated Afrobeats catalog as fallback
+    for (const cat of CURATED_AUDIO_CATALOG) {
+      if (cat.previewUrl && !cat.previewUrl.includes('instagram.com/reels/audio')) {
+        downloadQueue.push({
+          url: cat.previewUrl,
+          track: {
+            audioId: cat.audioId,
+            audioType: cat.audioType,
+            title: cat.title,
+            artist: cat.artist,
+            durationMs: cat.durationMs,
+            artworkUrl: cat.artworkUrl,
+            previewUrl: cat.previewUrl,
+            genre: cat.genre,
+            mood: cat.mood,
+          },
+        });
+      }
+    }
+
+    for (const item of downloadQueue) {
       try {
-        const aRes = await fetch(audioStreamUrl, { signal: AbortSignal.timeout(15000) });
+        const aRes = await fetch(item.url, { signal: AbortSignal.timeout(10000) });
         if (aRes.ok) {
           const aBuf = Buffer.from(await aRes.arrayBuffer());
           audioFilePath = path.join(workDir, 'track.m4a');
           await fs.writeFile(audioFilePath, aBuf);
+          if (item.track) {
+            recommendedAudio = item.track;
+            console.log(`[reel-generator] Active soundtrack loaded for "${snap.title}": "${item.track.title}" by ${item.track.artist}`);
+          }
+          break;
         }
       } catch {
-        audioFilePath = null;
+        continue;
       }
     }
 

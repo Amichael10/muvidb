@@ -38,6 +38,7 @@ export type AudioRecommendationContext = {
   connectionId?: string | null;
   excludeAudioIds?: string[];
   shuffle?: boolean;
+  requirePlayableStream?: boolean;
 };
 
 export type SearchOptions = {
@@ -93,7 +94,7 @@ function normalizeTrack(raw: any, fallbackType: InstagramAudioType): InstagramAu
   };
 }
 
-async function resolveItunesAudioStream(title: string, artist: string | null): Promise<{
+export async function resolveItunesAudioStream(title: string, artist: string | null): Promise<{
   streamUrl: string | null;
   artworkUrl: string | null;
 }> {
@@ -424,8 +425,10 @@ export async function recommendInstagramAudioForContent(
     }
 
     if (hasPlayableStream) {
-      score += 30;
+      score += ctx.requirePlayableStream ? 120 : 30;
       reasons.push('Instant playable preview');
+    } else if (ctx.requirePlayableStream) {
+      score -= 40;
     }
 
     if (NIGERIAN_AFROBEATS_PATTERN.test(text)) {
@@ -456,15 +459,43 @@ export async function recommendInstagramAudioForContent(
   scored.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
 
   // 5. Anti-Repeat Randomized Jitter:
-  // Pick randomly from among the top 4 candidates with score > 0 and not recently used
-  const topCandidates = scored.filter(t => !t.isRecentlyUsed && (t.matchScore || 0) > 0).slice(0, 5);
+  // Pick randomly from among top 8 candidates with positive scores to maximize music variety
+  const topCandidates = scored.filter(t => !t.isRecentlyUsed && (t.matchScore || 0) > 0).slice(0, 8);
   let chosen: InstagramAudioTrack | null = null;
 
   if (topCandidates.length > 0) {
     const randomIndex = Math.floor(Math.random() * topCandidates.length);
-    chosen = topCandidates[randomIndex];
+    chosen = { ...topCandidates[randomIndex] };
   } else {
-    chosen = scored[0] || null;
+    chosen = scored[0] ? { ...scored[0] } : null;
+  }
+
+  // 6. Dynamic Playable Stream Resolution:
+  // If chosen track lacks previewUrl, resolve live via iTunes Apple Music search
+  if (chosen && (!chosen.previewUrl || chosen.previewUrl.includes('instagram.com/reels/audio'))) {
+    const itunes = await resolveItunesAudioStream(chosen.title, chosen.artist).catch(() => ({ streamUrl: null, artworkUrl: null }));
+    if (itunes.streamUrl) {
+      chosen.previewUrl = itunes.streamUrl;
+      if (itunes.artworkUrl && !chosen.artworkUrl) chosen.artworkUrl = itunes.artworkUrl;
+    }
+  }
+
+  // If a playable stream is required (e.g. for video reels) and chosen still lacks one, cascade
+  if (ctx.requirePlayableStream && (!chosen || !chosen.previewUrl)) {
+    for (const cand of scored) {
+      if (cand.previewUrl && !cand.previewUrl.includes('instagram.com/reels/audio')) {
+        chosen = { ...cand };
+        break;
+      }
+    }
+    // Safety fallback: pick from verified playable Afrobeats tracks
+    if (!chosen || !chosen.previewUrl) {
+      const verified = CURATED_AUDIO_CATALOG.filter(t => Boolean(t.previewUrl));
+      if (verified.length > 0) {
+        const fb = verified[Math.floor(Math.random() * verified.length)];
+        chosen = { ...fb, matchReason: 'Verified trending Afrobeats soundtrack' };
+      }
+    }
   }
 
   const alternatives = scored.filter(t => t.audioId !== chosen?.audioId).slice(0, 15);
