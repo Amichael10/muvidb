@@ -11,7 +11,17 @@ const WINDOW_MS = 5 * 60 * 1000;
 const HIT_THRESHOLD = Number(process.env.SCRAPE_ALERT_THRESHOLD || 50);
 const COOLDOWN_MS = Number(process.env.SCRAPE_ALERT_COOLDOWN_MS || 30 * 60 * 1000);
 
-const GOOD_BOT_RE = /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|applebot|facebookexternalhit|twitterbot|linkedinbot|semrushbot|ahrefsbot|dotbot|petalbot|bytespider|gptbot|claudebot|anthropic/i;
+const GOOD_BOT_RE = /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|applebot|facebookexternalhit|twitterbot|linkedinbot|semrushbot|ahrefsbot|dotbot/i;
+
+/**
+ * Malicious, unauthorized, or aggressive AI dataset scrapers blocked across all IPs.
+ */
+export const BLOCKED_BOT_RE = /elevenlabs|elevenlabscrawler|bytespider|imagesiftbot|dataforseobot|omgili|diffbot|timpibot/i;
+
+export function isBlockedUserAgent(ua: string): boolean {
+  if (!ua) return false;
+  return BLOCKED_BOT_RE.test(ua);
+}
 
 const readHeader = (headers: any, name: string): string | undefined => {
   const raw = typeof headers?.get === 'function' ? headers.get(name) : headers?.[name];
@@ -56,6 +66,10 @@ export function trackPageHit(req: any, path: string, kind: HitKind = 'page'): vo
 
 export async function rejectIfBlocked(req: any): Promise<boolean> {
   try {
+    const ua = String(readHeader(req?.headers, 'user-agent') || '');
+    if (isBlockedUserAgent(ua)) {
+      return true;
+    }
     const ip = clientIp(req);
     return await isIpBlocked(ip);
   } catch {
@@ -72,6 +86,7 @@ async function recordAndMaybeAlert(
   if (!telegramConfigured()) return;
 
   const ua = String(readHeader(req?.headers, 'user-agent') || '');
+  if (isBlockedUserAgent(ua)) return;
   if (GOOD_BOT_RE.test(ua)) return;
 
   const ip = clientIp(req);
