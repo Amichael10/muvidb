@@ -48,6 +48,12 @@ Disallow: /watchlist
 
 # AI search and user-requested assistants follow the public-page rules above.
 # Block training crawlers & commercial SEO dataset harvesters.
+User-agent: SofyaBot
+Disallow: /
+
+User-agent: Sofya
+Disallow: /
+
 User-agent: ElevenlabsCrawler
 Disallow: /
 

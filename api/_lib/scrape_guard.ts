@@ -16,7 +16,7 @@ const GOOD_BOT_RE = /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|appl
 /**
  * Malicious, unauthorized, or aggressive AI dataset scrapers blocked across all IPs.
  */
-export const BLOCKED_BOT_RE = /elevenlabs|elevenlabscrawler|bytespider|imagesiftbot|dataforseobot|omgili|diffbot|timpibot/i;
+export const BLOCKED_BOT_RE = /sofyabot|sofya|elevenlabs|elevenlabscrawler|bytespider|imagesiftbot|dataforseobot|omgili|diffbot|timpibot|cohere-ai|youbot/i;
 
 export function isBlockedUserAgent(ua: string): boolean {
   if (!ua) return false;
