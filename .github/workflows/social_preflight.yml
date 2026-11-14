@@ -26,3 +26,10 @@ jobs:
           curl --fail --silent --show-error --max-time 120 \
             -H "x-cron-secret: $CRON_SECRET" \
             "$BASE_URL/api/cron/sync?task=social_preflight"
+
+      - name: Publish due social jobs
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --max-time 120 \
+            -H "x-cron-secret: $CRON_SECRET" \
+            "$BASE_URL/api/cron/sync?task=social_publish" || true

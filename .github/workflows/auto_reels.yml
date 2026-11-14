@@ -10,7 +10,7 @@ on:
       days:
         description: 'Number of days ahead to pre-render reels for'
         required: false
-        default: '3'
+        default: '7'
 
 concurrency:
   group: auto-reels-renderer
@@ -59,6 +59,6 @@ jobs:
 
       - name: Pre-Render Rolling Editorial Reels
         run: |
-          DAYS="${{ github.event.inputs.days || '3' }}"
+          DAYS="${{ github.event.inputs.days || '7' }}"
           echo "Pre-rendering editorial reels for next $DAYS days..."
           npx tsx scripts/auto_render_editorial_reels.ts "$DAYS"

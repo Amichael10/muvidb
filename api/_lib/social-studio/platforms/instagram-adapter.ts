@@ -294,7 +294,11 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
       if (audio && typeof audio === 'object') {
         const selected = audio as Record<string, unknown>;
         const audioId = String(selected.audio_id || '').trim();
-        if (audioId) {
+        // Instagram Meta Graph API accepts external Instagram sound/music library IDs.
+        // Internal curated catalog keys (e.g. "cat_fave_baby_riddim", "cat_mercy_chinwo_confidence")
+        // are for Remotion/ffmpeg rendering and cause Meta to throw HTTP 500 OAuthException.
+        const isInternalCatalogKey = audioId.startsWith('cat_');
+        if (audioId && !isInternalCatalogKey) {
           const clampVolume = (value: unknown, fallback: number) => {
             const numeric = Number(value);
             return Number.isFinite(numeric) ? Math.min(100, Math.max(0, Math.round(numeric))) : fallback;
@@ -314,35 +318,58 @@ export class InstagramPlatformAdapter implements SocialPlatformAdapter {
       containerParams.set('image_url', assetUrl);
     }
 
-    // 1. Create Media Container (with graceful fallback if collaborators or cover_url is rejected)
-    let containerRes: { id?: string };
-    try {
-      containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, containerParams);
-    } catch (createErr: any) {
-      if (containerParams.has('collaborators')) {
-        console.warn(`[instagram-adapter] Failed to create media container with collaborators (${createErr?.message}). Retrying without collaborators...`);
-        const fallbackParams = new URLSearchParams(containerParams);
-        fallbackParams.delete('collaborators');
-        try {
-          containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, fallbackParams);
-        } catch (secondErr: any) {
-          if (fallbackParams.has('cover_url')) {
-            console.warn(`[instagram-adapter] Retrying without cover_url...`);
-            const thirdParams = new URLSearchParams(fallbackParams);
-            thirdParams.delete('cover_url');
-            containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, thirdParams);
-          } else {
-            throw secondErr;
-          }
-        }
-      } else if (containerParams.has('cover_url')) {
-        console.warn(`[instagram-adapter] Failed to create media container with cover_url (${createErr?.message}). Retrying without cover_url...`);
-        const fallbackParams = new URLSearchParams(containerParams);
-        fallbackParams.delete('cover_url');
-        containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, fallbackParams);
-      } else {
-        throw createErr;
+    // 1. Create Media Container (with progressive fallback stripping audio_configuration, collaborators, and cover_url)
+    let containerRes: { id?: string } | null = null;
+    const attemptParams = new URLSearchParams(containerParams);
+    let lastCreateErr: any = null;
+
+    const fallbackSteps = [
+      () => true, // initial attempt with full params
+      (p: URLSearchParams) => {
+        if (!p.has('audio_configuration')) return false;
+        p.delete('audio_configuration');
+        return true;
+      },
+      (p: URLSearchParams) => {
+        if (!p.has('collaborators')) return false;
+        p.delete('collaborators');
+        return true;
+      },
+      (p: URLSearchParams) => {
+        if (!p.has('cover_url')) return false;
+        p.delete('cover_url');
+        return true;
+      },
+      (p: URLSearchParams) => {
+        const hadAny = p.has('audio_configuration') || p.has('collaborators') || p.has('cover_url');
+        p.delete('audio_configuration');
+        p.delete('collaborators');
+        p.delete('cover_url');
+        return hadAny;
+      },
+    ];
+
+    for (let step = 0; step < fallbackSteps.length; step++) {
+      if (step > 0) {
+        const changed = fallbackSteps[step](attemptParams);
+        if (!changed) continue;
+        console.warn(`[instagram-adapter] Retrying container creation (fallback step ${step})...`);
       }
+      try {
+        containerRes = await this.post(`/${encodeURIComponent(this.instagramAccountId)}/media`, new URLSearchParams(attemptParams));
+        if (containerRes?.id) break;
+      } catch (err: any) {
+        lastCreateErr = err;
+        console.warn(`[instagram-adapter] Container creation failed at step ${step}: ${err?.message || err}`);
+      }
+    }
+
+    if (!containerRes?.id) {
+      throw lastCreateErr || new SocialPlatformError({
+        platform: 'instagram',
+        code: 'instagram_container_missing',
+        message: 'Instagram did not return a media container ID.',
+      });
     }
     const containerId = containerRes.id;
     if (!containerId) {

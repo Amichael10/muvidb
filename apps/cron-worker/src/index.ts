@@ -128,7 +128,7 @@ async function checkAndDispatchPreflight(env: Env) {
 async function checkAndDispatchPublishJobs(env: Env, force: boolean) {
   const now = new Date().toISOString();
 
-  const queryUrl = `${env.SUPABASE_URL}/rest/v1/social_publish_jobs?select=id,platform_variant_id,scheduled_for&status=eq.queued&scheduled_for=lte.${encodeURIComponent(now)}&limit=10`;
+  const queryUrl = `${env.SUPABASE_URL}/rest/v1/social_publish_jobs?select=id,platform_variant_id,scheduled_for,status&status=in.(queued,retrying)&available_at=lte.${encodeURIComponent(now)}&limit=10`;
 
   try {
     const res = await fetch(queryUrl, {

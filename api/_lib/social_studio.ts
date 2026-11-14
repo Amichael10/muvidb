@@ -1246,7 +1246,7 @@ async function processJob(job: any, lockedBy: string, now: Date) {
     await supabase
       .from('social_platform_variants')
       .update({
-        status: 'failed',
+        status: canRetry ? 'scheduled' : 'failed',
         last_error_code: platformError.code,
         last_error_message: platformError.message,
       })
@@ -1257,6 +1257,8 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       .update({
         status: nextStatus,
         available_at: nextAvailable,
+        locked_at: null,
+        locked_by: null,
         last_error_code: platformError.code,
         last_error_message: platformError.message,
         last_error_details: {
@@ -4173,7 +4175,10 @@ export async function generateAndAttachReelForContentItem(
             video_volume: 0,
           }
         : null);
-    if (variant.platform === 'instagram' && effectiveInstagramAudio) {
+    const rawAudioId = String(effectiveInstagramAudio?.audio_id || '').trim();
+    // Only pass instagram_audio if audio_id is a valid numeric Meta asset ID.
+    // Curated Remotion music tracks ('cat_*') are already baked into the video.
+    if (variant.platform === 'instagram' && effectiveInstagramAudio && /^\d+$/.test(rawAudioId)) {
       nextOptions.instagram_audio = effectiveInstagramAudio;
     }
     await supabase
