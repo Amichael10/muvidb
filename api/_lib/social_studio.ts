@@ -1698,19 +1698,16 @@ export async function syncContentItemWithSource(
     return { updated: false, changes: [] };
   }
 
-  // Custom carousel posts have curated slide sets and custom editorial copy; do not overwrite
+  // Check if item has video or carousel assets (we protect the media assets while allowing copy/metadata sync)
   const { data: existingVariants } = await supabase
     .from('social_platform_variants')
     .select('platform_options')
     .eq('content_item_id', contentItemId);
-  const isProtectedFormat = (existingVariants || []).some(
+  const isVideoOrCarousel = (existingVariants || []).some(
     v => (v.platform_options as any)?.post_format === 'carousel' ||
          (v.platform_options as any)?.asset_format === 'video_vertical_9_16' ||
          Boolean((v.platform_options as any)?.video_url)
   );
-  if (isProtectedFormat && !options.force) {
-    return { updated: false, changes: [] };
-  }
 
   const oldSnapshot = (item.source_snapshot || {}) as Record<string, any>;
   const capturedAt = new Date().toISOString();
@@ -1854,7 +1851,9 @@ export async function syncContentItemWithSource(
   let newAssetUrl: string | null = null;
   const posterUrlToFetch = freshSnapshot.posterUrl || (freshSnapshot as any).photoUrl;
 
-  if ((changes.includes('poster') || options.force) && posterUrlToFetch) {
+  // If poster image URL changed (or force), fetch, prepare, and store new asset for single-card posts.
+  // Video reels and carousels retain their media unless explicitly forced.
+  if (!isVideoOrCarousel && (changes.includes('poster') || options.force) && posterUrlToFetch) {
     try {
       const rawImage = await downloadSocialImage(posterUrlToFetch);
       const poster = await preparePoster(rawImage);

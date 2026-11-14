@@ -273,29 +273,43 @@ const NIGERIAN_AFROBEATS_PATTERN = new RegExp(
   'i'
 );
 
+const TRADITIONAL_EPIC_KEYWORDS = /\b(ayaba|oosa|oba|igwe|obi|kabiyesi|orisha|babalawo|juju|shrine|herbalist|native doctor|witchcraft|witch|deity|deities|gods|ancestors|ancestral|ritual|traditional|folklore|epic|warrior|kingdom|palace|bata|dundun|oriki|village|enchanted|spirit world|coven|highlife|cultural|chieftaincy|native|dike|igbo|yoruba)\b/i;
+const CHRISTIAN_GOSPEL_KEYWORDS = /\b(faith|gospel|christian|christ|church|pastor|evangelist|jesus|worship|praise|hallelujah|holy spirit|bible|mount zion|revival|faith-based)\b/i;
+const NOLLYWOOD_SOUNDTRACK_KEYWORDS = /\b(soundtrack|ost|score|classic nollywood|vintage nollywood|stanley okorie|nostalgia)\b/i;
+const THRILLER_ACTION_KEYWORDS = /\b(thriller|crime|mystery|horror|suspense|dark|revenge|detective|investigation|heist|gang|underworld|assassin|kidnap|police|action)\b/i;
+const ROMANCE_DRAMA_KEYWORDS = /\b(romance|romantic|love|marriage|wedding|heartbreak|relationship|drama|emotional|family|affair|infidelity|betrayal|dating|crush|healing)\b/i;
+const UPBEAT_PARTY_KEYWORDS = /\b(box_office|box office|milestone|record|comedy|party|celebration|blockbuster|street|amapiano|dance|carnival)\b/i;
+
 export function classifyContentAudioMood(ctx: AudioRecommendationContext = {}): AudioMoodProfile {
   const genreList = Array.isArray(ctx.genres)
     ? ctx.genres.join(' ')
     : String(ctx.genres || '');
   const blob = `${ctx.title || ''} ${genreList} ${ctx.synopsis || ''} ${ctx.theme || ''} ${ctx.contentType || ''}`.toLowerCase();
 
-  if (/\b(faith|gospel|christian|church|pastor|prayer|miracle|redemption|spiritual|god)\b/.test(blob)) {
-    return 'faith_inspirational';
-  }
-  if (/\b(highlife|cultural|traditional|igbo|yoruba|village|chieftaincy|native|epic traditional|folklore|ritual|kingdom)\b/.test(blob)) {
+  // 1. Traditional / Cultural / Indigenous Epic must be detected FIRST
+  // African epic movies talk about "gods", "spiritual world", "prayers to ancestors" which previously clashed with faith.
+  if (TRADITIONAL_EPIC_KEYWORDS.test(blob)) {
     return 'cultural_highlife';
   }
-  if (/\b(soundtrack|ost|score|classic nollywood|nostalgia|vintage nollywood)\b/.test(blob)) {
+  // 2. Pure Christian Faith / Gospel
+  if (CHRISTIAN_GOSPEL_KEYWORDS.test(blob)) {
+    return 'faith_inspirational';
+  }
+  // 3. Vintage Nollywood Cinema Soundtracks & Nostalgia
+  if (NOLLYWOOD_SOUNDTRACK_KEYWORDS.test(blob)) {
     return 'nollywood_soundtrack';
   }
-  if (/\b(box_office|box office|milestone|record|comedy|party|celebration|blockbuster|street|action|heist|wedding party|amapiano)\b/.test(blob)) {
-    return 'upbeat_energy';
+  // 4. Thriller, Crime, Action, Suspense, Horror
+  if (THRILLER_ACTION_KEYWORDS.test(blob)) {
+    return 'cinematic_thriller';
   }
-  if (/\b(romance|romantic|love|marriage|heartbreak|relationship|drama|emotional|family|betrayal|cycle|healing|affair)\b/.test(blob)) {
+  // 5. Romance, Marriage, Family Drama, Emotional
+  if (ROMANCE_DRAMA_KEYWORDS.test(blob)) {
     return 'romance_drama';
   }
-  if (/\b(thriller|crime|mystery|horror|suspense|dark|revenge|detective|investigation)\b/.test(blob)) {
-    return 'cinematic_thriller';
+  // 6. Upbeat Box Office, Celebration, Street Energy
+  if (UPBEAT_PARTY_KEYWORDS.test(blob)) {
+    return 'upbeat_energy';
   }
   return 'general_afrobeats';
 }
@@ -397,7 +411,21 @@ export async function recommendInstagramAudioForContent(
   for (const t of secondaryCandidates) pushCandidate({ ...t, matchReason: `Compatible ${t.genre.replace('_', ' ')}` });
   for (const t of liveTrendingTracks) pushCandidate(t);
 
-  // 4. Score candidates with strong anti-repetition and genre priority guards
+  const genreList = Array.isArray(ctx.genres)
+    ? ctx.genres.join(' ')
+    : String(ctx.genres || '');
+  const contentBlob = `${ctx.title || ''} ${genreList} ${ctx.synopsis || ''} ${ctx.theme || ''} ${ctx.contentType || ''}`.toLowerCase();
+  const isTraditionalContent = TRADITIONAL_EPIC_KEYWORDS.test(contentBlob);
+  const isChristianContent = CHRISTIAN_GOSPEL_KEYWORDS.test(contentBlob);
+  const isDarkOrThrillerContent = THRILLER_ACTION_KEYWORDS.test(contentBlob);
+
+  const titleWords = String(ctx.title || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !['the', 'and', 'for', 'you', 'will', 'not', 'are', 'with', 'from', 'this', 'that'].includes(w));
+
+  // 4. Score candidates with strong anti-repetition, genre priority, and title synergy guards
   const scored = pool.map((track) => {
     const text = `${track.title} ${track.artist || ''}`.toLowerCase();
     const hasPlayableStream = Boolean(
@@ -422,6 +450,40 @@ export async function recommendInstagramAudioForContent(
       reasons.push('Compatible genre');
     } else {
       score -= 60;
+    }
+
+    // STRICT ANTI-MISMATCH GATES
+    const isTrackGospel = track.genre === 'faith_inspirational' || track.mood === 'faith_inspirational' || FAITH_GOSPEL_PATTERN.test(text);
+    const isTrackTraditional = track.genre === 'cultural_highlife' || track.mood === 'cultural_highlife' || HIGHLIFE_CULTURAL_PATTERN.test(text);
+
+    // 1. Traditional / Juju / Epic film CANNOT receive gospel tracks
+    if (isTraditionalContent && isTrackGospel) {
+      score -= 10000;
+      reasons.push('STRICT DISQUALIFICATION: Gospel track for traditional/juju movie');
+    }
+    // 2. Christian film CANNOT receive secular/street/traditional tracks
+    if (isChristianContent && !isTrackGospel) {
+      score -= 10000;
+      reasons.push('STRICT DISQUALIFICATION: Non-gospel track for faith film');
+    }
+    // 3. Thriller / Crime / Action film CANNOT receive gospel tracks
+    if (isDarkOrThrillerContent && isTrackGospel) {
+      score -= 5000;
+      reasons.push('Incompatible mood: Gospel track for crime/thriller');
+    }
+
+    // SYNONYMOUS TITLE & THEME SYNERGY
+    if (titleWords.length > 0) {
+      const hasTitleOverlap = titleWords.some(w => text.includes(w));
+      if (hasTitleOverlap) {
+        score += 150;
+        reasons.push('Synonymous title synergy (+150)');
+      }
+    }
+
+    if (isTraditionalContent && isTrackTraditional) {
+      score += 50;
+      reasons.push('Traditional indigenous cinema synergy (+50)');
     }
 
     if (hasPlayableStream) {
@@ -483,17 +545,35 @@ export async function recommendInstagramAudioForContent(
   // If a playable stream is required (e.g. for video reels) and chosen still lacks one, cascade
   if (ctx.requirePlayableStream && (!chosen || !chosen.previewUrl)) {
     for (const cand of scored) {
-      if (cand.previewUrl && !cand.previewUrl.includes('instagram.com/reels/audio')) {
+      if ((cand.matchScore || 0) > 0 && cand.previewUrl && !cand.previewUrl.includes('instagram.com/reels/audio')) {
         chosen = { ...cand };
         break;
       }
     }
-    // Safety fallback: pick from verified playable Afrobeats tracks
+    // Safety fallback: strictly respect the current mood profile and anti-mismatch constraints!
     if (!chosen || !chosen.previewUrl) {
-      const verified = CURATED_AUDIO_CATALOG.filter(t => Boolean(t.previewUrl));
-      if (verified.length > 0) {
-        const fb = verified[Math.floor(Math.random() * verified.length)];
-        chosen = { ...fb, matchReason: 'Verified trending Afrobeats soundtrack' };
+      const verifiedMatchingMood = CURATED_AUDIO_CATALOG.filter(
+        t => Boolean(t.previewUrl) && (t.genre === mood || t.mood === mood)
+      );
+      if (verifiedMatchingMood.length > 0) {
+        chosen = {
+          ...verifiedMatchingMood[Math.floor(Math.random() * verifiedMatchingMood.length)],
+          matchReason: `Verified playable soundtrack (${mood.replace('_', ' ')})`
+        };
+      } else {
+        const verifiedSafe = CURATED_AUDIO_CATALOG.filter(t => {
+          if (!t.previewUrl) return false;
+          if (isTraditionalContent && (t.genre === 'faith_inspirational' || t.mood === 'faith_inspirational')) return false;
+          if (isChristianContent && t.genre !== 'faith_inspirational') return false;
+          if (isDarkOrThrillerContent && (t.genre === 'faith_inspirational' || t.mood === 'faith_inspirational')) return false;
+          return true;
+        });
+        if (verifiedSafe.length > 0) {
+          chosen = {
+            ...verifiedSafe[Math.floor(Math.random() * verifiedSafe.length)],
+            matchReason: 'Verified playable African cinema soundtrack'
+          };
+        }
       }
     }
   }
