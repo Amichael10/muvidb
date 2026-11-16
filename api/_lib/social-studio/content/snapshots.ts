@@ -210,8 +210,13 @@ export function buildActorSpotlightSnapshot(input: {
   const credits = Array.isArray(input.credits) ? input.credits : [];
   const limit = input.knownForLimit ?? 3;
 
-  const knownFor: SnapshotKnownForFilm[] = credits
-    .filter(credit => credit?.films?.id && isLikelyFilmTitle(text(credit.films.title)))
+  // Prioritize credits that have a valid poster_url so filmography grids never show blank/broken slots
+  const creditsWithPosters = credits.filter(c => c?.films?.poster_url && isLikelyFilmTitle(text(c.films.title)));
+  const targetCredits = creditsWithPosters.length >= limit
+    ? creditsWithPosters
+    : credits.filter(credit => credit?.films?.id && isLikelyFilmTitle(text(credit.films.title)));
+
+  const knownFor: SnapshotKnownForFilm[] = targetCredits
     .map(credit => ({
       filmId: String(credit.films.id),
       title: String(text(credit.films.title)),

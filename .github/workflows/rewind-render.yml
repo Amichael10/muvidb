@@ -1,0 +1,99 @@
+name: Rewind 2026 Render
+
+# Renders the per-actor Rewind videos and share stills and uploads them to the
+# `rewind` storage bucket. Manual only — there is no schedule, because the
+# snapshot is rebuilt on demand and rendering 780-odd actors is measured in
+# hours, not minutes.
+#
+# Video rendering NEVER runs on Vercel. This workflow is the only place the
+# service-role key meets the renderer.
+#
+# THROUGHPUT: roughly 3 minutes per actor (one 14s H.264 encode plus two
+# 1080p stills, each its own browser launch). A GitHub-hosted runner caps a
+# job at 6 hours, so a single run should stay at or below `limit: 100`.
+# `shard` splits one pass across parallel runs when a full rebuild is needed.
+#
+# NOTE: GitHub only lists a workflow_dispatch workflow if the file exists on
+# the DEFAULT branch, which for this repo is `staging`, not `main`. This file
+# has to reach staging before the "Run workflow" button appears.
+
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: 'Render one actor by slug (leave blank for a batch)'
+        required: false
+        type: string
+      limit:
+        description: 'Max actors this run (keep at or below 100 for the 6h job cap)'
+        required: false
+        default: '50'
+        type: string
+      force:
+        description: 'Re-render actors that already have a video'
+        required: false
+        default: false
+        type: boolean
+      shard:
+        description: 'Shard of a wider pass, as N/M (e.g. 2/8). Blank = no sharding.'
+        required: false
+        type: string
+      dry_run:
+        description: 'List what would render, change nothing'
+        required: false
+        default: false
+        type: boolean
+
+# One render at a time. Two concurrent runs would both claim the same
+# video_url IS NULL rows and render them twice.
+concurrency:
+  group: rewind-render
+  cancel-in-progress: false
+
+jobs:
+  render:
+    name: Render and upload
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # The root project supplies the Supabase client and the script; the
+      # Remotion project supplies the compositions and the renderer.
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install Remotion dependencies
+        run: npm ci
+        working-directory: muvidb-launch-video
+
+      # Remotion downloads its own Chrome Headless Shell but still needs the
+      # system libraries it links against.
+      - name: Install Chrome system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 libdbus-1-3 libatk1.0-0 libasound2 libxrandr2 \
+            libxkbcommon-dev libxfixes3 libxcomposite1 libxdamage1 \
+            libgbm-dev libatk-bridge2.0-0 libcups2
+
+      - name: Render
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.slug }}" ];  then ARGS="$ARGS --slug ${{ inputs.slug }}"; fi
+          if [ -n "${{ inputs.limit }}" ]; then ARGS="$ARGS --limit ${{ inputs.limit }}"; fi
+          if [ -n "${{ inputs.shard }}" ]; then ARGS="$ARGS --shard ${{ inputs.shard }}"; fi
+          if [ "${{ inputs.force }}" = "true" ];   then ARGS="$ARGS --force"; fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          echo "rewind-render.ts$ARGS"
+          npx tsx scripts/rewind-render.ts $ARGS
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

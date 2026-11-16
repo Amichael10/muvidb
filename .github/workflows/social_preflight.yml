@@ -20,16 +20,18 @@ jobs:
       BASE_URL: 'https://muvidb.com'
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
-      - name: Recheck posts due in twenty minutes
-        shell: bash
-        run: |
-          curl --fail --silent --show-error --max-time 120 \
-            -H "x-cron-secret: $CRON_SECRET" \
-            "$BASE_URL/api/cron/sync?task=social_preflight"
-
       - name: Publish due social jobs
         shell: bash
+        continue-on-error: true
         run: |
           curl --fail --silent --show-error --max-time 120 \
             -H "x-cron-secret: $CRON_SECRET" \
             "$BASE_URL/api/cron/sync?task=social_publish" || true
+
+      - name: Recheck posts due in twenty minutes
+        shell: bash
+        continue-on-error: true
+        run: |
+          curl --fail --silent --show-error --max-time 120 \
+            -H "x-cron-secret: $CRON_SECRET" \
+            "$BASE_URL/api/cron/sync?task=social_preflight" || true

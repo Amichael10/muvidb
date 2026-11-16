@@ -245,3 +245,7 @@ rhoda_*
 
 
 *.dll
+
+# Remotion Rewind-only bundle (scripts/rewind-render.ts rebuilds it per run)
+build-rewind/
+muvidb-launch-video/out/

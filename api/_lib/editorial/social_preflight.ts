@@ -17,7 +17,7 @@ export function classifyArtworkOrientation(width: number | null, height: number 
   return ratio > 1.08 ? 'landscape' : ratio < 0.92 ? 'portrait' : 'square';
 }
 
-async function inspectArtwork(url: string | null): Promise<ArtworkInspection> {
+export async function inspectArtwork(url: string | null): Promise<ArtworkInspection> {
   const cleanUrl = (url || '').trim().replace(/\s+/g, '');
   if (!cleanUrl) return { url: null, width: null, height: null, orientation: 'unknown' };
   try {

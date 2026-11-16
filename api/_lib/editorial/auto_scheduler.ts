@@ -1,7 +1,7 @@
 import { supabase } from '../supabase.js';
 import { approveEditorialSlot } from '../social_studio.js';
 import { fetchSeriesCandidates, CandidateEntity, getPublishedEntityIds } from './candidate_service.js';
-import { preflightFilm } from './social_preflight.js';
+import { preflightFilm, inspectArtwork } from './social_preflight.js';
 
 const LAGOS_OFFSET_HOURS = 1;
 
@@ -61,16 +61,6 @@ export async function resolveEligibleCandidate(options: {
     };
   }
 
-  // If a play or person is already assigned to the slot and NOT claimed, keep it.
-  if (initialId && !claimedCandidateIds.has(initialId) && (initialType === 'play' || initialType === 'person')) {
-    return {
-      candidateId: initialId,
-      candidateType: initialType,
-      candidateName: initialId,
-      wasReplaced: false,
-    };
-  }
-
   // 1. If subject is already set, validate it first
   if (initialId && !claimedCandidateIds.has(initialId)) {
     if (initialType === 'movie') {
@@ -91,14 +81,46 @@ export async function resolveEligibleCandidate(options: {
           : preflight.reasons.join(', ');
       console.warn(`[auto_scheduler] Pre-assigned movie ${initialId} for slot ${slot.id} failed preflight (${reason}). Finding next latest replacement movie...`);
       claimedCandidateIds.add(initialId);
-    } else {
-      // For person or play, if already set, assume valid
-      return {
-        candidateId: initialId,
-        candidateType: initialType,
-        candidateName: initialId,
-        wasReplaced: false,
-      };
+    } else if (initialType === 'play') {
+      const { data: play } = await supabase
+        .from('plays')
+        .select('id, title, status, run_start_date, run_end_date, poster_url')
+        .eq('id', initialId)
+        .maybeSingle();
+
+      const { derivePlayStatus } = await import('../theatre_service.js').catch(() => ({ derivePlayStatus: () => 'archived' }));
+      const isArchived = !play || play.status === 'archived' || derivePlayStatus(play, new Date()) === 'archived';
+      const artwork = play?.poster_url ? await inspectArtwork(play.poster_url).catch(() => null) : null;
+      const isPortrait = artwork?.orientation === 'portrait';
+
+      if (play && !isArchived && isPortrait) {
+        return {
+          candidateId: initialId,
+          candidateType: 'play',
+          candidateName: play.title,
+          wasReplaced: false,
+        };
+      }
+      const reason = !play ? 'play_not_found' : isArchived ? 'play_archived' : !artwork ? 'missing_poster' : `poster_${artwork.orientation}`;
+      console.warn(`[auto_scheduler] Pre-assigned play ${initialId} ("${play?.title || initialId}") rejected (${reason}). Finding replacement candidate...`);
+      claimedCandidateIds.add(initialId);
+    } else if (initialType === 'person') {
+      const { data: person } = await supabase
+        .from('people')
+        .select('id, name, photo_url, photo_cutout_url, bio, film_count')
+        .eq('id', initialId)
+        .maybeSingle();
+
+      if (person && (person.photo_url || person.photo_cutout_url)) {
+        return {
+          candidateId: initialId,
+          candidateType: 'person',
+          candidateName: person.name,
+          wasReplaced: false,
+        };
+      }
+      console.warn(`[auto_scheduler] Pre-assigned person ${initialId} rejected: missing photo. Finding replacement candidate...`);
+      claimedCandidateIds.add(initialId);
     }
   }
 
@@ -127,6 +149,19 @@ export async function resolveEligibleCandidate(options: {
         preflight,
         wasReplaced: Boolean(initialId),
       };
+    } else if (c.type === 'play') {
+      if (!c.imageUrl) continue;
+      const art = await inspectArtwork(c.imageUrl).catch(() => null);
+      if (!art || art.orientation !== 'portrait') {
+        console.warn(`[auto_scheduler] Candidate play "${c.name}" (${c.id}) rejected: poster is ${art?.orientation || 'unreadable'}`);
+        continue;
+      }
+      return {
+        candidateId: c.id,
+        candidateType: 'play',
+        candidateName: c.name,
+        wasReplaced: Boolean(initialId),
+      };
     } else {
       return {
         candidateId: c.id,
@@ -137,62 +172,75 @@ export async function resolveEligibleCandidate(options: {
     }
   }
 
-  // 3. Fallback: For movie slots (especially new releases and upcoming), query upcoming & newly released films directly
-  if (initialType === 'movie' || seriesSlug.includes('upcoming') || seriesSlug.includes('release')) {
-    console.log(`[auto_scheduler] Series candidates exhausted for ${seriesSlug}. Querying upcoming/recent films from database...`);
+  // 3. Fallback: If candidates for the series are exhausted, find an eligible alternative
+  console.log(`[auto_scheduler] Series candidates exhausted for ${seriesSlug}. Evaluating fallbacks...`);
 
-    // Fetch upcoming films first (ordered by release date)
-    const { data: upcomingFilms } = await supabase
-      .from('films')
-      .select('id, title, poster_url, release_date')
-      .eq('is_published', true)
-      .not('poster_url', 'is', null)
-      .gte('release_date', referenceDateStr)
-      .order('release_date', { ascending: true })
-      .limit(30);
-
-    for (const f of upcomingFilms || []) {
-      if (!f.poster_url || claimedCandidateIds.has(f.id)) continue;
-      const preflight = await preflightFilm(f.id).catch(() => null);
-      if (!preflight || !preflight.ready) continue;
-      if (preflight.artwork?.orientation === 'landscape') continue;
-
-      console.log(`[auto_scheduler] Selected upcoming film "${f.title}" (${f.id}) as replacement for slot ${slot.id}`);
+  // Fallback A: For stage play slots or empty series, try Behind The Camera / Talent candidates
+  if (seriesSlug === 'whats_on_stage' || initialType === 'play') {
+    const btlCandidates = await fetchSeriesCandidates('behind_the_camera', 10).catch(() => []);
+    for (const btl of btlCandidates) {
+      if (claimedCandidateIds.has(btl.id) || !btl.imageUrl) continue;
+      console.log(`[auto_scheduler] Selected Behind The Camera candidate "${btl.name}" (${btl.id}) as replacement for slot ${slot.id}`);
       return {
-        candidateId: f.id,
-        candidateType: 'movie',
-        candidateName: f.title,
-        preflight,
+        candidateId: btl.id,
+        candidateType: 'person',
+        candidateName: btl.name,
         wasReplaced: true,
       };
     }
+  }
 
-    // Fetch fresh releases from past 1 to 7 days if still not found
-    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
-    const { data: recentFilms } = await supabase
-      .from('films')
-      .select('id, title, poster_url, release_date')
-      .eq('is_published', true)
-      .not('poster_url', 'is', null)
-      .gte('release_date', sevenDaysAgo)
-      .order('release_date', { ascending: false })
-      .limit(30);
+  // Fallback B: Query upcoming films (ordered by release date)
+  const { data: upcomingFilms } = await supabase
+    .from('films')
+    .select('id, title, poster_url, release_date')
+    .eq('is_published', true)
+    .not('poster_url', 'is', null)
+    .gte('release_date', referenceDateStr)
+    .order('release_date', { ascending: true })
+    .limit(30);
 
-    for (const f of recentFilms || []) {
-      if (!f.poster_url || claimedCandidateIds.has(f.id)) continue;
-      const preflight = await preflightFilm(f.id).catch(() => null);
-      if (!preflight || !preflight.ready) continue;
-      if (preflight.artwork?.orientation === 'landscape') continue;
+  for (const f of upcomingFilms || []) {
+    if (!f.poster_url || claimedCandidateIds.has(f.id)) continue;
+    const preflight = await preflightFilm(f.id).catch(() => null);
+    if (!preflight || !preflight.ready) continue;
+    if (preflight.artwork?.orientation === 'landscape') continue;
 
-      console.log(`[auto_scheduler] Selected recent film "${f.title}" (${f.id}) as replacement for slot ${slot.id}`);
-      return {
-        candidateId: f.id,
-        candidateType: 'movie',
-        candidateName: f.title,
-        preflight,
-        wasReplaced: true,
-      };
-    }
+    console.log(`[auto_scheduler] Selected upcoming film "${f.title}" (${f.id}) as replacement for slot ${slot.id}`);
+    return {
+      candidateId: f.id,
+      candidateType: 'movie',
+      candidateName: f.title,
+      preflight,
+      wasReplaced: true,
+    };
+  }
+
+  // Fallback C: Query fresh releases from past 1 to 7 days
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const { data: recentFilms } = await supabase
+    .from('films')
+    .select('id, title, poster_url, release_date')
+    .eq('is_published', true)
+    .not('poster_url', 'is', null)
+    .gte('release_date', sevenDaysAgo)
+    .order('release_date', { ascending: false })
+    .limit(30);
+
+  for (const f of recentFilms || []) {
+    if (!f.poster_url || claimedCandidateIds.has(f.id)) continue;
+    const preflight = await preflightFilm(f.id).catch(() => null);
+    if (!preflight || !preflight.ready) continue;
+    if (preflight.artwork?.orientation === 'landscape') continue;
+
+    console.log(`[auto_scheduler] Selected recent film "${f.title}" (${f.id}) as replacement for slot ${slot.id}`);
+    return {
+      candidateId: f.id,
+      candidateType: 'movie',
+      candidateName: f.title,
+      preflight,
+      wasReplaced: true,
+    };
   }
 
   return null;
@@ -215,6 +263,30 @@ export async function autoScheduleDueCalendarSlots(now = new Date(), options: { 
     return (h || 0) * 60 + (m || 0);
   })();
   const maxMinutes = options.forceAll ? Infinity : nowMinutes + (options.maxLookaheadMinutes ?? 90);
+
+  // 0. Roll forward any stranded/un-drafted release slots from the last 48 hours to today
+  const twoDaysAgo = new Date(now.getTime() - 2 * 86_400_000).toISOString().slice(0, 10);
+  const { data: strandedReleases } = await supabase
+    .from('social_calendar')
+    .select('id, scheduled_date, scheduled_time, planner_key, subject_entity_id')
+    .like('planner_key', 'release:%')
+    .lt('scheduled_date', dateStr)
+    .gte('scheduled_date', twoDaysAgo)
+    .in('status', ['planned', 'subject_selected'])
+    .is('draft_id', null);
+
+  if (strandedReleases && strandedReleases.length > 0) {
+    console.log(`[auto_scheduler] Rolling forward ${strandedReleases.length} stranded release slots to today (${dateStr})...`);
+    for (const r of strandedReleases) {
+      await supabase
+        .from('social_calendar')
+        .update({
+          scheduled_date: dateStr,
+          notes: `Rolled forward to ${dateStr} from ${r.scheduled_date} to prevent late ingestion orphan.`,
+        })
+        .eq('id', r.id);
+    }
+  }
 
   // 1. Fetch unapproved slots for today in WAT
   const { data: slots, error } = await supabase
@@ -367,6 +439,16 @@ export async function autoScheduleDueCalendarSlots(now = new Date(), options: { 
       claimedCandidateIds.add(candidateId);
     } catch (err: any) {
       console.error(`[auto_scheduler] Failed to auto-schedule slot ${slot.id}:`, err?.message || err);
+      await supabase
+        .from('social_calendar')
+        .update({
+          status: 'failed',
+          notes: `Auto-schedule failed: ${err?.message || 'unknown_error'}`,
+          preflight_checked_at: new Date().toISOString(),
+          preflight_status: 'blocked',
+        })
+        .eq('id', slot.id)
+        .catch(() => {});
       skippedSlots.push({ slotId: slot.id, reason: err?.message || 'unknown_error' });
     }
   }

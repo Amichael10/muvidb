@@ -330,17 +330,17 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
         .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url')
         .not('photo_url', 'is', null)
         .gte('film_count', 3)
-        .lte('film_count', 80)
+        .lte('film_count', 150)
         .or('known_for_department.ilike.%edit%,known_for_department.ilike.%camera%,known_for_department.ilike.%sound%,known_for_department.ilike.%costume%,known_for_department.ilike.%art%,known_for_department.ilike.%post%')
         .order('film_count', { ascending: false, nullsFirst: false })
         .limit(Math.max(limit * 4, 60)),
-      // Query for emerging directors, writers, and grassroots producers (capped at <= 50 credits)
+      // Query for emerging & prolific directors, writers, and grassroots producers (up to 150 credits)
       supabase
         .from('people')
         .select('id, name, slug, photo_url, photo_cutout_url, nationality, film_count, profile_views, bio, popularity_score, known_for_department, instagram_url, twitter_url')
         .not('photo_url', 'is', null)
         .gte('film_count', 3)
-        .lte('film_count', 50)
+        .lte('film_count', 150)
         .or('known_for_department.ilike.%direct%,known_for_department.ilike.%writ%,known_for_department.ilike.%produc%')
         .order('film_count', { ascending: false, nullsFirst: false })
         .limit(Math.max(limit * 4, 60)),
@@ -353,13 +353,13 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       return dept === 'actor' || dept === 'acting';
     };
 
-    // Filter out industry moguls with > 60 credits and already-published people
+    // Filter out already-published people and pure actors
     const belowTheLine = (btlRes.data || []).filter(p => {
       if (publishedIds.has(p.id)) return false;
       if (isActorOnly(p)) return false;
-      return (p.film_count || 0) <= 60;
+      return (p.film_count || 0) <= 150;
     });
-    const aboveTheLine = (atlRes.data || []).filter(p => !publishedIds.has(p.id) && !isActorOnly(p) && (p.film_count || 0) <= 50);
+    const aboveTheLine = (atlRes.data || []).filter(p => !publishedIds.has(p.id) && !isActorOnly(p) && (p.film_count || 0) <= 150);
 
     // Interleave: 2 below-the-line craftspeople to 1 director/producer
     const targetList: typeof belowTheLine = [];
@@ -502,9 +502,10 @@ export async function fetchSeriesCandidates(seriesSlug: string, limit = 30): Pro
       .limit(limit * 3);
 
     const now = new Date();
-    // Filter out all archived or ended plays and already-published productions
+    // Filter out all archived or ended plays, unpublished items, and plays without posters
     const activePlays = (plays || []).filter((p) => {
       if (publishedIds.has(p.id)) return false;
+      if (!p.poster_url) return false;
       const derived = derivePlayStatus(p, now);
       return derived !== 'archived' && p.status !== 'archived';
     });

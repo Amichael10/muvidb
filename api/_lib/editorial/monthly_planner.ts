@@ -93,7 +93,8 @@ export async function planRollingSocialCalendar(options: {
   const endDate = dateOnly(endDay);
 
   if (!options.dryRun) {
-    // 1. Automatically prune stale unapproved slots from past dates so the schedule stays fresh
+    // 1. Automatically prune stale unapproved base slots from past dates so the schedule stays fresh.
+    // Preserves release slots so auto_scheduler or rolling planner can roll them forward.
     await supabase
       .from('social_calendar')
       .update({
@@ -101,6 +102,7 @@ export async function planRollingSocialCalendar(options: {
         notes: 'Expired unapproved slot from past date (pruned to prevent stale schedule)',
       })
       .lt('scheduled_date', startDate)
+      .not('planner_key', 'like', 'release:%')
       .in('status', ['planned', 'subject_selected', 'draft_ready']);
 
     // 2. Clear unlocked planned slots in this weekly window if requested
@@ -129,7 +131,7 @@ export async function planRollingSocialCalendar(options: {
       .gte('release_date', releaseCatchupDate)
       .lte('release_date', endDate)
       .order('release_date', { ascending: true }),
-    supabase.from('social_calendar').select('planner_key').like('planner_key', 'release:%'),
+    supabase.from('social_calendar').select('planner_key,status,draft_id,scheduled_date').like('planner_key', 'release:%'),
     supabase.from('social_calendar').select('planner_key,status,selection_locked,scheduled_date,series_id,social_content_series(slug)')
       .like('planner_key', 'base:%')
       .in('status', ['published', 'approved', 'draft_ready', 'subject_selected']),
@@ -206,7 +208,13 @@ export async function planRollingSocialCalendar(options: {
   }
 
   const releases = canonicalizeReleaseFilms(films || []);
-  const existingReleaseKeys = new Set((existingReleaseRows || []).map(row => row.planner_key));
+  // A release slot is only considered "existing" if it was already drafted/approved/published,
+  // or if its scheduled_date is today or in the future. Un-drafted past release slots must be re-planned for today.
+  const existingReleaseKeys = new Set(
+    (existingReleaseRows || [])
+      .filter((row: any) => row.draft_id || ['approved', 'published'].includes(row.status) || row.scheduled_date >= startDate)
+      .map((row: any) => row.planner_key)
+  );
   const releasesByDay = new Map<string, any[]>();
   for (const film of releases) {
     if (publishedFilmIds.has(film.id)) continue;

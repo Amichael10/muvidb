@@ -9,6 +9,9 @@ vi.mock('../supabase.js', () => {
     lte: vi.fn().mockReturnThis(),
     not: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
+    like: vi.fn().mockReturnThis(),
+    ilike: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
@@ -32,6 +35,7 @@ vi.mock('./candidate_service.js', () => ({
 
 vi.mock('./social_preflight.js', () => ({
   preflightFilm: vi.fn(),
+  inspectArtwork: vi.fn().mockResolvedValue({ orientation: 'portrait' }),
 }));
 
 import { autoScheduleDueCalendarSlots } from './auto_scheduler.js';
@@ -66,6 +70,8 @@ describe('autoScheduleDueCalendarSlots candidate fallback', () => {
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
           in: vi.fn().mockReturnThis(),
+          is: vi.fn().mockReturnThis(),
+          like: vi.fn().mockReturnThis(),
           gte: vi.fn().mockReturnThis(),
           lt: vi.fn().mockReturnThis(),
           lte: vi.fn().mockReturnThis(),
@@ -152,6 +158,105 @@ describe('autoScheduleDueCalendarSlots candidate fallback', () => {
         slotId: 'slot-1',
         candidateId: 'film-valid',
         candidateType: 'movie',
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('replaces a stage play with square artwork with an eligible behind_the_camera candidate', async () => {
+    const mockPlaySlot = {
+      id: 'slot-stage-1',
+      scheduled_date: '2026-10-26',
+      scheduled_time: '12:00:00',
+      status: 'planned',
+      priority: 'normal',
+      subject_entity_type: 'play',
+      subject_entity_id: 'play-square-artwork',
+      planner_key: 'base:2026-10-26:2',
+      social_content_series: { id: 's-stage', name: "What's On Stage", slug: 'whats_on_stage' },
+    };
+
+    const fromMock = vi.mocked(supabase.from);
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'social_calendar') {
+        const query: any = {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          in: vi.fn().mockReturnThis(),
+          is: vi.fn().mockReturnThis(),
+          like: vi.fn().mockReturnThis(),
+          gte: vi.fn().mockReturnThis(),
+          lt: vi.fn().mockReturnThis(),
+          lte: vi.fn().mockReturnThis(),
+          not: vi.fn().mockReturnThis(),
+          order: vi.fn().mockResolvedValue({ data: [mockPlaySlot], error: null }),
+          update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+          then: (resolve: any) => resolve({ data: [], error: null }),
+        };
+        return query;
+      }
+      if (table === 'plays') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: {
+              id: 'play-square-artwork',
+              title: 'Square Play',
+              status: 'published',
+              poster_url: 'https://example.com/square.png',
+            },
+            error: null,
+          }),
+        } as any;
+      }
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        not: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        lt: vi.fn().mockReturnThis(),
+        lte: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        then: (resolve: any) => resolve({ data: [], error: null }),
+      } as any;
+    });
+
+    const { inspectArtwork } = await import('./social_preflight.js');
+    vi.mocked(inspectArtwork).mockImplementation(async (url: any) => {
+      if (url?.includes('square')) return { orientation: 'square' as const, url, width: 1080, height: 1080 };
+      return { orientation: 'portrait' as const, url, width: 1080, height: 1350 };
+    });
+
+    vi.mocked(fetchSeriesCandidates).mockImplementation(async (seriesSlug: string) => {
+      if (seriesSlug === 'whats_on_stage') return [];
+      if (seriesSlug === 'behind_the_camera') {
+        return [
+          {
+            id: 'director-omoruyi',
+            type: 'person',
+            name: 'Omoruyi Efosa Emmanuel',
+            imageUrl: 'https://example.com/omoruyi.webp',
+            completenessScore: 0.95,
+            data: {},
+          },
+        ];
+      }
+      return [];
+    });
+
+    const result = await autoScheduleDueCalendarSlots(new Date('2026-10-26T11:00:00Z'));
+    expect(result.skipped).toHaveLength(0);
+    expect(result.scheduled).toContain('slot-stage-1');
+    expect(approveEditorialSlot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slotId: 'slot-stage-1',
+        candidateId: 'director-omoruyi',
+        candidateType: 'person',
       }),
       expect.any(Object),
     );

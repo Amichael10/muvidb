@@ -287,9 +287,11 @@ function actorBody(snapshot: ActorSpotlightSnapshot, contentType?: string | null
 
   const titles = snapshot.knownFor.map(film => film.title).filter(Boolean);
   if (titles.length) {
+    const dept = (snapshot.knownForDepartment || '').toLowerCase();
+    const verb = dept.includes('writ') ? 'penning' : (dept.includes('direct') ? 'directing' : 'crafting');
     lines.push(
       isBehindCamera
-        ? `From penning standout hits like ${joinTitles(titles)}, ${snapshot.name} continues to deliver unforgettable Nollywood cinema.`
+        ? `From ${verb} standout hits like ${joinTitles(titles)}, ${snapshot.name} continues to deliver unforgettable Nollywood cinema.`
         : `From standout performances in ${joinTitles(titles)}, ${snapshot.name} continues to deliver unforgettable Nollywood cinema.`
     );
   }

@@ -1481,7 +1481,7 @@ async function loadPersonSource(
     .eq('person_id', personId)
     .eq('films.is_published', true)
     .order('billing_order', { ascending: true, nullsFirst: false })
-    .limit(12);
+    .limit(40);
 
   if (creditsError) throw creditsError;
 
@@ -2239,7 +2239,13 @@ export async function generateSocialDraft(
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
     snapshot.kind === 'actor_spotlight'
-      ? `Actor Spotlight — ${snapshot.name}`
+      ? (input.contentType === 'behind_the_camera'
+          ? `Behind The Camera — ${snapshot.name}`
+          : input.contentType === 'you_know_the_face'
+            ? `You Know The Face — ${snapshot.name}`
+            : input.contentType === 'filmography'
+              ? `Filmography — ${snapshot.name}`
+              : `Actor Spotlight — ${snapshot.name}`)
       : snapshot.kind === 'birthday_spotlight'
         ? `Birthday Spotlight — ${snapshot.name}`
         : snapshot.kind === 'whats_on_stage'

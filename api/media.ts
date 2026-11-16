@@ -79,7 +79,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     return res.status(200).send(buffer);
   } catch (e: any) {
-    const status = [400, 403, 413, 504].includes(e?.statusCode) ? e.statusCode : 502;
-    return res.status(status).send(status === 403 ? 'Blocked host' : status === 413 ? 'Too large' : 'Image fetch failed');
+    const code = e?.statusCode;
+    const status = [400, 403, 404, 410, 413, 504].includes(code)
+      ? code
+      : (code >= 400 && code < 500 ? code : 404);
+    if (status === 404) {
+      res.setHeader('Cache-Control', 'public, max-age=300');
+    }
+    const msg = status === 403 ? 'Blocked host' : status === 413 ? 'Too large' : status === 404 ? 'Image not found' : 'Image fetch failed';
+    return res.status(status).send(msg);
   }
 }

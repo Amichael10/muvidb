@@ -342,7 +342,18 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
   const suppliedRoles = 'roles' in (person || {}) && Array.isArray((person as any).roles)
     ? (person as any).roles.filter(Boolean).join(' · ')
     : '';
-  const personRole = suppliedRoles || person?.knownForDepartment || 'Screen professional';
+  const rawRole = suppliedRoles || person?.knownForDepartment || 'Screen professional';
+  const roleNounMap: Record<string, string> = {
+    directing: 'director',
+    writing: 'writer',
+    acting: 'actor',
+    producing: 'producer',
+    cinematography: 'cinematographer',
+    editing: 'editor',
+    sound: 'sound designer',
+  };
+  const personRoleNoun = roleNounMap[rawRole.toLowerCase().trim()] || rawRole;
+  const personRole = rawRole;
   const personSummary = (person as any)?.summary || (person as any)?.shortBio || summarizePersonBio(person?.bio, 210);
   const roleLines = String(personRole)
     .split(/\s*(?:·|,|&|\/|\band\b)\s*/i)
@@ -379,7 +390,7 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
         title: 'The Mind Behind The Magic',
         status: String(personRole).toUpperCase(),
         detail: 'CRAFT & VISION',
-        support: `Ever wondered who breathes soul into your favorite Nollywood stories before an actor even steps on set? Meet ${title}.<br><br>${person?.bio ? summarizePersonBio(person.bio, 260) : `As a respected ${personRole.toLowerCase()}, they bring rare cultural nuance, emotional weight, and dedication to every production they shape.`}`,
+        support: `Ever wondered who breathes soul into your favorite Nollywood stories before an actor even steps on set? Meet ${title}.<br><br>${person?.bio ? summarizePersonBio(person.bio, 260) : `As a respected ${personRoleNoun.toLowerCase()}, they bring rare cultural nuance, emotional weight, and dedication to every production they shape.`}`,
         image,
       };
     }
@@ -430,7 +441,7 @@ function simpleEditorialData(snapshot: SocialSourceSnapshot, variant: SimpleEdit
         ...base,
         variant: 'celebration-closing',
         title: `Join us in celebrating ${title}`,
-        support: `— an extraordinary ${personRole.toLowerCase()} reshaping the African screen landscape one story at a time! 🥂✨`,
+        support: `— an extraordinary ${personRoleNoun.toLowerCase()} reshaping the African screen landscape one story at a time! 🥂✨`,
         status: 'EXPLORE THEIR WORK AT MUVIDB.COM',
       };
     }
@@ -562,6 +573,31 @@ async function renderHtmlTemplate(input: {
   try {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
     const templateData = { ...spec.data(input.snapshot, input.slide), ...(input.dataOverride || {}) };
+
+    // Inlining image URLs to base64 data URLs guarantees 100% reliable rendering in Chromium
+    // with zero network latency, zero CORS blocks, and zero partial-decode cutoffs.
+    const imageKeys = ['image', 'image2', 'image3', 'image4', 'grid1', 'grid2', 'grid3', 'grid4', 'criticAvatar'];
+    await Promise.all(
+      imageKeys.map(async key => {
+        const val = templateData[key];
+        if (typeof val === 'string' && val.startsWith('http')) {
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+            const res = await fetch(val, { signal: controller.signal });
+            clearTimeout(timeout);
+            if (res.ok) {
+              const buf = Buffer.from(await res.arrayBuffer());
+              const mime = res.headers.get('content-type') || (val.endsWith('.png') ? 'image/png' : val.endsWith('.webp') ? 'image/webp' : 'image/jpeg');
+              templateData[key] = `data:${mime};base64,${buf.toString('base64')}`;
+            }
+          } catch (err: any) {
+            console.warn(`[renderHtmlTemplate] Failed to inline image for key "${key}" (${val}):`, err.message);
+          }
+        }
+      })
+    );
+
     if (typeof templateData.profileUrl === 'string' && templateData.profileUrl) {
       const QRCode = nodeRequire('qrcode') as {
         toDataURL: (value: string, options: Record<string, unknown>) => Promise<string>;

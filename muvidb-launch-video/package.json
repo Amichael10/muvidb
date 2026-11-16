@@ -6,9 +6,12 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/dm-sans": "^5.3.0",
     "@remotion/animation-utils": "^4.0.504",
     "@remotion/cli": "4.0.504",
     "@remotion/google-fonts": "^4.0.504",
+    "@remotion/layout-utils": "^4.0.504",
     "@remotion/tailwind-v4": "4.0.504",
     "@remotion/transitions": "4.0.504",
     "gsap": "^3.15.0",
@@ -39,7 +42,11 @@
     "alert:muted": "remotion render ActorAlertVerticalMuted out/muvidb-actor-alert-muted.mp4 --codec=h264",
     "alert:cover": "remotion still ActorAlertCover out/muvidb-actor-alert-cover.png",
     "alert:all": "npm run alert:audio && npm run alert:subs && npm run alert:vertical && npm run alert:landscape && npm run alert:square && npm run alert:muted && npm run alert:clean && npm run alert:cover",
-    "alert:clean": "remotion render ActorAlertVerticalClean out/muvidb-actor-alert-vertical-clean.mp4 --codec=h264"
+    "alert:clean": "remotion render ActorAlertVerticalClean out/muvidb-actor-alert-vertical-clean.mp4 --codec=h264",
+    "rewind:studio": "remotion studio",
+    "rewind:video": "remotion render RewindVideo out/rewind-video.mp4 --codec=h264 --pixel-format=yuv420p --image-format=png --muted",
+    "rewind:story": "remotion still RewindStory out/rewind-story.png",
+    "rewind:feed": "remotion still RewindFeed out/rewind-feed.png"
   },
   "sideEffects": [
     "*.css"

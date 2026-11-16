@@ -58,7 +58,9 @@ export async function downloadPublicImage(input: URL, headers: Record<string, st
           return;
         }
         if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
-          response.destroy(); reject(downloadError('Upstream error', 502)); return;
+          const upstreamStatus = response.statusCode || 502;
+          const mappedStatus = [401, 403, 404, 410].includes(upstreamStatus) ? 404 : 502;
+          response.destroy(); reject(downloadError(`Upstream returned ${upstreamStatus}`, mappedStatus)); return;
         }
         if (Number(response.headers['content-length']) > maxBytes) {
           response.destroy(); reject(downloadError('Too large', 413)); return;
