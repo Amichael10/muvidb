@@ -94,6 +94,12 @@ netflix_playwright_state.json
 # Local agent tooling + throwaway repair/inspection scripts.
 .agents/
 scratch/
+AGENTS.md
+SESSION_HANDOFF.md
+docs/WORK_LOG.md
+docs/HARVEST_HANDOFF.md
+docs/_agent5_pwa_notes.md
+docs/security/
 
 # React Router framework-mode generated typegen + build output
 .react-router/
@@ -190,6 +196,12 @@ netflix_playwright_state.json
 # Local agent tooling + throwaway repair/inspection scripts.
 .agents/
 scratch/
+AGENTS.md
+SESSION_HANDOFF.md
+docs/WORK_LOG.md
+docs/HARVEST_HANDOFF.md
+docs/_agent5_pwa_notes.md
+docs/security/
 
 # React Router framework-mode generated typegen + build output
 .react-router/
