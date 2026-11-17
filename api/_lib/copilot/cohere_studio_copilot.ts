@@ -642,7 +642,7 @@ export async function executeCopilotTool(
         )
       `;
 
-      let query = supabase.from('films').select(filmSelect).not('poster_url', 'is', null);
+      let query: any = supabase.from('films').select(filmSelect).not('poster_url', 'is', null);
 
       if (days && days > 0) {
         const cutoffDate = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString().slice(0, 10);

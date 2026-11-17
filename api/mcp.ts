@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createMcpServer } from '../packages/muvidb-mcp/src/index.js';
+import { createMcpServer } from '../packages/muvidb-mcp/src/index';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 export const maxDuration = 60;

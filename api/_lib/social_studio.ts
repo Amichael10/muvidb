@@ -2239,11 +2239,11 @@ export async function generateSocialDraft(
   const warnings = collectSnapshotWarnings(snapshot);
   const title =
     snapshot.kind === 'actor_spotlight'
-      ? (input.contentType === 'behind_the_camera'
+      ? ((input.contentType as string) === 'behind_the_camera'
           ? `Behind The Camera — ${snapshot.name}`
-          : input.contentType === 'you_know_the_face'
+          : (input.contentType as string) === 'you_know_the_face'
             ? `You Know The Face — ${snapshot.name}`
-            : input.contentType === 'filmography'
+            : (input.contentType as string) === 'filmography'
               ? `Filmography — ${snapshot.name}`
               : `Actor Spotlight — ${snapshot.name}`)
       : snapshot.kind === 'birthday_spotlight'

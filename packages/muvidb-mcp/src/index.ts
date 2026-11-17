@@ -1,10 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { searchFilms, getFilmDetails, getFilmCredits, getWhereToWatch } from './tools/films.js';
-import { searchPeople, getPersonFilmography } from './tools/people.js';
-import { getAwardsAndNominations } from './tools/awards.js';
-import { getBoxOfficeRankings } from './tools/boxOffice.js';
+import { searchFilms, getFilmDetails, getFilmCredits, getWhereToWatch } from './tools/films';
+import { searchPeople, getPersonFilmography } from './tools/people';
+import { getAwardsAndNominations } from './tools/awards';
+import { getBoxOfficeRankings } from './tools/boxOffice';
 
 export function createMcpServer() {
   const server = new McpServer({

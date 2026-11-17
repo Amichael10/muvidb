@@ -37,7 +37,7 @@ export function getSupabaseClient(): SupabaseClient {
   });
 }
 
-export async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 800): Promise<T> {
+export async function withRetry<T = any>(fn: () => any, retries = 3, delay = 800): Promise<T> {
   let lastErr: any;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {

@@ -439,16 +439,19 @@ export async function autoScheduleDueCalendarSlots(now = new Date(), options: { 
       claimedCandidateIds.add(candidateId);
     } catch (err: any) {
       console.error(`[auto_scheduler] Failed to auto-schedule slot ${slot.id}:`, err?.message || err);
-      await supabase
-        .from('social_calendar')
-        .update({
-          status: 'failed',
-          notes: `Auto-schedule failed: ${err?.message || 'unknown_error'}`,
-          preflight_checked_at: new Date().toISOString(),
-          preflight_status: 'blocked',
-        })
-        .eq('id', slot.id)
-        .catch(() => {});
+      try {
+        await supabase
+          .from('social_calendar')
+          .update({
+            status: 'failed',
+            notes: `Auto-schedule failed: ${err?.message || 'unknown_error'}`,
+            preflight_checked_at: new Date().toISOString(),
+            preflight_status: 'blocked',
+          })
+          .eq('id', slot.id);
+      } catch {
+        // Ignore fallback update failure
+      }
       skippedSlots.push({ slotId: slot.id, reason: err?.message || 'unknown_error' });
     }
   }
