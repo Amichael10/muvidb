@@ -27,7 +27,7 @@ temp_lumi_*/
 # Scratch and output directories
 scratch/
 output/
-tools/
+/tools/
 *.exe
 
 # Root-level test, fix, and debug scripts
