@@ -23,6 +23,10 @@ logs/
 # Temporary task/run directories
 temp_lumi_*/
 .tmp-npm-cache/
+.npm-cache/
+.local-clipper-venv/
+tmp/
+muvidb-launch-video/out/
 
 # Scratch and output directories
 scratch/
@@ -127,6 +131,10 @@ coverage/
 # Temporary task/run directories
 temp_lumi_*/
 .tmp-npm-cache/
+.npm-cache/
+.local-clipper-venv/
+tmp/
+muvidb-launch-video/out/
 
 # Scratch and output directories
 scratch/
