@@ -1,0 +1,33 @@
+{
+  "name": "@muvidb/mcp",
+  "version": "1.0.0",
+  "description": "The official Model Context Protocol (MCP) server for MuviDB — the open database of Nollywood and African Cinema.",
+  "main": "dist/index.js",
+  "bin": {
+    "muvidb-mcp": "./bin/cli.js"
+  },
+  "type": "module",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "muvidb",
+    "nollywood",
+    "african-cinema",
+    "films",
+    "movies",
+    "ai-agents"
+  ],
+  "author": "MuviDB Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "@supabase/supabase-js": "^2.49.1",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  },
+  "scripts": {
+    "start": "node bin/cli.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run src/mcp.test.ts"
+  }
+}
