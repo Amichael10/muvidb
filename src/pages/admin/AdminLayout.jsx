@@ -139,7 +139,7 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className={`admin-workspace flex min-h-screen font-sans ${isDark ? 'dark' : 'light'} bg-bg transition-colors duration-300 relative overflow-x-hidden`}>
+    <div className={`admin-workspace flex min-h-screen font-sans ${isDark ? 'dark' : 'light'} bg-bg transition-colors duration-300 relative`}>
       {/* ──────────────────────────────────────────────────────────────────────── */}
       {/* MOBILE DRAWER BACKDROP & SLIDE-OUT ASIDE (< md)                          */}
       {/* ──────────────────────────────────────────────────────────────────────── */}
@@ -285,7 +285,7 @@ export default function AdminLayout() {
       {/* DESKTOP SIDEBAR (>= md)                                                  */}
       {/* ──────────────────────────────────────────────────────────────────────── */}
       <aside 
-        className={`admin-sidebar bg-sidebar border-r border-sidebar-border hidden md:flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative z-30 h-screen sticky top-0 ${
+        className={`admin-sidebar bg-sidebar border-r border-sidebar-border hidden md:flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out relative z-30 min-h-screen self-stretch ${
           isCollapsed ? 'w-[72px]' : 'w-[284px]'
         }`}
       >
@@ -313,7 +313,7 @@ export default function AdminLayout() {
           )}
         </div>
 
-        <nav className="admin-nav flex-1 overflow-y-auto px-3 space-y-1 py-4 custom-scrollbar">
+        <nav className="admin-nav flex-1 px-3 space-y-1 py-4">
           {visibleNavItems.map((item) => (
             <NavLink
               key={item.path}
@@ -349,7 +349,7 @@ export default function AdminLayout() {
         </nav>
 
         {/* Desktop User Card (Large & Prominent) */}
-        <div className="p-4 border-t border-sidebar-border bg-surface-2/30">
+        <div className="p-4 border-t border-sidebar-border bg-surface-2/30 mt-auto">
           <div className={`flex items-center gap-3 overflow-hidden ${isCollapsed ? 'justify-center gap-0' : ''}`}>
             {/* Prominent Avatar on Desktop */}
             <div className="w-10 h-10 rounded-xl bg-surface-2 border border-brand/30 flex flex-shrink-0 items-center justify-center text-brand font-bold text-sm shadow-sm overflow-hidden">
