@@ -63,6 +63,9 @@
     "api/media.ts": {
       "maxDuration": 60
     },
+    "api/mcp.ts": {
+      "maxDuration": 60
+    },
     "api/v1.ts": {
       "maxDuration": 60
     },
