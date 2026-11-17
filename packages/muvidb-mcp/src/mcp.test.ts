@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { createMcpServer } from './index.js';
-import { searchFilms, getFilmCredits, getWhereToWatch } from './tools/films.js';
-import { searchPeople, getPersonFilmography } from './tools/people.js';
-import { getAwardsAndNominations } from './tools/awards.js';
+import { createMcpServer } from '../../../api/_lib/mcp/index.js';
+import { searchFilms, getFilmCredits, getWhereToWatch } from '../../../api/_lib/mcp/tools/films.js';
+import { searchPeople, getPersonFilmography } from '../../../api/_lib/mcp/tools/people.js';
+import { getAwardsAndNominations } from '../../../api/_lib/mcp/tools/awards.js';
 
 describe('MuviDB MCP Server', () => {
   it('instantiates the MCP server with all 8 tools registered', () => {
