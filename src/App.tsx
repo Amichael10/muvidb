@@ -83,6 +83,7 @@ const PlayDetail = lazyWithRetry(() => import('./pages/PlayDetail'));
 const TitleChecker = lazyWithRetry(() => import('./pages/TitleChecker'));
 const Support = lazyWithRetry(() => import('./pages/Support'));
 const Brand = lazyWithRetry(() => import('./pages/Brand'));
+const OAuthAuthorize = lazyWithRetry(() => import('./pages/OAuthAuthorize'));
 
 // Lazy admin pages — kept entirely out of the public bundle
 const AdminLayout = lazyWithRetry(() => import('./pages/admin/AdminLayout'));
@@ -183,8 +184,9 @@ function Layout({ children }) {
   const isOnboardingPath = location.pathname === '/onboarding';
   const isWaitlistPath = location.pathname === '/waitlist';
   const isPortfolioPath = location.pathname.startsWith('/@') || location.pathname.startsWith('/portfolio/');
+  const isOAuthPath = location.pathname.startsWith('/oauth');
   
-  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath || isPortfolioPath;
+  const hideLayout = isAdminPath || isOnboardingPath || isWaitlistPath || isPortfolioPath || isOAuthPath;
   
   return (
     <div className="min-h-screen flex flex-col bg-bg text-text-primary">
@@ -387,6 +389,7 @@ export default function App() {
                 <Route path="/support-us" element={<Navigate to="/" replace />} />
                 <Route path="/brand" element={<Brand />} />
                 <Route path="/brand-kit" element={<Brand />} />
+                <Route path="/oauth/authorize" element={<OAuthAuthorize />} />
 
                 {/* Onboarding */}
                 <Route path="/waitlist" element={<Waitlist />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast';
 import FilmCard from '../components/film/FilmCard';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import WhatsAppOptInModal from '../components/person/WhatsAppOptInModal';
+import AiAssistantTab from '../components/dashboard/AiAssistantTab';
 
 function canMutateReview(createdAt) {
   if (!createdAt) return false;
@@ -90,8 +91,9 @@ function EmptyState({ icon, title, body, cta, to }) {
 export default function Dashboard() {
   const { user, refreshUserProfile, updatePassword } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState('watchlist');
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'watchlist');
   const [loading, setLoading] = useState(true);
 
   const [watchlist, setWatchlist] = useState([]);
@@ -475,6 +477,7 @@ export default function Dashboard() {
     { id: 'watchlist', label: 'Watchlist', icon: 'solar:bookmark-linear', count: watchlist.length },
     { id: 'following', label: 'Following', icon: 'solar:users-group-rounded-linear', count: following.length },
     { id: 'reviews', label: 'Reviews', icon: 'solar:chat-square-like-linear', count: reviews.length },
+    { id: 'ai-mcp', label: 'AI & ChatGPT', icon: 'solar:magic-stick-3-linear', badge: 'New' },
     { id: 'settings', label: 'Settings', icon: 'solar:settings-linear' },
   ];
 
@@ -518,6 +521,15 @@ export default function Dashboard() {
                 >
                   <Icon icon={tab.icon} className={`text-lg ${active ? 'opacity-100' : 'opacity-70'}`} />
                   <span className="flex-1 text-left">{tab.label}</span>
+                  {tab.badge && (
+                    <span
+                      className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                        active ? 'bg-white/20 text-white' : 'bg-brand/15 text-brand'
+                      }`}
+                    >
+                      {tab.badge}
+                    </span>
+                  )}
                   {typeof tab.count === 'number' && (
                     <span
                       className={`text-[10px] font-bold tabular-nums min-w-[1.25rem] text-center ${
@@ -567,7 +579,16 @@ export default function Dashboard() {
                     }`}
                   >
                     <Icon icon={tab.icon} className="text-sm" />
-                    {tab.label}
+                    <span>{tab.label}</span>
+                    {tab.badge && (
+                      <span
+                        className={`text-[8px] font-black uppercase tracking-wider px-1 py-0.5 rounded ${
+                          active ? 'bg-white/20 text-white' : 'bg-brand/20 text-brand'
+                        }`}
+                      >
+                        {tab.badge}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -1015,6 +1036,9 @@ export default function Dashboard() {
                   )}
                 </div>
               )}
+
+              {/* AI & CHATGPT (MCP) */}
+              {activeTab === 'ai-mcp' && <AiAssistantTab user={user} />}
 
               {/* SETTINGS */}
               {activeTab === 'settings' && (

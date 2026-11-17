@@ -1,13 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createMcpServer } from './_lib/mcp/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { verifyMcpToken } from './_lib/mcp/auth.js';
 
 export const maxDuration = 60;
 export const config = { api: { bodyParser: false } };
 
 /**
  * Official MuviDB Model Context Protocol (MCP) Remote Serverless Endpoint.
- * Compatible with ChatGPT custom MCP connector, Claude web, and remote AI agents.
+ * OAuth-gated for ChatGPT custom MCP connector, Claude web, and remote AI agents.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Global CORS headers for remote MCP clients (ChatGPT, Claude, IDEs)
@@ -31,6 +32,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       status: 'online',
       protocol: 'streamable-http',
       endpoint: '/api/mcp',
+      authentication: 'OAuth 2.1 / Bearer Token',
+      auth_docs: 'https://muvidb.com/dashboard?tab=ai-mcp',
+      protected_resource: 'https://muvidb.com/.well-known/oauth-protected-resource',
       tools: [
         'search_films',
         'get_film_details',
@@ -41,6 +45,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'get_awards_and_nominations',
         'get_box_office_rankings'
       ]
+    });
+  }
+
+  // Gate all protocol operations (POST initialize, tool call, SSE streams) with OAuth Bearer Token
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.setHeader(
+      'WWW-Authenticate',
+      'Bearer realm="muvidb-mcp", resource_metadata="https://muvidb.com/.well-known/oauth-protected-resource"'
+    );
+    return res.status(401).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32001,
+        message:
+          'Unauthorized: MuviDB account required. Connect your account via OAuth or provide an Authorization: Bearer <token> header.'
+      },
+      id: null
+    });
+  }
+
+  const token = authHeader.slice(7).trim();
+  const session = await verifyMcpToken(token);
+  if (!session) {
+    res.setHeader(
+      'WWW-Authenticate',
+      'Bearer error="invalid_token", error_description="The access token is expired or invalid"'
+    );
+    return res.status(401).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32001,
+        message: 'Unauthorized: Invalid or expired Bearer token. Please re-authenticate your MuviDB account.'
+      },
+      id: null
     });
   }
 
