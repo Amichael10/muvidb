@@ -71,6 +71,7 @@ export default [
   // route('support-us', 'pages/Support.jsx', { id: 'support-us-alias' }),
   route('brand', 'pages/Brand.jsx'),
   route('brand-kit', 'pages/Brand.jsx', { id: 'brand-kit-alias' }),
+  route('oauth/authorize', 'pages/OAuthAuthorize.jsx'),
   route('waitlist', 'pages/Waitlist.tsx'),
   route('run-scanners', 'routes/api.run-scanners.tsx'),
   // ---- Authenticated ----
