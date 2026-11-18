@@ -22,6 +22,7 @@ export const AWARD_LOGOS = {
   AFFIF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-affif.jpg',
   SEPTIMIUS: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-septimius.jpg',
   TIFF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-tiff.png',
+  BFI: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-bfi.png',
   SUNDANCE: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-sundance.jpg',
   VENICE: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/award-logo-venice.jpg',
   CFIF: 'https://pkenrmorywmuvnzfoylp.supabase.co/storage/v1/object/public/posters/97c4c683-7aa2-4eb6-8ced-ab37f838e2b1.jpg',
@@ -1170,6 +1171,33 @@ export const AWARD_ORGS = [
     tags: ['Toronto', 'Canada', 'TIFF', 'City to City Lagos', 'World Premieres', 'Global Hub'],
   },
   {
+    id: 'BFI',
+    label: 'BFI London Film Festival',
+    full: 'BFI London Film Festival',
+    tagline: 'The UK’s Leading Global Film Festival Celebrating World & African Cinema',
+    category: 'festival',
+    location: 'London, United Kingdom',
+    frequency: 'Annual (October)',
+    founded: 1957,
+    accent: '#E50914',
+    about:
+      'The BFI London Film Festival (LFF) is the UK’s greatest celebration of world cinema, presented by the British Film Institute. Staged across iconic venues including BFI Southbank and the Royal Festival Hall, LFF spotlights visionary international filmmakers, major African screen works, and prominent diaspora voices.',
+    when:
+      'Held annually in October in London, United Kingdom.',
+    submissions:
+      'Fiction features, documentaries, and short films submitted via BFI official submission portal.',
+    entryPlan: {
+      fees: 'International Feature / Short Submission Fee',
+      eligibility: 'UK and World premieres; international features and shorts.',
+      formats: 'DCP with English subtitles.',
+      categoriesCount: 'Official Competition, Sutherland First Feature, Grierson Documentary, Short Film & Audience Awards',
+      platform: 'BFI Official Portal',
+    },
+    submitUrl: 'https://www.bfi.org.uk/london-film-festival',
+    submitLabel: 'BFI LFF Official Portal',
+    tags: ['London', 'United Kingdom', 'BFI', 'LFF', 'World Cinema', 'African Showcase', 'Sutherland Award'],
+  },
+  {
     id: 'ZAFAA',
     label: 'ZAFAA Global Awards',
     full: 'Zulu African Film Academy Awards',
@@ -1608,6 +1636,7 @@ export function normOrg(raw) {
   if (upper.includes('SUNDANCE')) return 'SUNDANCE';
   if (upper.includes('FILM AFRICA') || upper.includes('FILM_AFRICA') || upper.includes('ROYAL AFRICAN SOCIETY')) return 'FILM_AFRICA';
   if (upper === 'TIFF' || upper.includes('TORONTO INTERNATIONAL')) return 'TIFF';
+  if (upper === 'BFI' || upper.includes('BFI LONDON') || upper.includes('LONDON FILM FESTIVAL') || upper === 'LFF') return 'BFI';
   if (upper.includes('ZAFAA') || upper.includes('ZULU AFRICAN')) return 'ZAFAA';
   if (upper.includes('GMAA') || upper.includes('GOLDEN MOVIE AWARDS')) return 'GMAA';
   if (upper.includes('NAGA') || upper.includes('ACADEMY OF GOLDEN AWARDS')) return 'NAGA';

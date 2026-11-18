@@ -460,7 +460,7 @@ ${maps.map((m) => `  <sitemap>\n    <loc>${baseUrl}/sitemap-${m}.xml</loc>\n    
           'golden-stars', 'kilaf', 'kadiff', 'ccff', 'lifacc', 'wriff', 'affif',
           'oafp', 'ntff', 'ekoiff', 'asiff', 'biff', 'bcff', 'lifanima', 'eko-star',
           'septimius', 'eloy', 'city-people', 'ambo', 'film-africa', 'reffa',
-          'sundance', 'tiff', 'venice', 'cannes', 'berlinale', 'bafta', 'oscars',
+          'sundance', 'tiff', 'bfi', 'venice', 'cannes', 'berlinale', 'bafta', 'oscars',
           'golden-globes', 'eniff', 'cfif', 'tarina', 'afma', 'nafest'
         ];
         const awardPages = [
