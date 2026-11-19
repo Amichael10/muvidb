@@ -53,14 +53,28 @@ const WIN_FFMPEG_CANDIDATES = [
 ].filter(Boolean);
 
 async function resolveFfmpegBinary(): Promise<string | null> {
+  // 1. Check ffmpeg-static bundle
+  try {
+    const ffmpegModule = await import('ffmpeg-static');
+    const staticBin = (ffmpegModule as any).default || ffmpegModule;
+    if (typeof staticBin === 'string' && existsSync(staticBin)) {
+      return staticBin;
+    }
+  } catch (err: any) {
+    console.warn('[reel-generator] ffmpeg-static import skipped:', err?.message);
+  }
+
+  // 2. Check explicit FFMPEG_PATH environment variable
   if (process.env.FFMPEG_PATH && existsSync(process.env.FFMPEG_PATH)) {
     return process.env.FFMPEG_PATH;
   }
+  // 3. Check Windows candidate paths
   for (const candidate of WIN_FFMPEG_CANDIDATES) {
     if (candidate !== 'ffmpeg' && existsSync(candidate)) {
       return candidate;
     }
   }
+  // 4. Check system ffmpeg in PATH
   try {
     await execFileAsync('ffmpeg', ['-version']);
     return 'ffmpeg';
@@ -595,9 +609,8 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
             '-loop', '1',
             '-framerate', '24',
             '-i', coverFilePath,
-            '-ss', '4',
             '-i', audioFilePath,
-            '-filter_complex', `[1:a]afade=t=in:st=0:d=0.5,afade=t=out:st=${durationSec - 0.9}:d=0.9,volume=0.9[aout]`,
+            '-filter_complex', `[1:a]afade=t=in:st=0:d=0.4,afade=t=out:st=${durationSec - 0.8}:d=0.8,volume=0.95[aout]`,
             '-map', '0:v:0',
             '-map', '[aout]',
             '-t', String(durationSec),
