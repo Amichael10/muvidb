@@ -82,6 +82,17 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
+def is_allowed_origin(origin: str | None) -> bool:
+    if not origin:
+        return False
+    if origin in ALLOWED_ORIGINS:
+        return True
+    if re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin):
+        return True
+    if re.match(r"^https://[a-zA-Z0-9_\-\.]+\.vercel\.app$", origin):
+        return True
+    return False
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -96,7 +107,7 @@ class PrivateNetworkAccessMiddleware(BaseHTTPMiddleware):
             return Response("Invalid local host", status_code=403)
         if not request.client or request.client.host not in ("127.0.0.1", "::1"):
             return Response("Loopback access required", status_code=403)
-        if origin and origin not in ALLOWED_ORIGINS:
+        if origin and not is_allowed_origin(origin):
             return Response("Origin not allowed", status_code=403)
         if request.method == "OPTIONS":
             if not origin:
@@ -282,7 +293,7 @@ def health(request: Request):
         "transcription": transcribe_mod.whisper_available(),
         "filmcraft": bool(fc_path),
         "filmcraft_version": "0.5.0" if fc_path else None,
-        "pairing_token": PAIRING_TOKEN if request.headers.get("origin") in ALLOWED_ORIGINS else None,
+        "pairing_token": PAIRING_TOKEN if is_allowed_origin(request.headers.get("origin")) else None,
     }
 
 

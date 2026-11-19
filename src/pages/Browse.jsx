@@ -278,6 +278,16 @@ export default function Browse() {
   const visibleCountries = countriesExpanded ? orderedCountries : countryPreview;
   const hiddenCountryCount = Math.max(0, orderedCountries.length - COUNTRY_PREVIEW);
 
+  const hasActiveFilters = Boolean(
+    selectedGenres.length > 0 ||
+    selectedCountries.length > 0 ||
+    selectedPlatform ||
+    selectedYear ||
+    selectedRatings.length > 0 ||
+    searchQuery ||
+    sortBy !== 'views'
+  );
+
   const totalPages = Math.max(1, Math.ceil((totalCount || films.length) / PAGE_SIZE));
 
   return (
@@ -321,128 +331,12 @@ export default function Browse() {
       />
 
       <div className="max-w-7xl mx-auto border-x border-border min-h-screen">
-        <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
-          {/* Filters Sidebar */}
-          <div className={`md:w-80 shrink-0 p-8 space-y-12 bg-surface-2/5 ${isMobileFiltersOpen ? 'block' : 'hidden md:block'}`}>
-            <div className="flex items-center justify-between border-b border-border pb-4">
-              <h3 className="font-heading font-bold text-sm text-text-primary">Filters</h3>
-              <button onClick={clearAll} className="text-[9px] font-bold text-brand hover:underline">Clear Filters</button>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Sort By</h4>
-              <select
-                value={sortBy}
-                onChange={(e) => {
-                  resetPage();
-                  setSortBy(e.target.value);
-                }}
-                className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
-              >
-                <option value="views">Most Viewed</option>
-                <option value="rating">Top Rated</option>
-                <option value="newest">Newest Arrivals</option>
-                <option value="oldest">Vintage</option>
-              </select>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Watch Platform</h4>
-              <select
-                value={selectedPlatform}
-                onChange={(e) => {
-                  resetPage();
-                  setSelectedPlatform(e.target.value);
-                }}
-                className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
-              >
-                <option value="">All Platforms</option>
-                {PLATFORMS.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-6">
-              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Genres</h4>
-              <div className="space-y-3">
-                {visibleGenres.map(genre => (
-                  <label key={genre} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleGenre(genre)}>
-                    <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedGenres.includes(genre) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
-                      {selectedGenres.includes(genre) && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                    </div>
-                    <span className={`text-[11px] font-bold tracking-wider transition-colors ${selectedGenres.includes(genre) ? 'text-brand' : 'text-text-primary group-hover:text-brand'}`}>{genre}</span>
-                  </label>
-                ))}
-              </div>
-              {hiddenGenreCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setGenresExpanded((v) => !v)}
-                  className="text-[10px] font-bold uppercase tracking-widest text-brand hover:underline"
-                >
-                  {genresExpanded ? 'Show less' : `${hiddenGenreCount}+ more`}
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-6">
-              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Countries</h4>
-              <div className="space-y-3">
-                {visibleCountries.map(country => (
-                  <label key={country} className="flex items-center gap-3 cursor-pointer group" onClick={() => toggleCountry(country)}>
-                    <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedCountries.includes(country) ? 'bg-brand border-brand shadow-[0_0_8px_var(--brand)]' : 'border-border bg-surface group-hover:border-brand/50'}`}>
-                      {selectedCountries.includes(country) && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                    </div>
-                    <span className={`text-[11px] font-bold tracking-wider transition-colors ${selectedCountries.includes(country) ? 'text-brand' : 'text-text-primary group-hover:text-brand'}`}>{country}</span>
-                  </label>
-                ))}
-              </div>
-              {hiddenCountryCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setCountriesExpanded((v) => !v)}
-                  className="text-[10px] font-bold uppercase tracking-widest text-brand hover:underline"
-                >
-                  {countriesExpanded ? 'Show less' : `${hiddenCountryCount}+ more`}
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Year</h4>
-              <select
-                value={selectedYear}
-                onChange={(e) => {
-                  resetPage();
-                  setSelectedYear(e.target.value);
-                }}
-                className="w-full bg-surface border border-border text-text-primary rounded-lg p-4 text-[10px] font-bold tracking-wider outline-none focus:border-brand transition-all"
-              >
-                <option value="">Any year</option>
-                {yearOptions.map((y) => (
-                  <option key={y} value={String(y)}>{y}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-6">
-              <h4 className="font-bold text-text-muted text-[10px] tracking-wider">Rating</h4>
-              <div className="flex flex-wrap gap-2">
-                {nfvcbRatings.map(r => (
-                  <button key={r} onClick={() => toggleRating(r)} className={`px-4 py-2 rounded text-[10px] font-bold border transition-all ${selectedRatings.includes(r) ? 'bg-brand border-brand text-white shadow-lg shadow-brand/20' : 'border-border text-text-muted hover:border-brand/50 hover:text-text-primary'}`}>
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Films Grid */}
-          <div className="flex-1 p-4 md:p-8 lg:p-12">
-            {/* Search Bar */}
-            <div className="mb-8 relative max-w-md">
-              <Icon icon="solar:magnifer-linear" className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted opacity-60 text-lg pointer-events-none" />
+        {/* Streamlined Top Horizontal Filter Bar */}
+        <div className="border-b border-border bg-surface-2/10 px-4 sm:px-6 lg:px-8 py-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Icon icon="solar:magnifer-linear" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted text-base pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
@@ -450,126 +344,266 @@ export default function Browse() {
                   resetPage();
                   setSearchQuery(e.target.value);
                 }}
-                placeholder="Search movies by title..."
-                className="w-full h-12 bg-surface border border-border text-text-primary rounded-xl px-5 pl-11 text-sm focus:border-brand focus:outline-none transition-all shadow-md"
+                placeholder="Search movies..."
+                className="w-full h-10 bg-surface border border-border text-text-primary rounded-xl pl-9 pr-8 text-xs focus:border-brand focus:outline-none transition-all shadow-sm"
               />
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => {
-                    resetPage();
-                    setSearchQuery('');
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                  onClick={() => { resetPage(); setSearchQuery(''); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary cursor-pointer"
                   aria-label="Clear search"
                 >
-                  <Icon icon="solar:close-circle-linear" className="text-lg" />
+                  <Icon icon="solar:close-circle-linear" className="text-base" />
                 </button>
               )}
             </div>
 
-            {loading ? (
-              <div className={`grid gap-4 sm:gap-6 md:gap-8 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="flex justify-center">
-                    <SkeletonCard size="md" variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth={selectedPlatform === 'youtube'} />
-                  </div>
-                ))}
-              </div>
-            ) : films.length > 0 ? (
-              <>
-                <div className={`grid gap-4 sm:gap-6 md:gap-8 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
-                  {films.map(film => (
-                    <div key={film.id} className={selectedPlatform === 'youtube' ? '' : 'flex justify-center'}>
-                      <FilmCard film={film} variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth={selectedPlatform === 'youtube'} />
-                    </div>
-                  ))}
-                </div>
+            {/* Watch Platform Dropdown */}
+            <select
+              value={selectedPlatform}
+              onChange={(e) => {
+                resetPage();
+                setSelectedPlatform(e.target.value);
+              }}
+              className="h-10 bg-surface border border-border text-text-primary rounded-xl px-3 text-xs font-semibold outline-none focus:border-brand transition-all cursor-pointer"
+            >
+              <option value="">All Platforms</option>
+              {PLATFORMS.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
 
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                  <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <p className="text-xs text-text-muted font-medium">
-                      Showing <span className="font-bold text-text-primary">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount || (currentPage * PAGE_SIZE))}</span> of <span className="font-bold text-text-primary">{(totalCount || films.length).toLocaleString()}</span> titles
-                    </p>
+            {/* Genre Dropdown */}
+            <select
+              value={selectedGenres[0] || ''}
+              onChange={(e) => {
+                resetPage();
+                setSelectedGenres(e.target.value ? [e.target.value] : []);
+              }}
+              className="h-10 bg-surface border border-border text-text-primary rounded-xl px-3 text-xs font-semibold outline-none focus:border-brand transition-all cursor-pointer"
+            >
+              <option value="">All Genres</option>
+              {dbGenres.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        disabled={currentPage === 1}
-                        onClick={() => goToPage(currentPage - 1)}
-                        className="px-3.5 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-primary hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
-                        aria-label="Previous page"
-                      >
-                        <Icon icon="solar:alt-arrow-left-linear" className="text-sm" />
-                        <span>Prev</span>
-                      </button>
+            {/* Country Dropdown */}
+            <select
+              value={selectedCountries[0] || ''}
+              onChange={(e) => {
+                resetPage();
+                setSelectedCountries(e.target.value ? [e.target.value] : []);
+              }}
+              className="h-10 bg-surface border border-border text-text-primary rounded-xl px-3 text-xs font-semibold outline-none focus:border-brand transition-all cursor-pointer"
+            >
+              <option value="">All Countries</option>
+              {dbCountries.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
 
-                      <div className="flex items-center gap-1 px-1">
-                        {Array.from({ length: totalPages }, (_, i) => i + 1)
-                          .filter(p => {
-                            if (totalPages <= 7) return true;
-                            if (p === 1 || p === totalPages) return true;
-                            if (Math.abs(p - currentPage) <= 1) return true;
-                            return false;
-                          })
-                          .reduce((acc, p, idx, arr) => {
-                            if (idx > 0 && p - arr[idx - 1] > 1) {
-                              acc.push(-idx);
-                            }
-                            acc.push(p);
-                            return acc;
-                          }, [])
-                          .map((item) => {
-                            if (item < 0) {
-                              return (
-                                <span key={`ellipsis-${item}`} className="px-2 text-xs text-text-muted font-bold">
-                                  …
-                                </span>
-                              );
-                            }
-                            const isCurrent = item === currentPage;
-                            return (
-                              <button
-                                key={item}
-                                type="button"
-                                onClick={() => goToPage(item)}
-                                className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                  isCurrent
-                                    ? 'bg-brand text-black shadow-md shadow-brand/20 font-black'
-                                    : 'bg-surface hover:bg-surface-2 border border-border text-text-secondary hover:text-text-primary'
-                                }`}
-                              >
-                                {item}
-                              </button>
-                            );
-                          })}
-                      </div>
+            {/* Year Dropdown */}
+            <select
+              value={selectedYear}
+              onChange={(e) => {
+                resetPage();
+                setSelectedYear(e.target.value);
+              }}
+              className="h-10 bg-surface border border-border text-text-primary rounded-xl px-3 text-xs font-semibold outline-none focus:border-brand transition-all cursor-pointer"
+            >
+              <option value="">Any Year</option>
+              {yearOptions.map((y) => (
+                <option key={y} value={String(y)}>{y}</option>
+              ))}
+            </select>
 
-                      <button
-                        type="button"
-                        disabled={currentPage === totalPages}
-                        onClick={() => goToPage(currentPage + 1)}
-                        className="px-3.5 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-primary hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
-                        aria-label="Next page"
-                      >
-                        <span>Next</span>
-                        <Icon icon="solar:alt-arrow-right-linear" className="text-sm" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="bg-surface-2/10 border-2 border-dashed border-border rounded-xl p-32 text-center">
-                <p className="text-text-muted text-xs font-bold mb-6">No matching results found.</p>
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <button onClick={clearAll} className="bg-brand text-white text-[10px] font-bold px-8 py-3 rounded-lg hover:shadow-brand/20 transition-all">Reset Filters</button>
-                  <Link to="/submit/film" className="border border-border text-text-primary text-[10px] font-bold px-8 py-3 rounded-lg hover:border-brand hover:text-brand transition-all">Add a Missing Film</Link>
-                </div>
-              </div>
+            {/* Rating Dropdown */}
+            <select
+              value={selectedRatings[0] || ''}
+              onChange={(e) => {
+                resetPage();
+                setSelectedRatings(e.target.value ? [e.target.value] : []);
+              }}
+              className="h-10 bg-surface border border-border text-text-primary rounded-xl px-3 text-xs font-semibold outline-none focus:border-brand transition-all cursor-pointer"
+            >
+              <option value="">All Ratings</option>
+              {nfvcbRatings.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+
+            {/* Sort Dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                resetPage();
+                setSortBy(e.target.value);
+              }}
+              className="h-10 bg-surface border border-border text-text-primary rounded-xl px-3 text-xs font-semibold outline-none focus:border-brand transition-all cursor-pointer sm:ml-auto"
+            >
+              <option value="views">Most Viewed</option>
+              <option value="rating">Top Rated</option>
+              <option value="newest">Newest Arrivals</option>
+              <option value="oldest">Vintage</option>
+            </select>
+
+            {/* Reset Filters Button */}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearAll}
+                className="h-10 px-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Icon icon="solar:refresh-linear" className="text-sm" />
+                <span>Reset</span>
+              </button>
             )}
           </div>
+
+          {/* Active Filter Pill Tags */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {selectedPlatform && (
+                <span className="inline-flex items-center gap-1.5 bg-surface border border-border rounded-lg px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-sm">
+                  <span className="text-text-muted">Platform:</span>
+                  <span>{PLATFORMS.find(p => p.id === selectedPlatform)?.name || selectedPlatform}</span>
+                  <button type="button" onClick={() => setSelectedPlatform('')} className="hover:text-red-400 text-xs cursor-pointer ml-0.5">×</button>
+                </span>
+              )}
+              {selectedGenres.map(g => (
+                <span key={g} className="inline-flex items-center gap-1.5 bg-surface border border-border rounded-lg px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-sm">
+                  <span className="text-text-muted">Genre:</span>
+                  <span>{g}</span>
+                  <button type="button" onClick={() => toggleGenre(g)} className="hover:text-red-400 text-xs cursor-pointer ml-0.5">×</button>
+                </span>
+              ))}
+              {selectedCountries.map(c => (
+                <span key={c} className="inline-flex items-center gap-1.5 bg-surface border border-border rounded-lg px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-sm">
+                  <span className="text-text-muted">Country:</span>
+                  <span>{c}</span>
+                  <button type="button" onClick={() => toggleCountry(c)} className="hover:text-red-400 text-xs cursor-pointer ml-0.5">×</button>
+                </span>
+              ))}
+              {selectedYear && (
+                <span className="inline-flex items-center gap-1.5 bg-surface border border-border rounded-lg px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-sm">
+                  <span className="text-text-muted">Year:</span>
+                  <span>{selectedYear}</span>
+                  <button type="button" onClick={() => setSelectedYear('')} className="hover:text-red-400 text-xs cursor-pointer ml-0.5">×</button>
+                </span>
+              )}
+              {selectedRatings.map(r => (
+                <span key={r} className="inline-flex items-center gap-1.5 bg-surface border border-border rounded-lg px-2.5 py-1 text-[11px] font-bold text-text-primary shadow-sm">
+                  <span className="text-text-muted">Rating:</span>
+                  <span>{r}</span>
+                  <button type="button" onClick={() => toggleRating(r)} className="hover:text-red-400 text-xs cursor-pointer ml-0.5">×</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Dense 6-Column Responsive Movie Grid */}
+        <div className="px-4 sm:px-6 lg:px-8 py-8">
+          {loading ? (
+            <div className={`grid gap-3.5 sm:gap-4 lg:gap-5 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'}`}>
+              {[...Array(18)].map((_, i) => (
+                <SkeletonCard key={i} variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth />
+              ))}
+            </div>
+          ) : films.length > 0 ? (
+            <>
+              <div className={`grid gap-3.5 sm:gap-4 lg:gap-5 ${selectedPlatform === 'youtube' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'}`}>
+                {films.map(film => (
+                  <FilmCard key={film.id} film={film} variant={selectedPlatform === 'youtube' ? 'youtube' : 'portrait'} fullWidth />
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <p className="text-xs text-text-muted font-medium">
+                    Showing <span className="font-bold text-text-primary">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount || (currentPage * PAGE_SIZE))}</span> of <span className="font-bold text-text-primary">{(totalCount || films.length).toLocaleString()}</span> titles
+                  </p>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => goToPage(currentPage - 1)}
+                      className="px-3.5 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-primary hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                      aria-label="Previous page"
+                    >
+                      <Icon icon="solar:alt-arrow-left-linear" className="text-sm" />
+                      <span>Prev</span>
+                    </button>
+
+                    <div className="flex items-center gap-1 px-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => {
+                          if (totalPages <= 7) return true;
+                          if (p === 1 || p === totalPages) return true;
+                          if (Math.abs(p - currentPage) <= 1) return true;
+                          return false;
+                        })
+                        .reduce((acc, p, idx, arr) => {
+                          if (idx > 0 && p - arr[idx - 1] > 1) {
+                            acc.push(-idx);
+                          }
+                          acc.push(p);
+                          return acc;
+                        }, [])
+                        .map((p, idx) => {
+                          if (p < 0) {
+                            return (
+                              <span key={`ellipsis-${idx}`} className="px-2 text-text-muted text-xs select-none">
+                                …
+                              </span>
+                            );
+                          }
+                          const isCurrent = p === currentPage;
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => goToPage(p)}
+                              className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                isCurrent
+                                  ? 'bg-brand text-white shadow-sm'
+                                  : 'text-text-muted hover:text-text-primary hover:bg-surface-2'
+                              }`}
+                              aria-current={isCurrent ? 'page' : undefined}
+                            >
+                              {p}
+                            </button>
+                          );
+                        })}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => goToPage(currentPage + 1)}
+                      className="px-3.5 py-2 rounded-xl bg-surface border border-border text-xs font-bold text-text-primary hover:bg-surface-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                      aria-label="Next page"
+                    >
+                      <span>Next</span>
+                      <Icon icon="solar:alt-arrow-right-linear" className="text-sm" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="bg-surface-2/10 border-2 border-dashed border-border rounded-xl p-32 text-center">
+              <p className="text-text-muted text-xs font-bold mb-6">No matching results found.</p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button onClick={clearAll} className="bg-brand text-white text-[10px] font-bold px-8 py-3 rounded-lg hover:shadow-brand/20 transition-all cursor-pointer">Reset Filters</button>
+                <Link to="/submit/film" className="border border-border text-text-primary text-[10px] font-bold px-8 py-3 rounded-lg hover:border-brand hover:text-brand transition-all">Add a Missing Film</Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

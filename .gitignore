@@ -250,6 +250,18 @@ scripts/*.json
 !scripts/scraper/package.json
 !scripts/scraper/package-lock.json
 
+# Sensitive scraped datasets, outreach sheets, phone numbers & private contacts
+*.csv
+*.tsv
+*.xlsx
+*.xls
+scripts/data/dca_*
+scripts/data/dca_pages/
+scripts/data/*contacts*
+scripts/data/*outreach*
+scripts/data/*phone*
+scripts/data/*private*
+
 # Tesseract binary traineddata models
 tessdata/
 *.traineddata

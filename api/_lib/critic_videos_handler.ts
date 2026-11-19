@@ -277,30 +277,51 @@ Rules:
 
       if (sourceCorpus.length > 20) {
         try {
-          const prompt = `You are extracting a Nollywood film critic review from a video review's metadata/transcript.
+          const prompt = `You are an elite Nollywood film review extractor. Extract a substantive, genuine critical verdict or pull-quote from this video review transcript/content.
 VIDEO TITLE: ${videoTitle}
 CHANNEL: ${channelTitle}
-CONTENT / DESCRIPTION / TRANSCRIPT:
+CONTENT / TRANSCRIPT:
 ${sourceCorpus.slice(0, 14000)}
 
 Return ONLY valid JSON:
 {
-  "quote": "the sharpest 1-2 sentence critical verdict or pull-quote summarizing the critic's review of the film (use verbatim sentences from the transcript/description when available)",
+  "quote": "1-2 complete sentences containing the critic's direct opinion or verdict about the film's acting, plot, pacing, production, or storytelling (copied verbatim from the transcript/content whenever possible)",
   "rating": 4,
   "filmTitle": "exact title of the movie being reviewed"
 }
-Rules:
-- Convert any rating (e.g. 7/10, 4/5) to a 1-5 integer, or null if no rating is mentioned.
-- Never return promotional channel links, social handles, or 'subscribe to my channel' boilerplate as the quote.`;
+
+STRICT QUALITY RULES:
+1. "quote" MUST be a meaningful critique or evaluation of the film itself.
+2. NEVER return:
+   - The video title or film title
+   - Channel intros or social greetings ("Hello guys", "Welcome back", "I watch a new film every other day", "Follow along for reviews", "Today I just came back from")
+   - Subscription or promotional boilerplate ("starring X, Y, Z", "Link in bio", "subscribe to my channel")
+   - A single word or incomplete fragment
+3. Convert any explicit score (e.g. 7/10, 3/5, 4 stars) into a 1-5 integer, or null if unmentioned.
+4. If no genuine critical opinion exists in the source text, set "quote" to null.`;
           const aiRes = await generateAIContent(prompt);
           const parsed = parseJSON(aiRes.text) as any;
-          if (parsed?.quote) quote = String(parsed.quote).trim();
+          if (parsed?.quote) {
+            const candidateQuote = String(parsed.quote).trim();
+            if (
+              candidateQuote.length >= 25 &&
+              candidateQuote.toLowerCase() !== videoTitle.toLowerCase() &&
+              !candidateQuote.toLowerCase().startsWith('my honest movie review') &&
+              !/follow along|subscribe to my|welcome back to my channel|today i just came back/i.test(candidateQuote)
+            ) {
+              quote = candidateQuote;
+            }
+          }
           rating = normalizeStarRating(parsed?.rating, sourceCorpus);
           if (parsed?.filmTitle) detectedFilmTitle = String(parsed.filmTitle).trim();
         } catch {
-          const fallback = await selectCriticExcerpt(sourceCorpus);
-          quote = fallback.excerpt;
-          rating = normalizeStarRating(fallback.rating, sourceCorpus);
+          if (suppliedTranscript && suppliedTranscript.length >= 100) {
+            const fallback = await selectCriticExcerpt(suppliedTranscript);
+            if (fallback?.excerpt && fallback.excerpt.length >= 25) {
+              quote = fallback.excerpt;
+              rating = normalizeStarRating(fallback.rating, suppliedTranscript);
+            }
+          }
         }
       }
 
@@ -328,6 +349,7 @@ Rules:
         rating,
         filmTitle: detectedFilmTitle || matchedFilm?.title || null,
         matchedFilm,
+        transcript: suppliedTranscript || '',
       });
     }
 

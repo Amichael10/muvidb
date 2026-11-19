@@ -95,23 +95,28 @@ function parseRssItems(xml: string, sourceName: string): DiscoveredReview[] {
         const author = authorMatch ? authorMatch[1].trim() : '';
         const rawDesc = descMatch ? descMatch[1].replace(/<[^>]+>/g, '').trim() : '';
 
-        if (/review/i.test(rawTitle) || /review/i.test(link) || /movie|film|cinema/i.test(entryXml)) {
+        const isReviewPost = /(?:review|verdict|critique)/i.test(rawTitle) || /(?:review|verdict|critique)/i.test(link);
+        const isNewsOrRoundup = /\b(winners|awards|festival|lineup|full list|announces?|interview|trailer|box office|nominations?|premiere|fashion)\b/i.test(rawTitle);
+
+        if (isReviewPost && !isNewsOrRoundup) {
           let quote = '';
           const titleVerdictMatch = rawTitle.match(/(?:Review|Stage Review|Movie Review|Film Review|Series Review)\s*[:\-—]\s*(.+)$/i);
           if (titleVerdictMatch && titleVerdictMatch[1]?.trim() && !titleVerdictMatch[1].trim().toLowerCase().endsWith('review')) {
             quote = titleVerdictMatch[1].replace(/\s*\((?:Documentary|Short Film|Animation)\)\s*$/i, '').replace(/\.$/, '').trim();
           } else {
-            const firstDescLine = rawDesc.split('\n').map(l => l.trim()).find(l => l.length > 20 && !l.startsWith('#')) || '';
-            quote = firstDescLine || rawTitle;
+            const firstDescLine = rawDesc.split('\n').map(l => l.trim()).find(l => l.length > 35 && !l.startsWith('#') && !l.toLowerCase().startsWith('my honest movie review')) || '';
+            quote = firstDescLine;
           }
-          items.push({
-            film_title: cleanMovieTitle(rawTitle),
-            critic_name: author || sourceName,
-            source_publication: sourceName,
-            review_url: link,
-            quote,
-            published_date: pubDateMatch ? pubDateMatch[1] : undefined
-          });
+          if (quote && quote.length >= 35) {
+            items.push({
+              film_title: cleanMovieTitle(rawTitle),
+              critic_name: author || sourceName,
+              source_publication: sourceName,
+              review_url: link,
+              quote,
+              published_date: pubDateMatch ? pubDateMatch[1] : undefined
+            });
+          }
         }
       }
     }
@@ -135,26 +140,28 @@ function parseRssItems(xml: string, sourceName: string): DiscoveredReview[] {
       const author = creatorMatch ? creatorMatch[1].trim() : '';
       const rawDesc = descMatch ? descMatch[1].replace(/<[^>]+>/g, '').trim() : '';
 
-      // Only include if it's a review or Nollywood movie review
-      if (/review/i.test(rawTitle) || /review/i.test(link) || /movie|film|cinema/i.test(itemXml)) {
+      const isReviewPost = /(?:review|verdict|critique)/i.test(rawTitle) || /(?:review|verdict|critique)/i.test(link);
+      const isNewsOrRoundup = /\b(winners|awards|festival|lineup|full list|announces?|interview|trailer|box office|nominations?|premiere|fashion)\b/i.test(rawTitle);
+
+      if (isReviewPost && !isNewsOrRoundup) {
         let quote = '';
         const titleVerdictMatch = rawTitle.match(/(?:Review|Stage Review|Movie Review|Film Review|Series Review)\s*[:\-—]\s*(.+)$/i);
         if (titleVerdictMatch && titleVerdictMatch[1]?.trim() && !titleVerdictMatch[1].trim().toLowerCase().endsWith('review')) {
           quote = titleVerdictMatch[1].replace(/\s*\((?:Documentary|Short Film|Animation)\)\s*$/i, '').replace(/\.$/, '').trim();
-        } else if (rawDesc) {
+        } else if (rawDesc && rawDesc.length >= 35 && !rawDesc.toLowerCase().startsWith('my honest movie review')) {
           quote = rawDesc.slice(0, 240) + '...';
-        } else {
-          quote = rawTitle;
         }
 
-        items.push({
-          film_title: cleanMovieTitle(rawTitle),
-          critic_name: author || sourceName,
-          source_publication: sourceName,
-          review_url: link,
-          quote,
-          published_date: pubDateMatch ? pubDateMatch[1] : undefined
-        });
+        if (quote && quote.length >= 35) {
+          items.push({
+            film_title: cleanMovieTitle(rawTitle),
+            critic_name: author || sourceName,
+            source_publication: sourceName,
+            review_url: link,
+            quote,
+            published_date: pubDateMatch ? pubDateMatch[1] : undefined
+          });
+        }
       }
     }
   }
@@ -353,6 +360,13 @@ export async function runCriticsSync(): Promise<{
     }
 
     if (existingReview) delete payload.created_at;
+    // Quality filter: do not insert empty, short, or boilerplate quotes
+    const cleanQ = (payload.quote || '').trim();
+    if (!cleanQ || cleanQ.length < 30 || cleanQ.toLowerCase() === targetTitle.toLowerCase() || cleanQ.toLowerCase().startsWith('my honest movie review') || cleanQ.includes('review of ' + targetTitle)) {
+      skipped++;
+      continue;
+    }
+
     const write = existingReview
       ? supabase.from('critic_reviews').update(payload).eq('id', existingReview.id)
       : supabase.from('critic_reviews').insert(payload);

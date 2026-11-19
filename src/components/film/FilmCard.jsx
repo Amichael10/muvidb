@@ -232,8 +232,12 @@ export default function FilmCard({
     lg: 'w-[190px] sm:w-[220px] min-w-[190px] sm:min-w-[220px]'
   };
 
+  const widthClass = fullWidth
+    ? 'w-full'
+    : (isLandscapeVariant ? 'w-72 sm:w-80 shrink-0' : sizeClasses[size]);
+
   return (
-    <div className={`relative group flex flex-col transition-all duration-200 select-none ${isLandscapeVariant ? (fullWidth ? 'w-full' : 'w-72 sm:w-80 shrink-0') : sizeClasses[size]}`}>
+    <div className={`relative group flex flex-col transition-all duration-200 select-none ${widthClass}`}>
       
       {isLandscapeVariant ? (
         /* Landscape / YouTube Letterboxd Card */
@@ -297,10 +301,10 @@ export default function FilmCard({
           </div>
         </div>
       ) : (
-        /* Pristine Letterboxd 2:3 Portrait Card */
+        /* Pristine 2:3 Portrait Card */
         <div className="flex flex-col w-full">
-          {/* Poster Art (Pure, Sacred, Unadorned 2:3) */}
-          <div className="relative aspect-[2/3] w-full rounded-[4px] overflow-hidden border border-white/10 group-hover:border-white/30 bg-[#14181c] shadow-lg transition-all duration-300 group-hover:scale-[1.03] group-hover:shadow-[0_12px_28px_rgba(0,0,0,0.85)]">
+          {/* Poster Art (Pure, Clean 2:3 Aspect Ratio) */}
+          <div className="relative aspect-[2/3] w-full rounded-xl sm:rounded-2xl overflow-hidden border border-white/10 group-hover:border-white/30 bg-[#121518] shadow-md transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-[0_12px_28px_rgba(0,0,0,0.85)]">
             <Link 
               to={`/films/${film.slug || film.id}`}
               title={formatFilmTitle(film.title)}
@@ -314,30 +318,36 @@ export default function FilmCard({
                 name={formatFilmTitle(film.title)}
                 loading="lazy"
                 width={384}
-                sizes="(max-width: 640px) 44vw, 192px"
+                sizes="(max-width: 640px) 44vw, 240px"
               />
             </Link>
 
-            {/* Letterboxd Action Dock (Fades in on hover) */}
-            <div className="absolute inset-x-0 top-0 p-2 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
-              {/* Left pill (Series / Cinema / Country flag) */}
-              <div className="flex items-center gap-1">
-                {flag && <span className="text-xs">{flag}</span>}
+            {/* Top Badge: TV / Short indicator & Flag */}
+            {(flag || film.content_type === 'series' || film.is_series_group || isShortFilm) && (
+              <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[10px] border border-white/10">
+                {flag && <span>{flag}</span>}
                 {(film.content_type === 'series' || film.is_series_group) ? (
-                  <span className="bg-brand text-white text-[8px] font-black uppercase px-1 py-0.5 rounded-[2px]">
-                    TV
-                  </span>
+                  <span className="text-brand font-black uppercase text-[8px]">TV</span>
                 ) : isShortFilm ? (
-                  <span className="bg-teal-500 text-white text-[8px] font-black uppercase px-1 py-0.5 rounded-[2px]">
-                    SHORT
-                  </span>
+                  <span className="text-teal-400 font-black uppercase text-[8px]">SHORT</span>
                 ) : null}
               </div>
+            )}
 
-              {/* Right Watchlist action button */}
+            {/* Bottom Overlay: Rating Badge (Left) and Bookmark / Watchlist Button (Right) */}
+            <div className="absolute inset-x-0 bottom-0 p-2 sm:p-2.5 flex items-center justify-between pointer-events-none z-20 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+              {/* Star Rating Badge (Bottom Left) */}
+              {ratingStar ? (
+                <div className="flex items-center gap-1 bg-black/70 backdrop-blur-md border border-white/10 px-2 py-0.5 rounded-md text-[11px] font-bold text-emerald-400 shadow-sm pointer-events-auto">
+                  <span className="text-emerald-400">★</span>
+                  <span>{ratingStar}</span>
+                </div>
+              ) : <div />}
+
+              {/* Bookmark / Watchlist Action Button (Bottom Right) */}
               <button
                 type="button"
-                className="w-7 h-7 rounded-[3px] bg-black/80 hover:bg-brand text-white flex items-center justify-center border border-white/20 transition-all duration-150 cursor-pointer"
+                className="w-7 h-7 rounded-md bg-black/70 backdrop-blur-md hover:bg-brand text-white flex items-center justify-center border border-white/15 shadow-sm transition-all duration-150 cursor-pointer pointer-events-auto"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -346,54 +356,34 @@ export default function FilmCard({
                 title={actionType === 'add' ? `Add ${formatFilmTitle(film.title)} to watchlist` : `Remove from watchlist`}
                 aria-label={actionType === 'add' ? `Add to watchlist` : `Remove from watchlist`}
               >
-                <Icon icon={actionType === 'add' ? "solar:bookmark-linear" : "solar:close-circle-linear"} width="15" />
+                <Icon icon={actionType === 'add' ? "solar:bookmark-linear" : "solar:bookmark-bold"} width="15" />
               </button>
             </div>
-
-            {/* Central subtle hover play indicator */}
-            <Link
-              to={`/films/${film.slug || film.id}`}
-              className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-              tabIndex={-1}
-              aria-hidden="true"
-            >
-              <div className="w-9 h-9 rounded-full bg-black/60 group-hover:bg-brand text-white flex items-center justify-center border border-white/25 shadow-xl transition-transform duration-200 transform group-hover:scale-105">
-                <Icon icon="solar:play-bold" className="text-sm ml-0.5" />
-              </div>
-            </Link>
-
-            {/* Bottom rating pill inside poster (only if exists and mobile or unobtrusive) */}
-            {ratingStar && (
-              <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 bg-black/75 backdrop-blur-sm border border-amber-400/30 text-amber-400 px-1.5 py-0.5 rounded-[3px] text-[10px] font-bold">
-                <span>★</span>
-                <span>{ratingStar}</span>
-              </div>
-            )}
           </div>
 
-          {/* Letterboxd Typographic Stack Beneath Poster */}
-          <div className="pt-2 pb-1 flex flex-col text-left">
+          {/* Typographic Stack Beneath Poster */}
+          <div className="pt-2 sm:pt-2.5 pb-1 flex flex-col text-left">
             <Link 
               to={`/films/${film.slug || film.id}`}
-              className="font-heading font-semibold text-xs sm:text-[13px] text-white/90 group-hover:text-brand line-clamp-1 leading-snug transition-colors"
+              className="font-heading font-bold text-sm text-white/95 group-hover:text-brand line-clamp-1 leading-snug transition-colors"
               title={formatFilmTitle(film.title)}
             >
               {formatFilmTitle(film.title)}
             </Link>
 
-            <div className="flex items-center justify-between text-[11px] text-white/50 font-mono mt-0.5">
+            <div className="flex items-center justify-between text-xs text-text-muted mt-0.5 font-sans">
               <div className="flex items-center gap-1.5 truncate">
                 {year && <span>{year}</span>}
                 {director && (
                   <>
                     <span className="opacity-40">•</span>
-                    <span className="truncate max-w-[90px]">{director}</span>
+                    <span className="truncate max-w-[100px]">{director}</span>
                   </>
                 )}
                 {!director && film.genres?.[0] && (
                   <>
                     <span className="opacity-40">•</span>
-                    <span className="truncate max-w-[80px]">{film.genres[0]}</span>
+                    <span className="truncate max-w-[90px]">{film.genres[0]}</span>
                   </>
                 )}
               </div>

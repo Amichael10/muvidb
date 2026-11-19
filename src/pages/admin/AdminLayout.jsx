@@ -51,6 +51,7 @@ export default function AdminLayout() {
   const navItems = useMemo(() => [
     { path: '/admin', label: 'Overview', icon: 'solar:graph-up-linear', exact: true, category: 'Core' },
     { path: '/admin/films', label: 'Films', icon: 'solar:clapperboard-play-linear', category: 'Catalog' },
+    { path: '/admin/intake', label: 'Social Intake', icon: 'solar:import-linear', category: 'Catalog' },
     { path: '/admin/people', label: 'People', icon: 'solar:user-linear', category: 'Catalog' },
     { path: '/admin/people-enrichment', label: 'People Enrichment', icon: 'solar:user-check-linear', category: 'Catalog' },
     { path: '/admin/credits', label: 'Credits', icon: 'solar:case-linear', category: 'Catalog' },
@@ -97,7 +98,7 @@ export default function AdminLayout() {
     { path: '/admin/logs', label: 'Logs', icon: 'solar:history-linear' },
   ];
 
-  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/people', '/admin/credits', '/admin/companies', '/admin/critics', '/admin/critic-videos', '/admin/plays', '/admin/title-checker'];
+  const allowedPathsForLimited = ['/admin', '/admin/films', '/admin/intake', '/admin/people', '/admin/credits', '/admin/companies', '/admin/critics', '/admin/critic-videos', '/admin/plays', '/admin/title-checker'];
   
   // Security guard for manual URL entry by admin_limited
   const isPathAllowed = (path) => {

@@ -1,7 +1,8 @@
 import { searchPeopleByName } from '../../lib/peopleSearch';
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
-import { fetchPlays, getPlayDateLabel, upsertPlay, upsertStageCredit, deleteStageCredit } from '../../lib/plays';
+import { fetchPlays, getPlayDateLabel, upsertPlay, upsertStageCredit, deleteStageCredit, deletePlay } from '../../lib/plays';
+import ConfirmModal from '../../components/admin/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import { authHeaders } from '../../lib/apiAuth';
 import ImageField from '../../components/admin/ImageField';
@@ -93,6 +94,8 @@ export default function AdminPlays() {
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingPlay, setEditingPlay] = useState(null);
+  const [deletingPlay, setDeletingPlay] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState(BLANK_FORM);
   const [formMsg, setFormMsg] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -196,6 +199,23 @@ export default function AdminPlays() {
     setInstagramImport(BLANK_INSTAGRAM_IMPORT);
     setInstagramImageName('');
     setInstagramImportMsg(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingPlay) return;
+    try {
+      setIsDeleting(true);
+      await deletePlay(deletingPlay.id);
+      setPlays(prev => prev.filter(p => p.id !== deletingPlay.id));
+      if (editingPlay?.id === deletingPlay.id) {
+        handleCloseDrawer();
+      }
+      setDeletingPlay(null);
+    } catch (err) {
+      alert('Failed to delete stage play: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Load credits from DB
@@ -698,13 +718,23 @@ export default function AdminPlays() {
                   View Public Page
                 </a>
 
-                <button
-                  onClick={() => handleOpenDrawer(play)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand/10 text-brand font-bold hover:bg-brand hover:text-on-brand transition-all text-xs"
-                >
-                  <Icon icon="solar:pen-bold" className="w-3.5 h-3.5" />
-                  Edit Play
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingPlay(play)}
+                    className="inline-flex items-center justify-center p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    title="Delete Stage Play"
+                  >
+                    <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleOpenDrawer(play)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand/10 text-brand font-bold hover:bg-brand hover:text-on-brand transition-all text-xs"
+                  >
+                    <Icon icon="solar:pen-bold" className="w-3.5 h-3.5" />
+                    Edit Play
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -1190,13 +1220,26 @@ export default function AdminPlays() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full bg-brand text-on-brand font-bold py-3 rounded-xl hover:bg-brand-hover transition-colors disabled:opacity-60 text-xs shadow-lg shadow-brand/20"
-          >
-            {saving ? 'Saving Play Profile…' : editingPlay ? 'Update Play Profile' : 'Save Play Profile'}
-          </button>
+          <div className="flex items-center gap-3">
+            {editingPlay && (
+              <button
+                type="button"
+                onClick={() => setDeletingPlay(editingPlay)}
+                className="px-4 py-3 rounded-xl border border-red-500/30 text-red-400 font-bold hover:bg-red-500/10 transition-colors text-xs flex items-center justify-center gap-2"
+                title="Delete Stage Play"
+              >
+                <Icon icon="solar:trash-bin-trash-bold" className="w-4 h-4" />
+                Delete Play
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-brand text-on-brand font-bold py-3 rounded-xl hover:bg-brand-hover transition-colors disabled:opacity-60 text-xs shadow-lg shadow-brand/20"
+            >
+              {saving ? 'Saving Play Profile…' : editingPlay ? 'Update Play Profile' : 'Save Play Profile'}
+            </button>
+          </div>
 
           {/* Full Width Bottom Section: Stage Performers & Crew */}
           <div className="pt-8 border-t border-border space-y-4">
@@ -1515,6 +1558,18 @@ export default function AdminPlays() {
           </div>
         </form>
       </Drawer>
+
+      {/* Confirm Play Deletion Modal */}
+      {deletingPlay && (
+        <ConfirmModal
+          title="Delete Stage Play?"
+          message={`Are you sure you want to permanently delete "${deletingPlay.title}"? All associated cast credits and gallery images will also be removed. This cannot be undone.`}
+          confirmLabel="Delete Stage Play"
+          isProcessing={isDeleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeletingPlay(null)}
+        />
+      )}
     </div>
   );
 }

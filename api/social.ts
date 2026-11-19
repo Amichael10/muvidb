@@ -387,6 +387,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           kind: String(req.query?.kind || '') || null,
         }));
       }
+      if (task === 'instagram_session_status') {
+        const { getInstagramSessionCookies } = await import('./_lib/instagram_downloader.js');
+        const cookie = getInstagramSessionCookies();
+        return res.status(200).json({
+          hasSession: Boolean(cookie),
+          source: (process.env.IG_COOKIE || process.env.INSTAGRAM_SESSION_COOKIE) ? 'env' : (cookie ? 'session_file' : 'none'),
+        });
+      }
+
       if (task === 'threads_status' || task === 'connections_status') {
         const connection = await getThreadsConnection();
         const allConnections = await getAllPlatformConnections();
@@ -507,6 +516,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (task === 'reset_studio_data') {
         const actor = await requireSocialStudioAdmin(req);
         return res.status(200).json(await resetSocialStudioData(actor));
+      }
+
+      if (task === 'social_intake_extract') {
+        await requireSocialStudioAdmin(req);
+        const { extractSocialIntake } = await import('./_lib/social_intake_engine.js');
+        return res.status(200).json(await extractSocialIntake(req.body || {}));
+      }
+
+      if (task === 'social_intake_ocr') {
+        await requireSocialStudioAdmin(req);
+        const { runIntakeOcr } = await import('./_lib/social_intake_engine.js');
+        return res.status(200).json(await runIntakeOcr(req.body || {}));
+      }
+
+      if (task === 'social_intake_publish') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { publishIntakeEntity } = await import('./_lib/social_intake_engine.js');
+        return res.status(201).json(await publishIntakeEntity({
+          entityType: req.body?.entityType,
+          payload: req.body?.payload || {},
+          actorId: actor.id,
+        }));
       }
 
       if (task === 'intake_update') {

@@ -370,7 +370,7 @@ export default function WatchPlatform() {
         </div>
 
         {/* Grid */}
-        <div className="p-8 md:p-12">
+        <div className="px-4 sm:px-6 md:px-8 py-8">
           {loading ? (
             isYoutube ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-8">
@@ -379,9 +379,9 @@ export default function WatchPlatform() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6 sm:gap-8">
-                {[...Array(10)].map((_, i) => (
-                  <div key={i} className="flex justify-center"><SkeletonCard size="md" /></div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4 lg:gap-5">
+                {[...Array(12)].map((_, i) => (
+                  <SkeletonCard key={i} fullWidth />
                 ))}
               </div>
             )
@@ -394,9 +394,9 @@ export default function WatchPlatform() {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6 sm:gap-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4 lg:gap-5">
                 {filtered.map((film) => (
-                  <div key={film.id} className="flex justify-center"><FilmCard film={film} /></div>
+                  <FilmCard key={film.id} film={film} fullWidth />
                 ))}
               </div>
             )

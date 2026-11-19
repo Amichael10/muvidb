@@ -78,8 +78,8 @@ export default function SkeletonCard({ size = 'md', variant = 'portrait', fullWi
   };
 
   return (
-    <div className={`rounded-xl overflow-hidden bg-surface animate-shimmer ${sizeClasses[size]}`}>
-      <div className="w-full h-full"></div>
+    <div className={`rounded-xl sm:rounded-2xl overflow-hidden bg-surface animate-shimmer ${fullWidth ? 'w-full aspect-[2/3]' : sizeClasses[size]}`}>
+      <div className="w-full h-full bg-surface-2/60"></div>
     </div>
   );
 }

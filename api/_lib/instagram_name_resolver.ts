@@ -63,7 +63,155 @@ export const KNOWN_NOLLYWOOD_HANDLES: Record<string, string> = {
   'regina.daniels': 'Regina Daniels',
   'kanayo.o.kanayo': 'Kanayo O. Kanayo',
   peteedochie: 'Pete Edochie',
+  chidi_mokeme: 'Chidi Mokeme',
+  uzor_arukwe: 'Uzor Arukwe',
+  uzorarukwe: 'Uzor Arukwe',
+  'uzor.arukwe': 'Uzor Arukwe',
+  kelechiudegbe: 'Kelechi Udegbe',
+  uchemontana: 'Uche Montana',
+  bolanleaustenpeters: 'Bolanle Austen-Peters',
+  bbssashore: 'Bolanle Austen-Peters',
+  bap_productions: 'Bolanle Austen-Peters Productions',
+  tope_alake: 'Tope Alake',
+  topeolowoniyan: 'Tope Olowoniyan',
+  sharonooja: 'Sharon Ooja',
+  jemimaosunde: 'Jemima Osunde',
+  bisolaaiyeola: 'Bisola Aiyeola',
+  gabrielafolayan: 'Gabriel Afolayan',
+  somkele_i: 'Somkele Iyamah-Idhalama',
+  beverlynaya: 'Beverly Naya',
+  beverly_osu: 'Beverly Osu',
+  enioluwaofficial: 'Enioluwa Adeoluwa',
+  officialchineduikedieze: 'Chinedu Ikedieze',
+  ositaiheme: 'Osita Iheme',
+  macaronii: 'Debo Adedayo (Mr Macaroni)',
+  mrmacaronii: 'Debo Adedayo (Mr Macaroni)',
+  taaooma: 'Maryam Apaokagi (Taaooma)',
+  layiwasabi: 'Isaac Olayiwola (Layi Wasabi)',
+  nasboi: 'Nasir Lawal (Nasboi)',
+  judithaudu: 'Judith Audu',
+  gennyuzoma: 'Genny Uzoma',
+  maurice_sam: 'Maurice Sam',
+  rayemodi: 'Ray Emodi',
+  terrakulture: 'Terra Kulture',
+  musoncentre: 'MUSON Centre',
+  filmoneng: 'FilmOne',
+  silverbirdfilm: 'Silverbird',
+  inkblotwp: 'Inkblot Productions',
+  anthillstudios_: 'Anthill Studios',
+  greohstudios: 'Greoh Studios',
 };
+
+export interface ResolvedMentionDetail {
+  handle: string;
+  cleanHandle: string;
+  resolvedName: string;
+  personId?: string | null;
+  slug?: string | null;
+  photoUrl?: string | null;
+  primaryRole?: string | null;
+  matched: boolean;
+}
+
+/**
+ * Parses all @mentions from a caption and resolves each into a real Nollywood talent name,
+ * matching against the Supabase `people` table to retrieve their profile thumbnail and id.
+ */
+export async function resolveCaptionMentionsDetailed(caption: string): Promise<ResolvedMentionDetail[]> {
+  if (!caption || typeof caption !== 'string') return [];
+  const rawMatches = caption.match(/@[a-zA-Z0-9._]+/g);
+  if (!rawMatches || !rawMatches.length) return [];
+
+  // Deduplicate case-insensitively
+  const seen = new Set<string>();
+  const uniqueHandles: string[] = [];
+  for (const match of rawMatches) {
+    const clean = match.replace(/^@+/, '').replace(/\/+$/, '').trim();
+    const lower = clean.toLowerCase();
+    if (clean && !seen.has(lower) && clean.length > 1) {
+      seen.add(lower);
+      uniqueHandles.push(clean);
+    }
+  }
+
+  const results: ResolvedMentionDetail[] = [];
+
+  for (const cleanHandle of uniqueHandles) {
+    const handleTag = `@${cleanHandle}`;
+    const lower = cleanHandle.toLowerCase();
+
+    let candidateName = KNOWN_NOLLYWOOD_HANDLES[lower] || null;
+
+    if (!candidateName) {
+      // Humanize handle into proper Title Case
+      candidateName = cleanHandle
+        .replace(/[._-]+/g, ' ')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .split(' ')
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ')
+        .trim();
+    }
+
+    let personId: string | null = null;
+    let slug: string | null = null;
+    let photoUrl: string | null = null;
+    let primaryRole: string | null = null;
+    let matched = false;
+
+    try {
+      // 1. Try matching by instagram_url handle
+      const { data: byInsta } = await supabase
+        .from('people')
+        .select('id, name, slug, photo_url, known_for_department')
+        .or(`instagram_url.ilike.%/${cleanHandle},instagram_url.ilike.%/${cleanHandle}/%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (byInsta?.id) {
+        personId = byInsta.id;
+        candidateName = byInsta.name;
+        slug = byInsta.slug;
+        photoUrl = byInsta.photo_url;
+        primaryRole = byInsta.known_for_department;
+        matched = true;
+      } else if (candidateName) {
+        // 2. Try matching by person name
+        const { data: byName } = await supabase
+          .from('people')
+          .select('id, name, slug, photo_url, known_for_department')
+          .ilike('name', candidateName)
+          .limit(1)
+          .maybeSingle();
+
+        if (byName?.id) {
+          personId = byName.id;
+          candidateName = byName.name;
+          slug = byName.slug;
+          photoUrl = byName.photo_url;
+          primaryRole = byName.known_for_department;
+          matched = true;
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[instagram_name_resolver] DB lookup error for ${cleanHandle}:`, e?.message);
+    }
+
+    results.push({
+      handle: handleTag,
+      cleanHandle,
+      resolvedName: candidateName || cleanHandle,
+      personId,
+      slug,
+      photoUrl,
+      primaryRole,
+      matched,
+    });
+  }
+
+  return results;
+}
 
 /**
  * Resolves Instagram @ handles (e.g. @funkejenifaakindele or @deyemitheactor)

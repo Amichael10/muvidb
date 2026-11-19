@@ -465,3 +465,31 @@ export async function updatePlayImage(imageId, updates) {
   return data;
 }
 
+/**
+ * Delete a stage play and all associated credits and images (Admin)
+ */
+export async function deletePlay(playId) {
+  if (!playId) throw new Error('Play ID is required for deletion');
+
+  // Delete child records first to satisfy foreign keys
+  try {
+    await supabase.from('stage_credits').delete().eq('play_id', playId);
+  } catch (err) {
+    console.warn('Error clearing stage_credits for play:', err);
+  }
+
+  try {
+    await supabase.from('play_images').delete().eq('play_id', playId);
+  } catch (err) {
+    console.warn('Error clearing play_images for play:', err);
+  }
+
+  const { error } = await supabase
+    .from('plays')
+    .delete()
+    .eq('id', playId);
+
+  if (error) throw error;
+  return true;
+}
+

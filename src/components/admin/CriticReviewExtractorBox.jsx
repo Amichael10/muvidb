@@ -18,6 +18,8 @@ export default function CriticReviewExtractorBox({
   const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [extractingOcr, setExtractingOcr] = useState(false);
   const [rawOcrText, setRawOcrText] = useState('');
+  const [rawTranscript, setRawTranscript] = useState('');
+  const [showTranscript, setShowTranscript] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
   const [clipperStatus, setClipperStatus] = useState('checking');
   const fileInputRef = useRef(null);
@@ -181,6 +183,12 @@ export default function CriticReviewExtractorBox({
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Failed to extract review from video URL');
 
+      const retrievedTranscript = clipperTranscript || data.transcript || '';
+      if (retrievedTranscript) {
+        setRawTranscript(retrievedTranscript);
+        setShowTranscript(true);
+      }
+
       onExtracted?.({
         quote: data.quote || '',
         rating: data.rating ?? null,
@@ -188,6 +196,7 @@ export default function CriticReviewExtractorBox({
         matchedFilm: data.matchedFilm || null,
         filmTitle: data.filmTitle || data.videoTitle || null,
         criticName: data.channelTitle || null,
+        transcript: retrievedTranscript,
       });
 
       const details = [
@@ -318,8 +327,9 @@ export default function CriticReviewExtractorBox({
           )}
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
+        <div className="space-y-2">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
             <Icon
               icon="mdi:youtube"
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500"
@@ -365,6 +375,49 @@ export default function CriticReviewExtractorBox({
             )}
           </button>
         </div>
+
+        {rawTranscript && (
+          <div className="bg-surface border border-border rounded-lg p-2.5 space-y-2 mt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
+                <Icon icon="solar:document-text-bold" className="text-brand w-3.5 h-3.5" />
+                Spoken Video Transcript ({rawTranscript.length.toLocaleString()} characters)
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTranscript(prev => !prev)}
+                  className="text-[10px] font-bold text-text-muted hover:text-text-primary underline cursor-pointer"
+                >
+                  {showTranscript ? 'Collapse' : 'Expand Transcript'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sel = window.getSelection()?.toString().trim();
+                    if (sel && sel.length >= 10) {
+                      onExtracted?.({ quote: sel, rawText: sel });
+                      setStatusMsg({ type: 'success', text: 'Set selected text as review quote!' });
+                    } else {
+                      onExtracted?.({ quote: rawTranscript.slice(0, 400), rawText: rawTranscript });
+                      setStatusMsg({ type: 'success', text: 'Loaded transcript into quote field!' });
+                    }
+                  }}
+                  className="text-[10px] font-bold text-brand hover:underline cursor-pointer"
+                  title="Highlight any text in the transcript box below and click this button"
+                >
+                  Use Highlighted Text
+                </button>
+              </div>
+            </div>
+            {showTranscript && (
+              <div className="bg-surface-2/60 border border-border/50 rounded-lg p-2.5 max-h-48 overflow-y-auto text-[11px] text-text-primary leading-relaxed whitespace-pre-wrap select-text font-sans">
+                {rawTranscript}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       )}
 
       {statusMsg && (

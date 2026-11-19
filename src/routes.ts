@@ -123,6 +123,8 @@ export default [
       route('critic-videos', 'pages/admin/AdminCriticVideos.jsx'),
       route('plays', 'pages/admin/AdminPlays.jsx'),
       route('theatre-plays', 'pages/admin/AdminPlays.jsx', { id: 'admin-plays-alias' }),
+      route('intake', 'pages/admin/AdminIntake.jsx'),
+      route('social-intake', 'pages/admin/AdminIntake.jsx', { id: 'admin-social-intake-alias' }),
 
       // Full admins only — `admin_limited` must not reach these.
       layout('routes/require-admin-strict.tsx', [
