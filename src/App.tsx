@@ -128,23 +128,28 @@ import QuickViewModal from './components/film/QuickViewModal';
 
 // Protected Route Wrapper
 function ProtectedRoute({ children, allowedRoles = [] }) {
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
   const location = useLocation();
   
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
+
+  const effectiveRole = role || user.role;
+  if (allowedRoles.length > 0 && !effectiveRole) {
+    return null;
+  }
   
   // Force onboarding if not complete
-  if (!user.onboarded && user.role !== 'admin' && user.role !== 'fan' && location.pathname !== '/onboarding') {
+  if (!user.onboarded && effectiveRole !== 'admin' && effectiveRole !== 'fan' && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 
   // Prevent accessing onboarding if already complete
-  if ((user.onboarded || user.role === 'fan') && location.pathname === '/onboarding') {
-    return <Navigate to={user.role === 'professional' ? '/pro-dashboard' : '/dashboard'} replace />;
+  if ((user.onboarded || effectiveRole === 'fan') && location.pathname === '/onboarding') {
+    return <Navigate to={effectiveRole === 'professional' ? '/pro-dashboard' : '/dashboard'} replace />;
   }
   
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+  if (allowedRoles.length > 0 && !allowedRoles.includes(effectiveRole)) {
     return <Navigate to="/dashboard" replace />;
   }
   

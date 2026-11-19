@@ -227,10 +227,9 @@ export default function ProDashboard() {
   }, [user?.id]);
 
   useEffect(() => {
-    document.title = 'IMDbPro Creator Dashboard | MuviDB';
-    if (user?.role === 'admin' || user?.role === 'admin_limited') navigate('/admin');
-    else load();
-  }, [load, navigate, user?.role]);
+    document.title = 'MuviDB Pro Creator Dashboard | MuviDB';
+    load();
+  }, [load]);
 
   const person = access?.people || {};
   const progress = useMemo(() => getProfileProgress(person, credits), [person, credits]);
@@ -596,7 +595,7 @@ export default function ProDashboard() {
               <Icon icon="solar:user-check-linear" width="42" className="mx-auto text-brand" />
               <h1 className="mt-5 text-3xl font-black text-text-primary">Connect your professional profile</h1>
               <p className="mt-4 text-sm leading-7 text-text-muted">
-                Find your existing MuviDB page, claim it and bring your credits into your IMDbPro workspace.
+                Find your existing MuviDB page, claim it and bring your credits into your MuviDB Pro workspace.
               </p>
               <Link to="/claim" className="mt-7 inline-flex rounded-xl bg-brand px-7 py-3 text-xs font-black text-white">
                 Find my profile
@@ -1761,7 +1760,7 @@ export default function ProDashboard() {
               <EmptyState
                 icon="solar:cup-star-bold"
                 title="No awards listed yet"
-                body="Add your verified awards, festival selections, and nominations to showcase on your public IMDbPro profile."
+                body="Add your verified awards, festival selections, and nominations to showcase on your public MuviDB Pro profile."
                 action={
                   <button
                     onClick={() => setInlineAwardOpen(true)}

@@ -43,8 +43,34 @@ function isInvalidAuthError(error) {
   );
 }
 
-function roleFromUser(authUser) {
+const ROLE_CACHE_KEY = 'muvidb_user_role';
+
+function getCachedRole(authUser) {
+  if (!authUser?.id) return null;
+  try {
+    const cached = localStorage.getItem(`${ROLE_CACHE_KEY}_${authUser.id}`) || localStorage.getItem(ROLE_CACHE_KEY);
+    if (cached) return cached;
+  } catch (_) {}
   return authUser?.user_metadata?.role || null;
+}
+
+function setCachedRole(authUser, role) {
+  if (!authUser?.id || !role) return;
+  try {
+    localStorage.setItem(`${ROLE_CACHE_KEY}_${authUser.id}`, role);
+    localStorage.setItem(ROLE_CACHE_KEY, role);
+  } catch (_) {}
+}
+
+function clearCachedRole(userId) {
+  try {
+    if (userId) localStorage.removeItem(`${ROLE_CACHE_KEY}_${userId}`);
+    localStorage.removeItem(ROLE_CACHE_KEY);
+  } catch (_) {}
+}
+
+function roleFromUser(authUser) {
+  return getCachedRole(authUser);
 }
 
 export function AuthProvider({ children }) {
@@ -58,12 +84,14 @@ export function AuthProvider({ children }) {
 
   const clearLocalAuth = async () => {
     try {
+      const currentId = authState.user?.id;
+      clearCachedRole(currentId);
       // Local scope clears the browser session even if the auth user was already deleted.
       await supabase.auth.signOut({ scope: 'local' });
     } catch (_) {
       /* ignore */
     }
-    setAuthState({ user: null, role: null, loading: false });
+    setAuthState({ user: null, role: null, profile: null, loading: false });
   };
 
   const setRememberedSession = (remember) => {
@@ -108,17 +136,21 @@ export function AuthProvider({ children }) {
 
   const applyCachedAuthUser = (authUser) => {
     if (!authUser) return;
+    const cachedRole = getCachedRole(authUser);
     setAuthState(prev => ({
       ...prev,
       user: authUser,
-      role: prev.role || roleFromUser(authUser),
-      loading: false,
+      role: prev.role || cachedRole,
+      // If we already have a verified or cached role, we allow rendering to continue.
+      // If role is completely unknown, keep loading: true until fetchUserProfile finishes
+      // so route guards do NOT prematurely bounce users to the wrong dashboard!
+      loading: (prev.role || cachedRole) ? false : prev.loading,
     }));
   };
 
   const fetchUserProfile = async (authUser) => {
     if (!authUser) {
-      setAuthState({ user: null, role: null, loading: false });
+      setAuthState({ user: null, role: null, profile: null, loading: false });
       return;
     }
     
@@ -148,18 +180,27 @@ export function AuthProvider({ children }) {
       
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching user profile:', error);
-        // On intermittent failure, preserve existing role if possible
+        // On intermittent failure, preserve existing or cached role if possible
+        const fallbackRole = authState.role || getCachedRole(authUser);
         setAuthState(prev => ({
           ...prev,
           user: authUser,
-          role: prev.role || authUser.user_metadata?.role || null,
+          role: fallbackRole,
           loading: false,
         }));
         return;
       }
 
-      // Prioritize DB role, fallback to metadata
-      let finalRole = (profile?.role) || authUser.user_metadata?.role || null;
+      // Prioritize DB role, fallback to cached role, then metadata
+      let finalRole = (profile?.role) || getCachedRole(authUser) || authUser.user_metadata?.role || null;
+
+      if (finalRole) {
+        setCachedRole(authUser, finalRole);
+        // If Supabase auth user_metadata is out of sync with DB, update it in background
+        if (authUser.user_metadata?.role !== finalRole) {
+          supabase.auth.updateUser({ data: { role: finalRole } }).catch(() => {});
+        }
+      }
 
       setAuthState(prev => ({
         ...prev,
@@ -177,10 +218,11 @@ export function AuthProvider({ children }) {
       }, 600);
     } catch (err) {
       console.error('Error in fetchUserProfile:', err);
+      const fallbackRole = authState.role || getCachedRole(authUser);
       setAuthState(prev => ({
         ...prev,
         user: authUser,
-        role: prev.role || authUser.user_metadata?.role || null,
+        role: fallbackRole,
         loading: false,
       }));
     }
@@ -417,9 +459,11 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     manualSignOutRef.current = true;
     try {
+      const currentId = authState.user?.id;
+      clearCachedRole(currentId);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      setAuthState({ user: null, role: null, loading: false });
+      setAuthState({ user: null, role: null, profile: null, loading: false });
     } finally {
       manualSignOutRef.current = false;
     }

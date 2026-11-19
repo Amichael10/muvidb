@@ -18,23 +18,32 @@ export default function ProtectedRoute({
   children: ReactNode;
   allowedRoles?: string[];
 }) {
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
   const location = useLocation();
 
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
 
+  const effectiveRole = role || user.role;
+
+  // Crucial: If a route requires specific roles (e.g. ['admin', 'admin_limited']),
+  // but the user's role has not resolved yet, do NOT prematurely kick them to /dashboard!
+  // Wait on the current URL until the verified role arrives so refresh maintains state.
+  if (allowedRoles.length > 0 && !effectiveRole) {
+    return null;
+  }
+
   // Force onboarding if not complete
-  if (!user.onboarded && user.role !== 'admin' && user.role !== 'fan' && location.pathname !== '/onboarding') {
+  if (!user.onboarded && effectiveRole !== 'admin' && effectiveRole !== 'fan' && location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 
   // Prevent accessing onboarding if already complete
-  if ((user.onboarded || user.role === 'fan') && location.pathname === '/onboarding') {
-    return <Navigate to={user.role === 'professional' ? '/pro-dashboard' : '/dashboard'} replace />;
+  if ((user.onboarded || effectiveRole === 'fan') && location.pathname === '/onboarding') {
+    return <Navigate to={effectiveRole === 'professional' ? '/pro-dashboard' : '/dashboard'} replace />;
   }
 
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+  if (allowedRoles.length > 0 && !allowedRoles.includes(effectiveRole)) {
     return <Navigate to="/dashboard" replace />;
   }
 
