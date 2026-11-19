@@ -730,9 +730,10 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 "-t", str(duration),
                 "-sn",
                 "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                "-maxrate", "2500k", "-bufsize", "5000k",
                 "-pix_fmt", "yuv420p", "-r", "30",
-                "-c:a", "aac", "-b:a", "192k",
+                "-c:a", "aac", "-b:a", "128k",
                 "-movflags", "+faststart", str(final_path),
             ]
             subprocess.run(cmd, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
@@ -828,9 +829,10 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 "-t", str(duration),
                 "-sn",
                 "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                "-maxrate", "2500k", "-bufsize", "5000k",
                 "-pix_fmt", "yuv420p", "-r", "30",
-                "-c:a", "aac", "-b:a", "192k",
+                "-c:a", "aac", "-b:a", "128k",
                 "-movflags", "+faststart", str(final_path)
             ])
             try:
@@ -918,9 +920,10 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "-t", str(duration),
                     "-sn",
                     "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
-                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                    "-maxrate", "2500k", "-bufsize", "5000k",
                     "-pix_fmt", "yuv420p", "-r", "30",
-                    "-c:a", "aac", "-b:a", "192k",
+                    "-c:a", "aac", "-b:a", "128k",
                     "-movflags", "+faststart", str(final_path),
                 ])
                 subprocess.run(cmd, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
@@ -1047,21 +1050,23 @@ def upload_clip_to_r2(payload: UploadRequest):
     """Directly stream upload the rendered MP4 file from the desktop clipper process to R2.
     This bypasses browser mixed-content / Private Network Access restrictions and saves browser memory."""
     path = file_for_token(payload.token)
+    file_size = path.stat().st_size
     try:
-        data = path.read_bytes()
-        req = urllib.request.Request(
-            payload.upload_url,
-            data=data,
-            headers={
-                "Content-Type": payload.content_type,
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            },
-            method="PUT",
-        )
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            if resp.status not in (200, 201, 204):
-                raise HTTPException(502, f"R2 upload failed with status {resp.status}")
-        return {"success": True, "size_bytes": len(data), "file_name": path.name}
+        import requests
+        with path.open("rb") as f:
+            resp = requests.put(
+                payload.upload_url,
+                data=f,
+                headers={
+                    "Content-Type": payload.content_type,
+                    "Content-Length": str(file_size),
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                },
+                timeout=(30, 900),
+            )
+            if resp.status_code not in (200, 201, 204):
+                raise HTTPException(502, f"R2 upload failed with status {resp.status_code}: {resp.text[:200]}")
+        return {"success": True, "size_bytes": file_size, "file_name": path.name}
     except Exception as exc:
         raise HTTPException(500, f"Direct upload from desktop clipper failed: {exc}")
 

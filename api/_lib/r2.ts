@@ -32,6 +32,7 @@ export async function createR2UploadUrl(fileNameOrKey: string, mimeType: string,
     region: 'auto',
     endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+    forcePathStyle: true,
   });
   const key = fileNameOrKey.startsWith('media/') || fileNameOrKey.startsWith('social/')
     ? fileNameOrKey

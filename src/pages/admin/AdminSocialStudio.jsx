@@ -911,7 +911,8 @@ export default function AdminSocialStudio() {
             const uploadResponse = await fetchWithLocalClipperAuth(session.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: blob });
             if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
           } catch (err) {
-            throw new Error('Clipper download blocked by browser. Please restart your local clipper script to apply the CORS patch.');
+            console.error('Video upload failed:', err);
+            throw new Error(err.message || 'Clipper upload failed. Please verify storage connection.');
           }
         }
         completed.push({ ...status, public_url: session.publicUrl, r2_key: session.key });
@@ -1372,7 +1373,8 @@ export default function AdminSocialStudio() {
               });
               if (!uploadResponse.ok) throw new Error('Could not upload the rendered video.');
             } catch (err) {
-              throw new Error('Clipper download blocked by browser. Please restart your local clipper script to apply the CORS patch.');
+              console.error('Video upload failed:', err);
+              throw new Error(err.message || 'Clipper upload failed. Please verify storage connection.');
             }
           }
 

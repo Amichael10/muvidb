@@ -8,6 +8,7 @@ scenedetect>=0.6.4
 # Local transcription for films with no YouTube captions. CPU int8 is enough;
 # weights download on first use.
 faster-whisper>=1.1.0
+requests>=2.31.0
 # faster-whisper 1.2.x still calls av.open(..., metadata_errors=...), which PyAV
 # removed. Installing it unpinned pulls av 19 and every transcribe() call then
 # dies with "open() got an unexpected keyword argument 'metadata_errors'".
