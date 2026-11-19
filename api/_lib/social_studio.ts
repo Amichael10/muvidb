@@ -4160,13 +4160,19 @@ export async function generateAndAttachReelForContentItem(
     .eq('content_item_id', item.id);
   if (varErr) throw varErr;
 
+  const isVideo = /\.(mp4|mov|webm)(\?.*)?$/i.test(renderedReel.publicUrl);
   for (const variant of variants || []) {
+    // If not an MP4 video, Instagram Graph API requires feed images to have aspect ratio between 4:5 and 1.91:1.
+    // Preserve the existing 4:5 portrait card for Instagram feed if one was already attached.
+    if (!isVideo && variant.platform === 'instagram' && variant.selected_asset_id) {
+      continue;
+    }
     const nextOptions: Record<string, unknown> = {
       ...(variant.platform_options || {}),
       post_format: 'single',
-      asset_format: 'video_vertical_9_16',
+      asset_format: isVideo ? 'video_vertical_9_16' : 'vertical_9_16',
       asset_url: renderedReel.publicUrl,
-      video_url: renderedReel.publicUrl,
+      video_url: isVideo ? renderedReel.publicUrl : undefined,
       cover_url: renderedReel.coverImageUrl || (variant.platform_options as any)?.cover_url || null,
     };
     const effectiveInstagramAudio =

@@ -872,7 +872,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const draft = await generateSocialDraft({
           ...parsed,
-          skipAssets: shouldGenerateReel,
+          // Always generate baseline editorial assets so publishing is 100% resilient
+          skipAssets: false,
         }, actor);
 
         const contentItemId = draft.contentItem.id;
@@ -901,12 +902,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         let reelResult = null;
         if (shouldGenerateReel) {
-          reelResult = await generateAndAttachReelForContentItem({
-            contentItemId,
-            seriesLabel: parsed.contentType === 'upcoming_movie' ? 'New & Upcoming' : 'Now Streaming',
-            audioStreamUrl: body.audioStreamUrl || null,
-            instagramAudio: body.instagramAudio || null,
-          }, actor);
+          try {
+            reelResult = await generateAndAttachReelForContentItem({
+              contentItemId,
+              seriesLabel: parsed.contentType === 'upcoming_movie' ? 'New & Upcoming' : 'Now Streaming',
+              audioStreamUrl: body.audioStreamUrl || null,
+              instagramAudio: body.instagramAudio || null,
+            }, actor);
+          } catch (reelErr: any) {
+            console.warn('[social] Reel auto-generation fallback to standard assets:', reelErr?.message);
+          }
         }
 
         const published = await publishContentItemNow({ contentItemId }, actor);

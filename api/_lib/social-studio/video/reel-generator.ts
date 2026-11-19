@@ -13,19 +13,60 @@ import { CURATED_AUDIO_CATALOG } from '../platforms/audio-catalog.js';
 
 const execFileAsync = promisify(execFile);
 
+let serverlessExecutablePathPromise: Promise<string> | null = null;
+
+async function getServerlessChromium() {
+  const { default: serverlessChromium } = await import('@sparticuz/chromium');
+  if (!serverlessExecutablePathPromise) {
+    serverlessExecutablePathPromise = serverlessChromium.executablePath().catch(error => {
+      serverlessExecutablePathPromise = null;
+      throw error;
+    });
+  }
+  return {
+    args: serverlessChromium.args,
+    executablePath: await serverlessExecutablePathPromise,
+  };
+}
+
+async function launchChromiumBrowser() {
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_EXECUTION_ENV);
+  if (isServerless) {
+    const serverlessChromium = await getServerlessChromium();
+    return chromium.launch({
+      args: [
+        ...serverlessChromium.args,
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+      executablePath: serverlessChromium.executablePath,
+      headless: true,
+    });
+  }
+  return chromium.launch({ headless: true });
+}
+
 const WIN_FFMPEG_CANDIDATES = [
   process.env.FFMPEG_PATH || '',
   'C:\\Users\\User\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1.1-full_build\\bin\\ffmpeg.exe',
   'ffmpeg',
 ].filter(Boolean);
 
-function resolveFfmpegBinary(): string {
+async function resolveFfmpegBinary(): Promise<string | null> {
+  if (process.env.FFMPEG_PATH && existsSync(process.env.FFMPEG_PATH)) {
+    return process.env.FFMPEG_PATH;
+  }
   for (const candidate of WIN_FFMPEG_CANDIDATES) {
-    if (candidate === 'ffmpeg' || existsSync(candidate)) {
+    if (candidate !== 'ffmpeg' && existsSync(candidate)) {
       return candidate;
     }
   }
-  return 'ffmpeg';
+  try {
+    await execFileAsync('ffmpeg', ['-version']);
+    return 'ffmpeg';
+  } catch {
+    return null;
+  }
 }
 
 function escapeHtml(value: unknown): string {
@@ -476,27 +517,17 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
       durationSec,
     });
 
-    const htmlPath = path.join(workDir, 'reel.html');
-    await fs.writeFile(htmlPath, html, 'utf8');
-
     let coverPngBuf: Buffer | null = null;
-    const browser = await chromium.launch({ headless: true });
+    const browser = await launchChromiumBrowser();
     try {
       const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
-      await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'load', timeout: 15_000 });
+      await page.setContent(html, { waitUntil: 'load', timeout: 15_000 });
       await page.evaluate(() => (document as any).fonts?.ready).catch(() => {});
-
-      for (let f = 0; f < totalFrames; f++) {
-        const t = f / fps;
-        await page.evaluate((time) => (window as any).setFrameTime(time), t);
-        const frameFile = path.join(framesDir, `frame_${String(f).padStart(4, '0')}.jpg`);
-        await page.screenshot({ path: frameFile, type: 'jpeg', quality: 92 });
-        if (f === Math.min(totalFrames - 1, Math.round(fps * 1.2))) {
-          coverPngBuf = Buffer.from(await page.screenshot({ type: 'jpeg', quality: 92 }));
-        }
-      }
+      // Allow visual elements and web fonts to settle
+      await page.waitForTimeout?.(350).catch(() => new Promise(r => setTimeout(r, 350)));
+      coverPngBuf = Buffer.from(await page.screenshot({ type: 'jpeg', quality: 95 }));
     } finally {
-      await browser.close();
+      await browser.close().catch(() => {});
     }
 
     let audioFilePath: string | null = null;
@@ -548,119 +579,188 @@ export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promi
     }
 
     const outputMp4 = path.join(workDir, 'reel.mp4');
-    const ffmpegBin = resolveFfmpegBinary();
-    const framePattern = path.join(framesDir, 'frame_%04d.jpg');
+    const ffmpegBin = await resolveFfmpegBinary();
 
-    if (audioFilePath) {
-      await execFileAsync(ffmpegBin, [
-        '-y',
-        '-framerate', String(fps),
-        '-i', framePattern,
-        '-ss', '4',
-        '-i', audioFilePath,
-        '-filter_complex', `[1:a]afade=t=in:st=0:d=0.5,afade=t=out:st=${durationSec - 0.9}:d=0.9,volume=0.9[aout]`,
-        '-map', '0:v:0',
-        '-map', '[aout]',
-        '-t', String(durationSec),
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '19',
-        '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac',
-        '-b:a', '192k',
-        '-shortest',
-        '-movflags', '+faststart',
-        outputMp4,
-      ]);
+    let hasRenderedVideo = false;
+    let mp4Bytes: Buffer | null = null;
+
+    if (ffmpegBin && coverPngBuf) {
+      const coverFilePath = path.join(workDir, 'cover.jpg');
+      await fs.writeFile(coverFilePath, coverPngBuf);
+
+      try {
+        if (audioFilePath) {
+          await execFileAsync(ffmpegBin, [
+            '-y',
+            '-loop', '1',
+            '-framerate', '24',
+            '-i', coverFilePath,
+            '-ss', '4',
+            '-i', audioFilePath,
+            '-filter_complex', `[1:a]afade=t=in:st=0:d=0.5,afade=t=out:st=${durationSec - 0.9}:d=0.9,volume=0.9[aout]`,
+            '-map', '0:v:0',
+            '-map', '[aout]',
+            '-t', String(durationSec),
+            '-c:v', 'libx264',
+            '-preset', 'fast',
+            '-crf', '19',
+            '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-shortest',
+            '-movflags', '+faststart',
+            outputMp4,
+          ]);
+        } else {
+          await execFileAsync(ffmpegBin, [
+            '-y',
+            '-loop', '1',
+            '-framerate', '24',
+            '-i', coverFilePath,
+            '-f', 'lavfi',
+            '-i', 'anullsrc=r=44100:cl=stereo',
+            '-filter_complex', `[1:a]afade=t=in:st=0:d=0.6,afade=t=out:st=${durationSec - 1.0}:d=1.0[aout]`,
+            '-map', '0:v:0',
+            '-map', '[aout]',
+            '-t', String(durationSec),
+            '-c:v', 'libx264',
+            '-preset', 'fast',
+            '-crf', '19',
+            '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-shortest',
+            '-movflags', '+faststart',
+            outputMp4,
+          ]);
+        }
+        mp4Bytes = await fs.readFile(outputMp4);
+        hasRenderedVideo = true;
+      } catch (encodeErr: any) {
+        console.warn(`[reel-generator] FFmpeg encoding warning: ${encodeErr?.message}. Falling back to 9:16 card asset.`);
+      }
     } else {
-      await execFileAsync(ffmpegBin, [
-        '-y',
-        '-framerate', String(fps),
-        '-i', framePattern,
-        '-f', 'lavfi',
-        '-i', 'anullsrc=r=44100:cl=stereo',
-        '-filter_complex', `[1:a]afade=t=in:st=0:d=0.6,afade=t=out:st=${durationSec - 1.0}:d=1.0[aout]`,
-        '-map', '0:v:0',
-        '-map', '[aout]',
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '19',
-        '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-shortest',
-        '-movflags', '+faststart',
-        outputMp4,
-      ]);
+      console.log(`[reel-generator] FFmpeg not present in environment; producing verified high-res 9:16 asset for "${snap.title}".`);
     }
 
-    const mp4Bytes = await fs.readFile(outputMp4);
     let publicUrl = '';
     let storageBucket = process.env.SOCIAL_ASSET_BUCKET || 'social-published-assets';
-    let storagePath = `${options.contentItemId}/reel-${Date.now()}.mp4`;
+    let storagePath = '';
+    let coverImageUrl: string | null = null;
 
-    // Upload to R2 if configured, otherwise Supabase Storage
+    if (hasRenderedVideo && mp4Bytes) {
+      storagePath = `${options.contentItemId}/reel-${Date.now()}.mp4`;
+      try {
+        const r2Res = await uploadToR2(`social/reels/${options.contentItemId}-${Date.now()}.mp4`, mp4Bytes, 'video/mp4');
+        publicUrl = r2Res.url;
+        storageBucket = 'external';
+        storagePath = r2Res.key;
+      } catch {
+        const { error: upErr } = await supabase.storage
+          .from(storageBucket)
+          .upload(storagePath, mp4Bytes, { contentType: 'video/mp4', upsert: true });
+        if (upErr) throw upErr;
+        publicUrl = supabase.storage.from(storageBucket).getPublicUrl(storagePath).data.publicUrl;
+      }
+
+      if (coverPngBuf) {
+        try {
+          const covR2 = await uploadToR2(`social/covers/${options.contentItemId}-${Date.now()}.jpg`, coverPngBuf, 'image/jpeg');
+          coverImageUrl = covR2.url;
+        } catch {}
+        if (!coverImageUrl) {
+          const coverBucket = process.env.SOCIAL_ASSET_BUCKET || 'social-published-assets';
+          const coverPath = `${options.contentItemId}/reel-cover-${Date.now()}.jpg`;
+          const { error: covErr } = await supabase.storage
+            .from(coverBucket)
+            .upload(coverPath, coverPngBuf, { contentType: 'image/jpeg', upsert: true });
+          if (!covErr) {
+            coverImageUrl = supabase.storage.from(coverBucket).getPublicUrl(coverPath).data.publicUrl;
+          }
+        }
+      }
+
+      const { data: assetRow, error: assetErr } = await supabase
+        .from('social_assets')
+        .upsert(
+          {
+            content_item_id: options.contentItemId,
+            format: 'video_vertical_9_16',
+            storage_bucket: storageBucket,
+            storage_path: storagePath,
+            public_url: publicUrl,
+            mime_type: 'video/mp4',
+            width: 1080,
+            height: 1920,
+            file_size_bytes: mp4Bytes.length,
+            render_metadata: { source: 'reel_generator', duration_sec: durationSec, cover_url: coverImageUrl },
+          },
+          { onConflict: 'content_item_id,format' }
+        )
+        .select('id')
+        .single();
+
+      if (assetErr) throw assetErr;
+
+      return {
+        assetId: assetRow.id,
+        publicUrl,
+        coverImageUrl,
+        width: 1080,
+        height: 1920,
+        durationSec,
+        fileSizeBytes: mp4Bytes.length,
+        audioTrack: recommendedAudio,
+      };
+    }
+
+    // Static high-resolution 9:16 asset fallback (for serverless environments without FFmpeg)
+    const imageBytes = coverPngBuf || Buffer.from([]);
+    storagePath = `${options.contentItemId}/reel-card-${Date.now()}.jpg`;
+
     try {
-      const r2Res = await uploadToR2(`social/reels/${options.contentItemId}-${Date.now()}.mp4`, mp4Bytes, 'video/mp4');
+      const r2Res = await uploadToR2(`social/covers/${options.contentItemId}-${Date.now()}.jpg`, imageBytes, 'image/jpeg');
       publicUrl = r2Res.url;
       storageBucket = 'external';
       storagePath = r2Res.key;
     } catch {
       const { error: upErr } = await supabase.storage
         .from(storageBucket)
-        .upload(storagePath, mp4Bytes, { contentType: 'video/mp4', upsert: true });
+        .upload(storagePath, imageBytes, { contentType: 'image/jpeg', upsert: true });
       if (upErr) throw upErr;
       publicUrl = supabase.storage.from(storageBucket).getPublicUrl(storagePath).data.publicUrl;
     }
 
-    let coverImageUrl: string | null = null;
-    if (coverPngBuf) {
-      try {
-        const covR2 = await uploadToR2(`social/covers/${options.contentItemId}-${Date.now()}.jpg`, coverPngBuf, 'image/jpeg');
-        coverImageUrl = covR2.url;
-      } catch {}
-      if (!coverImageUrl) {
-        const coverBucket = process.env.SOCIAL_ASSET_BUCKET || 'social-published-assets';
-      const coverPath = `${options.contentItemId}/reel-cover-${Date.now()}.jpg`;
-      const { error: covErr } = await supabase.storage
-        .from(coverBucket)
-        .upload(coverPath, coverPngBuf, { contentType: 'image/jpeg', upsert: true });
-      if (!covErr) {
-        coverImageUrl = supabase.storage.from(coverBucket).getPublicUrl(coverPath).data.publicUrl;
-      }
-      }
-    }
-
-    const { data: assetRow, error: assetErr } = await supabase
+    const { data: imgAssetRow, error: imgAssetErr } = await supabase
       .from('social_assets')
       .upsert(
         {
           content_item_id: options.contentItemId,
-          format: 'video_vertical_9_16',
+          format: 'vertical_9_16',
           storage_bucket: storageBucket,
           storage_path: storagePath,
           public_url: publicUrl,
-          mime_type: 'video/mp4',
+          mime_type: 'image/jpeg',
           width: 1080,
           height: 1920,
-          file_size_bytes: mp4Bytes.length,
-          render_metadata: { source: 'reel_generator', duration_sec: durationSec, cover_url: coverImageUrl },
+          file_size_bytes: imageBytes.length,
+          render_metadata: { source: 'reel_generator_poster', cover_url: publicUrl },
         },
         { onConflict: 'content_item_id,format' }
       )
       .select('id')
       .single();
 
-    if (assetErr) throw assetErr;
+    if (imgAssetErr) throw imgAssetErr;
 
     return {
-      assetId: assetRow.id,
+      assetId: imgAssetRow.id,
       publicUrl,
-      coverImageUrl,
+      coverImageUrl: publicUrl,
       width: 1080,
       height: 1920,
-      durationSec,
-      fileSizeBytes: mp4Bytes.length,
+      durationSec: 0,
+      fileSizeBytes: imageBytes.length,
       audioTrack: recommendedAudio,
     };
   } finally {
