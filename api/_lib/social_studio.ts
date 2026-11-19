@@ -4140,7 +4140,7 @@ export async function generateAndAttachReelForContentItem(
 
   const capturedAt = new Date().toISOString();
   const snapshot =
-    item.source_snapshot?.kind === 'upcoming_movie'
+    item.source_snapshot && (item.source_snapshot.kind === 'upcoming_movie' || item.source_snapshot.kind === 'streaming_alert')
       ? item.source_snapshot
       : await loadUpcomingMovieSource(item.source_entity_id, capturedAt);
 

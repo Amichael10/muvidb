@@ -197,6 +197,7 @@ class BatchClipRequest(BaseModel):
 
 
 def cleanup_expired_files() -> None:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     cutoff = time.time() - FILE_TTL_SECONDS
     for path in OUTPUT_DIR.glob("*.mp4"):
         try:
@@ -665,6 +666,8 @@ def render_filmcraft_clip(start: float, end: float, aspect_ratio: str, final_pat
 def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: Path) -> None:
     """Fast stream-based slicing and rendering in sub-30s with master segment sharing."""
     try:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        final_path.parent.mkdir(parents=True, exist_ok=True)
         ensure_ffmpeg_in_path()
         require_dependencies()
         start = float(payload.start_time)
@@ -949,6 +952,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
 
 @app.post("/clip", status_code=202)
 def create_clip(payload: ClipRequest):
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     require_dependencies()
     cleanup_expired_files()
     start = float(payload.start_time)
@@ -995,6 +999,7 @@ def filmcraft_direct_render(payload: ClipRequest):
 @app.post("/batch", status_code=202)
 def create_batch(payload: BatchClipRequest):
     """Queue multiple local renders without blocking the browser on each one."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     require_dependencies()
     if not payload.clips:
         raise HTTPException(400, "At least one clip is required")

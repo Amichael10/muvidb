@@ -901,6 +901,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         let reelResult = null;
+        let reelError: Error | null = null;
         if (shouldGenerateReel) {
           try {
             reelResult = await generateAndAttachReelForContentItem({
@@ -912,7 +913,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }, actor);
           } catch (reelErr: any) {
             console.warn('[social] Reel auto-generation fallback to standard assets:', reelErr?.message);
+            reelError = reelErr;
           }
+        }
+
+        const { data: currentVariants } = await supabase
+          .from('social_platform_variants')
+          .select('id, platform, selected_asset_id, platform_options')
+          .eq('content_item_id', contentItemId);
+
+        const unrendered = (currentVariants || []).filter(
+          (v: any) => !v.selected_asset_id && !v.platform_options?.carousel_asset_urls?.length
+        );
+
+        if (unrendered.length > 0) {
+          const missingPlatforms = unrendered.map((v: any) => v.platform).join(', ');
+          const detail = reelError ? ` (Reel render failed: ${reelError.message})` : '';
+          throw httpError(409, `These variants have no rendered asset: ${missingPlatforms}${detail}`);
         }
 
         const published = await publishContentItemNow({ contentItemId }, actor);
