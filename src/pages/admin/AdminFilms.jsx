@@ -9,6 +9,7 @@ import ImageField from '../../components/admin/ImageField';
 import AwardsEditor from '../../components/admin/AwardsEditor';
 import { syncFilmAwardsToPeople } from '../../lib/awardsSync';
 import CriticReviewsEditor from '../../components/admin/CriticReviewsEditor';
+import AdminBoxOfficeModal from '../../components/film/AdminBoxOfficeModal';
 import YouTubeFilmImport from '../../components/admin/YouTubeFilmImport';
 import CompanyListEditor from '../../components/admin/CompanyListEditor';
 import { ALL_ROLES, canonicalizeRole } from '../../lib/creditRoles';
@@ -26,6 +27,39 @@ import { NFVCB_RATING_OPTIONS } from '../../lib/contributions';
 import { getShowName } from '../../utils/series';
 import { deleteFilmsPermanently } from '../../utils/filmDelete';
 import { resolveFilmGenreSelection, visibleFilmGenres } from '../../lib/filmGenres';
+
+function parseBoxOfficeAmount(val) {
+  if (val === null || val === undefined || val === '') return null;
+  const str = String(val).trim().toLowerCase().replace(/,/g, '').replace(/[₦$£€]/g, '');
+  if (str.endsWith('b') || str.endsWith('billion')) {
+    const num = parseFloat(str);
+    return isNaN(num) ? null : Math.round(num * 1_000_000_000);
+  }
+  if (str.endsWith('m') || str.endsWith('million')) {
+    const num = parseFloat(str);
+    return isNaN(num) ? null : Math.round(num * 1_000_000);
+  }
+  if (str.endsWith('k') || str.endsWith('thousand')) {
+    const num = parseFloat(str);
+    return isNaN(num) ? null : Math.round(num * 1_000);
+  }
+  const num = parseFloat(str);
+  return isNaN(num) ? null : num;
+}
+
+function formatBoxOfficePreview(amount, currency = 'NGN') {
+  if (amount === null || amount === undefined || amount === '' || isNaN(amount)) return null;
+  const num = typeof amount === 'number' ? amount : parseBoxOfficeAmount(amount);
+  if (!num || isNaN(num)) return null;
+  const symbol = currency === 'NGN' ? '₦' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : currency === 'EUR' ? '€' : `${currency} `;
+  if (num >= 1_000_000_000) {
+    return `${symbol}${(num / 1_000_000_000).toFixed(2)} Billion`;
+  }
+  if (num >= 1_000_000) {
+    return `${symbol}${(num / 1_000_000).toFixed(2)} Million`;
+  }
+  return `${symbol}${num.toLocaleString()}`;
+}
 
 export default function AdminFilms() {
   const { user } = useAuth();
@@ -188,11 +222,13 @@ export default function AdminFilms() {
     box_office_domestic: '',
     budget: '',
     box_office_worldwide: '',
+    box_office_opening_weekend: '',
     box_office_currency: 'NGN',
     box_office_source: 'CEAN Official',
     distributor: ''
   };
 
+  const [showBoxOfficeModal, setShowBoxOfficeModal] = useState(false);
   const [formData, setFormData] = useState(initialFormState);
   const [parentSeriesQuery, setParentSeriesQuery] = useState('');
   const [parentSeriesResults, setParentSeriesResults] = useState([]);
@@ -853,6 +889,12 @@ export default function AdminFilms() {
         season_count: film.season_count ?? '',
         episode_count: film.episode_count ?? '',
         distributor: film.distributor || film.streaming_links?.distributor || '',
+        box_office_domestic: film.box_office_domestic != null ? String(film.box_office_domestic) : (film.streaming_links?.box_office?.domestic != null ? String(film.streaming_links.box_office.domestic) : ''),
+        box_office_worldwide: film.box_office_worldwide != null ? String(film.box_office_worldwide) : (film.streaming_links?.box_office?.worldwide != null ? String(film.streaming_links.box_office.worldwide) : ''),
+        box_office_opening_weekend: film.box_office_opening_weekend != null ? String(film.box_office_opening_weekend) : (film.streaming_links?.box_office?.opening_weekend != null ? String(film.streaming_links.box_office.opening_weekend) : ''),
+        box_office_currency: film.box_office_currency || film.streaming_links?.box_office?.currency || 'NGN',
+        box_office_source: film.box_office_source || film.streaming_links?.box_office?.source || 'CEAN Official',
+        budget: film.budget != null ? String(film.budget) : (film.streaming_links?.box_office?.budget != null ? String(film.streaming_links.box_office.budget) : ''),
       };
       // Merge over the base rather than replacing it: a draft saved before a
       // field existed on this form has no key for it, and save would then write
@@ -1515,23 +1557,25 @@ export default function AdminFilms() {
             return baseStreaming;
           })(),
           ...(distributorJoined ? { distributor: distributorJoined } : { distributor: null }),
-          ...((formData.box_office_domestic || formData.box_office_worldwide) ? {
+          ...((formData.box_office_domestic || formData.box_office_worldwide || formData.box_office_opening_weekend) ? {
             box_office: {
-              domestic: formData.box_office_domestic ? parseFloat(formData.box_office_domestic) : 0,
-              worldwide: formData.box_office_worldwide ? parseFloat(formData.box_office_worldwide) : 0,
+              domestic: parseBoxOfficeAmount(formData.box_office_domestic) || 0,
+              worldwide: parseBoxOfficeAmount(formData.box_office_worldwide) || 0,
+              opening_weekend: parseBoxOfficeAmount(formData.box_office_opening_weekend) || null,
               currency: formData.box_office_currency || 'NGN',
               source: formData.box_office_source || null,
-              budget: formData.budget ? parseFloat(formData.budget) : 0,
+              budget: parseBoxOfficeAmount(formData.budget) || 0,
               updated_at: new Date().toISOString()
             }
           } : {})
         },
-        box_office_domestic: formData.box_office_domestic ? parseFloat(formData.box_office_domestic) : null,
-        box_office_worldwide: formData.box_office_worldwide ? parseFloat(formData.box_office_worldwide) : null,
+        box_office_domestic: parseBoxOfficeAmount(formData.box_office_domestic),
+        box_office_worldwide: parseBoxOfficeAmount(formData.box_office_worldwide),
+        box_office_opening_weekend: parseBoxOfficeAmount(formData.box_office_opening_weekend),
         box_office_currency: formData.box_office_currency || 'NGN',
         box_office_source: formData.box_office_source || null,
-        budget: formData.budget ? parseFloat(formData.budget) : null,
-        box_office_updated_at: (formData.box_office_domestic || formData.box_office_worldwide) ? new Date().toISOString() : null,
+        budget: parseBoxOfficeAmount(formData.budget),
+        box_office_updated_at: (formData.box_office_domestic || formData.box_office_worldwide || formData.box_office_opening_weekend) ? new Date().toISOString() : null,
         awards: (formData.awards || [])
           .filter((a) => (a.organization || '').trim() || (a.category || '').trim())
           .map((a) => ({
@@ -3711,6 +3755,155 @@ export default function AdminFilms() {
             filmCredits={credits}
           />
 
+          <hr className="border-border" />
+
+          {/* Box Office & Financial Performance */}
+          <section className="space-y-4 rounded-xl border border-border bg-surface-2/40 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                  <Icon icon="solar:dollar-minimalistic-bold" width="16" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-text-primary">
+                    Box Office & Financial Performance
+                  </h4>
+                  <p className="text-[11px] text-text-muted">
+                    Track theatrical grosses, opening weekend, and budget with shorthand parsing (e.g. 1.4b, 450m).
+                  </p>
+                </div>
+              </div>
+
+              {editingFilm?.id && (
+                <button
+                  type="button"
+                  onClick={() => setShowBoxOfficeModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 text-[11px] font-bold text-emerald-300 transition shrink-0"
+                  title="Open full box office manager modal"
+                >
+                  <Icon icon="solar:chart-square-bold" width="14" />
+                  <span>Advanced Box Office Manager</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Domestic Gross</label>
+                  {formatBoxOfficePreview(formData.box_office_domestic, formData.box_office_currency) && (
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      {formatBoxOfficePreview(formData.box_office_domestic, formData.box_office_currency)}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  name="box_office_domestic"
+                  value={formData.box_office_domestic ?? ''}
+                  onChange={handleChange}
+                  placeholder="e.g. 1.4b or 1400000000"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Worldwide Gross</label>
+                  {formatBoxOfficePreview(formData.box_office_worldwide, formData.box_office_currency) && (
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      {formatBoxOfficePreview(formData.box_office_worldwide, formData.box_office_currency)}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  name="box_office_worldwide"
+                  value={formData.box_office_worldwide ?? ''}
+                  onChange={handleChange}
+                  placeholder="e.g. 2.1b or 2100000000"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Opening Weekend</label>
+                  {formatBoxOfficePreview(formData.box_office_opening_weekend, formData.box_office_currency) && (
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      {formatBoxOfficePreview(formData.box_office_opening_weekend, formData.box_office_currency)}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  name="box_office_opening_weekend"
+                  value={formData.box_office_opening_weekend ?? ''}
+                  onChange={handleChange}
+                  placeholder="e.g. 125m or 125000000"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted">Production Budget</label>
+                  {formatBoxOfficePreview(formData.budget, formData.box_office_currency) && (
+                    <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                      {formatBoxOfficePreview(formData.budget, formData.box_office_currency)}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  name="budget"
+                  value={formData.budget ?? ''}
+                  onChange={handleChange}
+                  placeholder="e.g. 450m or 450000000"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1">Currency</label>
+                <select
+                  name="box_office_currency"
+                  value={formData.box_office_currency || 'NGN'}
+                  onChange={handleChange}
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                >
+                  <option value="NGN">NGN (₦) — Nigerian Naira</option>
+                  <option value="USD">USD ($) — US Dollar</option>
+                  <option value="GBP">GBP (£) — British Pound</option>
+                  <option value="EUR">EUR (€) — Euro</option>
+                  <option value="GHS">GHS (GH₵) — Ghanaian Cedi</option>
+                  <option value="ZAR">ZAR (R) — South African Rand</option>
+                  <option value="KES">KES (KSh) — Kenyan Shilling</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1">Data Source</label>
+                <input
+                  type="text"
+                  name="box_office_source"
+                  list="box-office-sources-list"
+                  value={formData.box_office_source ?? ''}
+                  onChange={handleChange}
+                  placeholder="e.g. CEAN Official, Comscore"
+                  className="w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-text-primary focus:border-brand outline-none"
+                />
+                <datalist id="box-office-sources-list">
+                  <option value="CEAN Official" />
+                  <option value="Cinema Exhibitors Association of Nigeria" />
+                  <option value="Comscore" />
+                  <option value="Distributor Report" />
+                  <option value="Variety / Deadline" />
+                </datalist>
+              </div>
+            </div>
+          </section>
+
           {editingFilm?.id && (
             <>
               <hr className="border-border" />
@@ -3986,6 +4179,43 @@ export default function AdminFilms() {
           </div>
         </form>
       </Drawer>
+
+      {showBoxOfficeModal && editingFilm && (
+        <AdminBoxOfficeModal
+          film={{
+            ...editingFilm,
+            box_office_domestic: parseBoxOfficeAmount(formData.box_office_domestic),
+            box_office_worldwide: parseBoxOfficeAmount(formData.box_office_worldwide),
+            box_office_opening_weekend: parseBoxOfficeAmount(formData.box_office_opening_weekend),
+            box_office_currency: formData.box_office_currency,
+            box_office_source: formData.box_office_source,
+            budget: parseBoxOfficeAmount(formData.budget),
+          }}
+          onClose={() => setShowBoxOfficeModal(false)}
+          onUpdated={(updated) => {
+            setShowBoxOfficeModal(false);
+            if (updated) {
+              setFormData(prev => ({
+                ...prev,
+                box_office_domestic: updated.domestic != null ? String(updated.domestic) : prev.box_office_domestic,
+                box_office_worldwide: updated.worldwide != null ? String(updated.worldwide) : prev.box_office_worldwide,
+                box_office_opening_weekend: updated.openingWeekend != null ? String(updated.openingWeekend) : prev.box_office_opening_weekend,
+                box_office_currency: updated.currency || prev.box_office_currency,
+                box_office_source: updated.source || prev.box_office_source,
+              }));
+              setEditingFilm(prev => prev ? ({
+                ...prev,
+                box_office_domestic: updated.domestic != null ? updated.domestic : prev.box_office_domestic,
+                box_office_worldwide: updated.worldwide != null ? updated.worldwide : prev.box_office_worldwide,
+                box_office_opening_weekend: updated.openingWeekend != null ? updated.openingWeekend : prev.box_office_opening_weekend,
+                box_office_currency: updated.currency || prev.box_office_currency,
+                box_office_source: updated.source || prev.box_office_source,
+              }) : null);
+              fetchFilms();
+            }
+          }}
+        />
+      )}
 
       {deletingFilm && (
         <ConfirmModal

@@ -128,18 +128,22 @@ export async function handleCriticVideos(req: VercelRequest, res: VercelResponse
         updated_at: new Date().toISOString(),
       };
 
-      const { data: existing } = await supabase
-        .from('critic_reviews')
-        .select('id')
-        .eq('critic_id', criticId)
-        .eq('film_id', filmId)
-        .maybeSingle();
+      let targetReviewId = payload.id ? String(payload.id).trim() : null;
+      if (!targetReviewId) {
+        const { data: existing } = await supabase
+          .from('critic_reviews')
+          .select('id')
+          .eq('critic_id', criticId)
+          .eq('film_id', filmId)
+          .maybeSingle();
+        targetReviewId = existing?.id || null;
+      }
 
-      if (existing?.id) {
+      if (targetReviewId) {
         const { data: updated, error: updateErr } = await supabase
           .from('critic_reviews')
           .update(reviewPayload)
-          .eq('id', existing.id)
+          .eq('id', targetReviewId)
           .select()
           .single();
         if (updateErr) throw new Error(updateErr.message);

@@ -867,7 +867,7 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "force_keyframes_at_cuts": False,
                     "extractor_args": {
                         "youtube": {
-                            "player_client": ["android", "web", "web_embedded"]
+                            "player_client": ["web", "ios", "mweb"]
                         }
                     },
                     "outtmpl": raw_template,
@@ -885,21 +885,23 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     with yt_dlp.YoutubeDL(clean_fallback_opts) as clean_dl:
                         clean_dl.download([url])
 
-                # Strictly pick actual video files, excluding .part, .ytdl, or standalone audio
+                # Strictly pick actual video files with at least 50KB of content
                 video_candidates = [
                     c for c in Path(workdir).glob("source.*")
                     if c.suffix.lower() in (".mp4", ".mkv", ".webm", ".mov", ".ts")
                     and not c.name.endswith(".part")
                     and not c.name.endswith(".ytdl")
+                    and c.stat().st_size > 50_000
                 ]
                 if not video_candidates:
                     video_candidates = [
                         c for c in Path(workdir).glob("*")
                         if c.suffix.lower() in (".mp4", ".mkv", ".webm")
                         and not c.name.endswith(".part")
+                        and c.stat().st_size > 50_000
                     ]
                 if not video_candidates:
-                    raise RuntimeError("YouTube did not return a usable video segment.")
+                    raise RuntimeError("YouTube did not return a usable video segment (network timeout or format unavailable).")
 
                 source_video = sorted(video_candidates, key=lambda f: f.stat().st_size, reverse=True)[0]
 
@@ -918,7 +920,10 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                 ]
                 crop_proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
                 if crop_proc.returncode != 0:
+                    err_msg = (crop_proc.stderr or "").strip().splitlines()
+                    last_err = err_msg[-1] if err_msg else "Unknown FFmpeg error"
                     print(f"[Clipper] FFmpeg crop error: {crop_proc.stderr}")
+                    raise RuntimeError(f"FFmpeg crop failed: {last_err}")
 
         if not final_path.exists() or final_path.stat().st_size == 0 or not has_video_stream(final_path):
             final_path.unlink(missing_ok=True)

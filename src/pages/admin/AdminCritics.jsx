@@ -45,6 +45,7 @@ export default function AdminCritics() {
 
   // -- Review Linker state inside drawer -------------------------------------
   const [reviewForm, setReviewForm] = useState(BLANK_REVIEW);
+  const [editingReviewId, setEditingReviewId] = useState(null);
   const [reviewMsg, setReviewMsg] = useState(null);
   const [savingReview, setSavingReview] = useState(false);
   const [existingReviews, setExistingReviews] = useState([]);
@@ -84,6 +85,7 @@ export default function AdminCritics() {
     setCriticFormMsg(null);
     setReviewMsg(null);
     setReviewForm(BLANK_REVIEW);
+    setEditingReviewId(null);
     setSelectedFilm(null);
     setFilmSearch('');
     setFilmResults([]);
@@ -119,6 +121,7 @@ export default function AdminCritics() {
     setCriticFormData(BLANK_CRITIC);
     setCriticFormMsg(null);
     setReviewForm(BLANK_REVIEW);
+    setEditingReviewId(null);
     setSelectedFilm(null);
     setFilmSearch('');
     setExistingReviews([]);
@@ -223,6 +226,7 @@ export default function AdminCritics() {
     setReviewMsg(null);
     try {
       const payload = {
+        ...(editingReviewId ? { id: editingReviewId } : {}),
         critic_id: criticId,
         film_id: reviewForm.film_id,
         quote: reviewForm.quote.trim(),
@@ -232,24 +236,57 @@ export default function AdminCritics() {
         critic_name: criticFormData.name || '',
       };
       await upsertCriticReview(payload);
-      setReviewMsg({ type: 'success', text: 'Film review linked successfully!' });
-      setReviewForm(prev => ({ ...prev, quote: '', rating: '', review_url: '' }));
-      setSelectedFilm(null);
-      setFilmSearch('');
+      setReviewMsg({
+        type: 'success',
+        text: editingReviewId ? 'Critic review quote updated successfully!' : 'Film review linked successfully!'
+      });
+      handleCancelEditReview();
       loadExistingReviews(criticId);
       loadData();
     } catch (err) {
-      setReviewMsg({ type: 'error', text: 'Failed to link review: ' + err.message });
+      setReviewMsg({ type: 'error', text: (editingReviewId ? 'Failed to update review: ' : 'Failed to link review: ') + err.message });
     } finally {
       setSavingReview(false);
       setTimeout(() => setReviewMsg(null), 3500);
     }
   }
 
+  function handleEditReview(review) {
+    setEditingReviewId(review.id);
+    const film = review.film || { id: review.film_id, title: review.film?.title || 'Selected Film', poster_url: review.film?.poster_url, year: review.film?.year };
+    setSelectedFilm(film);
+    setFilmSearch(film.title ? `${film.title}${film.year ? ` (${film.year})` : ''}` : '');
+    setReviewForm({
+      id: review.id,
+      critic_id: review.critic_id || editingCritic?.id,
+      film_id: review.film_id,
+      quote: review.quote || '',
+      rating: review.rating !== null && review.rating !== undefined ? String(review.rating) : '',
+      review_url: review.review_url || '',
+      source_publication: review.publication || criticFormData.publication || '',
+    });
+    setReviewMsg(null);
+  }
+
+  function handleCancelEditReview() {
+    setEditingReviewId(null);
+    setReviewForm(prev => ({
+      ...BLANK_REVIEW,
+      critic_id: editingCritic?.id || '',
+      source_publication: criticFormData.publication || ''
+    }));
+    setSelectedFilm(null);
+    setFilmSearch('');
+    setReviewMsg(null);
+  }
+
   async function handleDeleteReview(review) {
     if (!window.confirm('Delete this review?')) return;
     try {
       await deleteCriticReview(review.id);
+      if (editingReviewId === review.id) {
+        handleCancelEditReview();
+      }
       loadExistingReviews(editingCritic?.id);
       loadData();
     } catch (err) {
@@ -636,8 +673,29 @@ export default function AdminCritics() {
               </p>
             </div>
 
-            {/* Film Search & Add Review Form */}
-            <div className="p-4 bg-surface-2/40 border border-border rounded-xl space-y-4">
+            {/* Film Search & Add/Edit Review Form */}
+            <div className={`p-4 bg-surface-2/40 border rounded-xl space-y-4 transition-all ${
+              editingReviewId ? 'border-brand/60 ring-2 ring-brand/10' : 'border-border'
+            }`}>
+              {editingReviewId && (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-brand/10 border border-brand/30 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="p-1 rounded-lg bg-brand text-on-brand shrink-0">
+                      <Icon icon="solar:pen-bold" className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="font-bold text-text-primary truncate">
+                      Editing Quote for: <span className="text-brand">{selectedFilm?.title || 'Selected Film'}</span>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelEditReview}
+                    className="text-[11px] font-bold text-text-muted hover:text-text-primary underline shrink-0 ml-2"
+                  >
+                    Cancel Edit
+                  </button>
+                </div>
+              )}
               <CriticReviewExtractorBox
                 disabled={!editingCritic}
                 criticId={editingCritic?.id}
@@ -753,14 +811,26 @@ export default function AdminCritics() {
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={handleReviewSubmit}
-                disabled={savingReview || !editingCritic}
-                className="w-full bg-brand text-on-brand font-bold py-2.5 rounded-xl hover:bg-brand-hover transition-colors text-xs disabled:opacity-50"
-              >
-                {savingReview ? 'Linking Review…' : 'Link Review to Critic'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleReviewSubmit}
+                  disabled={savingReview || !editingCritic}
+                  className="flex-1 bg-brand text-on-brand font-bold py-2.5 rounded-xl hover:bg-brand-hover transition-colors text-xs disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Icon icon={editingReviewId ? "solar:check-circle-bold" : "solar:link-bold"} className="w-4 h-4" />
+                  {savingReview ? (editingReviewId ? 'Updating Quote…' : 'Linking Review…') : (editingReviewId ? 'Update Review Quote' : 'Link Review to Critic')}
+                </button>
+                {editingReviewId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEditReview}
+                    className="px-4 py-2.5 rounded-xl border border-border text-xs font-bold text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* List of existing linked reviews */}
@@ -777,25 +847,53 @@ export default function AdminCritics() {
                       {existingReviews.map(rev => {
                         const film = rev.film || {};
                         return (
-                          <div key={rev.id} className="flex items-start gap-3 bg-surface-2 border border-border rounded-xl p-3">
+                          <div
+                            key={rev.id}
+                            className={`flex items-start gap-3 bg-surface-2 border rounded-xl p-3 transition-all ${
+                              editingReviewId === rev.id
+                                ? 'border-brand ring-2 ring-brand/30 bg-brand/[0.04]'
+                                : 'border-border hover:border-border/80'
+                            }`}
+                          >
                             {film.poster_url && (
                               <img src={film.poster_url} alt={film.title} className="w-8 h-12 rounded-md object-cover border border-border flex-shrink-0" />
                             )}
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-bold text-text-primary truncate">{film.title} {film.year && `(${film.year})`}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-xs font-bold text-text-primary truncate">{film.title} {film.year && `(${film.year})`}</p>
+                                {editingReviewId === rev.id && (
+                                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-brand text-on-brand">
+                                    Editing
+                                  </span>
+                                )}
+                              </div>
                               {rev.rating && (
                                 <p className="text-[10px] text-brand font-bold">{'★'.repeat(rev.rating)} {rev.rating}/5</p>
                               )}
                               <p className="text-[10px] text-text-muted italic line-clamp-2 mt-0.5">"{rev.quote}"</p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteReview(rev)}
-                              className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors flex-shrink-0"
-                              title="Delete review"
-                            >
-                              <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleEditReview(rev)}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  editingReviewId === rev.id
+                                    ? 'bg-brand text-on-brand shadow-sm'
+                                    : 'text-text-muted hover:text-brand hover:bg-surface'
+                                }`}
+                                title="Edit review quote"
+                              >
+                                <Icon icon="solar:pen-bold" className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReview(rev)}
+                                className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
+                                title="Delete review"
+                              >
+                                <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         );
                       })}

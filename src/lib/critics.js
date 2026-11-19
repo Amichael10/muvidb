@@ -182,6 +182,17 @@ export async function upsertCriticReview(reviewData) {
     // Fall back to direct Supabase query below
   }
 
+  if (payload.id) {
+    const { data, error } = await supabase
+      .from('critic_reviews')
+      .update(payload)
+      .eq('id', payload.id)
+      .select('*, film:films(id, title, year, poster_url)')
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
   const { data: existing } = await supabase
     .from('critic_reviews')
     .select('id')
