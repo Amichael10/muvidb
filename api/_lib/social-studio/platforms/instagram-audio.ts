@@ -121,6 +121,59 @@ export async function resolveItunesAudioStream(title: string, artist: string | n
   }
 }
 
+export async function searchItunesAudio(query: string, limit = 20): Promise<InstagramAudioTrack[]> {
+  const cleanQuery = query.trim().slice(0, 100);
+  if (!cleanQuery) return [];
+  try {
+    const url = new URL('https://itunes.apple.com/search');
+    url.searchParams.set('term', cleanQuery);
+    url.searchParams.set('entity', 'song');
+    url.searchParams.set('limit', String(Math.min(limit, 30)));
+    const res = await fetch(url, { signal: AbortSignal.timeout(4500) });
+    if (!res.ok) return [];
+    const json: any = await res.json().catch(() => ({}));
+    const hits = Array.isArray(json?.results) ? json.results : [];
+    return hits.map((hit: any) => {
+      const trackId = String(hit.trackId || hit.collectionId || '');
+      const title = String(hit.trackName || '').trim();
+      const artist = String(hit.artistName || '').trim();
+      if (!trackId || !title) return null;
+      const genreName = String(hit.primaryGenreName || '').toLowerCase();
+      let genre = 'afrobeats_hits';
+      let mood = 'afrobeats_hits';
+      if (/highlife|folk|world|traditional|reggae|afro|rock/i.test(genreName) || /osibisa|ambolley|flavour|cavemen|thomas|frimpong|lumba|dede/i.test(`${title} ${artist}`)) {
+        genre = 'cultural_highlife';
+        mood = 'cultural_highlife';
+      } else if (/gospel|christian|spiritual/i.test(genreName) || /worship|praise|jesus|god|grace|blessing/i.test(title)) {
+        genre = 'faith_inspirational';
+        mood = 'faith_inspirational';
+      } else if (/soundtrack|score|sound track|cinematic/i.test(genreName)) {
+        genre = 'nollywood_soundtrack';
+        mood = 'nollywood_soundtrack';
+      } else if (/dance|electronic|hip-hop|rap|drill/i.test(genreName)) {
+        genre = 'upbeat_energy';
+        mood = 'upbeat_energy';
+      }
+      return {
+        audioId: `itunes_${trackId}`,
+        audioType: 'music' as const,
+        title,
+        artist: artist || null,
+        durationMs: typeof hit.trackTimeMillis === 'number' ? hit.trackTimeMillis : 30000,
+        artworkUrl: typeof hit.artworkUrl100 === 'string' ? hit.artworkUrl100.replace('100x100bb', '300x300bb') : null,
+        previewUrl: typeof hit.previewUrl === 'string' ? hit.previewUrl : null,
+        genre,
+        mood,
+        energyLevel: 'medium' as const,
+        matchReason: `Universal Music Catalog · ${hit.primaryGenreName || 'Music'}`,
+        isCurated: false,
+      };
+    }).filter(Boolean) as InstagramAudioTrack[];
+  } catch {
+    return [];
+  }
+}
+
 function shuffleArray<T>(items: T[]): T[] {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -128,6 +181,13 @@ function shuffleArray<T>(items: T[]): T[] {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
 }
 
 export async function searchInstagramAudio(options: SearchOptions = {}): Promise<{
@@ -142,8 +202,12 @@ export async function searchInstagramAudio(options: SearchOptions = {}): Promise
   const selectedGenre = String(options.genre || options.mood || '').trim().toLowerCase();
   const shouldShuffle = Boolean(options.shuffle);
 
-  // 1. Check recent usage so we can badge tracks
-  const recentIds = await getRecentlyUsedInstagramAudioIds(50).catch(() => new Set<string>());
+  // 1. Check recent usage with non-blocking 1.2s timeout
+  const recentIds = await withTimeout(
+    getRecentlyUsedInstagramAudioIds(50).catch(() => new Set<string>()),
+    1200,
+    new Set<string>()
+  );
 
   // 2. Filter from curated catalog
   let curatedMatches: InstagramAudioTrack[] = [];
@@ -177,15 +241,27 @@ export async function searchInstagramAudio(options: SearchOptions = {}): Promise
     curatedMatches = shuffleArray(curatedMatches);
   }
 
-  // 3. Live Instagram Graph API (with in-memory caching for trending)
+  // 3. Live Instagram Graph API & Universal Music Search
   let liveTracks: InstagramAudioTrack[] = [];
+  let itunesTracks: InstagramAudioTrack[] = [];
   const isTrendingRequest = !query && (selectedGenre === 'trending' || selectedGenre === 'all' || !selectedGenre);
+
+  if (query) {
+    // When a search query is typed, query universal music catalog in parallel with IG
+    itunesTracks = await searchItunesAudio(query, 25).catch(() => []);
+  }
 
   if (isTrendingRequest && _trendingCache && Date.now() - _trendingCache.timestamp < TRENDING_CACHE_TTL_MS) {
     liveTracks = _trendingCache.tracks;
   } else {
     try {
-      const { accessToken, connection } = await getPlatformPublishingCredentials('instagram', options.connectionId);
+      const creds = await withTimeout(
+        getPlatformPublishingCredentials('instagram', options.connectionId).catch(() => null),
+        1500,
+        null
+      );
+      const accessToken = creds?.accessToken;
+      const connection = creds?.connection;
       const igUserId = String(connection?.external_account_id || '').trim();
 
       if (igUserId && accessToken) {
@@ -247,6 +323,7 @@ export async function searchInstagramAudio(options: SearchOptions = {}): Promise
     for (const t of curatedMatches) addTrack(t);
   } else if (query) {
     for (const t of curatedMatches) addTrack(t);
+    for (const t of itunesTracks) addTrack(t);
     for (const t of liveTracks) addTrack(t);
   } else {
     for (const t of curatedMatches) addTrack(t);
@@ -266,14 +343,14 @@ export async function searchInstagramAudio(options: SearchOptions = {}): Promise
 const MELODIC_ROMANCE_PATTERN = /\b(fola|bnxn|buju|young jonn|omah lay|tems|ayra starr|ckay|joeboy|fireboy|johnny drille|simi|chike|adekunle gold|wizkid|oxlade|victony|ruger|magixx|crayon|qing madi|bloody civilian|seyi vibez|llona|tiwa savage|nonso amadi|wurld|ladipoe|kizz daniel|ric hassani|fave)\b/i;
 const UPBEAT_PARTY_PATTERN = /\b(davido|asake|zlatan|txc|shoday|scotts maphuma|shallipopi|odumodublvck|burna boy|rema|naira marley|zinoleesky|mohbad|portable|kcce|flavour|phyno|olamide|pocolee|rex|timaya|bella shmurda|sarkodie|stonebwoy|black sherif|uncle waffles|tyla|titom|yuppe)\b/i;
 const FAITH_GOSPEL_PATTERN = /\b(moses bliss|mercy chinwo|nathaniel bassey|dunsin oyekan|sinach|ada ehi|frank edwards|ebuka songs|theophilus sunday|sunmisola|judikay|tim godfrey|mabel omajuwa|tasha cobbs|maverick city|worship|praise|prophetic|hallelujah|gospel|pastor)\b/i;
-const HIGHLIFE_CULTURAL_PATTERN = /\b(cavemen|the cavemen|flavour|phyno|umu obiligbo|osita osadebe|oliver de coque|bright chimezie|highlife|igbo|palmwine|cultural)\b/i;
+const HIGHLIFE_CULTURAL_PATTERN = /\b(cavemen|the cavemen|flavour|phyno|umu obiligbo|osita osadebe|oliver de coque|bright chimezie|highlife|igbo|palmwine|cultural|osibisa|gyedu-blay ambolley|ambolley|pat thomas|frimpong|et mensah|e\.t\. mensah|amakye dede|daddy lumba|kuami eugene|kidi|bisa kdei|ghana|ghanaian|accra|kumasi)\b/i;
 const SOUNDTRACK_NOLLYWOOD_PATTERN = /\b(stanley okorie|billionaire|happy day|soundtrack|score|sound sultan|brymo|cobhams|timi dakolo|nollywood)\b/i;
 const NIGERIAN_AFROBEATS_PATTERN = new RegExp(
   `${MELODIC_ROMANCE_PATTERN.source}|${UPBEAT_PARTY_PATTERN.source}|${HIGHLIFE_CULTURAL_PATTERN.source}|${SOUNDTRACK_NOLLYWOOD_PATTERN.source}|\\b(peruzzi|mr eazi|mayorkun|falz|yemi alade|wande coal|patoranking|tekno|pheelz|spinall|dj tunez|basketmouth|vector|mi abaga|show dem camp|obongjayar|cruel santino)\\b`,
   'i'
 );
 
-const TRADITIONAL_EPIC_KEYWORDS = /\b(ayaba|oosa|oba|igwe|obi|kabiyesi|orisha|babalawo|juju|shrine|herbalist|native doctor|witchcraft|witch|deity|deities|gods|ancestors|ancestral|ritual|traditional|folklore|epic|warrior|kingdom|palace|bata|dundun|oriki|village|enchanted|spirit world|coven|highlife|cultural|chieftaincy|native|dike|igbo|yoruba)\b/i;
+const TRADITIONAL_EPIC_KEYWORDS = /\b(ayaba|oosa|oba|igwe|obi|kabiyesi|orisha|babalawo|juju|shrine|herbalist|native doctor|witchcraft|witch|deity|deities|gods|ancestors|ancestral|ritual|traditional|folklore|epic|warrior|kingdom|palace|bata|dundun|oriki|village|enchanted|spirit world|coven|highlife|cultural|chieftaincy|native|dike|igbo|yoruba|ghana|ghanaian|asante|ashanti|accra|kente|akan)\b/i;
 const CHRISTIAN_GOSPEL_KEYWORDS = /\b(faith|gospel|christian|christ|church|pastor|evangelist|jesus|worship|praise|hallelujah|holy spirit|bible|mount zion|revival|faith-based)\b/i;
 const NOLLYWOOD_SOUNDTRACK_KEYWORDS = /\b(soundtrack|ost|score|classic nollywood|vintage nollywood|stanley okorie|nostalgia)\b/i;
 const THRILLER_ACTION_KEYWORDS = /\b(thriller|crime|mystery|horror|suspense|dark|revenge|detective|investigation|heist|gang|underworld|assassin|kidnap|police|action)\b/i;
