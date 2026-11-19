@@ -815,17 +815,18 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
         if direct_stream_url:
             header_str = "".join(f"{key}: {value}\r\n" for key, value in direct_stream_headers.items() if key.lower() != "content-length") if direct_stream_headers else ""
             command = ["ffmpeg", "-y", "-nostdin"]
+            # Fast seeking BEFORE input allows HTTP Range streaming without downloading prior minutes
+            command.extend(["-ss", str(start)])
             if header_str:
                 command.extend(["-headers", header_str])
-            command.extend(["-timeout", "15000000"])
-            command.extend(["-i", direct_stream_url])
+            command.extend(["-timeout", "15000000", "-i", direct_stream_url])
             if direct_audio_url:
+                command.extend(["-ss", str(start)])
                 if header_str:
                     command.extend(["-headers", header_str])
                 command.extend(["-timeout", "15000000", "-i", direct_audio_url])
                 command.extend(["-map", "0:v:0", "-map", "1:a:0?"])
             command.extend([
-                "-ss", str(start),
                 "-t", str(duration),
                 "-sn",
                 "-vf", video_filter(payload.aspect_ratio, payload.fit_mode),
@@ -899,23 +900,9 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
 
                 source_video = sorted(video_candidates, key=lambda f: f.stat().st_size, reverse=True)[0]
 
-                seek_start = 0
-                try:
-                    probe_res = subprocess.run(
-                        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(source_video)],
-                        capture_output=True, text=True, timeout=10, stdin=subprocess.DEVNULL
-                    )
-                    src_dur = float(probe_res.stdout.strip())
-                    if src_dur > duration + 15:
-                        seek_start = start
-                except Exception:
-                    pass
-
                 CLIP_JOBS[token].update({"message": f"Cropping to {payload.aspect_ratio}…", "progress": 80})
-                cmd = ["ffmpeg", "-y", "-nostdin"]
-                if seek_start > 0:
-                    cmd.extend(["-ss", str(seek_start)])
-                cmd.extend([
+                cmd = [
+                    "ffmpeg", "-y", "-nostdin",
                     "-i", str(source_video),
                     "-t", str(duration),
                     "-sn",
@@ -925,8 +912,10 @@ def process_clip(payload: ClipRequest, token: str, final_name: str, final_path: 
                     "-pix_fmt", "yuv420p", "-r", "30",
                     "-c:a", "aac", "-b:a", "128k",
                     "-movflags", "+faststart", str(final_path),
-                ])
-                subprocess.run(cmd, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+                ]
+                crop_proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+                if crop_proc.returncode != 0:
+                    print(f"[Clipper] FFmpeg crop error: {crop_proc.stderr}")
 
         if not final_path.exists() or final_path.stat().st_size == 0 or not has_video_stream(final_path):
             final_path.unlink(missing_ok=True)

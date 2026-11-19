@@ -432,7 +432,7 @@ function buildReelHtml(params: {
 }
 
 export async function renderAndStoreReelAsset(options: ReelRenderOptions): Promise<RenderedReelResult> {
-  const durationSec = options.durationSec || 6;
+  const durationSec = options.durationSec || 15;
   const fps = options.fps || 24;
   const totalFrames = durationSec * fps;
   const snap = options.snapshot;

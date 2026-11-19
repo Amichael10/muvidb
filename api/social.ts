@@ -908,6 +908,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               seriesLabel: parsed.contentType === 'upcoming_movie' ? 'New & Upcoming' : 'Now Streaming',
               audioStreamUrl: body.audioStreamUrl || null,
               instagramAudio: body.instagramAudio || null,
+              durationSec: typeof body.durationSec === 'number' && body.durationSec >= 5 ? body.durationSec : 15,
             }, actor);
           } catch (reelErr: any) {
             console.warn('[social] Reel auto-generation fallback to standard assets:', reelErr?.message);

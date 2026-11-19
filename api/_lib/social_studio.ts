@@ -4114,6 +4114,7 @@ export async function generateAndAttachReelForContentItem(
     seriesLabel?: 'Now Streaming' | 'New & Upcoming';
     audioStreamUrl?: string | null;
     instagramAudio?: Record<string, unknown> | null;
+    durationSec?: number;
   },
   actor: SocialActor
 ) {
@@ -4152,6 +4153,7 @@ export async function generateAndAttachReelForContentItem(
     snapshot,
     seriesLabel,
     audioStreamUrl: input.audioStreamUrl || null,
+    durationSec: input.durationSec || 15,
   });
 
   const { data: variants, error: varErr } = await supabase

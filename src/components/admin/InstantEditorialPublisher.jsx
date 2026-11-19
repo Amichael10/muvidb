@@ -517,6 +517,7 @@ export default function InstantEditorialPublisher({ onPublished }) {
         criticReviewId: activeTheme.id === 'critics_say' ? selectedCriticReview?.id : undefined,
         platforms,
         asReel: activeTheme.isReel,
+        durationSec: activeTheme.isReel ? 15 : undefined,
         caption: platformCaptions[activeCaptionTab] || caption,
         captions: platformCaptions,
         audioStreamUrl: activeTheme.isReel ? selectedAudio?.previewUrl || null : null,
