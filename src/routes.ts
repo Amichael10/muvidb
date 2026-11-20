@@ -66,9 +66,8 @@ export default [
   route('title-checker', 'pages/TitleChecker.jsx', { id: 'title-checker-alias' }),
   route('developers', 'pages/DeveloperApi.jsx'),
   route('api-docs', 'pages/DeveloperApi.jsx', { id: 'api-docs-alias' }),
-  // Hidden support routes:
-  // route('support', 'pages/Support.jsx'),
-  // route('support-us', 'pages/Support.jsx', { id: 'support-us-alias' }),
+  route('support', 'pages/Support.jsx'),
+  route('support-us', 'pages/Support.jsx', { id: 'support-us-alias' }),
   route('brand', 'pages/Brand.jsx'),
   route('brand-kit', 'pages/Brand.jsx', { id: 'brand-kit-alias' }),
   route('oauth/authorize', 'pages/OAuthAuthorize.jsx'),

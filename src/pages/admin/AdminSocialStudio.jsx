@@ -2532,7 +2532,7 @@ export default function AdminSocialStudio() {
                           {cell.date.getDate()}
                         </span>
 
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                           {daySlots.length > 0 && (
                             <button
                               type="button"
@@ -2613,35 +2613,37 @@ export default function AdminSocialStudio() {
                                   </div>
                                 </div>
 
-                                <div className="mt-1 flex items-center gap-1.5 pr-5">
-                                  {candidate?.imageUrl ? (
-                                    <img
-                                      src={candidate.imageUrl}
-                                      alt=""
-                                      className="h-5 w-5 rounded-md object-cover border border-white/10 shrink-0"
-                                    />
-                                  ) : (
-                                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-surface-3 text-text-muted">
-                                      <Icon icon={icon} width="10" />
-                                    </div>
-                                  )}
-                                  <span className="truncate text-[10px] font-black text-white leading-tight">
-                                    {candidate?.name || series.name || 'Post'}
-                                  </span>
-                                </div>
-                              </button>
+                                <div className="mt-1 flex items-center justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    {candidate?.imageUrl ? (
+                                      <img
+                                        src={candidate.imageUrl}
+                                        alt=""
+                                        className="h-5 w-5 rounded-md object-cover border border-white/10 shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-surface-3 text-text-muted">
+                                        <Icon icon={icon} width="10" />
+                                      </div>
+                                    )}
+                                    <span className="truncate text-[10px] font-black text-white leading-tight">
+                                      {candidate?.name || series.name || 'Post'}
+                                    </span>
+                                  </div>
 
-                              {/* Quick Delete button to remove slot/post from calendar */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteCalendarPost(slot);
-                                }}
-                                className="opacity-0 group-hover/slot:opacity-100 focus:opacity-100 absolute top-1 right-1 flex h-4.5 w-4.5 items-center justify-center rounded bg-red-600/90 hover:bg-red-500 text-white transition-opacity shadow-sm z-10"
-                                title="Remove from calendar"
-                              >
-                                <Icon icon="solar:trash-bin-trash-bold" width="11" />
+                                  {/* Quick Delete button to remove slot/post from calendar */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteCalendarPost(slot);
+                                    }}
+                                    className="opacity-0 group-hover/slot:opacity-100 focus:opacity-100 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white transition-all border border-red-500/30"
+                                    title="Remove from calendar"
+                                  >
+                                    <Icon icon="solar:trash-bin-trash-bold" width="11" />
+                                  </button>
+                                </div>
                               </button>
                             </div>
                           );

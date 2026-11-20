@@ -229,6 +229,7 @@ cookies.txt
 cookies.txt.txt
 .npm-cache/
 __pycache__/
+scripts/data/
 *.pyc
 
 # Diagnostic / scratch / scrape dump scripts
