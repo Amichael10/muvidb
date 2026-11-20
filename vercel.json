@@ -252,12 +252,20 @@
       "destination": "/api/data?_r=film-media"
     },
     {
+      "source": "/api/bachs",
+      "destination": "/api/data?_r=bachs"
+    },
+    {
       "source": "/api/bachs/:path*",
       "destination": "/api/data?_r=bachs&path=:path*"
     },
     {
       "source": "/api/webhooks/bachs",
       "destination": "/api/data?_r=webhooks/bachs"
+    },
+    {
+      "source": "/api/opay",
+      "destination": "/api/data?_r=opay"
     },
     {
       "source": "/api/opay/:path*",
