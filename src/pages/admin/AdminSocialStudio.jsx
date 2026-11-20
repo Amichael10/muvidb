@@ -1720,31 +1720,69 @@ export default function AdminSocialStudio() {
   };
 
   const handleDeleteCalendarPost = async slot => {
-    const candidateName = slot?.candidate?.name || slot?.social_content_series?.name || 'this scheduled post';
+    const candidateName = slot?.candidate?.name || slot?.social_content_series?.name || 'this slot';
     const confirmed = window.confirm(
-      `Delete scheduled post for “${candidateName}”? This cancels the scheduled publication, removes queued jobs, and returns the calendar slot to available.`,
+      `Remove “${candidateName}” from calendar? This will delete the calendar slot and any attached draft or scheduled jobs.`,
     );
     if (!confirmed) return;
 
-    const toastId = toast.loading('Deleting scheduled post…');
+    const toastId = toast.loading('Removing from calendar…');
+    // Optimistically update calendar slots in UI immediately
+    setCalendarSlots(prev => prev.filter(s => s.id !== slot?.id));
+    if (selectedSlotForReview?.id === slot?.id) {
+      setSelectedSlotForReview(null);
+    }
+
     try {
-      const res = await fetchWithLocalClipperAuth('/api/social?task=delete_scheduled_post', {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=delete_calendar_slot', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slotId: slot?.id,
           contentItemId: slot?.draft_id || slot?.content_item_id || null,
+          deleteSlot: true,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success('Scheduled post deleted successfully', { id: toastId });
-      if (selectedSlotForReview?.id === slot?.id) {
-        setSelectedSlotForReview(null);
-      }
+      toast.success('Removed from calendar successfully', { id: toastId });
       await refreshAll();
     } catch (err) {
-      toast.error(err.message || 'Failed to delete scheduled post', { id: toastId });
+      toast.error(err.message || 'Failed to remove from calendar', { id: toastId });
+      fetchCalendar();
+    }
+  };
+
+  const handleClearDaySlots = async (dateStr, slots) => {
+    if (!slots || slots.length === 0) return;
+    const confirmed = window.confirm(
+      `Remove all ${slots.length} item(s) on ${dateStr} from the calendar?`,
+    );
+    if (!confirmed) return;
+
+    const toastId = toast.loading(`Clearing ${slots.length} slot(s)…`);
+    const slotIds = slots.map(s => s.id).filter(Boolean);
+    setCalendarSlots(prev => prev.filter(s => !slotIds.includes(s.id)));
+    if (selectedSlotForReview && slotIds.includes(selectedSlotForReview.id)) {
+      setSelectedSlotForReview(null);
+    }
+
+    try {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=delete_calendar_slots', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slotIds,
+          deleteSlot: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(`Removed ${slots.length} slot(s) for ${dateStr}`, { id: toastId });
+      await refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Failed to clear day slots', { id: toastId });
+      fetchCalendar();
     }
   };
 
@@ -2480,7 +2518,7 @@ export default function AdminSocialStudio() {
                             : 'bg-surface hover:bg-surface-2/40'
                       }`}
                     >
-                      {/* Cell Header: Date Number + Quick Add */}
+                      {/* Cell Header: Date Number + Clear Day & Quick Add */}
                       <div className="flex items-center justify-between">
                         <span
                           className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-xs font-black ${
@@ -2494,17 +2532,29 @@ export default function AdminSocialStudio() {
                           {cell.date.getDate()}
                         </span>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSlotContext({ scheduled_date: cell.dateStr, scheduled_time: '11:00' });
-                            setActiveTab('composer');
-                          }}
-                          className="opacity-0 group-hover:opacity-100 flex h-5 w-5 items-center justify-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-text-muted hover:border-brand hover:text-brand transition-all"
-                          title={`Schedule post for ${cell.dateStr}`}
-                        >
-                          +
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {daySlots.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleClearDaySlots(cell.dateStr, daySlots)}
+                              className="flex h-5 w-5 items-center justify-center rounded-md border border-red-500/30 bg-red-500/10 text-red-400 hover:border-red-500/60 hover:bg-red-500/20 hover:text-red-300 transition-all"
+                              title={`Remove all ${daySlots.length} slot(s) for ${cell.dateStr} from calendar`}
+                            >
+                              <Icon icon="solar:trash-bin-trash-bold" width="11" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSlotContext({ scheduled_date: cell.dateStr, scheduled_time: '11:00' });
+                              setActiveTab('composer');
+                            }}
+                            className="flex h-5 w-5 items-center justify-center rounded-md border border-white/10 bg-surface-2 text-[10px] text-text-muted hover:border-brand hover:text-brand transition-all"
+                            title={`Schedule post for ${cell.dateStr}`}
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
 
                       {/* Day Slots List */}
@@ -2516,7 +2566,6 @@ export default function AdminSocialStudio() {
                           const isScheduled = slot.status === 'scheduled';
                           const isPublished = slot.status === 'published';
                           const isApproved = slot.status === 'approved' || slot.status === 'draft_ready';
-                          const hasPost = isScheduled || isApproved || Boolean(slot.draft_id || slot.content_item_id);
 
                           return (
                             <div key={slot.id} className="relative group/slot">
@@ -2564,7 +2613,7 @@ export default function AdminSocialStudio() {
                                   </div>
                                 </div>
 
-                                <div className="mt-1 flex items-center gap-1.5 pr-3">
+                                <div className="mt-1 flex items-center gap-1.5 pr-5">
                                   {candidate?.imageUrl ? (
                                     <img
                                       src={candidate.imageUrl}
@@ -2582,20 +2631,18 @@ export default function AdminSocialStudio() {
                                 </div>
                               </button>
 
-                              {/* Quick Delete button for scheduled/draft post */}
-                              {hasPost && !isPublished && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteCalendarPost(slot);
-                                  }}
-                                  className="opacity-0 group-hover/slot:opacity-100 absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded bg-red-600/90 hover:bg-red-500 text-white transition-opacity shadow-sm z-10"
-                                  title="Delete scheduled post and revert slot"
-                                >
-                                  <Icon icon="solar:trash-bin-trash-bold" width="10" />
-                                </button>
-                              )}
+                              {/* Quick Delete button to remove slot/post from calendar */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteCalendarPost(slot);
+                                }}
+                                className="opacity-0 group-hover/slot:opacity-100 focus:opacity-100 absolute top-1 right-1 flex h-4.5 w-4.5 items-center justify-center rounded bg-red-600/90 hover:bg-red-500 text-white transition-opacity shadow-sm z-10"
+                                title="Remove from calendar"
+                              >
+                                <Icon icon="solar:trash-bin-trash-bold" width="11" />
+                              </button>
                             </div>
                           );
                         })}
@@ -2724,20 +2771,18 @@ export default function AdminSocialStudio() {
                         {series.category || 'Editorial'}
                       </span>
                       <div className="flex items-center gap-2">
-                        {hasPost && !isPublished && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCalendarPost(slot);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-xl border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all shadow-sm"
-                            title="Delete scheduled post and revert slot"
-                          >
-                            <Icon icon="solar:trash-bin-trash-bold" width="13" />
-                            <span>Delete</span>
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCalendarPost(slot);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-xl border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all shadow-sm"
+                          title="Remove from calendar"
+                        >
+                          <Icon icon="solar:trash-bin-trash-bold" width="13" />
+                          <span>Delete</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => setSelectedSlotForReview(slot)}

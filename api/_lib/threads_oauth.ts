@@ -386,6 +386,20 @@ export async function getPlatformPublishingCredentials(platform: string, connect
       connection = fallback.data;
       error = fallback.error;
     }
+  } else if (platform === 'linkedin' && process.env.LINKEDIN_ACCESS_TOKEN?.trim()) {
+    const orgId = process.env.LINKEDIN_ORGANIZATION_ID?.trim() || '137084214';
+    return {
+      connection: {
+        id: 'env-linkedin-connection',
+        platform: 'linkedin',
+        display_name: 'MuviDB',
+        username: 'muvidb',
+        external_account_id: `urn:li:organization:${orgId}`,
+        status: 'connected',
+        granted_scopes: ['w_organization_social', 'r_organization_social'],
+      },
+      accessToken: process.env.LINKEDIN_ACCESS_TOKEN.trim(),
+    };
   } else {
     const res = await supabase
       .from('social_connections')
@@ -482,10 +496,23 @@ export async function getAllPlatformConnections() {
 
   if (error) throw error;
 
-  const platforms = ['instagram', 'facebook', 'threads', 'tiktok', 'x', 'youtube'] as const;
+  const platforms = ['instagram', 'facebook', 'threads', 'tiktok', 'x', 'youtube', 'linkedin'] as const;
   const result: Record<string, any> = {};
 
   for (const p of platforms) {
+    if (p === 'linkedin' && process.env.LINKEDIN_ACCESS_TOKEN?.trim()) {
+      const orgId = process.env.LINKEDIN_ORGANIZATION_ID?.trim() || '137084214';
+      result[p] = {
+        id: 'env-linkedin-connection',
+        platform: 'linkedin',
+        displayName: 'MuviDB (Company Page)',
+        username: 'muvidb',
+        externalAccountId: `urn:li:organization:${orgId}`,
+        status: 'connected',
+        grantedScopes: ['w_organization_social', 'r_organization_social'],
+      };
+      continue;
+    }
     const conn = data?.find(row => row.platform === p);
     result[p] = conn ? sanitizeThreadsConnection(conn) : null;
   }
@@ -500,7 +527,23 @@ export async function listPlatformConnections() {
     .eq('status', 'connected')
     .order('updated_at', { ascending: false });
   if (error) throw error;
-  return (data || []).map(sanitizeThreadsConnection);
+  const list = (data || []).map(sanitizeThreadsConnection);
+  if (process.env.LINKEDIN_ACCESS_TOKEN?.trim() && !list.some(c => c.platform === 'linkedin')) {
+    const orgId = process.env.LINKEDIN_ORGANIZATION_ID?.trim() || '137084214';
+    list.push({
+      id: 'env-linkedin-connection',
+      platform: 'linkedin',
+      displayName: 'MuviDB (Company Page)',
+      username: 'muvidb',
+      externalAccountId: `urn:li:organization:${orgId}`,
+      status: 'connected',
+      grantedScopes: ['w_organization_social', 'r_organization_social'],
+      profileImageUrl: null,
+      tokenExpiresAt: null,
+      lastVerifiedAt: new Date().toISOString(),
+    });
+  }
+  return list;
 }
 
 export async function disconnectPlatform(platform: string) {

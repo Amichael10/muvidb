@@ -471,26 +471,27 @@ export default function AutoPilotReviewModal({
   );
 
   const handleDeleteScheduledPost = async () => {
-    const targetName = candidate?.name || slot?.candidate?.name || series?.name || 'this scheduled post';
+    const targetName = candidate?.name || slot?.candidate?.name || series?.name || 'this slot';
     const confirmed = window.confirm(
-      `Delete scheduled post for “${targetName}”? This cancels the scheduled publication, removes queued jobs, and returns this slot to available.`,
+      `Remove “${targetName}” from calendar? This will delete the calendar slot and any attached draft or scheduled jobs.`,
     );
     if (!confirmed) return;
 
     setDeleting(true);
-    const toastId = toast.loading('Deleting scheduled post…');
+    const toastId = toast.loading('Removing from calendar…');
     try {
-      const res = await fetch('/api/social?task=delete_scheduled_post', {
+      const res = await fetch('/api/social?task=delete_calendar_slot', {
         method: 'POST',
         headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slotId: slot?.id,
           contentItemId: slot?.draft_id || slot?.content_item_id || null,
+          deleteSlot: true,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success('Scheduled post deleted successfully', { id: toastId });
+      toast.success('Removed from calendar successfully', { id: toastId });
       onClose();
       if (typeof onDeleted === 'function') {
         onDeleted(data);
@@ -498,7 +499,7 @@ export default function AutoPilotReviewModal({
         onApproved(data);
       }
     } catch (err) {
-      toast.error(err.message || 'Failed to delete scheduled post', { id: toastId });
+      toast.error(err.message || 'Failed to remove from calendar', { id: toastId });
     } finally {
       setDeleting(false);
     }
@@ -1168,30 +1169,28 @@ export default function AutoPilotReviewModal({
               </button>
 
               <div className="flex items-center gap-2">
-                {hasScheduledOrDraftPost && (
-                  <button
-                    type="button"
-                    onClick={handleDeleteScheduledPost}
-                    disabled={deleting || approving}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:border-red-500/50 disabled:opacity-50 transition-all shadow-sm"
-                    title="Delete scheduled post and revert slot"
-                  >
-                    <Icon
-                      icon={deleting ? 'solar:spinner-linear' : 'solar:trash-bin-trash-bold'}
-                      className={deleting ? 'animate-spin' : ''}
-                      width="15"
-                    />
-                    <span>
-                      {deleting
-                        ? 'Deleting…'
-                        : slot.status === 'scheduled'
-                          ? 'Delete Scheduled Post'
-                          : slot.draft_id || slot.status === 'approved'
-                            ? 'Delete Post Draft'
-                            : 'Delete Post'}
-                    </span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleDeleteScheduledPost}
+                  disabled={deleting || approving}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:border-red-500/50 disabled:opacity-50 transition-all shadow-sm"
+                  title="Remove this slot/post from the calendar"
+                >
+                  <Icon
+                    icon={deleting ? 'solar:spinner-linear' : 'solar:trash-bin-trash-bold'}
+                    className={deleting ? 'animate-spin' : ''}
+                    width="15"
+                  />
+                  <span>
+                    {deleting
+                      ? 'Removing…'
+                      : slot?.status === 'scheduled'
+                        ? 'Delete Scheduled Post'
+                        : slot?.draft_id || slot?.status === 'approved'
+                          ? 'Delete Post Draft'
+                          : 'Remove from Calendar'}
+                  </span>
+                </button>
                 <button
                   type="button"
                   onClick={onClose}

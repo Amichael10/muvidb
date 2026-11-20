@@ -1046,9 +1046,11 @@ async function processJob(job: any, lockedBy: string, now: Date) {
       });
     } else if (publishMode === 'live' && variant.platform === 'linkedin') {
       const { connection, accessToken } = await getPlatformPublishingCredentials('linkedin', variant.connection_id);
+      const orgId = process.env.LINKEDIN_ORGANIZATION_ID?.trim();
+      const authorUrn = orgId ? `urn:li:organization:${orgId}` : connection.external_account_id;
       adapter = new LinkedInPlatformAdapter({
         accessToken,
-        authorUrn: connection.external_account_id,
+        authorUrn,
       });
     } else {
       throw new SocialPlatformError({
@@ -2750,8 +2752,14 @@ export async function deleteEditorialCalendarPost(
 
   // 2. Revert or delete the calendar slot
   if (targetSlot) {
-    const shouldDeleteRow = Boolean(input.deleteSlot || (targetSlot.source && targetSlot.source !== 'planned'));
+    const shouldDeleteRow = input.deleteSlot !== false;
     if (shouldDeleteRow) {
+      await supabase
+        .from('social_drafts')
+        .delete()
+        .eq('calendar_id', targetSlot.id)
+        .catch(() => {});
+
       await supabase
         .from('social_calendar')
         .delete()
@@ -2768,6 +2776,11 @@ export async function deleteEditorialCalendarPost(
         })
         .eq('id', targetSlot.id);
     }
+  } else if (input.slotId) {
+    await supabase
+      .from('social_calendar')
+      .delete()
+      .eq('id', input.slotId);
   }
 
   // 3. Clear any other calendar slots pointing to this content item

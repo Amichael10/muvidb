@@ -773,13 +773,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(await deleteSocialContentItem({ contentItemId }, actor));
       }
 
-      if (task === 'delete_scheduled_post' || task === 'delete_calendar_post' || task === 'delete_calendar_slot') {
+      if (task === 'delete_scheduled_post' || task === 'delete_calendar_post' || task === 'delete_calendar_slot' || task === 'delete_calendar_slots') {
         const actor = await requireSocialStudioAdmin(req);
-        const { slotId, contentItemId, deleteSlot } = req.body || {};
+        const { slotId, slotIds, contentItemId, deleteSlot } = req.body || {};
+        if (Array.isArray(slotIds) && slotIds.length > 0) {
+          const results = await Promise.allSettled(
+            slotIds.map((id: string) => deleteEditorialCalendarPost({ slotId: id, deleteSlot: deleteSlot !== false }, actor))
+          );
+          return res.status(200).json({ success: true, count: results.length });
+        }
         if (!slotId && !contentItemId) {
           return res.status(400).json({ error: 'slotId or contentItemId is required' });
         }
-        return res.status(200).json(await deleteEditorialCalendarPost({ slotId, contentItemId, deleteSlot }, actor));
+        return res.status(200).json(await deleteEditorialCalendarPost({ slotId, contentItemId, deleteSlot: deleteSlot !== false }, actor));
       }
 
       if (task === 'threads_oauth_start') {
