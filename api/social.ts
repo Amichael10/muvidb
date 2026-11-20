@@ -259,6 +259,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       prepareSocialContentItemForEdit,
       updateSocialContentItemDraft,
       deleteSocialContentItem,
+      deleteEditorialCalendarPost,
       createEditorVideoDraft,
       createUniversalSocialPost,
       publishContentItemNow,
@@ -770,6 +771,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'contentItemId is required' });
         }
         return res.status(200).json(await deleteSocialContentItem({ contentItemId }, actor));
+      }
+
+      if (task === 'delete_scheduled_post' || task === 'delete_calendar_post' || task === 'delete_calendar_slot') {
+        const actor = await requireSocialStudioAdmin(req);
+        const { slotId, contentItemId, deleteSlot } = req.body || {};
+        if (!slotId && !contentItemId) {
+          return res.status(400).json({ error: 'slotId or contentItemId is required' });
+        }
+        return res.status(200).json(await deleteEditorialCalendarPost({ slotId, contentItemId, deleteSlot }, actor));
       }
 
       if (task === 'threads_oauth_start') {

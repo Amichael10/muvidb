@@ -2655,6 +2655,18 @@ export async function deleteSocialContentItem(
     console.warn(`Social Studio: queue item ${item.id} cleanup was incomplete`, error);
   });
 
+  // Detach any calendar slot referencing this content item and reset it to planned
+  await supabase
+    .from('social_calendar')
+    .update({
+      draft_id: null,
+      status: 'planned',
+      notes: null,
+      subject_entity_id: null,
+      subject_entity_type: null,
+    })
+    .eq('draft_id', input.contentItemId);
+
   const { error: deleteError } = await supabase
     .from('social_content_items')
     .delete()
@@ -2662,6 +2674,122 @@ export async function deleteSocialContentItem(
   if (deleteError) throw deleteError;
 
   return { success: true, id: item.id, title: item.title, deletedBy: actor.id };
+}
+
+/**
+ * Permanently cancels and deletes a scheduled post and/or reverts its calendar slot back to available.
+ */
+export async function deleteEditorialCalendarPost(
+  input: {
+    slotId?: string;
+    contentItemId?: string;
+    deleteSlot?: boolean;
+  },
+  actor: SocialActor,
+) {
+  if (!isSocialStudioEnabled()) throw httpError(409, 'Social Studio is disabled');
+
+  let targetSlot: any = null;
+  let targetContentItemId = input.contentItemId || null;
+
+  if (input.slotId) {
+    const { data: slot, error: slotErr } = await supabase
+      .from('social_calendar')
+      .select('id, draft_id, status, source, subject_entity_id')
+      .eq('id', input.slotId)
+      .maybeSingle();
+    if (slotErr) throw slotErr;
+    if (slot) {
+      targetSlot = slot;
+      if (!targetContentItemId && slot.draft_id) {
+        targetContentItemId = slot.draft_id;
+      }
+    }
+  }
+
+  // If content item ID is not known, but slot has subject_entity_id, look up active draft
+  if (!targetContentItemId && targetSlot?.subject_entity_id) {
+    const { data: matchedDraft } = await supabase
+      .from('social_content_items')
+      .select('id')
+      .eq('source_entity_id', targetSlot.subject_entity_id)
+      .in('status', ['draft', 'approved', 'scheduled'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (matchedDraft) {
+      targetContentItemId = matchedDraft.id;
+    }
+  }
+
+  // 1. If there is a target content item, cancel jobs, clean up assets and delete it
+  if (targetContentItemId) {
+    try {
+      const { item, variantIds } = await assertContentItemCanBeChanged(targetContentItemId);
+
+      if (variantIds.length) {
+        await supabase
+          .from('social_publish_jobs')
+          .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+          .in('platform_variant_id', variantIds)
+          .in('status', ['queued', 'retrying', 'processing']);
+      }
+
+      await cleanupContentItemAssets(targetContentItemId).catch(err => {
+        console.warn(`[deleteEditorialCalendarPost] Asset cleanup warning for ${targetContentItemId}:`, err?.message);
+      });
+
+      await supabase
+        .from('social_content_items')
+        .delete()
+        .eq('id', targetContentItemId);
+    } catch (itemErr: any) {
+      console.warn(`[deleteEditorialCalendarPost] Could not delete content item ${targetContentItemId}:`, itemErr?.message || itemErr);
+    }
+  }
+
+  // 2. Revert or delete the calendar slot
+  if (targetSlot) {
+    const shouldDeleteRow = Boolean(input.deleteSlot || (targetSlot.source && targetSlot.source !== 'planned'));
+    if (shouldDeleteRow) {
+      await supabase
+        .from('social_calendar')
+        .delete()
+        .eq('id', targetSlot.id);
+    } else {
+      await supabase
+        .from('social_calendar')
+        .update({
+          draft_id: null,
+          status: 'planned',
+          notes: null,
+          subject_entity_id: null,
+          subject_entity_type: null,
+        })
+        .eq('id', targetSlot.id);
+    }
+  }
+
+  // 3. Clear any other calendar slots pointing to this content item
+  if (targetContentItemId) {
+    await supabase
+      .from('social_calendar')
+      .update({
+        draft_id: null,
+        status: 'planned',
+        notes: null,
+        subject_entity_id: null,
+        subject_entity_type: null,
+      })
+      .eq('draft_id', targetContentItemId);
+  }
+
+  return {
+    success: true,
+    slotId: input.slotId || targetSlot?.id || null,
+    contentItemId: targetContentItemId,
+    deletedBy: actor.id,
+  };
 }
 
 /**
@@ -3476,7 +3604,7 @@ export async function getEditorialCalendar(days = 7, shuffleOffset = 0, startDat
   const endDateString = endDate.toISOString().split('T')[0];
   const { data, error } = await supabase
     .from('social_calendar')
-    .select('id,scheduled_date,scheduled_time,status,priority,source,notes,series_id,subject_entity_type,subject_entity_id,selection_locked,created_at,social_content_series(id,name,slug,category,figma_template_key,description)')
+    .select('id,scheduled_date,scheduled_time,status,priority,source,notes,series_id,subject_entity_type,subject_entity_id,selection_locked,created_at,draft_id,social_content_series(id,name,slug,category,figma_template_key,description)')
     .gte('scheduled_date', today)
     .lte('scheduled_date', endDateString)
     .order('scheduled_date', { ascending: true })
@@ -3485,6 +3613,40 @@ export async function getEditorialCalendar(days = 7, shuffleOffset = 0, startDat
 
   if (error) throw error;
   const rawSlots = data || [];
+
+  // Hydrate linked content items for slots that have a draft_id
+  const draftIds = [...new Set(rawSlots.map((s: any) => s.draft_id).filter(Boolean))];
+  const draftItemMap = new Map<string, any>();
+  if (draftIds.length > 0) {
+    const { data: draftItems } = await supabase
+      .from('social_content_items')
+      .select('id, title, status, scheduled_for, published_at')
+      .in('id', draftIds);
+    for (const item of draftItems || []) {
+      draftItemMap.set(item.id, item);
+    }
+  }
+
+  for (const slot of rawSlots as any[]) {
+    if (slot.draft_id) {
+      const contentItem = draftItemMap.get(slot.draft_id);
+      if (contentItem) {
+        slot.content_item = contentItem;
+        slot.content_item_id = contentItem.id;
+        if (contentItem.status === 'published') {
+          slot.status = 'published';
+        } else if (contentItem.status === 'scheduled') {
+          slot.status = 'scheduled';
+        } else if (['draft', 'approved'].includes(contentItem.status)) {
+          slot.status = 'approved';
+        }
+      } else if (slot.status !== 'published') {
+        // Content item was removed from queue, reset slot to planned
+        slot.status = 'planned';
+        slot.draft_id = null;
+      }
+    }
+  }
 
   // Candidate selection is a deterministic editorial decision, not a rotation
   // through whatever rows were most recently updated in the database.

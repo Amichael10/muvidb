@@ -71,6 +71,7 @@ export default function AutoPilotReviewModal({
   slot,
   onClose,
   onApproved,
+  onDeleted,
   onOpenManualComposer,
 }) {
   const [candidate, setCandidate] = useState(null);
@@ -88,6 +89,7 @@ export default function AutoPilotReviewModal({
   const [customImageUrl, setCustomImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [videoStudioOpen, setVideoStudioOpen] = useState(false);
   const [viewLayout, setViewLayout] = useState('split');
   const [platformRatios, setPlatformRatios] = useState({ instagram: '4:5', tiktok: '9:16', facebook: '1:1', threads: '1:1' });
@@ -460,6 +462,48 @@ export default function AutoPilotReviewModal({
     }
   };
 
+  const hasScheduledOrDraftPost = Boolean(
+    slot?.draft_id ||
+    slot?.content_item_id ||
+    slot?.status === 'scheduled' ||
+    slot?.status === 'approved' ||
+    slot?.status === 'draft_ready'
+  );
+
+  const handleDeleteScheduledPost = async () => {
+    const targetName = candidate?.name || slot?.candidate?.name || series?.name || 'this scheduled post';
+    const confirmed = window.confirm(
+      `Delete scheduled post for “${targetName}”? This cancels the scheduled publication, removes queued jobs, and returns this slot to available.`,
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    const toastId = toast.loading('Deleting scheduled post…');
+    try {
+      const res = await fetch('/api/social?task=delete_scheduled_post', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slotId: slot?.id,
+          contentItemId: slot?.draft_id || slot?.content_item_id || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success('Scheduled post deleted successfully', { id: toastId });
+      onClose();
+      if (typeof onDeleted === 'function') {
+        onDeleted(data);
+      } else if (typeof onApproved === 'function') {
+        onApproved(data);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete scheduled post', { id: toastId });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleSelectSearchedCandidate = (selectedItem) => {
     const manualCandidate = {
       ...selectedItem,
@@ -517,6 +561,21 @@ export default function AutoPilotReviewModal({
               <span className="font-mono text-xs text-text-muted">
                 {formattedDate}
               </span>
+              {slot.status && (
+                <span
+                  className={`rounded px-1.5 py-0.5 text-[10px] font-black uppercase ${
+                    slot.status === 'published'
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : slot.status === 'scheduled'
+                        ? 'bg-amber-500/20 text-amber-400'
+                        : slot.status === 'approved' || slot.status === 'draft_ready'
+                          ? 'bg-sky-500/20 text-sky-400'
+                          : 'bg-surface-3 text-text-muted'
+                  }`}
+                >
+                  {slot.status}
+                </span>
+              )}
             </div>
             <h3 className="mt-0.5 text-lg font-black tracking-tight text-text-primary">
               Auto-Pilot Review & Publication
@@ -1109,6 +1168,30 @@ export default function AutoPilotReviewModal({
               </button>
 
               <div className="flex items-center gap-2">
+                {hasScheduledOrDraftPost && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteScheduledPost}
+                    disabled={deleting || approving}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:border-red-500/50 disabled:opacity-50 transition-all shadow-sm"
+                    title="Delete scheduled post and revert slot"
+                  >
+                    <Icon
+                      icon={deleting ? 'solar:spinner-linear' : 'solar:trash-bin-trash-bold'}
+                      className={deleting ? 'animate-spin' : ''}
+                      width="15"
+                    />
+                    <span>
+                      {deleting
+                        ? 'Deleting…'
+                        : slot.status === 'scheduled'
+                          ? 'Delete Scheduled Post'
+                          : slot.draft_id || slot.status === 'approved'
+                            ? 'Delete Post Draft'
+                            : 'Delete Post'}
+                    </span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={onClose}
@@ -1119,7 +1202,7 @@ export default function AutoPilotReviewModal({
                 <button
                   type="button"
                   onClick={handleApproveAndSchedule}
-                  disabled={approving || aiGenerating || isArchivedPlay}
+                  disabled={approving || aiGenerating || isArchivedPlay || deleting}
                   className="inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2 text-xs font-black text-white transition-all hover:bg-brand-hover hover:shadow-lg hover:shadow-brand/20 disabled:opacity-50"
                 >
                   <Icon

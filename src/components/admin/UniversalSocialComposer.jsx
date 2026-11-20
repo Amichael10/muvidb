@@ -280,6 +280,34 @@ export default function UniversalSocialComposer({
   // Scheduling
   const [scheduledFor, setScheduledFor] = useState(() => parsed?.scheduledFor || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeletePost = async () => {
+    if (!parsed?.id) return;
+    const confirmed = window.confirm(
+      `Delete “${title || 'this post'}”? This removes the scheduled publication, platform jobs, and generated assets. This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    const toastId = toast.loading('Deleting post…');
+    try {
+      const res = await fetch('/api/social?task=delete_queue_item', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentItemId: parsed.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success('Post deleted successfully', { id: toastId });
+      if (onCancel) onCancel();
+      else if (onPostCreated) onPostCreated();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete post', { id: toastId });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Live device preview platform
   const [previewPlatform, setPreviewPlatform] = useState('instagram');
@@ -818,6 +846,18 @@ export default function UniversalSocialComposer({
         </div>
 
         <div className="flex items-center gap-2">
+          {parsed?.id && (
+            <button
+              type="button"
+              onClick={handleDeletePost}
+              disabled={isSubmitting || isDeleting}
+              className="px-3.5 py-2 text-xs font-bold text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg border border-red-500/30 hover:border-red-500/50 transition-colors flex items-center gap-1.5"
+              title="Delete this post"
+            >
+              <Icon icon={isDeleting ? 'solar:spinner-linear' : 'solar:trash-bin-trash-bold'} className={isDeleting ? 'animate-spin' : ''} width="15" />
+              <span>{isDeleting ? 'Deleting…' : 'Delete Post'}</span>
+            </button>
+          )}
           {onCancel && (
             <button
               type="button"

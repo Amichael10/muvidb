@@ -1719,6 +1719,35 @@ export default function AdminSocialStudio() {
     }
   };
 
+  const handleDeleteCalendarPost = async slot => {
+    const candidateName = slot?.candidate?.name || slot?.social_content_series?.name || 'this scheduled post';
+    const confirmed = window.confirm(
+      `Delete scheduled post for “${candidateName}”? This cancels the scheduled publication, removes queued jobs, and returns the calendar slot to available.`,
+    );
+    if (!confirmed) return;
+
+    const toastId = toast.loading('Deleting scheduled post…');
+    try {
+      const res = await fetchWithLocalClipperAuth('/api/social?task=delete_scheduled_post', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slotId: slot?.id,
+          contentItemId: slot?.draft_id || slot?.content_item_id || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success('Scheduled post deleted successfully', { id: toastId });
+      if (selectedSlotForReview?.id === slot?.id) {
+        setSelectedSlotForReview(null);
+      }
+      await refreshAll();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete scheduled post', { id: toastId });
+    }
+  };
+
   const runPublishNow = async (contentItemId, currentStatus) => {
     setReviewingId(contentItemId);
     const toastId = toast.loading('Initiating instant publish for selected channels...');
@@ -2486,66 +2515,88 @@ export default function AdminSocialStudio() {
                           const candidate = slot.candidate;
                           const isScheduled = slot.status === 'scheduled';
                           const isPublished = slot.status === 'published';
+                          const isApproved = slot.status === 'approved' || slot.status === 'draft_ready';
+                          const hasPost = isScheduled || isApproved || Boolean(slot.draft_id || slot.content_item_id);
 
                           return (
-                            <button
-                              key={slot.id}
-                              type="button"
-                              onClick={() => setSelectedSlotForReview(slot)}
-                              className={`w-full text-left rounded-lg p-1.5 border transition-all shadow-sm hover:scale-[1.02] active:scale-95 ${
-                                isPublished
-                                  ? 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15'
-                                  : isScheduled
-                                    ? 'border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15'
-                                    : 'border-white/10 bg-surface-2 hover:border-brand/40 hover:bg-surface-3'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="font-mono text-[9px] font-bold text-text-muted">
-                                  {slot.scheduled_time?.slice(0, 5) || '11:00'}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  {(series.slug === 'where_to_watch' || series.slug === 'new_and_upcoming') && (
-                                    <span className="rounded bg-rose-500/20 px-1 text-[7px] font-black uppercase text-rose-300">
-                                      Reel
+                            <div key={slot.id} className="relative group/slot">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSlotForReview(slot)}
+                                className={`w-full text-left rounded-lg p-1.5 border transition-all shadow-sm hover:scale-[1.01] active:scale-95 ${
+                                  isPublished
+                                    ? 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15'
+                                    : isScheduled
+                                      ? 'border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15'
+                                      : isApproved
+                                        ? 'border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/15'
+                                        : 'border-white/10 bg-surface-2 hover:border-brand/40 hover:bg-surface-3'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="font-mono text-[9px] font-bold text-text-muted">
+                                    {slot.scheduled_time?.slice(0, 5) || '11:00'}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    {(series.slug === 'where_to_watch' || series.slug === 'new_and_upcoming') && (
+                                      <span className="rounded bg-rose-500/20 px-1 text-[7px] font-black uppercase text-rose-300">
+                                        Reel
+                                      </span>
+                                    )}
+                                    {['you_know_the_face', 'behind_the_camera', 'filmography', 'actor_spotlight'].includes(series.slug) && (
+                                      <span className="rounded bg-indigo-500/20 px-1 text-[7px] font-black uppercase text-indigo-300">
+                                        6-Slide
+                                      </span>
+                                    )}
+                                    <span
+                                      className={`rounded px-1 text-[8px] font-black uppercase ${
+                                        isPublished
+                                          ? 'bg-emerald-500/20 text-emerald-400'
+                                          : isScheduled
+                                            ? 'bg-amber-500/20 text-amber-400'
+                                            : isApproved
+                                              ? 'bg-sky-500/20 text-sky-400'
+                                              : 'bg-brand/20 text-brand'
+                                      }`}
+                                    >
+                                      {isPublished ? 'Live' : isScheduled ? 'Sched' : isApproved ? 'Draft' : 'Plan'}
                                     </span>
+                                  </div>
+                                </div>
+
+                                <div className="mt-1 flex items-center gap-1.5 pr-3">
+                                  {candidate?.imageUrl ? (
+                                    <img
+                                      src={candidate.imageUrl}
+                                      alt=""
+                                      className="h-5 w-5 rounded-md object-cover border border-white/10 shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-surface-3 text-text-muted">
+                                      <Icon icon={icon} width="10" />
+                                    </div>
                                   )}
-                                  {['you_know_the_face', 'behind_the_camera', 'filmography', 'actor_spotlight'].includes(series.slug) && (
-                                    <span className="rounded bg-indigo-500/20 px-1 text-[7px] font-black uppercase text-indigo-300">
-                                      6-Slide
-                                    </span>
-                                  )}
-                                  <span
-                                    className={`rounded px-1 text-[8px] font-black uppercase ${
-                                      isPublished
-                                        ? 'bg-emerald-500/20 text-emerald-400'
-                                        : isScheduled
-                                          ? 'bg-amber-500/20 text-amber-400'
-                                          : 'bg-brand/20 text-brand'
-                                    }`}
-                                  >
-                                    {isPublished ? 'Live' : isScheduled ? 'Sched' : 'Plan'}
+                                  <span className="truncate text-[10px] font-black text-white leading-tight">
+                                    {candidate?.name || series.name || 'Post'}
                                   </span>
                                 </div>
-                              </div>
+                              </button>
 
-                              <div className="mt-1 flex items-center gap-1.5">
-                                {candidate?.imageUrl ? (
-                                  <img
-                                    src={candidate.imageUrl}
-                                    alt=""
-                                    className="h-5 w-5 rounded-md object-cover border border-white/10 shrink-0"
-                                  />
-                                ) : (
-                                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-surface-3 text-text-muted">
-                                    <Icon icon={icon} width="10" />
-                                  </div>
-                                )}
-                                <span className="truncate text-[10px] font-black text-white leading-tight">
-                                  {candidate?.name || series.name || 'Post'}
-                                </span>
-                              </div>
-                            </button>
+                              {/* Quick Delete button for scheduled/draft post */}
+                              {hasPost && !isPublished && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCalendarPost(slot);
+                                  }}
+                                  className="opacity-0 group-hover/slot:opacity-100 absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded bg-red-600/90 hover:bg-red-500 text-white transition-opacity shadow-sm z-10"
+                                  title="Delete scheduled post and revert slot"
+                                >
+                                  <Icon icon="solar:trash-bin-trash-bold" width="10" />
+                                </button>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -2577,6 +2628,8 @@ export default function AdminSocialStudio() {
                 const candidate = slot.candidate;
                 const isScheduled = slot.status === 'scheduled';
                 const isPublished = slot.status === 'published';
+                const isApproved = slot.status === 'approved' || slot.status === 'draft_ready';
+                const hasPost = isScheduled || isApproved || Boolean(slot.draft_id || slot.content_item_id);
 
                 return (
                   <div
@@ -2670,18 +2723,34 @@ export default function AdminSocialStudio() {
                       <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
                         {series.category || 'Editorial'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSlotForReview(slot)}
-                        className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
-                          isScheduled || isPublished
-                            ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-                            : 'bg-brand text-white hover:bg-brand-hover shadow-brand/20 active:scale-95'
-                        }`}
-                      >
-                        <Icon icon={isScheduled || isPublished ? 'solar:check-circle-bold' : 'solar:bolt-bold'} width="14" />
-                        <span>{isPublished ? 'View Post' : isScheduled ? 'Scheduled' : 'Review & Schedule'}</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {hasPost && !isPublished && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCalendarPost(slot);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-xs font-bold text-red-400 hover:bg-red-500/20 hover:border-red-500/40 transition-all shadow-sm"
+                            title="Delete scheduled post and revert slot"
+                          >
+                            <Icon icon="solar:trash-bin-trash-bold" width="13" />
+                            <span>Delete</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSlotForReview(slot)}
+                          className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
+                            isScheduled || isPublished
+                              ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                              : 'bg-brand text-white hover:bg-brand-hover shadow-brand/20 active:scale-95'
+                          }`}
+                        >
+                          <Icon icon={isScheduled || isPublished ? 'solar:check-circle-bold' : 'solar:bolt-bold'} width="14" />
+                          <span>{isPublished ? 'View Post' : isScheduled ? 'Scheduled' : 'Review & Schedule'}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -4153,6 +4222,7 @@ export default function AdminSocialStudio() {
         slot={selectedSlotForReview}
         onClose={() => setSelectedSlotForReview(null)}
         onApproved={refreshAll}
+        onDeleted={refreshAll}
         onOpenManualComposer={(ctx) => {
           setSlotContext(ctx);
           setSelectedThemeId(ctx.seriesSlug || 'actor_spotlight');

@@ -168,6 +168,27 @@ export default function AdminEditorial() {
     }
   };
 
+  // Delete / Reset Slot Post
+  const handleDeleteSlotPost = async (slot, e) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm(`Reset or delete scheduled content for this slot (${slot.social_content_series?.name || 'slot'})?`)) return;
+    try {
+      const res = await fetch('/api/social?task=delete_scheduled_post', {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotId: slot.id, contentItemId: slot.draft_id }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to delete scheduled content');
+      }
+      toast.success('Slot reset to available');
+      fetchCalendar();
+    } catch (err) {
+      toast.error(getFriendlyErrorMessage(err));
+    }
+  };
+
   // Save Reactive Event
   const handleSaveEvent = async () => {
     if (!newEvent.title.trim()) {
@@ -332,11 +353,23 @@ export default function AdminEditorial() {
                       <span className="font-black text-text-primary">
                         {new Date(slot.scheduled_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                       </span>
-                      <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                        slot.status === 'published' ? 'bg-green-500/20 text-green-400' : 'bg-surface-2 text-text-muted'
-                      }`}>
-                        {slot.status}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                          slot.status === 'published' ? 'bg-green-500/20 text-green-400' : 'bg-surface-2 text-text-muted'
+                        }`}>
+                          {slot.status}
+                        </span>
+                        {slot.status !== 'planned' && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteSlotPost(slot, e)}
+                            className="p-0.5 text-text-muted hover:text-red-400 rounded hover:bg-red-500/10 transition-colors"
+                            title="Reset slot and delete scheduled content"
+                          >
+                            <Icon icon="solar:trash-bin-trash-bold" className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-xs font-bold text-brand truncate">{slot.social_content_series?.name}</p>
                   </div>
