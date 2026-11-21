@@ -42,11 +42,16 @@ function makeSlug(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+function isPlaceholderMediaUrl(url?: string | null): boolean {
+  if (!url || !url.trim()) return true;
+  return /images\.unsplash\.com|placeholder|default-poster/i.test(url);
+}
+
 async function upsertPlay(play: PlayPayload): Promise<'created' | 'updated' | 'unchanged' | 'failed'> {
   try {
     const { data: existing, error: fetchErr } = await supabase
       .from('plays')
-      .select('id, title, slug, status, run_start_date, run_end_date, synopsis, poster_url, banner_url')
+      .select('id, title, slug, status, run_start_date, run_end_date, performance_time, synopsis, poster_url, banner_url, playwright, director, producer, venue')
       .or(`slug.eq.${play.slug},title.eq.${play.title}`)
       .limit(1)
       .maybeSingle();
@@ -56,24 +61,52 @@ async function upsertPlay(play: PlayPayload): Promise<'created' | 'updated' | 'u
       return 'failed';
     }
 
-    const payload = {
-      ...play,
-      updated_at: new Date().toISOString()
-    };
-
     if (existing) {
+      // Preserve admin-edited posters, backdrops, synopses, and credits!
+      // Only fill missing or placeholder artwork/metadata from the scraper.
+      const updatePayload: Record<string, any> = {
+        status: derivePlayStatus({
+          run_start_date: existing.run_start_date || play.run_start_date,
+          run_end_date: existing.run_end_date || play.run_end_date,
+          year: play.year,
+          status: play.status || existing.status,
+        }),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (isPlaceholderMediaUrl(existing.poster_url) && play.poster_url && !isPlaceholderMediaUrl(play.poster_url)) {
+        updatePayload.poster_url = play.poster_url;
+      }
+      if (isPlaceholderMediaUrl(existing.banner_url) && play.banner_url && !isPlaceholderMediaUrl(play.banner_url)) {
+        updatePayload.banner_url = play.banner_url;
+      }
+      if (!existing.run_start_date && play.run_start_date) updatePayload.run_start_date = play.run_start_date;
+      if (!existing.run_end_date && play.run_end_date) updatePayload.run_end_date = play.run_end_date;
+      if (!existing.performance_time && play.performance_time) updatePayload.performance_time = play.performance_time;
+      if (!existing.synopsis && play.synopsis) updatePayload.synopsis = play.synopsis;
+      if (!existing.playwright && play.playwright) updatePayload.playwright = play.playwright;
+      if (!existing.director && play.director) updatePayload.director = play.director;
+      if (!existing.producer && play.producer) updatePayload.producer = play.producer;
+      if (!existing.venue && play.venue) updatePayload.venue = play.venue;
+      if (play.source_url) updatePayload.source_url = play.source_url;
+      if (play.box_office_metrics) updatePayload.box_office_metrics = play.box_office_metrics;
+
       const { error: updErr } = await supabase
         .from('plays')
-        .update(payload)
+        .update(updatePayload)
         .eq('id', existing.id);
 
       if (updErr) {
         console.error(`  ❌ Failed to update "${play.title}":`, updErr.message);
         return 'failed';
       }
-      console.log(`  ✓ Updated: "${play.title}" (${play.status})`);
+      console.log(`  ✓ Updated (preserving custom media): "${play.title}" (${updatePayload.status})`);
       return 'updated';
     } else {
+      const payload = {
+        ...play,
+        updated_at: new Date().toISOString(),
+      };
       const { error: insErr } = await supabase
         .from('plays')
         .insert(payload);
@@ -97,7 +130,7 @@ async function scrapeTerraKulture(): Promise<PlayPayload[]> {
   try {
     const res = await fetch('https://tickets.terrakulture.com/tickets/events', {
       headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(30000)
     });
     if (!res.ok) return plays;
     const html = await res.text();
@@ -114,7 +147,7 @@ async function scrapeTerraKulture(): Promise<PlayPayload[]> {
     for (const link of uniqueUrls) {
       const fullUrl = link.startsWith('http') ? link : `https://tickets.terrakulture.com${link}`;
       try {
-        const dRes = await fetch(fullUrl, { headers: { 'user-agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) });
+        const dRes = await fetch(fullUrl, { headers: { 'user-agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(25000) });
         if (!dRes.ok) continue;
         const dHtml = await dRes.text();
         const d$ = cheerio.load(dHtml);
@@ -150,6 +183,21 @@ async function scrapeTerraKulture(): Promise<PlayPayload[]> {
         let venue = 'Terra Kulture Arena';
         if (/Terra Kulture Lawn/i.test(bodyText)) venue = 'Terra Kulture Lawn';
 
+        // Extract real event image from og:image or main event poster instead of stock Unsplash
+        let posterUrl: string | null =
+          d$('meta[property="og:image"]').attr('content')?.trim() ||
+          d$('meta[name="twitter:image"]').attr('content')?.trim() ||
+          null;
+        if (!posterUrl) {
+          d$('img').each((_, imgEl) => {
+            if (posterUrl) return;
+            const src = d$(imgEl).attr('src')?.trim() || '';
+            if (src && !/logo|icon|avatar|favicon|spinner/i.test(src)) {
+              posterUrl = src.startsWith('http') ? src : `https://tickets.terrakulture.com${src.startsWith('/') ? '' : '/'}${src}`;
+            }
+          });
+        }
+
         plays.push({
           title,
           slug,
@@ -162,10 +210,10 @@ async function scrapeTerraKulture(): Promise<PlayPayload[]> {
           year: runStart ? Number(runStart.slice(0, 4)) : 2026,
           run_start_date: runStart,
           run_end_date: runEnd,
-          status: 'upcoming',
+          status: derivePlayStatus({ run_start_date: runStart, run_end_date: runEnd, year: runStart ? Number(runStart.slice(0, 4)) : 2026, status: 'upcoming' }),
           performance_time: performanceTime,
           source_url: fullUrl,
-          poster_url: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=800'
+          poster_url: posterUrl,
         });
       } catch (err: any) {
         console.warn(`Could not scrape ${fullUrl}:`, err.message);
@@ -430,11 +478,18 @@ async function runTheatreScrapeAndSync() {
     else if (status === 'failed') failed++;
   }
 
-  // 5. Sync Terra Kulture Real-time Seat Analytics & Gross
+  // 5. Sync Terra Kulture Real-time Seat Analytics & Gross (dynamic across all scraped Terra Kulture events)
   console.log('\n--- Syncing Terra Kulture Real-time Seat Analytics & Gross ---');
   try {
-    await harvestTerraKulturePlay('behind-closed-doors');
-    await harvestTerraKulturePlay('itoro-the-musical');
+    const tkEventSlugs = new Set<string>(['behind-closed-doors', 'itoro-the-musical']);
+    for (const tkPlay of tkPlays) {
+      const urlSlug = tkPlay.source_url?.split('/events/')[1]?.split(/[?#]/)[0]?.trim();
+      if (urlSlug) tkEventSlugs.add(urlSlug);
+      else if (tkPlay.slug) tkEventSlugs.add(tkPlay.slug);
+    }
+    for (const evSlug of tkEventSlugs) {
+      await harvestTerraKulturePlay(evSlug);
+    }
   } catch (err: any) {
     console.error('Error syncing Terra Kulture box office:', err.message);
   }

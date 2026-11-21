@@ -67,18 +67,37 @@ export function normalizeCinemaTitle(raw: string): string {
     .replace(/\s+/g, ' ');
 }
 
+const AFRICAN_COUNTRY_TOKENS = new Set([
+  'nigeria', 'ng', 'ghana', 'gh', 'south africa', 'za', 'kenya', 'ke',
+  'cameroon', 'cm', 'uganda', 'ug', 'tanzania', 'tz', 'rwanda', 'rw',
+  'senegal', 'sn', 'ivory coast', "cote d'ivoire", 'côte d’ivoire', 'ci',
+  'egypt', 'eg', 'morocco', 'ma', 'ethiopia', 'et', 'zimbabwe', 'zw',
+  'zambia', 'zm', 'benin', 'bj', 'togo', 'tg', 'sierra leone', 'sl',
+  'liberia', 'lr', 'gambia', 'gm', 'malawi', 'mw', 'mozambique', 'mz',
+  'angola', 'ao', 'botswana', 'bw', 'namibia', 'na', 'congo', 'cg',
+  'congo (drc)', 'cd', 'algeria', 'dz', 'tunisia', 'tn', 'sudan', 'sd',
+  'mali', 'ml', 'burkina faso', 'bf', 'niger', 'ne', 'gabon', 'ga',
+  'guinea', 'gn', 'madagascar', 'mg', 'mauritius', 'mu', 'eswatini', 'sz',
+]);
+
+function isAfricanCatalogFilm(film: any): boolean {
+  if (!film) return false;
+  if (film.is_nollywood === true) return true;
+  const countries = Array.isArray(film.countries) ? film.countries : [];
+  return countries.some((c: unknown) => AFRICAN_COUNTRY_TOKENS.has(String(c || '').trim().toLowerCase()));
+}
+
 let activeCinemaCatalogPromise: Promise<MatchedFilm[]> | null = null;
 
 async function getActiveCinemaCatalog(): Promise<MatchedFilm[]> {
   if (!activeCinemaCatalogPromise) {
     activeCinemaCatalogPromise = Promise.resolve(supabase
       .from('films')
-      .select('id,title,poster_url,backdrop_url,is_in_cinemas,synopsis,runtime_minutes,genres,year,nfvcb_rating,trailer_external_url')
-      .eq('is_nollywood', true)
+      .select('id,title,poster_url,backdrop_url,is_in_cinemas,is_nollywood,countries,synopsis,runtime_minutes,genres,year,nfvcb_rating,trailer_external_url')
       .eq('is_in_cinemas', true)
       .then(({ data, error }) => {
         if (error) throw error;
-        return ((data || []) as MatchedFilm[]).sort(
+        return ((data || []).filter(isAfricanCatalogFilm) as MatchedFilm[]).sort(
           (a, b) => Number(isOwnUrl(b.poster_url)) - Number(isOwnUrl(a.poster_url)),
         );
       }));
@@ -87,7 +106,7 @@ async function getActiveCinemaCatalog(): Promise<MatchedFilm[]> {
 }
 
 /**
- * Find an existing Nollywood film whose title exactly matches (case-insensitive,
+ * Find an existing African/Nollywood film whose title exactly matches (case-insensitive,
  * trimmed, collapsed whitespace). Returns films.id or null.
  *
  * We intentionally do NOT do fuzzy/substring matching here — the cost of a false
@@ -100,20 +119,21 @@ async function matchNollywoodFilm(title: string): Promise<MatchedFilm | null> {
   const clean = cleanCinemaListingTitle(title);
   if (!clean) return null;
 
-  // 1. Direct case-insensitive exact match, including the safe &/and variant.
+  // 1. Direct case-insensitive exact match across Nollywood & African catalog films,
+  // including the safe &/and variant.
   const directVariants = new Set([clean]);
   if (/\band\b/i.test(clean)) directVariants.add(clean.replace(/\band\b/gi, '&'));
   if (clean.includes('&')) directVariants.add(clean.replace(/&/g, 'and'));
 
   for (const variant of directVariants) {
-    const { data: directMatch } = await supabase
+    const { data: directMatches } = await supabase
       .from('films')
-      .select('id,title,poster_url,backdrop_url,is_in_cinemas,synopsis,runtime_minutes,genres,year,nfvcb_rating,trailer_external_url')
-      .eq('is_nollywood', true)
+      .select('id,title,poster_url,backdrop_url,is_in_cinemas,is_nollywood,countries,synopsis,runtime_minutes,genres,year,nfvcb_rating,trailer_external_url')
       .ilike('title', variant)
-      .limit(1);
+      .limit(5);
 
-    if (directMatch?.length) return directMatch[0] as MatchedFilm;
+    const africanMatch = (directMatches || []).find(isAfricanCatalogFilm);
+    if (africanMatch) return africanMatch as MatchedFilm;
   }
 
   // 2. Compare normalized forms only against films already curated as being in

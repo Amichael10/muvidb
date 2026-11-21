@@ -488,6 +488,34 @@ export default function AdminPlays() {
       const payload = editingPlay ? { ...formData, id: editingPlay.id } : formData;
       const saved = await upsertPlay(payload);
       setEditingPlay(saved);
+      setFormData({
+        title: saved.title || '',
+        slug: saved.slug || '',
+        playwright: saved.playwright || '',
+        director: saved.director || '',
+        producer: saved.producer || '',
+        venue: saved.venue || '',
+        city: saved.city || '',
+        country: saved.country || 'Nigeria',
+        poster_url: saved.poster_url || '',
+        banner_url: saved.banner_url || '',
+        synopsis: saved.synopsis || '',
+        genre: saved.genre || '',
+        year: saved.year || new Date().getFullYear(),
+        run_start_date: saved.run_start_date || '',
+        run_end_date: saved.run_end_date || '',
+        performance_time: saved.performance_time || '',
+        source_url: saved.source_url || '',
+        status: saved.status || 'archived',
+        box_office_domestic: saved.box_office_domestic ?? '',
+        box_office_tickets_sold: saved.box_office_tickets_sold ?? '',
+        box_office_source: saved.box_office_source || '',
+        box_office_metrics: saved.box_office_metrics || null,
+      });
+      setPlays(prev => {
+        const exists = prev.some(p => p.id === saved.id);
+        return exists ? prev.map(p => (p.id === saved.id ? saved : p)) : [saved, ...prev];
+      });
       setFormMsg({ type: 'success', text: editingPlay ? 'Play updated successfully!' : 'Play created successfully!' });
       if (!editingPlay) {
         loadSavedCredits(saved.id);
@@ -1240,9 +1268,10 @@ export default function AdminPlays() {
               {saving ? 'Saving Play Profile…' : editingPlay ? 'Update Play Profile' : 'Save Play Profile'}
             </button>
           </div>
+        </form>
 
-          {/* Full Width Bottom Section: Stage Performers & Crew */}
-          <div className="pt-8 border-t border-border space-y-4">
+        {/* Full Width Bottom Section: Stage Performers & Crew (outside <form> to avoid invalid nested forms) */}
+        <div className="pt-8 mt-8 border-t border-border space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-sm font-bold text-text-primary flex items-center gap-2">
@@ -1556,7 +1585,6 @@ export default function AdminPlays() {
               </div>
             )}
           </div>
-        </form>
       </Drawer>
 
       {/* Confirm Play Deletion Modal */}

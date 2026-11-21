@@ -122,15 +122,32 @@ export async function harvestTerraKulturePlay(slug: string) {
   console.log(`- Total Gross: ₦${totalGross.toLocaleString()}`);
   console.log(`- Tiers Breakdown:`, tierAggregates);
 
-  // Sync to public.plays
-  const { data: matchedPlay, error: findError } = await supabase
-    .from('plays')
-    .select('id, title, slug')
-    .eq('slug', slug)
-    .maybeSingle();
+  // Sync to public.plays (with retry on transient network timeout)
+  let matchedPlay: { id: string; title: string; slug: string } | null = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const { data, error: findError } = await supabase
+      .from('plays')
+      .select('id, title, slug')
+      .eq('slug', slug)
+      .maybeSingle();
 
-  if (findError) {
-    console.error('Error finding play:', findError);
+    if (!findError) {
+      matchedPlay = data;
+      break;
+    }
+    console.warn(`Attempt ${attempt}/3 finding play "${slug}" failed:`, findError.message);
+    if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
+  }
+
+  if (!matchedPlay) {
+    const titleGuess = slug.replace(/-/g, ' ');
+    const { data: fallbackPlay } = await supabase
+      .from('plays')
+      .select('id, title, slug')
+      .ilike('title', `%${titleGuess}%`)
+      .limit(1)
+      .maybeSingle();
+    if (fallbackPlay) matchedPlay = fallbackPlay;
   }
 
   const metrics = {

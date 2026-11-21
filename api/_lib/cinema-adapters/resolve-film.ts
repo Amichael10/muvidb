@@ -15,6 +15,21 @@ export interface CinemaResolvedFilm {
   trailer_external_url: string | null;
 }
 
+const AFRICAN_ISO_TO_NAME: Record<string, string> = {
+  DZ: 'Algeria', AO: 'Angola', BJ: 'Benin', BW: 'Botswana', BF: 'Burkina Faso',
+  BI: 'Burundi', CV: 'Cabo Verde', CM: 'Cameroon', CF: 'Central African Republic',
+  TD: 'Chad', KM: 'Comoros', CG: 'Congo', CD: 'Congo (DRC)', CI: 'Ivory Coast',
+  DJ: 'Djibouti', EG: 'Egypt', GQ: 'Equatorial Guinea', ER: 'Eritrea',
+  SZ: 'Eswatini', ET: 'Ethiopia', GA: 'Gabon', GM: 'Gambia', GH: 'Ghana',
+  GN: 'Guinea', GW: 'Guinea-Bissau', KE: 'Kenya', LS: 'Lesotho', LR: 'Liberia',
+  LY: 'Libya', MG: 'Madagascar', MW: 'Malawi', ML: 'Mali', MR: 'Mauritania',
+  MU: 'Mauritius', MA: 'Morocco', MZ: 'Mozambique', NA: 'Namibia', NE: 'Niger',
+  NG: 'Nigeria', RW: 'Rwanda', ST: 'Sao Tome and Principe', SN: 'Senegal',
+  SC: 'Seychelles', SL: 'Sierra Leone', SO: 'Somalia', ZA: 'South Africa',
+  SS: 'South Sudan', SD: 'Sudan', TZ: 'Tanzania', TG: 'Togo', TN: 'Tunisia',
+  UG: 'Uganda', ZM: 'Zambia', ZW: 'Zimbabwe',
+};
+
 const resolutionCache = new Map<string, Promise<CinemaResolvedFilm | null>>();
 
 function normalizedTitle(value: string): string {
@@ -68,36 +83,47 @@ async function resolveFromTmdb(
     if (!detailsResponse.ok) return null;
 
     const details = await detailsResponse.json() as any;
-    const isNigerian = details.production_countries?.some((country: any) => country.iso_3166_1 === 'NG');
-    if (!isNigerian) return null;
+    const prodCountries: Array<{ iso_3166_1?: string; name?: string }> = details.production_countries || [];
+    const africanCodes = prodCountries
+      .map((c) => String(c.iso_3166_1 || '').toUpperCase())
+      .filter((code) => Boolean(AFRICAN_ISO_TO_NAME[code]));
+    if (africanCodes.length === 0) return null;
+
+    const isNigerian = africanCodes.includes('NG');
+    const resolvedCountries = prodCountries
+      .map((c) => {
+        const code = String(c.iso_3166_1 || '').toUpperCase();
+        return AFRICAN_ISO_TO_NAME[code] || c.name || code;
+      })
+      .filter(Boolean);
 
     const releaseYear = details.release_date ? Number(details.release_date.slice(0, 4)) : null;
     const payload = {
       title: details.title || title,
       original_title: details.original_title || null,
       synopsis: details.overview || null,
-    year: Number.isFinite(releaseYear) ? releaseYear : null,
-    release_date: details.release_date || null,
-    poster_url: imageUrl(details.poster_path, 'w500'),
-    backdrop_url: imageUrl(details.backdrop_path, 'w1280'),
-    runtime_minutes: details.runtime || null,
-    genres: details.genres?.map((genre: any) => genre.name).filter(Boolean) || null,
-    countries: details.production_countries?.map((country: any) => country.iso_3166_1).filter(Boolean) || ['NG'],
-    languages: details.spoken_languages?.map((language: any) => language.english_name).filter(Boolean) || null,
-    tmdb_id: details.id,
-    tmdb_rating: details.vote_average || null,
-    tmdb_vote_count: details.vote_count || 0,
-    trailer_external_url: trailerUrl(details.videos),
-    trailer_source: 'youtube',
-    source: `tmdb-cinema:${source}`,
-    release_type: 'cinema',
-    status: 'released',
-    is_nollywood: true,
-    is_in_cinemas: true,
-    coming_soon: false,
-    is_published: true,
-    needs_review: true,
-  };
+      year: Number.isFinite(releaseYear) ? releaseYear : null,
+      release_date: details.release_date || null,
+      poster_url: imageUrl(details.poster_path, 'w500'),
+      backdrop_url: imageUrl(details.backdrop_path, 'w1280'),
+      runtime_minutes: details.runtime || null,
+      genres: details.genres?.map((genre: any) => genre.name).filter(Boolean) || null,
+      countries: resolvedCountries.length ? resolvedCountries : ['Nigeria'],
+      languages: details.spoken_languages?.map((language: any) => language.english_name).filter(Boolean) || null,
+      tmdb_id: details.id,
+      tmdb_rating: details.vote_average || null,
+      tmdb_vote_count: details.vote_count || 0,
+      trailer_external_url: trailerUrl(details.videos),
+      trailer_source: 'youtube',
+      source: `tmdb-cinema:${source}`,
+      release_type: 'cinema',
+      status: 'released',
+      is_nollywood: isNigerian,
+      is_in_cinemas: true,
+      coming_soon: false,
+      is_published: true,
+      needs_review: true,
+    };
 
   const { data, error } = await supabase
     .from('films')
