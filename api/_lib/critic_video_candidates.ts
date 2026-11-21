@@ -39,7 +39,198 @@ export interface CriticChannelRow {
   youtube_channel_id: string;
   name: string;
   uploads_playlist_id?: string | null;
+  critic_id?: string | null;
+  is_enabled?: boolean;
   baseline_at: string;
+  last_polled_at?: string | null;
+  last_video_id?: string | null;
+  last_error?: string | null;
+  created_at?: string | null;
+}
+
+export interface ResolvedYouTubeChannel {
+  youtubeChannelId: string;
+  name: string;
+  uploadsPlaylistId: string | null;
+  customUrl: string | null;
+  thumbnailUrl: string | null;
+}
+
+/**
+ * Resolve any YouTube channel identifier — @handle, channel URL, UC... ID, or
+ * even a video URL from that channel — into its canonical channel metadata.
+ */
+export async function resolveYouTubeChannelInput(rawInput: string): Promise<ResolvedYouTubeChannel> {
+  const raw = String(rawInput || '').trim();
+  if (!raw) throw new Error('Paste a YouTube @handle, channel URL, UC channel ID, or video URL.');
+
+  let item: any = null;
+
+  // 1. Direct channel ID or /channel/UC... URL
+  const directChannelId =
+    raw.match(/^(UC[A-Za-z0-9_-]{18,})$/)?.[1] ||
+    raw.match(/youtube\.com\/channel\/(UC[A-Za-z0-9_-]{18,})/i)?.[1] ||
+    null;
+
+  if (directChannelId) {
+    const res = await ytGet('channels', { part: 'snippet,contentDetails', id: directChannelId });
+    item = res?.items?.[0] || null;
+  }
+
+  // 2. Video URL (youtube.com/watch?v=..., youtu.be/..., /shorts/...) -> lookup its channel
+  if (!item) {
+    const identifiedVideo = identifyCriticVideoUrl(raw);
+    if (identifiedVideo?.platform === 'youtube') {
+      const vidRes = await ytGet('videos', { part: 'snippet', id: identifiedVideo.videoId });
+      const chId = vidRes?.items?.[0]?.snippet?.channelId;
+      if (chId) {
+        const res = await ytGet('channels', { part: 'snippet,contentDetails', id: chId });
+        item = res?.items?.[0] || null;
+      }
+    }
+  }
+
+  // 3. @handle (bare @HalimahThebird or youtube.com/@HalimahThebird/videos)
+  if (!item) {
+    const handleMatch =
+      raw.match(/^@([A-Za-z0-9._-]+)$/)?.[1] ||
+      raw.match(/youtube\.com\/@([A-Za-z0-9._-]+)/i)?.[1] ||
+      null;
+    if (handleMatch) {
+      const res = await ytGet('channels', { part: 'snippet,contentDetails', forHandle: handleMatch });
+      item = res?.items?.[0] || null;
+      if (!item) {
+        const fallback = await ytGet('channels', { part: 'snippet,contentDetails', forHandle: `@${handleMatch}` });
+        item = fallback?.items?.[0] || null;
+      }
+    }
+  }
+
+  // 4. Legacy /user/NAME
+  if (!item) {
+    const userMatch = raw.match(/youtube\.com\/user\/([A-Za-z0-9._-]+)/i)?.[1] || null;
+    if (userMatch) {
+      const res = await ytGet('channels', { part: 'snippet,contentDetails', forUsername: userMatch });
+      item = res?.items?.[0] || null;
+    }
+  }
+
+  // 5. Fallback search (e.g. youtube.com/c/CustomName or plain channel name)
+  if (!item) {
+    const customName =
+      raw.match(/youtube\.com\/c\/([A-Za-z0-9._-]+)/i)?.[1] ||
+      raw.replace(/^https?:\/\/(?:www\.)?youtube\.com\//i, '').replace(/\/.*$/, '').replace(/^@/, '').trim();
+    if (customName && customName.length >= 2) {
+      const searchRes = await ytGet('search', {
+        part: 'snippet',
+        type: 'channel',
+        q: customName,
+        maxResults: '1',
+      });
+      const foundChId = searchRes?.items?.[0]?.snippet?.channelId || searchRes?.items?.[0]?.id?.channelId;
+      if (foundChId) {
+        const res = await ytGet('channels', { part: 'snippet,contentDetails', id: foundChId });
+        item = res?.items?.[0] || null;
+      }
+    }
+  }
+
+  if (!item?.id) {
+    throw new Error(`Could not resolve YouTube channel from "${raw}". Try pasting the channel's @handle or a video URL from the channel.`);
+  }
+
+  return {
+    youtubeChannelId: item.id,
+    name: item.snippet?.title || raw,
+    uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads || null,
+    customUrl: item.snippet?.customUrl || null,
+    thumbnailUrl: item.snippet?.thumbnails?.default?.url || null,
+  };
+}
+
+export async function listCriticChannels(): Promise<CriticChannelRow[]> {
+  const { data, error } = await supabase
+    .from('critic_channels')
+    .select('id,youtube_channel_id,name,uploads_playlist_id,critic_id,is_enabled,baseline_at,last_polled_at,last_video_id,last_error,created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`Cannot list critic channels: ${error.message}`);
+  return (data || []) as CriticChannelRow[];
+}
+
+export async function upsertCriticChannel(input: {
+  channelInput: string;
+  criticId?: string | null;
+  lookbackDays?: number;
+  nameOverride?: string | null;
+}): Promise<CriticChannelRow> {
+  const resolved = await resolveYouTubeChannelInput(input.channelInput);
+  const lookbackDays = Number.isFinite(Number(input.lookbackDays))
+    ? Math.max(0, Math.min(3650, Number(input.lookbackDays)))
+    : 30;
+  const baselineAt = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: existing } = await supabase
+    .from('critic_channels')
+    .select('id')
+    .eq('youtube_channel_id', resolved.youtubeChannelId)
+    .maybeSingle();
+
+  const rowPayload: Record<string, any> = {
+    youtube_channel_id: resolved.youtubeChannelId,
+    name: (input.nameOverride || '').trim() || resolved.name,
+    uploads_playlist_id: resolved.uploadsPlaylistId,
+    critic_id: input.criticId || null,
+    is_enabled: true,
+    baseline_at: baselineAt,
+    last_error: null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (existing?.id) {
+    const { data, error } = await supabase
+      .from('critic_channels')
+      .update(rowPayload)
+      .eq('id', existing.id)
+      .select('id,youtube_channel_id,name,uploads_playlist_id,critic_id,is_enabled,baseline_at,last_polled_at,last_video_id,last_error,created_at')
+      .single();
+    if (error) throw new Error(`Cannot update critic channel: ${error.message}`);
+    return data as CriticChannelRow;
+  }
+
+  const { data, error } = await supabase
+    .from('critic_channels')
+    .insert(rowPayload)
+    .select('id,youtube_channel_id,name,uploads_playlist_id,critic_id,is_enabled,baseline_at,last_polled_at,last_video_id,last_error,created_at')
+    .single();
+  if (error) throw new Error(`Cannot add critic channel: ${error.message}`);
+  return data as CriticChannelRow;
+}
+
+export async function updateCriticChannel(
+  id: string,
+  patch: { isEnabled?: boolean; criticId?: string | null; lookbackDays?: number },
+): Promise<CriticChannelRow> {
+  const updatePayload: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (typeof patch.isEnabled === 'boolean') updatePayload.is_enabled = patch.isEnabled;
+  if (patch.criticId !== undefined) updatePayload.critic_id = patch.criticId || null;
+  if (patch.lookbackDays !== undefined && Number.isFinite(Number(patch.lookbackDays))) {
+    const days = Math.max(0, Math.min(3650, Number(patch.lookbackDays)));
+    updatePayload.baseline_at = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  }
+  const { data, error } = await supabase
+    .from('critic_channels')
+    .update(updatePayload)
+    .eq('id', id)
+    .select('id,youtube_channel_id,name,uploads_playlist_id,critic_id,is_enabled,baseline_at,last_polled_at,last_video_id,last_error,created_at')
+    .single();
+  if (error) throw new Error(`Cannot update critic channel: ${error.message}`);
+  return data as CriticChannelRow;
+}
+
+export async function deleteCriticChannel(id: string): Promise<{ ok: true; id: string }> {
+  const { error } = await supabase.from('critic_channels').delete().eq('id', id);
+  if (error) throw new Error(`Cannot delete critic channel: ${error.message}`);
+  return { ok: true, id };
 }
 
 interface CriticCandidateRow {
@@ -225,18 +416,35 @@ async function resolveUploadsPlaylistId(channel: CriticChannelRow): Promise<stri
  * from the `channels` table, which drives film ingestion — a critic channel
  * there would have its reviews ingested as films.
  */
-export async function pollCriticChannels(input: { limit?: number } = {}) {
-  const result = { channels: 0, discovered: 0, queued: 0, errors: [] as Array<{ channel: string; error: string }> };
-  const { data: channels, error } = await supabase
+export async function pollCriticChannels(input: { limit?: number; channelId?: string } = {}) {
+  const result = {
+    channels: 0,
+    discovered: 0,
+    queued: 0,
+    errors: [] as Array<{ channel: string; error: string }>,
+    details: [] as Array<{ id: string; name: string; discovered: number; queued: number; newestTitle: string | null; error?: string }>,
+  };
+  let query = supabase
     .from('critic_channels')
-    .select('id,youtube_channel_id,name,uploads_playlist_id,baseline_at')
-    .eq('is_enabled', true)
-    .order('last_polled_at', { ascending: true, nullsFirst: true })
-    .limit(input.limit ?? 20);
+    .select('id,youtube_channel_id,name,uploads_playlist_id,baseline_at,critic_id');
+
+  if (input.channelId) {
+    query = query.eq('id', input.channelId);
+  } else {
+    query = query
+      .eq('is_enabled', true)
+      .order('last_polled_at', { ascending: true, nullsFirst: true })
+      .limit(input.limit ?? 20);
+  }
+
+  const { data: channels, error } = await query;
   if (error) throw new Error(`Cannot read critic channels: ${error.message}`);
 
   for (const channel of (channels || []) as CriticChannelRow[]) {
     result.channels++;
+    let channelDiscovered = 0;
+    let channelQueued = 0;
+    let newestTitle: string | null = null;
     try {
       const playlistId = await resolveUploadsPlaylistId(channel);
       if (!playlistId) throw new Error('Channel has no uploads playlist');
@@ -254,17 +462,23 @@ export async function pollCriticChannels(input: { limit?: number } = {}) {
         const publishedAt = item?.contentDetails?.videoPublishedAt || item?.snippet?.publishedAt || null;
         const title = item?.snippet?.title || '';
         if (!videoId || !title) continue;
-        if (!newestVideoId) newestVideoId = videoId;
+        if (!newestVideoId) {
+          newestVideoId = videoId;
+          newestTitle = title;
+        }
         result.discovered++;
+        channelDiscovered++;
         // Adding a channel must not enqueue its whole back catalogue.
         if (publishedAt && Number.isFinite(baseline) && Date.parse(publishedAt) <= baseline) continue;
         await enqueueCriticVideoCandidate({
           videoId,
           criticChannelId: channel.id,
+          criticId: channel.critic_id || null,
           title,
           publishedAt,
         });
         result.queued++;
+        channelQueued++;
       }
 
       await supabase
@@ -276,9 +490,25 @@ export async function pollCriticChannels(input: { limit?: number } = {}) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', channel.id);
+
+      result.details.push({
+        id: channel.id,
+        name: channel.name,
+        discovered: channelDiscovered,
+        queued: channelQueued,
+        newestTitle,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       result.errors.push({ channel: channel.name, error: message });
+      result.details.push({
+        id: channel.id,
+        name: channel.name,
+        discovered: channelDiscovered,
+        queued: channelQueued,
+        newestTitle,
+        error: message,
+      });
       await supabase
         .from('critic_channels')
         .update({ last_polled_at: new Date().toISOString(), last_error: message })
@@ -293,7 +523,7 @@ export async function pollCriticChannels(input: { limit?: number } = {}) {
 export async function listCriticVideosAwaitingTranscript(limit = 10) {
   const { data, error } = await supabase
     .from('critic_review_candidates')
-    .select('id,video_id,video_url,video_title,film_id,attempts')
+    .select('id,video_id,video_url,video_title,film_id,attempts,critic_id,critic_channel_id,video_published_at,source_platform')
     .eq('status', 'pending_transcript')
     .order('created_at', { ascending: true })
     .limit(limit);

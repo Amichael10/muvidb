@@ -8,13 +8,17 @@ import {
   applyCriticVideoTranscript,
   approveCriticVideoCandidate,
   criticVideoTitleCandidates,
+  deleteCriticChannel,
   enqueueCriticVideoCandidate,
   identifyCriticVideoUrl,
+  listCriticChannels,
   listCriticVideosAwaitingTranscript,
   matchFilmForVideoTitle,
   normalizeSpokenRatings,
   pollCriticChannels,
   rejectCriticVideoCandidate,
+  updateCriticChannel,
+  upsertCriticChannel,
   type TranscriptSource,
 } from './critic_video_candidates.js';
 
@@ -493,17 +497,67 @@ STRICT QUALITY RULES:
       return res.status(200).json({ ok: true, id, film_id: filmId });
     }
 
+    // ── Monitored YouTube Critic Channels management ────────────────────────
+    if (action === 'list-channels') {
+      return res.status(200).json({ channels: await listCriticChannels() });
+    }
+
+    if (action === 'add-channel') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST for add-channel' });
+      const channelInput = String(payload.channel_input || payload.url || payload.handle || '').trim();
+      if (!channelInput) return res.status(400).json({ error: 'Provide a YouTube @handle, channel URL, UC channel ID, or video URL.' });
+      const criticId = String(payload.critic_id || '').trim() || null;
+      const lookbackDays = payload.lookback_days !== undefined ? Number(payload.lookback_days) : 14;
+      const nameOverride = payload.name ? String(payload.name).trim() : null;
+
+      const channel = await upsertCriticChannel({
+        channelInput,
+        criticId,
+        lookbackDays,
+        nameOverride,
+      });
+
+      let pollResult = null;
+      if (payload.poll_now !== false) {
+        pollResult = await pollCriticChannels({ channelId: channel.id });
+      }
+      return res.status(200).json({ ok: true, channel, poll: pollResult });
+    }
+
+    if (action === 'update-channel') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST for update-channel' });
+      const id = String(payload.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Channel id is required' });
+      const channel = await updateCriticChannel(id, {
+        ...(typeof payload.is_enabled === 'boolean' ? { isEnabled: payload.is_enabled } : {}),
+        ...(payload.critic_id !== undefined ? { criticId: payload.critic_id ? String(payload.critic_id).trim() : null } : {}),
+        ...(payload.lookback_days !== undefined ? { lookbackDays: Number(payload.lookback_days) } : {}),
+      });
+      return res.status(200).json({ ok: true, channel });
+    }
+
+    if (action === 'delete-channel') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST for delete-channel' });
+      const id = String(payload.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'Channel id is required' });
+      return res.status(200).json(await deleteCriticChannel(id));
+    }
+
     // Discovery, also driven by the whatsapp-style cron task.
     if (action === 'poll') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST to poll channels' });
       const limit = Math.min(50, Math.max(1, Number(payload.limit) || 20));
-      return res.status(200).json(await pollCriticChannels({ limit }));
+      const channelId = payload.channel_id ? String(payload.channel_id).trim() : undefined;
+      return res.status(200).json(await pollCriticChannels({ limit, channelId }));
     }
 
     return res.status(400).json({
       error: 'Unknown action',
-      actions: ['pending', 'transcript', 'review-queue', 'submit', 'attribute', 'approve', 'reject',
-        'assign-film', 'poll', 'extract-ocr', 'extract-youtube'],
+      actions: [
+        'pending', 'transcript', 'review-queue', 'submit', 'attribute', 'approve', 'reject',
+        'assign-film', 'poll', 'extract-ocr', 'extract-youtube',
+        'list-channels', 'add-channel', 'update-channel', 'delete-channel',
+      ],
     });
   } catch (error: any) {
     console.error('[critic-videos]', action, error?.message || error);

@@ -140,16 +140,30 @@ export async function extractSocialIntake(input: {
         authorName = ig.authorName;
         authorUsername = ig.authorUsername;
 
-        if (Array.isArray(ig.images) && ig.images.length) {
+        if (Array.isArray(ig.slides) && ig.slides.length) {
+          let firstImageMarked = false;
+          ig.slides.forEach((slide) => {
+            if (slide.type === 'image') {
+              mediaItems.push({ url: slide.url, type: 'image', isPrimary: !firstImageMarked });
+              firstImageMarked = true;
+            } else {
+              mediaItems.push({ url: slide.url, type: 'video' });
+            }
+          });
+        } else if (Array.isArray(ig.images) && ig.images.length) {
           ig.images.forEach((img, idx) => {
             mediaItems.push({ url: img, type: 'image', isPrimary: idx === 0 });
           });
-        } else if (ig.imageUrl) {
-          mediaItems.push({ url: ig.imageUrl, type: 'image', isPrimary: true });
-        }
-
-        if (ig.videoUrl) {
-          mediaItems.push({ url: ig.videoUrl, type: 'video' });
+          if (ig.videoUrl) {
+            mediaItems.push({ url: ig.videoUrl, type: 'video' });
+          }
+        } else {
+          if (ig.imageUrl) {
+            mediaItems.push({ url: ig.imageUrl, type: 'image', isPrimary: true });
+          }
+          if (ig.videoUrl) {
+            mediaItems.push({ url: ig.videoUrl, type: 'video' });
+          }
         }
       } catch (err: any) {
         console.warn('[social_intake_engine] Instagram extraction error:', err.message);
@@ -575,17 +589,26 @@ export async function publishIntakeEntity(input: {
       billing_order: number;
     }> = [];
 
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     // Director
     if (payload.director && typeof payload.director === 'string' && payload.director.trim()) {
       const dirName = payload.director.replace(/^@+/, '').trim();
-      const { data: dirId } = await supabase.rpc('upsert_person_by_name', {
-        p_name: dirName,
-        p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
-      });
+      let dirId: string | null =
+        typeof payload.director_person_id === 'string' && UUID_RE.test(payload.director_person_id.trim())
+          ? payload.director_person_id.trim()
+          : null;
+      if (!dirId) {
+        const { data: upsertedDirId } = await supabase.rpc('upsert_person_by_name', {
+          p_name: dirName,
+          p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
+        });
+        dirId = (upsertedDirId as unknown as string) || null;
+      }
       if (dirId) {
         creditsToInsert.push({
           film_id: filmId,
-          person_id: dirId as unknown as string,
+          person_id: dirId,
           role: 'director',
           character_name: null,
           billing_order: 0,
@@ -601,16 +624,23 @@ export async function publishIntakeEntity(input: {
         if (!actorName) continue;
         const cleanName = actorName.replace(/^@+/, '').trim();
         const characterName = typeof actor === 'object' && actor.character_name ? String(actor.character_name).trim() : null;
+        let pId: string | null =
+          typeof actor === 'object' && typeof actor?.person_id === 'string' && UUID_RE.test(actor.person_id.trim())
+            ? actor.person_id.trim()
+            : null;
 
-        const { data: pId } = await supabase.rpc('upsert_person_by_name', {
-          p_name: cleanName,
-          p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
-        });
+        if (!pId) {
+          const { data: upsertedId } = await supabase.rpc('upsert_person_by_name', {
+            p_name: cleanName,
+            p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
+          });
+          pId = (upsertedId as unknown as string) || null;
+        }
 
         if (pId) {
           creditsToInsert.push({
             film_id: filmId,
-            person_id: pId as unknown as string,
+            person_id: pId,
             role: 'actor',
             character_name: characterName,
             billing_order: order++,
@@ -626,16 +656,23 @@ export async function publishIntakeEntity(input: {
         if (!crewName) continue;
         const cleanName = crewName.replace(/^@+/, '').trim();
         const role = typeof crewMember === 'object' && crewMember?.role ? String(crewMember.role).trim().toLowerCase() : 'crew';
+        let pId: string | null =
+          typeof crewMember === 'object' && typeof crewMember?.person_id === 'string' && UUID_RE.test(crewMember.person_id.trim())
+            ? crewMember.person_id.trim()
+            : null;
 
-        const { data: pId } = await supabase.rpc('upsert_person_by_name', {
-          p_name: cleanName,
-          p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
-        });
+        if (!pId) {
+          const { data: upsertedId } = await supabase.rpc('upsert_person_by_name', {
+            p_name: cleanName,
+            p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
+          });
+          pId = (upsertedId as unknown as string) || null;
+        }
 
         if (pId) {
           creditsToInsert.push({
             film_id: filmId,
-            person_id: pId as unknown as string,
+            person_id: pId,
             role: role || 'crew',
             character_name: null,
             billing_order: 0,
@@ -644,15 +681,39 @@ export async function publishIntakeEntity(input: {
       }
     }
 
-    // Insert credits skipping existing combinations
+    // Insert new credits & update existing actor rows in-place (Zero-Duplicate Actor Guarantee)
     if (creditsToInsert.length > 0) {
       const { data: existingCredits } = await supabase
         .from('credits')
-        .select('person_id, role')
+        .select('id, person_id, role, character_name')
         .eq('film_id', filmId);
 
-      const existingSet = new Set((existingCredits || []).map(c => `${c.person_id}-${c.role}`));
-      const newCredits = creditsToInsert.filter(c => !existingSet.has(`${c.person_id}-${c.role}`));
+      const existingMap = new Map<string, { id: string; character_name: string | null }>();
+      for (const c of existingCredits || []) {
+        existingMap.set(`${c.person_id}-${c.role}`, { id: c.id, character_name: c.character_name });
+      }
+
+      const seenBatch = new Set<string>();
+      const newCredits: typeof creditsToInsert = [];
+
+      for (const c of creditsToInsert) {
+        const key = `${c.person_id}-${c.role}`;
+        if (seenBatch.has(key)) continue;
+        seenBatch.add(key);
+
+        const existing = existingMap.get(key);
+        if (existing) {
+          // Enrich existing row in-place if a clearer character name is supplied
+          if (c.character_name && !existing.character_name) {
+            await supabase
+              .from('credits')
+              .update({ character_name: c.character_name })
+              .eq('id', existing.id);
+          }
+        } else {
+          newCredits.push(c);
+        }
+      }
 
       if (newCredits.length > 0) {
         const { error: credErr } = await supabase.from('credits').insert(newCredits as any);
@@ -751,6 +812,8 @@ export async function publishIntakeEntity(input: {
       billing_order: number;
     }> = [];
 
+    const STAGE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     // Cast
     if (Array.isArray(payload.cast)) {
       let order = 1;
@@ -759,16 +822,23 @@ export async function publishIntakeEntity(input: {
         if (!actorName) continue;
         const cleanName = actorName.replace(/^@+/, '').trim();
         const characterName = typeof actor === 'object' && actor.character_name ? String(actor.character_name).trim() : null;
+        let pId: string | null =
+          typeof actor === 'object' && typeof actor?.person_id === 'string' && STAGE_UUID_RE.test(actor.person_id.trim())
+            ? actor.person_id.trim()
+            : null;
 
-        const { data: pId } = await supabase.rpc('upsert_person_by_name', {
-          p_name: cleanName,
-          p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
-        });
+        if (!pId) {
+          const { data: upsertedId } = await supabase.rpc('upsert_person_by_name', {
+            p_name: cleanName,
+            p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
+          });
+          pId = (upsertedId as unknown as string) || null;
+        }
 
         if (pId) {
           stageCreditsToInsert.push({
             play_id: playId,
-            person_id: pId as unknown as string,
+            person_id: pId,
             role: 'actor',
             character_name: characterName,
             billing_order: order++,
@@ -784,16 +854,23 @@ export async function publishIntakeEntity(input: {
         if (!crewName) continue;
         const cleanName = crewName.replace(/^@+/, '').trim();
         const role = typeof crewMember === 'object' && crewMember?.role ? String(crewMember.role).trim().toLowerCase() : 'crew';
+        let pId: string | null =
+          typeof crewMember === 'object' && typeof crewMember?.person_id === 'string' && STAGE_UUID_RE.test(crewMember.person_id.trim())
+            ? crewMember.person_id.trim()
+            : null;
 
-        const { data: pId } = await supabase.rpc('upsert_person_by_name', {
-          p_name: cleanName,
-          p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
-        });
+        if (!pId) {
+          const { data: upsertedId } = await supabase.rpc('upsert_person_by_name', {
+            p_name: cleanName,
+            p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
+          });
+          pId = (upsertedId as unknown as string) || null;
+        }
 
         if (pId) {
           stageCreditsToInsert.push({
             play_id: playId,
-            person_id: pId as unknown as string,
+            person_id: pId,
             role: role || 'crew',
             character_name: null,
             billing_order: 0,
@@ -805,11 +882,34 @@ export async function publishIntakeEntity(input: {
     if (stageCreditsToInsert.length > 0) {
       const { data: existingCredits } = await supabase
         .from('stage_credits')
-        .select('person_id, role')
+        .select('id, person_id, role, character_name')
         .eq('play_id', playId);
 
-      const existingSet = new Set((existingCredits || []).map(c => `${c.person_id}-${c.role}`));
-      const newCredits = stageCreditsToInsert.filter(c => !existingSet.has(`${c.person_id}-${c.role}`));
+      const existingMap = new Map<string, { id: string; character_name: string | null }>();
+      for (const c of existingCredits || []) {
+        existingMap.set(`${c.person_id}-${c.role}`, { id: c.id, character_name: c.character_name });
+      }
+
+      const seenBatch = new Set<string>();
+      const newCredits: typeof stageCreditsToInsert = [];
+
+      for (const c of stageCreditsToInsert) {
+        const key = `${c.person_id}-${c.role}`;
+        if (seenBatch.has(key)) continue;
+        seenBatch.add(key);
+
+        const existing = existingMap.get(key);
+        if (existing) {
+          if (c.character_name && !existing.character_name) {
+            await supabase
+              .from('stage_credits')
+              .update({ character_name: c.character_name })
+              .eq('id', existing.id);
+          }
+        } else {
+          newCredits.push(c);
+        }
+      }
 
       if (newCredits.length > 0) {
         const { error: credErr } = await supabase.from('stage_credits').insert(newCredits as any);

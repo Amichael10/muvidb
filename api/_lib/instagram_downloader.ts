@@ -7,6 +7,12 @@ import path from 'path';
  * and full unabridged captions from Instagram Reels and Posts.
  */
 
+export interface ExtractedInstagramSlide {
+  url: string;
+  type: 'image' | 'video';
+  thumbnailUrl?: string | null;
+}
+
 export interface ExtractedInstagramMedia {
   shortcode: string;
   isReel: boolean;
@@ -14,6 +20,7 @@ export interface ExtractedInstagramMedia {
   videoUrl: string | null;
   imageUrl: string | null;
   images?: string[];
+  slides?: ExtractedInstagramSlide[];
   caption: string;
   authorName: string | null;
   authorUsername: string | null;
@@ -48,11 +55,136 @@ export function decodeHtmlEntities(str: string): string {
 
 export function cleanInstagramUrl(url: string | null): string | null {
   if (!url) return null;
-  let cleaned = url.replace(/&amp;/g, '&');
-  // Remove Instagram's dynamic square cropping parameters so flyers and wide images retain original aspect ratio
-  cleaned = cleaned.replace(/stp=c\d+\.\d+\.\d+\.\d+a_dst-jpg/g, 'stp=dst-jpg');
-  cleaned = cleaned.replace(/_s\d+x\d+_/g, '_');
+  let cleaned = url
+    .replace(/\\u0026/gi, '&')
+    .replace(/\\u002f/gi, '/')
+    .replace(/\\\//g, '/')
+    .replace(/&amp;/g, '&')
+    .trim();
+  // Never tamper with query parameters on signed Instagram CDN URLs (oh=...),
+  // otherwise Meta's CDN rejects the request with 403 URL signature mismatch.
+  if (!/[?&]oh=/i.test(cleaned)) {
+    cleaned = cleaned.replace(/stp=c\d+\.\d+\.\d+\.\d+a_dst-jpg/g, 'stp=dst-jpg');
+    cleaned = cleaned.replace(/_s\d+x\d+_/g, '_');
+  }
   return cleaned;
+}
+
+/**
+ * Stable media deduplication key that strips CDN edge host & query params
+ * so the same slide at 640px and 1080px isn't added twice.
+ */
+function instagramMediaKey(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    const filename = parsed.pathname.split('/').pop() || parsed.pathname;
+    return filename.toLowerCase();
+  } catch {
+    return rawUrl.split('?')[0].toLowerCase();
+  }
+}
+
+function pickBestResourceUrl(node: any): string | null {
+  if (!node) return null;
+  if (typeof node.display_url === 'string' && node.display_url.startsWith('http')) {
+    return node.display_url;
+  }
+  if (Array.isArray(node.display_resources) && node.display_resources.length > 0) {
+    const sorted = [...node.display_resources].sort(
+      (a, b) => Number(b?.config_width || 0) - Number(a?.config_width || 0),
+    );
+    if (sorted[0]?.src) return sorted[0].src;
+  }
+  if (Array.isArray(node.image_versions2?.candidates) && node.image_versions2.candidates.length > 0) {
+    const sorted = [...node.image_versions2.candidates].sort(
+      (a, b) => Number(b?.width || 0) - Number(a?.width || 0),
+    );
+    if (sorted[0]?.url) return sorted[0].url;
+  }
+  return null;
+}
+
+/**
+ * Parses Instagram's embedded `contextJSON` payload from `/p/{shortcode}/embed/captioned/`
+ * to recover all carousel (`GraphSidecar`) slides, video streams, full caption, and author.
+ */
+function parseEmbedContextJson(html: string): {
+  slides: ExtractedInstagramSlide[];
+  caption: string;
+  authorUsername: string | null;
+  authorName: string | null;
+  videoUrl: string | null;
+} | null {
+  const ctxMatch =
+    html.match(/"contextJSON":"((?:[^"\\]|\\.)*)"/) ||
+    html.match(/contextJSON\\":\\"((?:[^"\\]|\\.)*)\\"/);
+  if (!ctxMatch?.[1]) return null;
+
+  let ctx: any = null;
+  try {
+    const unescaped = JSON.parse(`"${ctxMatch[1]}"`);
+    ctx = typeof unescaped === 'string' ? JSON.parse(unescaped) : unescaped;
+  } catch {
+    return null;
+  }
+
+  const sm = ctx?.gql_data?.shortcode_media;
+  const fallbackCtx = ctx?.context;
+  if (!sm && !fallbackCtx) return null;
+
+  const slides: ExtractedInstagramSlide[] = [];
+  const seenKeys = new Set<string>();
+  let videoUrl: string | null = null;
+
+  const pushSlide = (url: string | null | undefined, type: 'image' | 'video', thumb?: string | null) => {
+    const clean = cleanInstagramUrl(url || null);
+    if (!clean || clean.startsWith('data:')) return;
+    const key = `${type}:${instagramMediaKey(clean)}`;
+    if (seenKeys.has(key)) return;
+    seenKeys.add(key);
+    slides.push({
+      url: clean,
+      type,
+      thumbnailUrl: thumb ? cleanInstagramUrl(thumb) : null,
+    });
+    if (type === 'video' && !videoUrl) videoUrl = clean;
+  };
+
+  // 1. Multi-slide Carousel (GraphSidecar)
+  const sidecarEdges = sm?.edge_sidecar_to_children?.edges;
+  if (Array.isArray(sidecarEdges) && sidecarEdges.length > 0) {
+    for (const edge of sidecarEdges) {
+      const node = edge?.node;
+      if (!node) continue;
+      const img = pickBestResourceUrl(node);
+      if (node.is_video && node.video_url) {
+        pushSlide(node.video_url, 'video', img);
+      }
+      if (img) {
+        pushSlide(img, 'image');
+      }
+    }
+  } else if (sm) {
+    // 2. Single Image or Video / Reel
+    const img = pickBestResourceUrl(sm);
+    if (sm.video_url) pushSlide(sm.video_url, 'video', img);
+    if (img) pushSlide(img, 'image');
+  } else if (fallbackCtx?.media) {
+    const img = pickBestResourceUrl(fallbackCtx.media);
+    if (fallbackCtx.media.video_url) pushSlide(fallbackCtx.media.video_url, 'video', img);
+    if (img) pushSlide(img, 'image');
+  }
+
+  const captionRaw =
+    sm?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+    fallbackCtx?.caption ||
+    '';
+  const caption = captionRaw ? decodeHtmlEntities(String(captionRaw).trim()) : '';
+
+  const authorUsername = sm?.owner?.username || fallbackCtx?.username || null;
+  const authorName = sm?.owner?.full_name || authorUsername || null;
+
+  return { slides, caption, authorUsername, authorName, videoUrl };
 }
 
 export function extractInstagramShortcode(url: string): string | null {
@@ -99,6 +231,9 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
   let videoUrl: string | null = null;
   let imageUrl: string | null = null;
   const images: string[] = [];
+  const slides: ExtractedInstagramSlide[] = [];
+  const seenImageKeys = new Set<string>();
+  const seenSlideKeys = new Set<string>();
   let caption = '';
   let authorUsername: string | null = null;
   let authorName: string | null = null;
@@ -106,9 +241,29 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
   const recordImage = (rawUrl: string | null | undefined) => {
     if (!rawUrl) return;
     const clean = cleanInstagramUrl(rawUrl);
-    if (clean && !clean.startsWith('data:') && !images.includes(clean)) {
+    if (!clean || clean.startsWith('data:')) return;
+    const key = instagramMediaKey(clean);
+    if (!seenImageKeys.has(key)) {
+      seenImageKeys.add(key);
       images.push(clean);
       if (!imageUrl) imageUrl = clean;
+    }
+    const slideKey = `image:${key}`;
+    if (!seenSlideKeys.has(slideKey)) {
+      seenSlideKeys.add(slideKey);
+      slides.push({ url: clean, type: 'image' });
+    }
+  };
+
+  const recordVideo = (rawUrl: string | null | undefined, thumb?: string | null) => {
+    if (!rawUrl) return;
+    const clean = cleanInstagramUrl(rawUrl);
+    if (!clean || clean.startsWith('data:')) return;
+    if (!videoUrl) videoUrl = clean;
+    const slideKey = `video:${instagramMediaKey(clean)}`;
+    if (!seenSlideKeys.has(slideKey)) {
+      seenSlideKeys.add(slideKey);
+      slides.push({ url: clean, type: 'video', thumbnailUrl: thumb ? cleanInstagramUrl(thumb) : null });
     }
   };
 
@@ -121,7 +276,7 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
       const authRes = await fetch(authApiUrl, {
         headers: {
           'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
           'X-IG-App-ID': '936619743392459',
           'Accept': 'application/json, text/plain, */*',
           'Cookie': sessionCookie,
@@ -150,22 +305,24 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
 
           if (Array.isArray(item.carousel_media) && item.carousel_media.length) {
             for (const slide of item.carousel_media) {
-              const bestImg = slide.image_versions2?.candidates?.[0]?.url;
+              const bestImg = pickBestResourceUrl(slide);
               if (bestImg) recordImage(bestImg);
-              if (slide.video_versions?.[0]?.url && !videoUrl) {
-                videoUrl = slide.video_versions[0].url;
+              if (slide.video_versions?.[0]?.url) {
+                recordVideo(slide.video_versions[0].url, bestImg);
               }
             }
-          }
-
-          if (item.image_versions2?.candidates?.[0]?.url) {
-            recordImage(item.image_versions2.candidates[0].url);
-          } else if (item.display_url) {
-            recordImage(item.display_url);
-          }
-
-          if (item.video_versions?.[0]?.url && !videoUrl) {
-            videoUrl = item.video_versions[0].url;
+          } else if (Array.isArray(item.edge_sidecar_to_children?.edges) && item.edge_sidecar_to_children.edges.length) {
+            for (const edge of item.edge_sidecar_to_children.edges) {
+              const node = edge?.node;
+              const bestImg = pickBestResourceUrl(node);
+              if (bestImg) recordImage(bestImg);
+              if (node?.video_url) recordVideo(node.video_url, bestImg);
+            }
+          } else {
+            const singleImg = pickBestResourceUrl(item);
+            if (singleImg) recordImage(singleImg);
+            if (item.video_versions?.[0]?.url) recordVideo(item.video_versions[0].url, singleImg);
+            else if (item.video_url) recordVideo(item.video_url, singleImg);
           }
 
           if (images.length > 0 || videoUrl || caption) {
@@ -176,6 +333,7 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
               videoUrl,
               imageUrl: imageUrl || images[0] || null,
               images: images.length ? images : (imageUrl ? [imageUrl] : []),
+              slides,
               caption,
               authorName: authorName || authorUsername,
               authorUsername,
@@ -191,11 +349,87 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
     }
   }
 
-  // ── Strategy 0: Dedicated Render Microservice (yt-dlp) ──
+  // ── Strategy 1: Embed Page Parser (Fastest & most reliable full-carousel extractor, works anonymously!) ──
+  if (shortcode) {
+    const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      'curl/8.4.0',
+    ];
+
+    for (const ua of userAgents) {
+      try {
+        const embedRes = await fetch(embedUrl, {
+          headers: {
+            'User-Agent': ua,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            ...(sessionCookie ? { Cookie: sessionCookie } : {}),
+          },
+          signal: AbortSignal.timeout(7000),
+        });
+
+        if (!embedRes.ok) continue;
+        const html = await embedRes.text();
+
+        // Primary: structured contextJSON -> gql_data.shortcode_media (full carousel + unabridged caption)
+        const parsedCtx = parseEmbedContextJson(html);
+        if (parsedCtx && (parsedCtx.slides.length > 0 || parsedCtx.caption)) {
+          for (const slide of parsedCtx.slides) {
+            if (slide.type === 'video') recordVideo(slide.url, slide.thumbnailUrl);
+            else recordImage(slide.url);
+          }
+          if (parsedCtx.caption && (!caption || parsedCtx.caption.length > caption.length)) {
+            caption = parsedCtx.caption;
+          }
+          if (parsedCtx.authorUsername && !authorUsername) authorUsername = parsedCtx.authorUsername;
+          if (parsedCtx.authorName && !authorName) authorName = parsedCtx.authorName;
+          break;
+        }
+
+        // Secondary HTML fallback inside embed page
+        if (!videoUrl) {
+          const vidMatch =
+            html.match(/<video[^>]+src="([^">]+)"/i) ||
+            html.match(/video_url\\":\\"([^"\\]+)\\"/i) ||
+            html.match(/"video_url":"([^"]+)"/i);
+          if (vidMatch?.[1]) recordVideo(vidMatch[1]);
+        }
+
+        const imgMatch =
+          html.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]+src="([^">]+)"/i) ||
+          html.match(/<meta property="og:image" content="([^"]*)"/i);
+        if (imgMatch?.[1]) recordImage(imgMatch[1]);
+
+        if (!caption) {
+          const captionMatch =
+            html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i) ||
+            html.match(/<div class="CaptionComments"[^>]*>([\s\S]*?)<\/div>/i);
+          if (captionMatch?.[1]) {
+            const stripped = captionMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            if (stripped) caption = decodeHtmlEntities(stripped);
+          }
+        }
+
+        const userMatch = html.match(/class="UsernameText"[^>]*>([^<]+)<\/span>/i);
+        if (userMatch?.[1]) {
+          authorUsername = userMatch[1].trim();
+          if (!authorName) authorName = authorUsername;
+        }
+
+        if (images.length > 0 || videoUrl) break;
+      } catch {
+        /* try next user-agent or strategy */
+      }
+    }
+  }
+
+  // ── Strategy 2: Dedicated Render Microservice (yt-dlp — mainly for Reels/videos or when embed failed) ──
+  const needsMicroservice = (isReel && !videoUrl) || images.length === 0;
   const extractorUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
   const extractorSecret = (process.env.EXTRACTOR_SECRET || '').trim();
 
-  if (extractorUrl) {
+  if (extractorUrl && needsMicroservice) {
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (extractorSecret) headers['Authorization'] = `Bearer ${extractorSecret}`;
@@ -209,8 +443,8 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
 
       if (res.ok) {
         const data = await res.json();
-        if (data.success && (data.video_url || data.image_url || (Array.isArray(data.images) && data.images.length))) {
-          if (data.image_url) recordImage(data.image_url);
+        if (data.success) {
+          if (data.video_url) recordVideo(data.video_url, data.image_url);
           if (Array.isArray(data.images)) {
             data.images.forEach((u: string) => recordImage(u));
           }
@@ -220,18 +454,12 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
               else if (e?.thumbnail) recordImage(e.thumbnail);
             });
           }
-          return {
-            shortcode,
-            isReel,
-            isVideo: Boolean(data.video_url || isReel),
-            videoUrl: data.video_url || null,
-            imageUrl: imageUrl || (data.image_url ? cleanInstagramUrl(data.image_url) : null),
-            images: images.length ? images : (data.image_url ? [cleanInstagramUrl(data.image_url)!] : []),
-            caption: data.caption ? decodeHtmlEntities(data.caption) : '',
-            authorName: data.author || null,
-            authorUsername: data.author || null,
-            title: data.title || `${data.author || 'Instagram'} on Instagram`,
-          };
+          if (data.image_url) recordImage(data.image_url);
+          if (data.caption && !caption) caption = decodeHtmlEntities(data.caption);
+          if (data.author && !authorName) {
+            authorName = data.author;
+            authorUsername = authorUsername || data.author;
+          }
         }
       }
     } catch (err: any) {
@@ -239,15 +467,15 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
     }
   }
 
-  // ── Strategy 1: Official Instagram oEmbed API (Fastest for caption + author) ──
-  if (shortcode) {
+  // ── Strategy 3: Official Instagram oEmbed API (Fallback for caption + author) ──
+  if (shortcode && (images.length === 0 || !caption)) {
     try {
       const oembedRes = await fetch(
         `https://www.instagram.com/api/v1/oembed/?url=${encodeURIComponent(`https://www.instagram.com/p/${shortcode}/`)}`,
         {
           headers: {
             'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
             'X-IG-App-ID': '936619743392459',
             'Accept': 'application/json',
           },
@@ -257,11 +485,10 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
 
       if (oembedRes.ok) {
         const data = await oembedRes.json();
-        if (data.title) caption = decodeHtmlEntities(data.title.trim());
-        if (data.author_name) authorName = data.author_name.trim();
-        if (data.thumbnail_url) {
-          imageUrl = cleanInstagramUrl(data.thumbnail_url);
-          recordImage(imageUrl);
+        if (data.title && !caption) caption = decodeHtmlEntities(data.title.trim());
+        if (data.author_name && !authorName) authorName = data.author_name.trim();
+        if (data.thumbnail_url && images.length === 0) {
+          recordImage(data.thumbnail_url);
         }
       }
     } catch {
@@ -269,87 +496,17 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
     }
   }
 
-  // ── Strategy 2: Embed Page Parser (Extracts direct video src, carousel slides, and uncropped display images) ──
-  if (shortcode) {
+  // ── Strategy 4: Instagram GraphQL Web Query (Fallback when carousel still not expanded) ──
+  if (shortcode && images.length <= 1) {
     try {
-      const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
-      const embedRes = await fetch(embedUrl, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          ...(sessionCookie ? { Cookie: sessionCookie } : {}),
-        },
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (embedRes.ok) {
-        const html = await embedRes.text();
-
-        // 1. Check for video tags
-        if (!videoUrl) {
-          const vidMatch =
-            html.match(/<video[^>]+src="([^">]+)"/i) ||
-            html.match(/video_url\\":\\"([^"\\]+)\\"/i) ||
-            html.match(/"video_url":"([^"]+)"/i);
-
-          if (vidMatch && vidMatch[1]) {
-            videoUrl = vidMatch[1].replace(/\\u0026/g, '&').replace(/&amp;/g, '&');
-          }
-        }
-
-        // 2. Check for display images / carousel slides
-        const displayRegex = /(?:display_url|display_resources)[\"\\]*:\s*[\"\\]*(https:[^\"\\ ]+)/gi;
-        let dMatch: RegExpExecArray | null;
-        while ((dMatch = displayRegex.exec(html)) !== null) {
-          const raw = dMatch[1].replace(/\\u0026/g, '&').replace(/&amp;/g, '&');
-          recordImage(raw);
-        }
-
-        const imgMatch =
-          html.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]+src="([^">]+)"/i) ||
-          html.match(/<meta property="og:image" content="([^"]*)"/i);
-
-        if (imgMatch && imgMatch[1]) {
-          const rawImg = imgMatch[1].replace(/\\u0026/g, '&').replace(/&amp;/g, '&');
-          recordImage(rawImg);
-        }
-
-        // 3. Check for caption
-        if (!caption) {
-          const captionMatch =
-            html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i) ||
-            html.match(/<div class="CaptionComments"[^>]*>([\s\S]*?)<\/div>/i);
-          if (captionMatch && captionMatch[1]) {
-            const stripped = captionMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-            if (stripped) caption = decodeHtmlEntities(stripped);
-          }
-        }
-
-        // 4. Check for username
-        const userMatch = html.match(/class="UsernameText"[^>]*>([^<]+)<\/span>/i);
-        if (userMatch && userMatch[1]) {
-          authorUsername = userMatch[1].trim();
-          if (!authorName) authorName = authorUsername;
-        }
-      }
-    } catch {
-      /* continue to other strategies */
-    }
-  }
-
-  // ── Strategy 3: Instagram GraphQL Web Query ──
-  if (shortcode) {
-    try {
-      const gqlUrl = `https://www.instagram.com/graphql/query/?doc_id=17867956667140244&variables=${encodeURIComponent(
+      const gqlUrl = `https://www.instagram.com/graphql/query/?doc_id=8845758582119845&variables=${encodeURIComponent(
         JSON.stringify({ shortcode }),
       )}`;
 
       const gqlRes = await fetch(gqlUrl, {
         headers: {
           'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
           'X-IG-App-ID': '936619743392459',
           'X-ASBD-ID': '129477',
           'Accept': '*/*',
@@ -361,18 +518,20 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
 
       if (gqlRes.ok) {
         const gqlData = await gqlRes.json();
-        const media = gqlData?.data?.xdt_shortcode_media;
+        const media = gqlData?.data?.xdt_shortcode_media || gqlData?.data?.shortcode_media;
         if (media) {
-          if (media.video_url && !videoUrl) videoUrl = media.video_url;
-          if (media.display_url) recordImage(media.display_url);
-
-          // Extract sidecar carousel slides
           const sidecarEdges = media.edge_sidecar_to_children?.edges;
-          if (Array.isArray(sidecarEdges)) {
+          if (Array.isArray(sidecarEdges) && sidecarEdges.length > 0) {
             for (const edge of sidecarEdges) {
               const node = edge?.node;
-              if (node?.display_url) recordImage(node.display_url);
+              const bestImg = pickBestResourceUrl(node);
+              if (bestImg) recordImage(bestImg);
+              if (node?.video_url) recordVideo(node.video_url, bestImg);
             }
+          } else {
+            const bestImg = pickBestResourceUrl(media);
+            if (bestImg) recordImage(bestImg);
+            if (media.video_url) recordVideo(media.video_url, bestImg);
           }
 
           if (media.owner?.username && !authorUsername) {
@@ -442,6 +601,7 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
     videoUrl,
     imageUrl: imageUrl || images[0] || null,
     images: images.length ? images : (imageUrl ? [imageUrl] : []),
+    slides,
     caption,
     authorName: authorName || authorUsername,
     authorUsername,

@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import SEO from '../../components/SEO';
+import PersonSearchInput from '../../components/admin/PersonSearchInput';
 import { authHeaders } from '../../lib/apiAuth';
 import { supabase } from '../../lib/supabase';
 import { uploadAdminImage } from '../../lib/imageUpload';
@@ -115,6 +116,7 @@ export default function AdminIntake() {
     genres: ['Drama'],
     runtime_minutes: '',
     director: '',
+    director_person_id: null,
     cast: [],
     crew: [],
     platform: 'Cinema',
@@ -125,6 +127,185 @@ export default function AdminIntake() {
     status: 'upcoming',
     update_existing_film_id: null,
   });
+
+  // Telegram Approval Inbox (shared with Social Studio)
+  const [showTelegramInbox, setShowTelegramInbox] = useState(false);
+  const [telegramItems, setTelegramItems] = useState([]);
+  const [loadingTelegram, setLoadingTelegram] = useState(false);
+  const [telegramFilter, setTelegramFilter] = useState('open'); // 'open' | 'all' | 'applied' | 'rejected'
+  const [telegramSearch, setTelegramSearch] = useState('');
+  const [activeTelegramItem, setActiveTelegramItem] = useState(null);
+
+  const loadTelegramInbox = async () => {
+    setLoadingTelegram(true);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/social?task=intake_list', { headers });
+      const data = await res.json().catch(() => []);
+      if (res.ok && Array.isArray(data)) {
+        setTelegramItems(data);
+      }
+    } catch (err) {
+      console.warn('Could not load Telegram inbox:', err);
+    } finally {
+      setLoadingTelegram(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTelegramInbox();
+  }, []);
+
+  const openTelegramCount = telegramItems.filter(
+    (item) => !['applied', 'approved', 'rejected'].includes(item.workflow_status)
+  ).length;
+
+  const filteredTelegramItems = telegramItems.filter((item) => {
+    const statusOk =
+      telegramFilter === 'all' ||
+      (telegramFilter === 'open' && !['applied', 'approved', 'rejected'].includes(item.workflow_status)) ||
+      item.workflow_status === telegramFilter;
+    if (!statusOk) return false;
+    if (!telegramSearch.trim()) return true;
+    const q = telegramSearch.trim().toLowerCase();
+    return (
+      (item.title || '').toLowerCase().includes(q) ||
+      (item.description || '').toLowerCase().includes(q) ||
+      (item.source_url || '').toLowerCase().includes(q) ||
+      (item.metadata?.from_user || '').toLowerCase().includes(q)
+    );
+  });
+
+  const handleLoadTelegramItem = (item) => {
+    const payload = item.extracted_payload || item.metadata?.extracted_payload || {};
+    const itemUrl = item.source_url || '';
+    const caption = item.description || item.metadata?.raw_text || '';
+    const imageUrl = item.metadata?.image_url || '';
+
+    setActiveTelegramItem(item);
+    setUrl(itemUrl);
+    setManualCaption(caption);
+    if (caption) setShowManualInput(true);
+    setPublishResult(null);
+
+    const mediaList = imageUrl
+      ? [{ url: imageUrl, type: 'image', isPrimary: true }]
+      : [];
+
+    setPostData({
+      success: true,
+      platform: /instagram\.com/i.test(itemUrl)
+        ? 'instagram'
+        : /facebook\.com|fb\.watch/i.test(itemUrl)
+          ? 'facebook'
+          : /youtu/i.test(itemUrl)
+            ? 'youtube'
+            : 'telegram',
+      sourceUrl: itemUrl,
+      caption,
+      authorName: item.metadata?.author_name || item.metadata?.from_user || '',
+      authorUsername: item.metadata?.author_name || '',
+      media: mediaList,
+      mentions: [],
+    });
+    setSelectedSlideIdx(0);
+
+    const parsedCast = Array.isArray(payload.cast)
+      ? payload.cast.map((c) =>
+          typeof c === 'string'
+            ? { name: c, character_name: '', person_id: null }
+            : { name: c?.name || '', character_name: c?.character_name || '', person_id: c?.person_id || null }
+        ).filter((c) => c.name)
+      : [];
+
+    const parsedCrew = [];
+    if (payload.director) {
+      parsedCrew.push({ name: payload.director, role: 'director', person_id: null });
+    }
+    if (Array.isArray(payload.crew)) {
+      payload.crew.forEach((c) => {
+        if (c?.name) parsedCrew.push({ name: c.name, role: c.role || 'crew', person_id: c.person_id || null });
+      });
+    }
+
+    setFilmForm((prev) => ({
+      ...prev,
+      title: payload.title || item.title?.replace(/\s+on\s+Instagram.*$/i, '') || '',
+      year: payload.year || new Date().getFullYear(),
+      release_date: payload.release_date || '',
+      synopsis: payload.synopsis || caption || '',
+      genres: Array.isArray(payload.genres) && payload.genres.length ? payload.genres : ['Drama'],
+      runtime_minutes: payload.runtime_minutes || '',
+      director: payload.director || '',
+      director_person_id: null,
+      cast: parsedCast,
+      crew: parsedCrew,
+      platform: payload.platform || 'Cinema',
+      content_type: payload.content_type || 'movie',
+      poster_url: imageUrl || '',
+      backdrop_url: '',
+      trailer_external_url: /youtu(?:\.be|be\.com)/i.test(itemUrl) ? itemUrl : '',
+      status: 'upcoming',
+      update_existing_film_id: null,
+    }));
+
+    setPlayForm((prev) => ({
+      ...prev,
+      id: null,
+      title: payload.title || '',
+      year: payload.year || new Date().getFullYear(),
+      director: payload.director || '',
+      synopsis: payload.synopsis || caption || '',
+      poster_url: imageUrl || '',
+      banner_url: '',
+      source_url: itemUrl,
+      cast: parsedCast,
+      crew: parsedCrew,
+    }));
+
+    setReviewForm((prev) => ({
+      ...prev,
+      film_title: payload.film_title || payload.title || '',
+      critic_name: payload.critic_name || item.metadata?.author_name || '',
+      publication: payload.publication || '',
+      quote: payload.quote || caption.slice(0, 300),
+      rating: payload.rating ?? 8,
+      review_url: itemUrl,
+    }));
+
+    setSocialForm({
+      headline: payload.title || item.title || '',
+      instagram_caption: caption,
+      facebook_caption: caption,
+      threads_post: caption.slice(0, 480),
+      imageUrl: imageUrl || '',
+    });
+
+    const detectedKind = item.intake_kind || item.metadata?.extracted_kind || 'film';
+    if (detectedKind === 'critic_review') setActiveTab('critic_review');
+    else if (detectedKind === 'social_post' || detectedKind === 'news') setActiveTab('social_post');
+    else setActiveTab('film');
+
+    setShowTelegramInbox(false);
+    toast.success('Loaded Telegram item into Creator! Click "Fetch Post" if you also want to re-scrape carousel slides.');
+  };
+
+  const handleRejectTelegramItem = async (item) => {
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/social?task=intake_reject', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intakeId: item.id, reason: 'Dismissed from Social Intake' }),
+      });
+      if (!res.ok) throw new Error('Could not reject item');
+      toast.success('Telegram item dismissed');
+      if (activeTelegramItem?.id === item.id) setActiveTelegramItem(null);
+      await loadTelegramInbox();
+    } catch (err) {
+      toast.error(err.message || 'Could not reject Telegram item');
+    }
+  };
 
   const [playForm, setPlayForm] = useState({
     id: null,
@@ -256,12 +437,14 @@ export default function AdminIntake() {
       if (creds && creds.length > 0) {
         const existingCast = creds.filter(c => c.role === 'actor').map(c => ({
           name: c.people?.name || '',
+          person_id: c.people?.id || null,
           character_name: c.character_name || '',
           isExisting: true,
         })).filter(c => c.name);
 
         const existingCrew = creds.filter(c => c.role !== 'actor').map(c => ({
           name: c.people?.name || '',
+          person_id: c.people?.id || null,
           role: c.role || 'crew',
           isExisting: true,
         })).filter(c => c.name);
@@ -366,12 +549,14 @@ export default function AdminIntake() {
       if (creds && creds.length > 0) {
         const existingCast = creds.filter(c => c.role === 'actor').map(c => ({
           name: c.people?.name || '',
+          person_id: c.people?.id || null,
           character_name: c.character_name || '',
           isExisting: true,
         })).filter(c => c.name);
 
         const existingCrew = creds.filter(c => c.role !== 'actor').map(c => ({
           name: c.people?.name || '',
+          person_id: c.people?.id || null,
           role: c.role || 'crew',
           isExisting: true,
         })).filter(c => c.name);
@@ -783,15 +968,20 @@ export default function AdminIntake() {
   const handleAddMentionToCast = (mention) => {
     const nameToAdd = (mention.resolvedName || mention.handle.replace(/^@+/, '')).trim();
     if (!nameToAdd) return;
+    const personId = mention.personId || null;
     const currentCast = [...(filmForm.cast || [])];
-    const exists = currentCast.some(c => (typeof c === 'string' ? c : c.name).toLowerCase() === nameToAdd.toLowerCase());
+    const exists = currentCast.some(
+      (c) =>
+        (personId && c.person_id && c.person_id === personId) ||
+        (typeof c === 'string' ? c : c.name).toLowerCase() === nameToAdd.toLowerCase()
+    );
 
     if (exists) {
       toast.error(`${nameToAdd} is already in the cast list.`);
       return;
     }
 
-    currentCast.push({ name: nameToAdd, character_name: '' });
+    currentCast.push({ name: nameToAdd, person_id: personId, character_name: '' });
     setFilmForm(prev => ({ ...prev, cast: currentCast }));
     toast.success(`Added ${nameToAdd} to Cast!`);
   };
@@ -800,17 +990,18 @@ export default function AdminIntake() {
   const handleSetMentionAsDirector = (mention) => {
     const name = (mention.resolvedName || mention.handle.replace(/^@+/, '')).trim();
     if (!name) return;
+    const personId = mention.personId || null;
     setFilmForm(prev => {
       const crew = [...(prev.crew || [])];
       if (!crew.some(c => c.name.toLowerCase() === name.toLowerCase() && c.role === 'director')) {
-        crew.push({ name, role: 'director' });
+        crew.push({ name, person_id: personId, role: 'director' });
       }
-      return { ...prev, director: name, crew };
+      return { ...prev, director: name, director_person_id: personId, crew };
     });
     setPlayForm(prev => {
       const crew = [...(prev.crew || [])];
       if (!crew.some(c => c.name.toLowerCase() === name.toLowerCase() && c.role === 'director')) {
-        crew.push({ name, role: 'director' });
+        crew.push({ name, person_id: personId, role: 'director' });
       }
       return { ...prev, director: name, crew };
     });
@@ -821,10 +1012,11 @@ export default function AdminIntake() {
   const handleSetMentionAsPlaywright = (mention) => {
     const name = (mention.resolvedName || mention.handle.replace(/^@+/, '')).trim();
     if (!name) return;
+    const personId = mention.personId || null;
     setPlayForm(prev => {
       const crew = [...(prev.crew || [])];
       if (!crew.some(c => c.name.toLowerCase() === name.toLowerCase() && c.role === 'playwright')) {
-        crew.push({ name, role: 'playwright' });
+        crew.push({ name, person_id: personId, role: 'playwright' });
       }
       return { ...prev, playwright: name, crew };
     });
@@ -835,17 +1027,18 @@ export default function AdminIntake() {
   const handleAddMentionToRole = (mention, roleId) => {
     const name = (mention.resolvedName || mention.handle.replace(/^@+/, '')).trim();
     if (!name) return;
+    const personId = mention.personId || null;
 
     if (activeTab === 'play') {
       if (roleId === 'actor') {
         const currentCast = [...(playForm.cast || [])];
-        if (currentCast.some(c => (c.name || '').toLowerCase() === name.toLowerCase())) {
+        if (currentCast.some(c => (personId && c.person_id === personId) || (c.name || '').toLowerCase() === name.toLowerCase())) {
           toast.error(`${name} is already in stage cast.`);
           return;
         }
         setPlayForm(prev => ({
           ...prev,
-          cast: [...(prev.cast || []), { name, character_name: '' }],
+          cast: [...(prev.cast || []), { name, person_id: personId, character_name: '' }],
         }));
         toast.success(`Added ${name} to Stage Cast!`);
       } else {
@@ -857,7 +1050,7 @@ export default function AdminIntake() {
         if (!currentCrew.some(c => (c.name || '').toLowerCase() === name.toLowerCase() && c.role === roleId)) {
           setPlayForm(prev => ({
             ...prev,
-            crew: [...(prev.crew || []), { name, role: roleId }],
+            crew: [...(prev.crew || []), { name, person_id: personId, role: roleId }],
           }));
         }
         const label = STAGE_CREW_ROLES.find(r => r.id === roleId)?.label || roleId;
@@ -868,12 +1061,12 @@ export default function AdminIntake() {
       if (roleId === 'actor') {
         handleAddMentionToCast(mention);
       } else {
-        if (roleId === 'director') setFilmForm(prev => ({ ...prev, director: name }));
+        if (roleId === 'director') setFilmForm(prev => ({ ...prev, director: name, director_person_id: personId }));
         const currentCrew = [...(filmForm.crew || [])];
         if (!currentCrew.some(c => (c.name || '').toLowerCase() === name.toLowerCase() && c.role === roleId)) {
           setFilmForm(prev => ({
             ...prev,
-            crew: [...(prev.crew || []), { name, role: roleId }],
+            crew: [...(prev.crew || []), { name, person_id: personId, role: roleId }],
           }));
         }
         const label = FILM_CREW_ROLES.find(r => r.id === roleId)?.label || roleId;
@@ -887,7 +1080,7 @@ export default function AdminIntake() {
   const handleAddManualCastRow = () => {
     setFilmForm(prev => ({
       ...prev,
-      cast: [...(prev.cast || []), { name: '', character_name: '' }],
+      cast: [...(prev.cast || []), { name: '', person_id: null, character_name: '' }],
     }));
   };
 
@@ -903,7 +1096,11 @@ export default function AdminIntake() {
   const handleUpdateCastRow = (index, field, value) => {
     setFilmForm(prev => ({
       ...prev,
-      cast: (prev.cast || []).map((item, idx) => idx === index ? { ...item, [field]: value } : item),
+      cast: (prev.cast || []).map((item, idx) => {
+        if (idx !== index) return item;
+        const base = typeof item === 'string' ? { name: item, character_name: '', person_id: null } : item;
+        return typeof field === 'object' ? { ...base, ...field } : { ...base, [field]: value };
+      }),
     }));
   };
 
@@ -911,7 +1108,7 @@ export default function AdminIntake() {
   const handleAddManualCrewRow = () => {
     setFilmForm(prev => ({
       ...prev,
-      crew: [...(prev.crew || []), { name: '', role: 'producer' }],
+      crew: [...(prev.crew || []), { name: '', person_id: null, role: 'producer' }],
     }));
   };
 
@@ -927,7 +1124,10 @@ export default function AdminIntake() {
   const handleUpdateCrewRow = (index, field, value) => {
     setFilmForm(prev => ({
       ...prev,
-      crew: (prev.crew || []).map((item, idx) => idx === index ? { ...item, [field]: value } : item),
+      crew: (prev.crew || []).map((item, idx) => {
+        if (idx !== index) return item;
+        return typeof field === 'object' ? { ...item, ...field } : { ...item, [field]: value };
+      }),
     }));
   };
 
@@ -935,7 +1135,7 @@ export default function AdminIntake() {
   const handleAddPlayCastRow = () => {
     setPlayForm(prev => ({
       ...prev,
-      cast: [...(prev.cast || []), { name: '', character_name: '' }],
+      cast: [...(prev.cast || []), { name: '', person_id: null, character_name: '' }],
     }));
   };
 
@@ -949,7 +1149,10 @@ export default function AdminIntake() {
   const handleUpdatePlayCastRow = (index, field, value) => {
     setPlayForm(prev => ({
       ...prev,
-      cast: (prev.cast || []).map((item, idx) => idx === index ? { ...item, [field]: value } : item),
+      cast: (prev.cast || []).map((item, idx) => {
+        if (idx !== index) return item;
+        return typeof field === 'object' ? { ...item, ...field } : { ...item, [field]: value };
+      }),
     }));
   };
 
@@ -957,7 +1160,7 @@ export default function AdminIntake() {
   const handleAddPlayCrewRow = () => {
     setPlayForm(prev => ({
       ...prev,
-      crew: [...(prev.crew || []), { name: '', role: 'stage_manager' }],
+      crew: [...(prev.crew || []), { name: '', person_id: null, role: 'stage_manager' }],
     }));
   };
 
@@ -971,7 +1174,10 @@ export default function AdminIntake() {
   const handleUpdatePlayCrewRow = (index, field, value) => {
     setPlayForm(prev => ({
       ...prev,
-      crew: (prev.crew || []).map((item, idx) => idx === index ? { ...item, [field]: value } : item),
+      crew: (prev.crew || []).map((item, idx) => {
+        if (idx !== index) return item;
+        return typeof field === 'object' ? { ...item, ...field } : { ...item, [field]: value };
+      }),
     }));
   };
 
@@ -1062,6 +1268,25 @@ export default function AdminIntake() {
       setPublishResult(data);
       const label = activeTab === 'film' ? 'Film created' : activeTab === 'play' ? 'Stage Play created' : activeTab === 'critic_review' ? 'Review published' : 'Social Draft created';
       toast.success(`✓ ${label} successfully!`);
+
+      // Mark linked Telegram inbox item as applied so it leaves the open queue
+      if (activeTelegramItem?.id) {
+        try {
+          await fetch('/api/social?task=intake_update', {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              intakeId: activeTelegramItem.id,
+              workflowStatus: 'applied',
+              adminNotes: `Published via Social Intake as ${activeTab} (${data.id || ''})`,
+            }),
+          });
+          setActiveTelegramItem(null);
+          loadTelegramInbox();
+        } catch (tgErr) {
+          console.warn('Could not mark Telegram item applied:', tgErr);
+        }
+      }
     } catch (err) {
       console.error(err);
       toast.error(err.message || 'Failed to publish intake entity.');
@@ -1145,6 +1370,29 @@ export default function AdminIntake() {
               Reset All
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !showTelegramInbox;
+              setShowTelegramInbox(next);
+              if (next) loadTelegramInbox();
+            }}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors ${
+              showTelegramInbox
+                ? 'border-sky-500 bg-sky-500 text-white shadow-sm'
+                : 'border-sky-500/30 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20'
+            }`}
+          >
+            <Icon icon="ic:baseline-telegram" width="15" />
+            <span>Telegram Inbox</span>
+            {openTelegramCount > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                showTelegramInbox ? 'bg-white/20 text-white' : 'bg-sky-500 text-white'
+              }`}>
+                {openTelegramCount}
+              </span>
+            )}
+          </button>
           <Link
             to="/admin/social"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-brand/30 bg-brand/5 text-brand hover:bg-brand/10 transition-colors"
@@ -1154,6 +1402,161 @@ export default function AdminIntake() {
           </Link>
         </div>
       </div>
+
+      {/* ── TELEGRAM INTAKE INBOX (Shared with Social Studio Bot) ── */}
+      {showTelegramInbox && (
+        <div className="rounded-2xl border border-sky-500/30 bg-surface p-5 shadow-sm space-y-4 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/50 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <Icon icon="ic:baseline-telegram" className="text-sky-400" width="20" />
+                <h2 className="text-sm font-black uppercase tracking-wider text-text-primary">
+                  Telegram Forwarded Inbox ({filteredTelegramItems.length})
+                </h2>
+              </div>
+              <p className="text-xs text-text-muted mt-0.5">
+                Forward Instagram, Facebook, Threads, or YouTube posts to the MuviDB Telegram bot — click &ldquo;Load into Creator&rdquo; to populate all fields here.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={telegramSearch}
+                onChange={(e) => setTelegramSearch(e.target.value)}
+                placeholder="Filter inbox…"
+                className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs text-text-primary outline-none focus:border-sky-400 w-40"
+              />
+              <select
+                value={telegramFilter}
+                onChange={(e) => setTelegramFilter(e.target.value)}
+                className="rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-xs font-bold text-text-primary outline-none"
+              >
+                <option value="open">Open ({openTelegramCount})</option>
+                <option value="all">All ({telegramItems.length})</option>
+                <option value="applied">Applied</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <button
+                type="button"
+                onClick={loadTelegramInbox}
+                disabled={loadingTelegram}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-text-muted hover:text-text-primary"
+              >
+                <Icon icon="solar:refresh-linear" className={loadingTelegram ? 'animate-spin' : ''} width="14" />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTelegramInbox(false)}
+                className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-bold text-text-muted hover:text-text-primary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+
+          {loadingTelegram && telegramItems.length === 0 ? (
+            <div className="py-8 text-center text-xs text-text-muted">
+              <Icon icon="solar:spinner-linear" className="mx-auto animate-spin text-sky-400 mb-2" width="24" />
+              Loading Telegram inbox…
+            </div>
+          ) : filteredTelegramItems.length === 0 ? (
+            <p className="py-8 text-center text-xs text-text-muted">
+              No Telegram inbox items match this filter. Forward a post link or flyer to the MuviDB Telegram bot to see it here.
+            </p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 max-h-[440px] overflow-y-auto pr-1 scrollbar-thin">
+              {filteredTelegramItems.map((item) => {
+                const isLoaded = activeTelegramItem?.id === item.id;
+                const thumb = item.metadata?.image_url || '';
+                const extractedTitle = item.extracted_payload?.title || item.metadata?.extracted_payload?.title;
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex gap-3 rounded-xl border p-3 transition-all ${
+                      isLoaded
+                        ? 'border-sky-500 bg-sky-500/10'
+                        : 'border-border bg-surface-2/60 hover:border-sky-500/40'
+                    }`}
+                  >
+                    <div className="h-20 w-16 shrink-0 overflow-hidden rounded-lg border border-border bg-surface flex items-center justify-center">
+                      {thumb ? (
+                        <img
+                          src={getSafePreviewUrl(thumb)}
+                          referrerPolicy="no-referrer"
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Icon icon="ic:baseline-telegram" className="text-sky-400/70" width="24" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 flex flex-col justify-between gap-1.5">
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-xs font-black text-text-primary">
+                            {extractedTitle || item.title || 'Forwarded Telegram Post'}
+                          </p>
+                          <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[9px] font-bold uppercase text-text-muted border border-border">
+                            {item.intake_kind || item.metadata?.extracted_kind || 'unclassified'}
+                          </span>
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-[11px] text-text-muted leading-snug">
+                          {item.description || item.source_url || 'No caption'}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <span className="text-[10px] text-text-muted">
+                          {item.metadata?.from_user ? `From ${item.metadata.from_user} · ` : ''}
+                          {new Date(item.detected_at || item.created_at).toLocaleDateString()}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleLoadTelegramItem(item)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-brand px-2.5 py-1 text-[11px] font-bold text-white hover:brightness-110 transition-all"
+                          >
+                            <Icon icon="solar:import-linear" width="12" />
+                            Load into Creator
+                          </button>
+                          {!['applied', 'approved', 'rejected'].includes(item.workflow_status) && (
+                            <button
+                              type="button"
+                              onClick={() => handleRejectTelegramItem(item)}
+                              className="rounded-lg border border-border px-2 py-1 text-[10px] font-bold text-text-muted hover:text-red-400 hover:border-red-500/40 transition-colors"
+                              title="Dismiss from inbox"
+                            >
+                              Dismiss
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTelegramItem && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-xs">
+          <div className="flex items-center gap-2 text-sky-300">
+            <Icon icon="ic:baseline-telegram" width="16" />
+            <span>
+              Working from Telegram forward: <strong className="text-text-primary">{activeTelegramItem.title}</strong> — publishing will automatically mark this inbox item as applied.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTelegramItem(null)}
+            className="text-[11px] font-bold text-text-muted hover:text-text-primary"
+          >
+            Unlink
+          </button>
+        </div>
+      )}
 
       {/* ── STEP 1: URL Input & Fetcher ── */}
       <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm space-y-4">
@@ -1867,12 +2270,17 @@ export default function AdminIntake() {
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted block mb-1">
                   Director (Real Name)
                 </label>
-                <input
-                  type="text"
+                <PersonSearchInput
                   value={filmForm.director}
-                  onChange={(e) => setFilmForm(prev => ({ ...prev, director: e.target.value }))}
-                  placeholder="e.g. Kunle Afolayan"
-                  className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-sm text-text-primary outline-none focus:border-brand"
+                  personId={filmForm.director_person_id}
+                  defaultDepartment="Directing"
+                  placeholder="Search or create director (e.g. Kunle Afolayan)"
+                  inputClassName={`w-full rounded-lg border bg-surface-2 px-3 py-2.5 pr-14 text-sm text-text-primary outline-none transition-colors ${
+                    filmForm.director_person_id ? 'border-emerald-500/50 focus:border-emerald-400' : 'border-border focus:border-brand'
+                  }`}
+                  onChange={({ name, person_id }) =>
+                    setFilmForm(prev => ({ ...prev, director: name, director_person_id: person_id }))
+                  }
                 />
               </div>
 
@@ -1986,12 +2394,15 @@ export default function AdminIntake() {
                         <span className="text-[10px] font-black text-text-muted w-5 text-center">
                           #{idx + 1}
                         </span>
-                        <input
-                          type="text"
+                        <PersonSearchInput
+                          className="flex-1"
                           value={actorName}
-                          onChange={(e) => handleUpdateCastRow(idx, 'name', e.target.value)}
-                          placeholder="Actor Name (e.g. Deyemi Okanlawon)"
-                          className="flex-1 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-brand"
+                          personId={typeof c === 'object' ? (c.person_id || null) : null}
+                          defaultDepartment="Acting"
+                          placeholder="Search or create actor (e.g. Deyemi Okanlawon)"
+                          onChange={({ name, person_id }) =>
+                            handleUpdateCastRow(idx, { name, person_id })
+                          }
                         />
                         <input
                           type="text"
@@ -2047,12 +2458,15 @@ export default function AdminIntake() {
                       <span className="text-[10px] font-black text-text-muted w-5 text-center">
                         #{idx + 1}
                       </span>
-                      <input
-                        type="text"
+                      <PersonSearchInput
+                        className="flex-1"
                         value={c.name || ''}
-                        onChange={(e) => handleUpdateCrewRow(idx, 'name', e.target.value)}
-                        placeholder="Crew Name (e.g. Jade Osiberu)"
-                        className="flex-1 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-brand"
+                        personId={c.person_id || null}
+                        defaultDepartment="Production"
+                        placeholder="Search or create crew (e.g. Jade Osiberu)"
+                        onChange={({ name, person_id }) =>
+                          handleUpdateCrewRow(idx, { name, person_id })
+                        }
                       />
                       <select
                         value={c.role || 'producer'}
@@ -2367,12 +2781,22 @@ export default function AdminIntake() {
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted block mb-1">
                   Playwright (Writer)
                 </label>
-                <input
-                  type="text"
+                <PersonSearchInput
                   value={playForm.playwright}
-                  onChange={(e) => setPlayForm(prev => ({ ...prev, playwright: e.target.value }))}
-                  placeholder="e.g. Wole Soyinka"
-                  className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-text-primary outline-none focus:border-brand"
+                  defaultDepartment="Writing"
+                  placeholder="Search or create playwright (e.g. Wole Soyinka)"
+                  inputClassName="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 pr-14 text-xs text-text-primary outline-none focus:border-brand"
+                  onChange={({ name, person_id }) =>
+                    setPlayForm(prev => {
+                      const crew = [...(prev.crew || [])];
+                      if (person_id && name) {
+                        const existingIdx = crew.findIndex(c => c.role === 'playwright' && (c.person_id === person_id || (c.name || '').toLowerCase() === name.toLowerCase()));
+                        if (existingIdx >= 0) crew[existingIdx] = { ...crew[existingIdx], name, person_id };
+                        else crew.push({ name, person_id, role: 'playwright' });
+                      }
+                      return { ...prev, playwright: name, crew };
+                    })
+                  }
                 />
               </div>
 
@@ -2380,12 +2804,22 @@ export default function AdminIntake() {
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted block mb-1">
                   Stage Director
                 </label>
-                <input
-                  type="text"
+                <PersonSearchInput
                   value={playForm.director}
-                  onChange={(e) => setPlayForm(prev => ({ ...prev, director: e.target.value }))}
-                  placeholder="e.g. Bolanle Austen-Peters"
-                  className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-text-primary outline-none focus:border-brand"
+                  defaultDepartment="Directing"
+                  placeholder="Search or create director (e.g. Bolanle Austen-Peters)"
+                  inputClassName="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 pr-14 text-xs text-text-primary outline-none focus:border-brand"
+                  onChange={({ name, person_id }) =>
+                    setPlayForm(prev => {
+                      const crew = [...(prev.crew || [])];
+                      if (person_id && name) {
+                        const existingIdx = crew.findIndex(c => c.role === 'director' && (c.person_id === person_id || (c.name || '').toLowerCase() === name.toLowerCase()));
+                        if (existingIdx >= 0) crew[existingIdx] = { ...crew[existingIdx], name, person_id };
+                        else crew.push({ name, person_id, role: 'director' });
+                      }
+                      return { ...prev, director: name, crew };
+                    })
+                  }
                 />
               </div>
 
@@ -2393,12 +2827,12 @@ export default function AdminIntake() {
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted block mb-1">
                   Producer / Production House
                 </label>
-                <input
-                  type="text"
+                <PersonSearchInput
                   value={playForm.producer}
-                  onChange={(e) => setPlayForm(prev => ({ ...prev, producer: e.target.value }))}
-                  placeholder="e.g. BAP Productions"
-                  className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-text-primary outline-none focus:border-brand"
+                  defaultDepartment="Production"
+                  placeholder="Search or type producer / house"
+                  inputClassName="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 pr-14 text-xs text-text-primary outline-none focus:border-brand"
+                  onChange={({ name }) => setPlayForm(prev => ({ ...prev, producer: name }))}
                 />
               </div>
             </div>
@@ -2449,12 +2883,15 @@ export default function AdminIntake() {
                       <span className="text-[10px] font-black text-text-muted w-5 text-center">
                         #{idx + 1}
                       </span>
-                      <input
-                        type="text"
+                      <PersonSearchInput
+                        className="flex-1"
                         value={c.name || ''}
-                        onChange={(e) => handleUpdatePlayCastRow(idx, 'name', e.target.value)}
-                        placeholder="Actor Name (e.g. Bimbo Manuel)"
-                        className="flex-1 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-brand"
+                        personId={c.person_id || null}
+                        defaultDepartment="Acting"
+                        placeholder="Search or create stage actor (e.g. Bimbo Manuel)"
+                        onChange={({ name, person_id }) =>
+                          handleUpdatePlayCastRow(idx, { name, person_id })
+                        }
                       />
                       <input
                         type="text"
@@ -2509,12 +2946,15 @@ export default function AdminIntake() {
                       <span className="text-[10px] font-black text-text-muted w-5 text-center">
                         #{idx + 1}
                       </span>
-                      <input
-                        type="text"
+                      <PersonSearchInput
+                        className="flex-1"
                         value={c.name || ''}
-                        onChange={(e) => handleUpdatePlayCrewRow(idx, 'name', e.target.value)}
-                        placeholder="Creative / Crew Name"
-                        className="flex-1 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-brand"
+                        personId={c.person_id || null}
+                        defaultDepartment="Crew"
+                        placeholder="Search or create creative / crew"
+                        onChange={({ name, person_id }) =>
+                          handleUpdatePlayCrewRow(idx, { name, person_id })
+                        }
                       />
                       <select
                         value={c.role || 'stage_manager'}

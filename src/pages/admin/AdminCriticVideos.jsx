@@ -59,9 +59,18 @@ export default function AdminCriticVideos() {
   const [awaiting, setAwaiting] = useState([]);
   const [queue, setQueue] = useState([]);
   const [critics, setCritics] = useState([]);
+  const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [queueStatus, setQueueStatus] = useState('pending_review');
+
+  // Monitored YouTube Critic Channels form state
+  const [newChannelInput, setNewChannelInput] = useState('');
+  const [newChannelCriticId, setNewChannelCriticId] = useState('');
+  const [newChannelLookback, setNewChannelLookback] = useState('30');
+  const [addingChannel, setAddingChannel] = useState(false);
+  const [pollingChannelId, setPollingChannelId] = useState(null);
+  const [pollingAll, setPollingAll] = useState(false);
 
   const [submitUrl, setSubmitUrl] = useState('');
   const [submitCriticId, setSubmitCriticId] = useState('');
@@ -81,15 +90,22 @@ export default function AdminCriticVideos() {
     [critics],
   );
 
+  const channelsById = useMemo(
+    () => Object.fromEntries(channels.map(ch => [ch.id, ch])),
+    [channels],
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [pending, reviewQueue] = await Promise.all([
-        callApi('pending', { params: { limit: '25' } }),
+      const [pending, reviewQueue, channelList] = await Promise.all([
+        callApi('pending', { params: { limit: '40' } }),
         callApi('review-queue', { params: { limit: '50', status: queueStatus } }),
+        callApi('list-channels').catch(() => ({ channels: [] })),
       ]);
       setAwaiting(pending.candidates || []);
       setQueue(reviewQueue.candidates || []);
+      setChannels(channelList.channels || []);
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -275,14 +291,111 @@ export default function AdminCriticVideos() {
     }
   }
 
-  async function pollChannels() {
+  async function pollChannels(singleChannelId = null) {
+    if (singleChannelId) setPollingChannelId(singleChannelId);
+    else setPollingAll(true);
     try {
-      const result = await callApi('poll', { method: 'POST', body: { limit: 20 } });
-      toast.success(`Checked ${result.channels} channels · queued ${result.queued}`);
-      if (result.errors?.length) toast.error(`${result.errors.length} channel(s) failed`);
+      const result = await callApi('poll', {
+        method: 'POST',
+        body: singleChannelId ? { channel_id: singleChannelId } : { limit: 30 },
+      });
+      if (singleChannelId && result.details?.[0]) {
+        const d = result.details[0];
+        if (d.error) {
+          toast.error(`${d.name}: ${d.error}`);
+        } else {
+          toast.success(
+            `${d.name}: checked ${d.discovered} recent uploads · queued ${d.queued}${d.newestTitle ? ` (latest: "${d.newestTitle.slice(0, 48)}")` : ''}`
+          );
+        }
+      } else {
+        toast.success(`Checked ${result.channels} channel(s) · discovered ${result.discovered} · queued ${result.queued}`);
+        if (result.errors?.length) {
+          toast.error(`${result.errors.length} channel(s) failed: ${result.errors.map(e => `${e.channel} (${e.error})`).join('; ')}`);
+        }
+      }
       await load();
     } catch (error) {
       toast.error(error.message);
+    } finally {
+      setPollingChannelId(null);
+      setPollingAll(false);
+    }
+  }
+
+  async function handleAddChannel(event) {
+    event.preventDefault();
+    if (!newChannelInput.trim()) return;
+    setAddingChannel(true);
+    try {
+      const res = await callApi('add-channel', {
+        method: 'POST',
+        body: {
+          channel_input: newChannelInput.trim(),
+          critic_id: newChannelCriticId || null,
+          lookback_days: Number(newChannelLookback),
+          poll_now: true,
+        },
+      });
+      const ch = res.channel;
+      const queued = res.poll?.queued ?? 0;
+      const discovered = res.poll?.discovered ?? 0;
+      toast.success(
+        `Added "${ch.name}"! Polled ${discovered} recent upload(s) and queued ${queued} video(s).`
+      );
+      setNewChannelInput('');
+      setNewChannelCriticId('');
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setAddingChannel(false);
+    }
+  }
+
+  async function handleToggleChannel(channel) {
+    setPollingChannelId(channel.id);
+    try {
+      await callApi('update-channel', {
+        method: 'POST',
+        body: { id: channel.id, is_enabled: !channel.is_enabled },
+      });
+      toast.success(channel.is_enabled ? `Paused ${channel.name}` : `Resumed listening to ${channel.name}`);
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setPollingChannelId(null);
+    }
+  }
+
+  async function handleUpdateChannelCritic(channel, criticId) {
+    try {
+      await callApi('update-channel', {
+        method: 'POST',
+        body: { id: channel.id, critic_id: criticId || null },
+      });
+      toast.success(`Updated critic link for ${channel.name}`);
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  }
+
+  async function handleDeleteChannel(channel) {
+    if (!window.confirm(`Stop monitoring "${channel.name}" and remove it from the listener list?`)) return;
+    setPollingChannelId(channel.id);
+    try {
+      await callApi('delete-channel', {
+        method: 'POST',
+        body: { id: channel.id },
+      });
+      toast.success(`Removed ${channel.name}`);
+      await load();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setPollingChannelId(null);
     }
   }
 
@@ -312,10 +425,10 @@ export default function AdminCriticVideos() {
             <Icon icon={clipperStatus === 'running' ? 'solar:check-circle-bold' : 'solar:laptop-minimalistic-bold'} className="w-4 h-4" />
             <span>{clipperStatus === 'running' ? 'Clipper Ready' : 'Start Clipper'}</span>
           </button>
-          <button type="button" onClick={pollChannels}
-            className="px-3 py-2 text-sm rounded-md border border-current/20 hover:bg-current/5">
-            <Icon icon="mdi:magnify-scan" className="inline mr-1" />
-            Check channels
+          <button type="button" onClick={() => pollChannels(null)} disabled={pollingAll}
+            className="px-3 py-2 text-sm rounded-md border border-current/20 hover:bg-current/5 disabled:opacity-50">
+            <Icon icon={pollingAll ? 'solar:spinner-linear' : 'mdi:magnify-scan'} className={`inline mr-1 ${pollingAll ? 'animate-spin' : ''}`} />
+            {pollingAll ? 'Checking…' : `Check all channels (${channels.filter(c => c.is_enabled).length})`}
           </button>
           <button type="button" onClick={load}
             className="px-3 py-2 text-sm rounded-md border border-current/20 hover:bg-current/5">
@@ -494,6 +607,198 @@ export default function AdminCriticVideos() {
         </div>
       </div>
 
+      {/* ── Monitored YouTube Critic Channels ───────────────────────────── */}
+      <section className="rounded-xl border border-current/15 p-4 mb-6 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="font-medium flex items-center gap-2">
+              <Icon icon="mdi:youtube" className="text-red-500 w-5 h-5" />
+              <span>Monitored YouTube Critic Channels</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 font-semibold">
+                {channels.filter(c => c.is_enabled).length} active
+              </span>
+            </h2>
+            <p className="text-sm opacity-70 mt-0.5">
+              Add any Nollywood YouTube reviewer (e.g. Halimah Yusuf, Iroko Critic, VDK Film Club) by pasting their <code className="text-xs">@handle</code>, channel URL, or any video link. New uploads are discovered automatically and queued below.
+            </p>
+          </div>
+        </div>
+
+        {/* Add channel form */}
+        <form onSubmit={handleAddChannel} className="grid sm:grid-cols-12 gap-2 items-end bg-current/[0.03] p-3 rounded-lg border border-current/10">
+          <div className="sm:col-span-3">
+            <label className="block text-xs opacity-70 mb-1">Link to Critic</label>
+            <select
+              value={newChannelCriticId}
+              onChange={(e) => {
+                const cid = e.target.value;
+                setNewChannelCriticId(cid);
+                const found = criticsById[cid];
+                if (found && !newChannelInput.trim()) {
+                  if (found.profile_url && /youtube\.com|youtu\.be/i.test(found.profile_url)) {
+                    setNewChannelInput(found.profile_url);
+                  } else if (found.handle && /youtube/i.test(found.platform || '')) {
+                    setNewChannelInput(found.handle.startsWith('@') ? found.handle : `@${found.handle}`);
+                  }
+                }
+              }}
+              className="w-full px-2.5 py-2 rounded-md bg-transparent border border-current/20 text-sm"
+            >
+              <option value="">Choose critic…</option>
+              {critics.map(critic => (
+                <option key={critic.id} value={critic.id}>
+                  {critic.name}{critic.publication ? ` (${critic.publication})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-5">
+            <label className="block text-xs opacity-70 mb-1">YouTube @handle, Channel URL, or Video URL *</label>
+            <input
+              type="text"
+              value={newChannelInput}
+              onChange={(e) => setNewChannelInput(e.target.value)}
+              placeholder="@HalimahThebird or https://www.youtube.com/@IrokoCritic"
+              className="w-full px-3 py-2 rounded-md bg-transparent border border-current/20 text-sm"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs opacity-70 mb-1">Initial Lookback</label>
+            <select
+              value={newChannelLookback}
+              onChange={(e) => setNewChannelLookback(e.target.value)}
+              className="w-full px-2.5 py-2 rounded-md bg-transparent border border-current/20 text-sm"
+            >
+              <option value="14">Last 14 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="365">Last 1 year</option>
+              <option value="3650">Latest 15 uploads (All)</option>
+              <option value="0">Future only</option>
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              disabled={addingChannel || !newChannelInput.trim()}
+              className="w-full px-3 py-2 rounded-md bg-brand text-on-brand hover:bg-brand-hover disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-1.5"
+            >
+              <Icon icon={addingChannel ? 'solar:spinner-linear' : 'mdi:plus'} className={addingChannel ? 'animate-spin' : ''} />
+              <span>{addingChannel ? 'Adding…' : 'Add & Poll'}</span>
+            </button>
+          </div>
+        </form>
+
+        {/* Active channels list */}
+        {channels.length === 0 ? (
+          <p className="text-xs opacity-60">No YouTube channels configured yet.</p>
+        ) : (
+          <div className="divide-y divide-current/10 rounded-lg border border-current/10 overflow-hidden">
+            {channels.map(channel => {
+              const isBusy = pollingChannelId === channel.id;
+              return (
+                <div key={channel.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={`https://www.youtube.com/channel/${channel.youtube_channel_id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-semibold hover:underline flex items-center gap-1.5"
+                      >
+                        <Icon icon="mdi:youtube" className="text-red-500 shrink-0" />
+                        <span>{channel.name}</span>
+                      </a>
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                        channel.is_enabled
+                          ? 'bg-emerald-500/15 text-emerald-500'
+                          : 'bg-current/10 opacity-60'
+                      }`}>
+                        {channel.is_enabled ? 'Listening' : 'Paused'}
+                      </span>
+                      <span className="text-[11px] opacity-55 font-mono">
+                        {channel.youtube_channel_id}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-70 mt-1">
+                      <span>
+                        Last polled: {channel.last_polled_at ? new Date(channel.last_polled_at).toLocaleString() : 'Never'}
+                      </span>
+                      {channel.last_error && (
+                        <span className="text-rose-500 font-medium">
+                          Error: {channel.last_error}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={channel.critic_id || ''}
+                      onChange={(e) => handleUpdateChannelCritic(channel, e.target.value)}
+                      className="px-2 py-1 rounded border border-current/20 bg-transparent text-xs max-w-[180px]"
+                      title="Linked critic profile"
+                    >
+                      <option value="">No linked critic</option>
+                      {critics.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => pollChannels(channel.id)}
+                      className="px-2.5 py-1 text-xs rounded border border-current/20 hover:bg-current/10 disabled:opacity-50 font-medium"
+                      title="Poll new uploads since baseline"
+                    >
+                      {isBusy ? 'Polling…' : 'Test Poll'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={async () => {
+                        setPollingChannelId(channel.id);
+                        try {
+                          await callApi('update-channel', {
+                            method: 'POST',
+                            body: { id: channel.id, lookback_days: 3650 },
+                          });
+                          await pollChannels(channel.id);
+                        } catch (error) {
+                          toast.error(error.message);
+                          setPollingChannelId(null);
+                        }
+                      }}
+                      className="px-2.5 py-1 text-xs rounded border border-brand/40 text-brand hover:bg-brand/10 disabled:opacity-50 font-medium"
+                      title="Pull the latest 15 uploads from this channel regardless of publish date"
+                    >
+                      Pull Latest 15
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleToggleChannel(channel)}
+                      className="px-2.5 py-1 text-xs rounded border border-current/20 hover:bg-current/10 disabled:opacity-50"
+                    >
+                      {channel.is_enabled ? 'Pause' : 'Resume'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleDeleteChannel(channel)}
+                      className="px-2 py-1 text-xs rounded border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 disabled:opacity-50"
+                      title="Remove channel"
+                    >
+                      <Icon icon="solar:trash-bin-trash-linear" width="14" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       <form onSubmit={submitByUrl} className="rounded-lg border border-current/15 p-4 mb-8">
         <h2 className="font-medium mb-1">Add a review by link</h2>
         <p className="text-sm opacity-70 mb-3">
@@ -546,10 +851,26 @@ export default function AdminCriticVideos() {
           <p className="text-sm opacity-60">Nothing waiting. Use “Check channels” to look for new uploads.</p>
         ) : (
           <ul className="space-y-2">
-            {awaiting.map(candidate => (
+            {awaiting.map(candidate => {
+              const sourceChannel = candidate.critic_channel_id ? channelsById[candidate.critic_channel_id] : null;
+              const sourceCritic = candidate.critic_id ? criticsById[candidate.critic_id] : null;
+              return (
               <li key={candidate.id}
                 className="flex flex-wrap items-center gap-3 rounded-lg border border-current/15 p-3">
                 <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                    {(sourceChannel || sourceCritic) && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">
+                        <Icon icon={PLATFORM_ICONS[candidate.source_platform || 'youtube'] || PLATFORM_ICONS.other} width="12" />
+                        {sourceCritic?.name || sourceChannel?.name}
+                      </span>
+                    )}
+                    {candidate.video_published_at && (
+                      <span className="text-[11px] opacity-60">
+                        {new Date(candidate.video_published_at).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
                   <a href={candidate.video_url} target="_blank" rel="noreferrer"
                     className="font-medium hover:underline break-words">
                     {candidate.video_title || candidate.video_url}
@@ -566,7 +887,8 @@ export default function AdminCriticVideos() {
                   {busyId === candidate.id ? 'Fetching…' : 'Fetch transcript'}
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>
