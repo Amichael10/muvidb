@@ -24,8 +24,6 @@ const ALLOWED_DOMAINS = [
 const SKIP_DOMAINS = [
   'occ-0-',       // Netflix CDN — blocks all non-browser fetches
   'nflxso.net',
-  'instagram.f',  // Instagram CDN — requires login session
-  'fbcdn.net',
 ];
 
 // Detect a real image by its leading bytes (magic numbers), regardless of the
@@ -92,7 +90,16 @@ export async function mirrorImageToStorage(
           // Pretend we're hotlinking from the source site itself, NOT muvidb.com.
           // Most hotlink protection allows a same-origin Referer and blocks foreign
           // ones — sending 'https://muvidb.com/' is exactly what got us blocked.
-          'Referer': (() => { try { return new URL(externalUrl).origin + '/'; } catch { return ''; } })(),
+          'Referer': (() => {
+            try {
+              if (externalUrl.includes('cdninstagram.com') || externalUrl.includes('fbcdn.net') || externalUrl.includes('instagram.com')) {
+                return 'https://www.instagram.com/';
+              }
+              return new URL(externalUrl).origin + '/';
+            } catch {
+              return '';
+            }
+          })(),
         },
       });
     } finally {

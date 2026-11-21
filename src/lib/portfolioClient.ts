@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { fetchPersonStageCredits } from './plays';
+import { fetchCastingProfile, type CastingProfileData } from './castingProfile';
 
 export interface CustomLink {
   id: string;
@@ -110,6 +111,7 @@ export interface PortfolioData {
   }>;
   metrics: PortfolioMetrics;
   settings: PortfolioSettings;
+  castingProfile?: CastingProfileData | null;
 }
 
 /**
@@ -207,8 +209,8 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
 
   if (!personId) return null;
 
-  // 3. Fetch comprehensive person data, credits, media, and stage plays
-  const [personRes, creditsRes, mediaRes, stageRes] = await Promise.all([
+  // 3. Fetch comprehensive person data, credits, media, stage plays, and casting specs
+  const [personRes, creditsRes, mediaRes, stageRes, castingProfile] = await Promise.all([
     supabase
       .from('people')
       .select(`
@@ -241,6 +243,7 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
       .order('sort_order', { ascending: true })
       .limit(12),
     fetchPersonStageCredits(personId).catch(() => []),
+    fetchCastingProfile(personId).catch(() => null),
   ]);
 
   if (personRes.error || !personRes.data) return null;
@@ -379,6 +382,7 @@ export async function fetchPortfolioByHandle(rawHandle: string): Promise<Portfol
     media: mediaRes.data || [],
     metrics: computePortfolioMetrics(allFilms, stageRes || [], p.youtube_stats),
     settings,
+    castingProfile,
   };
 }
 

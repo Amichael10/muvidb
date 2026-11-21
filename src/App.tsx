@@ -390,8 +390,8 @@ export default function App() {
                 <Route path="/title-search" element={<TitleChecker />} />
                 <Route path="/tools/title-checker" element={<TitleChecker />} />
                 <Route path="/title-checker" element={<TitleChecker />} />
-                <Route path="/support" element={<Support />} />
-                <Route path="/support-us" element={<Support />} />
+                <Route path="/support" element={<Navigate to="/" replace />} />
+                <Route path="/support-us" element={<Navigate to="/" replace />} />
                 <Route path="/brand" element={<Brand />} />
                 <Route path="/brand-kit" element={<Brand />} />
                 <Route path="/oauth/authorize" element={<OAuthAuthorize />} />

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import SEO from '../../components/SEO';
 import { authHeaders } from '../../lib/apiAuth';
 import { supabase } from '../../lib/supabase';
+import { uploadAdminImage } from '../../lib/imageUpload';
 import { extractCreditsWithLocalOCR, extractRawTextWithLocalOCR } from '../../utils/localCreditOcr';
 
 const DESTINATIONS = [
@@ -23,6 +24,45 @@ const PLAY_GENRES = [
   'Drama', 'Musical', 'Tragedy', 'Comedy', 'Historical', 'Satire', 'Folklore', 'Dance Drama'
 ];
 
+const FILM_CREW_ROLES = [
+  { id: 'director', label: 'Director' },
+  { id: 'producer', label: 'Producer' },
+  { id: 'executive_producer', label: 'Executive Producer' },
+  { id: 'writer', label: 'Writer / Screenplay' },
+  { id: 'cinematographer', label: 'Cinematographer (DOP)' },
+  { id: 'editor', label: 'Editor' },
+  { id: 'sound', label: 'Sound Designer' },
+  { id: 'costume', label: 'Costume Designer' },
+  { id: 'production_designer', label: 'Production Designer' },
+  { id: 'composer', label: 'Music Composer' },
+  { id: 'casting', label: 'Casting Director' },
+  { id: 'crew', label: 'Other Crew' },
+];
+
+const STAGE_CREW_ROLES = [
+  { id: 'director', label: 'Stage Director' },
+  { id: 'playwright', label: 'Playwright / Writer' },
+  { id: 'producer', label: 'Producer / Company' },
+  { id: 'stage_manager', label: 'Stage Manager' },
+  { id: 'lighting', label: 'Lighting Designer' },
+  { id: 'choreographer', label: 'Choreographer' },
+  { id: 'costume', label: 'Costume & Wardrobe' },
+  { id: 'sound', label: 'Sound & Music' },
+  { id: 'crew', label: 'Stage Crew' },
+];
+
+// Helper to reliably preview images in browser without Instagram hotlinking blocks
+export function getSafePreviewUrl(rawUrl) {
+  if (!rawUrl) return '';
+  if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:') || rawUrl.includes('supabase.co')) {
+    return rawUrl;
+  }
+  if (/cdninstagram\.com|fbcdn\.net|instagram\.f/i.test(rawUrl)) {
+    return `/api/media?url=${encodeURIComponent(rawUrl)}`;
+  }
+  return rawUrl;
+}
+
 export default function AdminIntake() {
   // Input & state
   const [url, setUrl] = useState('');
@@ -36,6 +76,29 @@ export default function AdminIntake() {
 
   // Active destination tab
   const [activeTab, setActiveTab] = useState('film');
+
+  // Mode for linking to existing film or creating new
+  const [filmMode, setFilmMode] = useState('new'); // 'new' | 'link'
+  const [linkedFilm, setLinkedFilm] = useState(null);
+  const [filmSearchQuery, setFilmSearchQuery] = useState('');
+  const [filmSearchResults, setFilmSearchResults] = useState([]);
+  const [isSearchingFilms, setIsSearchingFilms] = useState(false);
+
+  // Mode for linking to existing stage play
+  const [playMode, setPlayMode] = useState('new'); // 'new' | 'link'
+  const [linkedPlay, setLinkedPlay] = useState(null);
+  const [playSearchQuery, setPlaySearchQuery] = useState('');
+  const [playSearchResults, setPlaySearchResults] = useState([]);
+  const [isSearchingPlays, setIsSearchingPlays] = useState(false);
+
+  // Mention active crew dropdown index
+  const [activeMentionDropdown, setActiveMentionDropdown] = useState(null);
+
+  // Image upload / mirror states
+  const [isMirroringPoster, setIsMirroringPoster] = useState(false);
+  const [isMirroringBackdrop, setIsMirroringBackdrop] = useState(false);
+  const [isUploadingPoster, setIsUploadingPoster] = useState(false);
+  const [isUploadingBackdrop, setIsUploadingBackdrop] = useState(false);
 
   // OCR state
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
@@ -53,15 +116,18 @@ export default function AdminIntake() {
     runtime_minutes: '',
     director: '',
     cast: [],
+    crew: [],
     platform: 'Cinema',
     content_type: 'movie',
     poster_url: '',
     backdrop_url: '',
     trailer_external_url: '',
     status: 'upcoming',
+    update_existing_film_id: null,
   });
 
   const [playForm, setPlayForm] = useState({
+    id: null,
     title: '',
     year: new Date().getFullYear(),
     venue: 'Terra Kulture, Victoria Island',
@@ -79,6 +145,8 @@ export default function AdminIntake() {
     poster_url: '',
     banner_url: '',
     source_url: '',
+    cast: [],
+    crew: [],
   });
 
   const [reviewForm, setReviewForm] = useState({
@@ -138,10 +206,196 @@ export default function AdminIntake() {
   const [isSearchingPeople, setIsSearchingPeople] = useState(false);
   const [activePersonField, setActivePersonField] = useState(null); // 'director' | 'cast_add'
 
-  // Match existing film lookup for review
-  const [filmSearchQuery, setFilmSearchQuery] = useState('');
-  const [filmSearchResults, setFilmSearchResults] = useState([]);
-  const [isSearchingFilms, setIsSearchingFilms] = useState(false);
+  // Live search existing film in MuviDB to link / enrich
+  useEffect(() => {
+    if (!filmSearchQuery.trim() || filmSearchQuery.trim().length < 2) {
+      setFilmSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingFilms(true);
+      try {
+        const { data } = await supabase
+          .from('films')
+          .select('id, title, year, poster_url, backdrop_url, synopsis, runtime_minutes, genres, slug')
+          .ilike('title', `%${filmSearchQuery.trim()}%`)
+          .limit(8);
+        setFilmSearchResults(data || []);
+      } catch (err) {
+        console.warn('Search films error:', err);
+      } finally {
+        setIsSearchingFilms(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [filmSearchQuery]);
+
+  const handleSelectExistingFilm = async (film) => {
+    setLinkedFilm(film);
+    setFilmForm(prev => ({
+      ...prev,
+      title: film.title,
+      year: film.year || prev.year,
+      synopsis: prev.synopsis || film.synopsis || '',
+      genres: film.genres?.length ? film.genres : prev.genres,
+      runtime_minutes: film.runtime_minutes || prev.runtime_minutes,
+      poster_url: prev.poster_url || film.poster_url || '',
+      backdrop_url: prev.backdrop_url || film.backdrop_url || '',
+      update_existing_film_id: film.id,
+    }));
+    setFilmSearchResults([]);
+    setFilmSearchQuery('');
+
+    // Fetch existing credits from DB so user can see and enrich
+    try {
+      const { data: creds } = await supabase
+        .from('credits')
+        .select('id, role, character_name, people(id, name)')
+        .eq('film_id', film.id);
+
+      if (creds && creds.length > 0) {
+        const existingCast = creds.filter(c => c.role === 'actor').map(c => ({
+          name: c.people?.name || '',
+          character_name: c.character_name || '',
+          isExisting: true,
+        })).filter(c => c.name);
+
+        const existingCrew = creds.filter(c => c.role !== 'actor').map(c => ({
+          name: c.people?.name || '',
+          role: c.role || 'crew',
+          isExisting: true,
+        })).filter(c => c.name);
+
+        setFilmForm(prev => {
+          const castMap = new Map();
+          (prev.cast || []).forEach(c => {
+            const name = typeof c === 'string' ? c : c.name;
+            if (name) castMap.set(name.toLowerCase(), typeof c === 'string' ? { name, character_name: '' } : c);
+          });
+          existingCast.forEach(c => {
+            if (!castMap.has(c.name.toLowerCase())) {
+              castMap.set(c.name.toLowerCase(), c);
+            }
+          });
+
+          const crewMap = new Map();
+          (prev.crew || []).forEach(c => {
+            if (c.name) crewMap.set(`${c.name.toLowerCase()}-${c.role}`, c);
+          });
+          existingCrew.forEach(c => {
+            const key = `${c.name.toLowerCase()}-${c.role}`;
+            if (!crewMap.has(key)) crewMap.set(key, c);
+          });
+
+          return {
+            ...prev,
+            cast: Array.from(castMap.values()),
+            crew: Array.from(crewMap.values()),
+          };
+        });
+        toast.success(`Linked to existing film "${film.title}"! Loaded credits.`);
+      } else {
+        toast.success(`Linked to existing film "${film.title}"!`);
+      }
+    } catch (err) {
+      console.warn('Could not load existing credits:', err);
+      toast.success(`Linked to existing film "${film.title}"!`);
+    }
+  };
+
+  const handleUnlinkFilm = () => {
+    setLinkedFilm(null);
+    setFilmForm(prev => ({ ...prev, update_existing_film_id: null }));
+    toast('Unlinked. In new film mode.');
+  };
+
+  // Live search existing stage play in MuviDB
+  useEffect(() => {
+    if (!playSearchQuery.trim() || playSearchQuery.trim().length < 2) {
+      setPlaySearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingPlays(true);
+      try {
+        const { data } = await supabase
+          .from('plays')
+          .select('id, title, year, venue, city, country, poster_url, banner_url, playwright, director, producer, synopsis, genre, run_start_date, run_end_date, status, slug')
+          .ilike('title', `%${playSearchQuery.trim()}%`)
+          .limit(8);
+        setPlaySearchResults(data || []);
+      } catch (err) {
+        console.warn('Search plays error:', err);
+      } finally {
+        setIsSearchingPlays(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [playSearchQuery]);
+
+  const handleSelectExistingPlay = async (play) => {
+    setLinkedPlay(play);
+    setPlayForm(prev => ({
+      ...prev,
+      id: play.id,
+      title: play.title,
+      year: play.year || prev.year,
+      venue: play.venue || prev.venue,
+      city: play.city || prev.city,
+      country: play.country || prev.country,
+      playwright: play.playwright || prev.playwright,
+      director: play.director || prev.director,
+      producer: play.producer || prev.producer,
+      genre: play.genre || prev.genre,
+      synopsis: prev.synopsis || play.synopsis || '',
+      status: play.status || prev.status,
+      run_start_date: play.run_start_date || prev.run_start_date,
+      run_end_date: play.run_end_date || prev.run_end_date,
+      poster_url: prev.poster_url || play.poster_url || '',
+      banner_url: prev.banner_url || play.banner_url || '',
+    }));
+    setPlaySearchResults([]);
+    setPlaySearchQuery('');
+
+    try {
+      const { data: creds } = await supabase
+        .from('stage_credits')
+        .select('id, role, character_name, people(id, name)')
+        .eq('play_id', play.id);
+
+      if (creds && creds.length > 0) {
+        const existingCast = creds.filter(c => c.role === 'actor').map(c => ({
+          name: c.people?.name || '',
+          character_name: c.character_name || '',
+          isExisting: true,
+        })).filter(c => c.name);
+
+        const existingCrew = creds.filter(c => c.role !== 'actor').map(c => ({
+          name: c.people?.name || '',
+          role: c.role || 'crew',
+          isExisting: true,
+        })).filter(c => c.name);
+
+        setPlayForm(prev => ({
+          ...prev,
+          cast: [...(prev.cast || []), ...existingCast],
+          crew: [...(prev.crew || []), ...existingCrew],
+        }));
+        toast.success(`Linked to stage play "${play.title}"!`);
+      } else {
+        toast.success(`Linked to stage play "${play.title}"!`);
+      }
+    } catch (err) {
+      console.warn('Could not load stage credits:', err);
+      toast.success(`Linked to stage play "${play.title}"!`);
+    }
+  };
+
+  const handleUnlinkPlay = () => {
+    setLinkedPlay(null);
+    setPlayForm(prev => ({ ...prev, id: null }));
+    toast('Unlinked from stage play.');
+  };
 
   // Reset all
   const handleReset = () => {
@@ -152,6 +406,11 @@ export default function AdminIntake() {
     setOcrResult(null);
     setShowOcrPanel(false);
     setPublishResult(null);
+    setLinkedFilm(null);
+    setLinkedPlay(null);
+    setFilmMode('new');
+    setPlayMode('new');
+    setActiveMentionDropdown(null);
     setFilmForm({
       title: '',
       year: new Date().getFullYear(),
@@ -161,14 +420,17 @@ export default function AdminIntake() {
       runtime_minutes: '',
       director: '',
       cast: [],
+      crew: [],
       platform: 'Cinema',
       content_type: 'movie',
       poster_url: '',
       backdrop_url: '',
       trailer_external_url: '',
       status: 'upcoming',
+      update_existing_film_id: null,
     });
     setPlayForm({
+      id: null,
       title: '',
       year: new Date().getFullYear(),
       venue: 'Terra Kulture, Victoria Island',
@@ -186,6 +448,8 @@ export default function AdminIntake() {
       poster_url: '',
       banner_url: '',
       source_url: '',
+      cast: [],
+      crew: [],
     });
     setReviewForm({
       targetType: 'film',
@@ -201,6 +465,113 @@ export default function AdminIntake() {
       is_anonymous: false,
       is_featured: true,
     });
+  };
+
+  // Set as Poster with server-side mirror for ephemeral social links
+  const handleSetAsPoster = async (slideUrl) => {
+    if (!slideUrl) return;
+    if (/cdninstagram\.com|fbcdn\.net|instagram\.f/i.test(slideUrl)) {
+      setIsMirroringPoster(true);
+      const toastId = toast.loading('Mirroring & saving poster to Supabase Storage…');
+      try {
+        const headers = await authHeaders();
+        const res = await fetch('/api/social?task=mirror_social_image', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ url: slideUrl, bucket: 'posters' }),
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          setFilmForm(prev => ({ ...prev, poster_url: data.url }));
+          setPlayForm(prev => ({ ...prev, poster_url: data.url }));
+          setSocialForm(prev => ({ ...prev, imageUrl: data.url }));
+          toast.success('Poster saved permanently to Supabase Storage!', { id: toastId });
+          return;
+        }
+      } catch (err) {
+        console.warn('Immediate mirror failed:', err);
+      } finally {
+        setIsMirroringPoster(false);
+      }
+      toast.dismiss(toastId);
+    }
+    setFilmForm(prev => ({ ...prev, poster_url: slideUrl }));
+    setPlayForm(prev => ({ ...prev, poster_url: slideUrl }));
+    setSocialForm(prev => ({ ...prev, imageUrl: slideUrl }));
+    toast.success(`Slide ${selectedSlideIdx + 1} set as Poster!`);
+  };
+
+  // Set as Backdrop with server-side mirror
+  const handleSetAsBackdrop = async (slideUrl) => {
+    if (!slideUrl) return;
+    if (/cdninstagram\.com|fbcdn\.net|instagram\.f/i.test(slideUrl)) {
+      setIsMirroringBackdrop(true);
+      const toastId = toast.loading('Mirroring & saving backdrop to Supabase Storage…');
+      try {
+        const headers = await authHeaders();
+        const res = await fetch('/api/social?task=mirror_social_image', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ url: slideUrl, bucket: 'backdrops' }),
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          setFilmForm(prev => ({ ...prev, backdrop_url: data.url }));
+          setPlayForm(prev => ({ ...prev, banner_url: data.url }));
+          toast.success('Backdrop saved permanently to Supabase Storage!', { id: toastId });
+          return;
+        }
+      } catch (err) {
+        console.warn('Immediate mirror failed:', err);
+      } finally {
+        setIsMirroringBackdrop(false);
+      }
+      toast.dismiss(toastId);
+    }
+    setFilmForm(prev => ({ ...prev, backdrop_url: slideUrl }));
+    setPlayForm(prev => ({ ...prev, banner_url: slideUrl }));
+    toast.success(`Slide ${selectedSlideIdx + 1} set as Backdrop!`);
+  };
+
+  // Direct upload custom poster from local device
+  const handleCustomPosterUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingPoster(true);
+    const toastId = toast.loading('Uploading custom poster to Supabase…');
+    try {
+      const { url: publicUrl, error } = await uploadAdminImage(file, 'posters');
+      if (error) throw new Error(error);
+      setFilmForm(prev => ({ ...prev, poster_url: publicUrl }));
+      setPlayForm(prev => ({ ...prev, poster_url: publicUrl }));
+      setSocialForm(prev => ({ ...prev, imageUrl: publicUrl }));
+      toast.success('Custom poster uploaded to Supabase Storage!', { id: toastId });
+    } catch (err) {
+      toast.error(err.message || 'Poster upload failed', { id: toastId });
+    } finally {
+      setIsUploadingPoster(false);
+      e.target.value = '';
+    }
+  };
+
+  // Direct upload custom backdrop from local device
+  const handleCustomBackdropUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingBackdrop(true);
+    const toastId = toast.loading('Uploading custom backdrop to Supabase…');
+    try {
+      const { url: publicUrl, error } = await uploadAdminImage(file, 'backdrops');
+      if (error) throw new Error(error);
+      setFilmForm(prev => ({ ...prev, backdrop_url: publicUrl }));
+      setPlayForm(prev => ({ ...prev, banner_url: publicUrl }));
+      toast.success('Custom backdrop uploaded to Supabase Storage!', { id: toastId });
+    } catch (err) {
+      toast.error(err.message || 'Backdrop upload failed', { id: toastId });
+    } finally {
+      setIsUploadingBackdrop(false);
+      e.target.value = '';
+    }
   };
 
   // Fetch post media & caption
@@ -236,6 +607,16 @@ export default function AdminIntake() {
       const primaryPoster = data.media?.find(m => m.type === 'image' && m.isPrimary)?.url || data.media?.find(m => m.type === 'image')?.url || '';
       const secondaryBackdrop = data.media?.filter(m => m.type === 'image')?.[1]?.url || '';
 
+      const detectedCrew = [];
+      if (filmSug.director) detectedCrew.push({ name: filmSug.director, role: 'director' });
+      if (Array.isArray(filmSug.crew)) {
+        filmSug.crew.forEach(c => {
+          if (c.name && !detectedCrew.some(x => x.name.toLowerCase() === c.name.toLowerCase() && x.role === c.role)) {
+            detectedCrew.push({ name: c.name, role: c.role || 'crew' });
+          }
+        });
+      }
+
       setFilmForm({
         title: filmSug.title || '',
         year: filmSug.year || new Date().getFullYear(),
@@ -245,17 +626,25 @@ export default function AdminIntake() {
         runtime_minutes: filmSug.runtime_minutes || '',
         director: filmSug.director || '',
         cast: Array.isArray(filmSug.cast) ? filmSug.cast : [],
+        crew: detectedCrew,
         platform: filmSug.platform || 'Cinema',
         content_type: filmSug.content_type || 'movie',
         poster_url: primaryPoster,
         backdrop_url: secondaryBackdrop,
         trailer_external_url: /youtu(?:\.be|be\.com)/i.test(url) ? url : '',
         status: 'upcoming',
+        update_existing_film_id: null,
       });
 
       // Populate stage play form
       const playSug = data.suggestions?.play || {};
+      const stageCrew = [];
+      if (playSug.director) stageCrew.push({ name: playSug.director, role: 'director' });
+      if (playSug.playwright) stageCrew.push({ name: playSug.playwright, role: 'playwright' });
+      if (playSug.producer) stageCrew.push({ name: playSug.producer, role: 'producer' });
+
       setPlayForm({
+        id: null,
         title: playSug.title || filmSug.title || '',
         year: playSug.year || new Date().getFullYear(),
         venue: playSug.venue || 'Terra Kulture, Victoria Island',
@@ -273,6 +662,8 @@ export default function AdminIntake() {
         poster_url: primaryPoster,
         banner_url: secondaryBackdrop,
         source_url: url || '',
+        cast: [],
+        crew: stageCrew,
       });
 
       // Populate review form
@@ -390,7 +781,8 @@ export default function AdminIntake() {
 
   // Add mention directly to cast
   const handleAddMentionToCast = (mention) => {
-    const nameToAdd = mention.resolvedName || mention.handle.replace(/^@+/, '');
+    const nameToAdd = (mention.resolvedName || mention.handle.replace(/^@+/, '')).trim();
+    if (!nameToAdd) return;
     const currentCast = [...(filmForm.cast || [])];
     const exists = currentCast.some(c => (typeof c === 'string' ? c : c.name).toLowerCase() === nameToAdd.toLowerCase());
 
@@ -399,27 +791,99 @@ export default function AdminIntake() {
       return;
     }
 
-    currentCast.push({ name: nameToAdd, character_name: null });
+    currentCast.push({ name: nameToAdd, character_name: '' });
     setFilmForm(prev => ({ ...prev, cast: currentCast }));
     toast.success(`Added ${nameToAdd} to Cast!`);
   };
 
   // Set mention as director
   const handleSetMentionAsDirector = (mention) => {
-    const name = mention.resolvedName || mention.handle.replace(/^@+/, '');
-    setFilmForm(prev => ({ ...prev, director: name }));
-    setPlayForm(prev => ({ ...prev, director: name }));
+    const name = (mention.resolvedName || mention.handle.replace(/^@+/, '')).trim();
+    if (!name) return;
+    setFilmForm(prev => {
+      const crew = [...(prev.crew || [])];
+      if (!crew.some(c => c.name.toLowerCase() === name.toLowerCase() && c.role === 'director')) {
+        crew.push({ name, role: 'director' });
+      }
+      return { ...prev, director: name, crew };
+    });
+    setPlayForm(prev => {
+      const crew = [...(prev.crew || [])];
+      if (!crew.some(c => c.name.toLowerCase() === name.toLowerCase() && c.role === 'director')) {
+        crew.push({ name, role: 'director' });
+      }
+      return { ...prev, director: name, crew };
+    });
     toast.success(`Set ${name} as Director!`);
   };
 
   // Set mention as playwright
   const handleSetMentionAsPlaywright = (mention) => {
-    const name = mention.resolvedName || mention.handle.replace(/^@+/, '');
-    setPlayForm(prev => ({ ...prev, playwright: name }));
+    const name = (mention.resolvedName || mention.handle.replace(/^@+/, '')).trim();
+    if (!name) return;
+    setPlayForm(prev => {
+      const crew = [...(prev.crew || [])];
+      if (!crew.some(c => c.name.toLowerCase() === name.toLowerCase() && c.role === 'playwright')) {
+        crew.push({ name, role: 'playwright' });
+      }
+      return { ...prev, playwright: name, crew };
+    });
     toast.success(`Set ${name} as Playwright!`);
   };
 
-  // Add manual cast row
+  // Generic mention role assignment
+  const handleAddMentionToRole = (mention, roleId) => {
+    const name = (mention.resolvedName || mention.handle.replace(/^@+/, '')).trim();
+    if (!name) return;
+
+    if (activeTab === 'play') {
+      if (roleId === 'actor') {
+        const currentCast = [...(playForm.cast || [])];
+        if (currentCast.some(c => (c.name || '').toLowerCase() === name.toLowerCase())) {
+          toast.error(`${name} is already in stage cast.`);
+          return;
+        }
+        setPlayForm(prev => ({
+          ...prev,
+          cast: [...(prev.cast || []), { name, character_name: '' }],
+        }));
+        toast.success(`Added ${name} to Stage Cast!`);
+      } else {
+        if (roleId === 'director') setPlayForm(prev => ({ ...prev, director: name }));
+        if (roleId === 'playwright') setPlayForm(prev => ({ ...prev, playwright: name }));
+        if (roleId === 'producer') setPlayForm(prev => ({ ...prev, producer: name }));
+
+        const currentCrew = [...(playForm.crew || [])];
+        if (!currentCrew.some(c => (c.name || '').toLowerCase() === name.toLowerCase() && c.role === roleId)) {
+          setPlayForm(prev => ({
+            ...prev,
+            crew: [...(prev.crew || []), { name, role: roleId }],
+          }));
+        }
+        const label = STAGE_CREW_ROLES.find(r => r.id === roleId)?.label || roleId;
+        toast.success(`Assigned ${name} as ${label}!`);
+      }
+    } else {
+      // Film
+      if (roleId === 'actor') {
+        handleAddMentionToCast(mention);
+      } else {
+        if (roleId === 'director') setFilmForm(prev => ({ ...prev, director: name }));
+        const currentCrew = [...(filmForm.crew || [])];
+        if (!currentCrew.some(c => (c.name || '').toLowerCase() === name.toLowerCase() && c.role === roleId)) {
+          setFilmForm(prev => ({
+            ...prev,
+            crew: [...(prev.crew || []), { name, role: roleId }],
+          }));
+        }
+        const label = FILM_CREW_ROLES.find(r => r.id === roleId)?.label || roleId;
+        toast.success(`Assigned ${name} as ${label}!`);
+      }
+    }
+    setActiveMentionDropdown(null);
+  };
+
+  // Add manual cast row (Film)
   const handleAddManualCastRow = () => {
     setFilmForm(prev => ({
       ...prev,
@@ -427,19 +891,87 @@ export default function AdminIntake() {
     }));
   };
 
-  // Remove cast row
+  // Remove cast row (Film)
   const handleRemoveCastRow = (index) => {
     setFilmForm(prev => ({
       ...prev,
-      cast: prev.cast.filter((_, idx) => idx !== index),
+      cast: (prev.cast || []).filter((_, idx) => idx !== index),
     }));
   };
 
-  // Update cast row
+  // Update cast row (Film)
   const handleUpdateCastRow = (index, field, value) => {
     setFilmForm(prev => ({
       ...prev,
-      cast: prev.cast.map((item, idx) => idx === index ? { ...item, [field]: value } : item),
+      cast: (prev.cast || []).map((item, idx) => idx === index ? { ...item, [field]: value } : item),
+    }));
+  };
+
+  // Add manual crew row (Film)
+  const handleAddManualCrewRow = () => {
+    setFilmForm(prev => ({
+      ...prev,
+      crew: [...(prev.crew || []), { name: '', role: 'producer' }],
+    }));
+  };
+
+  // Remove crew row (Film)
+  const handleRemoveCrewRow = (index) => {
+    setFilmForm(prev => ({
+      ...prev,
+      crew: (prev.crew || []).filter((_, idx) => idx !== index),
+    }));
+  };
+
+  // Update crew row (Film)
+  const handleUpdateCrewRow = (index, field, value) => {
+    setFilmForm(prev => ({
+      ...prev,
+      crew: (prev.crew || []).map((item, idx) => idx === index ? { ...item, [field]: value } : item),
+    }));
+  };
+
+  // Play Cast handlers
+  const handleAddPlayCastRow = () => {
+    setPlayForm(prev => ({
+      ...prev,
+      cast: [...(prev.cast || []), { name: '', character_name: '' }],
+    }));
+  };
+
+  const handleRemovePlayCastRow = (index) => {
+    setPlayForm(prev => ({
+      ...prev,
+      cast: (prev.cast || []).filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const handleUpdatePlayCastRow = (index, field, value) => {
+    setPlayForm(prev => ({
+      ...prev,
+      cast: (prev.cast || []).map((item, idx) => idx === index ? { ...item, [field]: value } : item),
+    }));
+  };
+
+  // Play Crew handlers
+  const handleAddPlayCrewRow = () => {
+    setPlayForm(prev => ({
+      ...prev,
+      crew: [...(prev.crew || []), { name: '', role: 'stage_manager' }],
+    }));
+  };
+
+  const handleRemovePlayCrewRow = (index) => {
+    setPlayForm(prev => ({
+      ...prev,
+      crew: (prev.crew || []).filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const handleUpdatePlayCrewRow = (index, field, value) => {
+    setPlayForm(prev => ({
+      ...prev,
+      crew: (prev.crew || []).map((item, idx) => idx === index ? { ...item, [field]: value } : item),
     }));
   };
 
@@ -775,7 +1307,12 @@ export default function AdminIntake() {
                           <Icon icon="solar:videocamera-record-bold" width="28" />
                         </div>
                       ) : (
-                        <img src={media.url} alt="" className="h-full w-full object-cover" />
+                        <img
+                          src={getSafePreviewUrl(media.url)}
+                          alt=""
+                          referrerPolicy="no-referrer"
+                          className="h-full w-full object-cover"
+                        />
                       )}
 
                       <span className="absolute bottom-1.5 left-1.5 bg-black/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-[9px] font-black text-white">
@@ -805,7 +1342,12 @@ export default function AdminIntake() {
                   {activeSlide.type === 'video' ? (
                     <video src={activeSlide.url} controls className="w-full h-full object-contain" />
                   ) : (
-                    <img src={activeSlide.url} alt="Slide preview" className="w-full h-full object-contain" />
+                    <img
+                      src={getSafePreviewUrl(activeSlide.url)}
+                      alt="Slide preview"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-contain"
+                    />
                   )}
                 </div>
 
@@ -826,29 +1368,22 @@ export default function AdminIntake() {
                   <div className="flex flex-wrap gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={() => {
-                        setFilmForm(prev => ({ ...prev, poster_url: activeSlide.url }));
-                        setPlayForm(prev => ({ ...prev, poster_url: activeSlide.url }));
-                        setSocialForm(prev => ({ ...prev, imageUrl: activeSlide.url }));
-                        toast.success(`Slide ${selectedSlideIdx + 1} set as Poster!`);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand text-white text-xs font-bold shadow-sm hover:brightness-110 active:scale-95 transition-all"
+                      disabled={isMirroringPoster}
+                      onClick={() => handleSetAsPoster(activeSlide.url)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand text-white text-xs font-bold shadow-sm hover:brightness-110 active:scale-95 disabled:opacity-60 transition-all"
                     >
-                      <Icon icon="solar:star-bold" />
-                      Set as Poster
+                      <Icon icon={isMirroringPoster ? 'solar:spinner-linear' : 'solar:star-bold'} className={isMirroringPoster ? 'animate-spin' : ''} />
+                      {isMirroringPoster ? 'Mirroring Poster…' : 'Set as Poster'}
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => {
-                        setFilmForm(prev => ({ ...prev, backdrop_url: activeSlide.url }));
-                        setPlayForm(prev => ({ ...prev, banner_url: activeSlide.url }));
-                        toast.success(`Slide ${selectedSlideIdx + 1} set as Backdrop!`);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-bold hover:bg-purple-500/20 active:scale-95 transition-all"
+                      disabled={isMirroringBackdrop}
+                      onClick={() => handleSetAsBackdrop(activeSlide.url)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-400 text-xs font-bold hover:bg-purple-500/20 active:scale-95 disabled:opacity-60 transition-all"
                     >
-                      <Icon icon="solar:gallery-wide-linear" />
-                      Set as Backdrop
+                      <Icon icon={isMirroringBackdrop ? 'solar:spinner-linear' : 'solar:gallery-wide-linear'} className={isMirroringBackdrop ? 'animate-spin' : ''} />
+                      {isMirroringBackdrop ? 'Mirroring Backdrop…' : 'Set as Backdrop'}
                     </button>
 
                     <button
@@ -904,64 +1439,131 @@ export default function AdminIntake() {
               </h2>
             </div>
             <p className="text-[11px] text-text-muted">
-              Auto-resolved to real human names in Nollywood database. Click to quick-add.
+              Auto-resolved to Nollywood database profiles. Assign to cast or specific crew departments.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2.5">
-            {postData.mentions.map((mention, idx) => (
-              <div
-                key={idx}
-                className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs transition-all hover:border-brand/40 shadow-sm"
-              >
-                {mention.photoUrl ? (
-                  <img src={mention.photoUrl} alt="" className="h-6 w-6 rounded-full object-cover border border-border" />
-                ) : (
-                  <div className="h-6 w-6 rounded-full bg-brand/10 text-brand flex items-center justify-center font-black text-[10px]">
-                    {mention.resolvedName?.charAt(0) || '@'}
-                  </div>
-                )}
+            {postData.mentions.map((mention, idx) => {
+              const isOpen = activeMentionDropdown === idx;
+              const crewRoles = activeTab === 'play' ? STAGE_CREW_ROLES : FILM_CREW_ROLES;
 
-                <div>
-                  <div className="flex items-center gap-1">
-                    <span className="font-bold text-text-primary">{mention.resolvedName}</span>
-                    {mention.matched && (
-                      <Icon icon="solar:check-circle-bold" className="text-emerald-400" width="13" title="Verified in database" />
-                    )}
-                  </div>
-                  <span className="text-[10px] text-text-muted font-mono">{mention.handle}</span>
-                </div>
+              return (
+                <div
+                  key={idx}
+                  className="relative inline-flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2 text-xs transition-all hover:border-brand/40 shadow-sm"
+                >
+                  {mention.photoUrl ? (
+                    <img src={getSafePreviewUrl(mention.photoUrl)} referrerPolicy="no-referrer" alt="" className="h-6 w-6 rounded-full object-cover border border-border" />
+                  ) : (
+                    <div className="h-6 w-6 rounded-full bg-brand/10 text-brand flex items-center justify-center font-black text-[10px]">
+                      {mention.resolvedName?.charAt(0) || '@'}
+                    </div>
+                  )}
 
-                <div className="flex items-center gap-1 ml-1 border-l border-border/60 pl-2">
-                  <button
-                    type="button"
-                    onClick={() => handleAddMentionToCast(mention)}
-                    className="p-1 rounded hover:bg-brand/10 text-text-muted hover:text-brand transition-colors text-[10px] font-bold"
-                    title="Add to Cast list"
-                  >
-                    + Cast
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetMentionAsDirector(mention)}
-                    className="p-1 rounded hover:bg-purple-500/10 text-text-muted hover:text-purple-400 transition-colors text-[10px] font-bold"
-                    title="Set as Director"
-                  >
-                    + Dir
-                  </button>
-                  {activeTab === 'play' && (
+                  <div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-bold text-text-primary">{mention.resolvedName}</span>
+                      {mention.matched && (
+                        <Icon icon="solar:check-circle-bold" className="text-emerald-400" width="13" title="Verified in database" />
+                      )}
+                    </div>
+                    <span className="text-[10px] text-text-muted font-mono">{mention.handle}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 ml-1 border-l border-border/60 pl-2">
                     <button
                       type="button"
-                      onClick={() => handleSetMentionAsPlaywright(mention)}
-                      className="p-1 rounded hover:bg-blue-500/10 text-text-muted hover:text-blue-400 transition-colors text-[10px] font-bold"
-                      title="Set as Playwright"
+                      onClick={() => handleAddMentionToRole(mention, 'actor')}
+                      className="px-1.5 py-0.5 rounded hover:bg-brand/10 text-text-muted hover:text-brand transition-colors text-[10px] font-bold"
+                      title="Add to Cast list"
                     >
-                      + Writer
+                      + Cast
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => handleAddMentionToRole(mention, 'director')}
+                      className="px-1.5 py-0.5 rounded hover:bg-purple-500/10 text-text-muted hover:text-purple-400 transition-colors text-[10px] font-bold"
+                      title="Set as Director"
+                    >
+                      + Dir
+                    </button>
+                    {activeTab === 'play' ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleAddMentionToRole(mention, 'playwright')}
+                          className="px-1.5 py-0.5 rounded hover:bg-blue-500/10 text-text-muted hover:text-blue-400 transition-colors text-[10px] font-bold"
+                          title="Set as Playwright"
+                        >
+                          + Playwright
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAddMentionToRole(mention, 'producer')}
+                          className="px-1.5 py-0.5 rounded hover:bg-amber-500/10 text-text-muted hover:text-amber-400 transition-colors text-[10px] font-bold"
+                          title="Add as Producer"
+                        >
+                          + Prod
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleAddMentionToRole(mention, 'producer')}
+                          className="px-1.5 py-0.5 rounded hover:bg-amber-500/10 text-text-muted hover:text-amber-400 transition-colors text-[10px] font-bold"
+                          title="Add as Producer"
+                        >
+                          + Prod
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAddMentionToRole(mention, 'writer')}
+                          className="px-1.5 py-0.5 rounded hover:bg-blue-500/10 text-text-muted hover:text-blue-400 transition-colors text-[10px] font-bold"
+                          title="Add as Writer"
+                        >
+                          + Writer
+                        </button>
+                      </>
+                    )}
+
+                    {/* Dropdown for other crew roles */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveMentionDropdown(isOpen ? null : idx)}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5 transition-colors ${
+                          isOpen ? 'bg-brand text-white' : 'text-text-muted hover:text-text-primary hover:bg-surface'
+                        }`}
+                        title="Assign to specific crew role"
+                      >
+                        <span>Crew</span>
+                        <Icon icon="solar:alt-arrow-down-linear" width="10" />
+                      </button>
+
+                      {isOpen && (
+                        <div className="absolute right-0 top-full mt-1.5 z-30 w-44 rounded-xl border border-border bg-surface p-1.5 shadow-2xl space-y-0.5 animate-fadeIn">
+                          <div className="px-2 py-1 text-[9px] font-black uppercase tracking-wider text-text-muted border-b border-border/40 mb-1">
+                            Assign {mention.resolvedName?.split(' ')[0]} to:
+                          </div>
+                          {crewRoles.map(r => (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => handleAddMentionToRole(mention, r.id)}
+                              className="w-full text-left px-2 py-1 rounded text-xs text-text-primary hover:bg-brand/10 hover:text-brand transition-colors font-medium"
+                            >
+                              {r.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1057,20 +1659,116 @@ export default function AdminIntake() {
                 <h3 className="text-sm font-black uppercase tracking-wider text-brand">
                   1. Film Specifications & Credits
                 </h3>
-                <p className="text-xs text-text-muted">Review and refine the extracted Nollywood film details.</p>
+                <p className="text-xs text-text-muted">Review, refine, or link to enrich an existing Nollywood movie.</p>
               </div>
               <span className="text-xs font-bold text-text-muted">
                 Zero-Duplicate Actor Guarantee Active
               </span>
             </div>
 
-            {/* Poster & Backdrop URLs */}
+            {/* Mode Switch: Create New Film vs Link & Enrich Existing Film */}
+            <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilmMode('new');
+                      handleUnlinkFilm();
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      filmMode === 'new' && !linkedFilm
+                        ? 'bg-brand text-white shadow-sm'
+                        : 'bg-surface text-text-muted hover:text-text-primary border border-border'
+                    }`}
+                  >
+                    <Icon icon="solar:clapperboard-play-linear" width="14" />
+                    <span>+ Create New Film</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilmMode('link')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      filmMode === 'link' || linkedFilm
+                        ? 'bg-brand text-white shadow-sm'
+                        : 'bg-surface text-text-muted hover:text-text-primary border border-border'
+                    }`}
+                  >
+                    <Icon icon="solar:link-circle-linear" width="14" />
+                    <span>Link & Enrich Existing Film</span>
+                  </button>
+                </div>
+
+                {linkedFilm && (
+                  <div className="flex items-center gap-2 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-lg">
+                    <Icon icon="solar:check-circle-bold" width="15" />
+                    <span>Enriching: <strong>{linkedFilm.title} ({linkedFilm.year})</strong></span>
+                    <button
+                      type="button"
+                      onClick={handleUnlinkFilm}
+                      className="ml-2 text-text-muted hover:text-red-400 p-0.5 transition-colors"
+                      title="Unlink and revert to new film"
+                    >
+                      <Icon icon="solar:close-circle-linear" width="16" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {filmMode === 'link' && !linkedFilm && (
+                <div className="relative pt-1 animate-fadeIn">
+                  <div className="relative">
+                    <Icon icon="solar:magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" width="16" />
+                    <input
+                      type="text"
+                      value={filmSearchQuery}
+                      onChange={(e) => setFilmSearchQuery(e.target.value)}
+                      placeholder="Type movie title to search and enrich existing film in MuviDB..."
+                      className="w-full rounded-xl border border-border bg-surface pl-9 pr-8 py-2.5 text-xs text-text-primary outline-none focus:border-brand font-medium placeholder:text-text-muted/50"
+                    />
+                    {isSearchingFilms && (
+                      <Icon icon="solar:spinner-linear" className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-brand" width="16" />
+                    )}
+                  </div>
+
+                  {filmSearchResults.length > 0 && (
+                    <div className="absolute z-20 mt-1.5 w-full rounded-xl border border-border bg-surface p-2 shadow-2xl max-h-60 overflow-y-auto space-y-1">
+                      {filmSearchResults.map(f => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => handleSelectExistingFilm(f)}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-surface-2 text-left transition-colors"
+                        >
+                          {f.poster_url ? (
+                            <img src={getSafePreviewUrl(f.poster_url)} referrerPolicy="no-referrer" alt="" className="h-10 w-7 rounded object-cover border border-border" />
+                          ) : (
+                            <div className="h-10 w-7 rounded bg-surface-2 border border-border flex items-center justify-center text-[10px] text-text-muted">
+                              🎬
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-text-primary truncate">{f.title}</p>
+                            <p className="text-[10px] text-text-muted">{f.year} • {f.genres?.join(', ') || 'Nollywood'}</p>
+                          </div>
+                          <span className="text-[10px] font-bold text-brand uppercase bg-brand/10 px-2.5 py-1 rounded-md">
+                            Select & Link
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Poster & Backdrop URLs with Upload File option */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted block mb-1">
                   Poster URL
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <input
                     type="text"
                     value={filmForm.poster_url}
@@ -1079,8 +1777,18 @@ export default function AdminIntake() {
                     className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-text-primary outline-none focus:border-brand font-mono"
                   />
                   {filmForm.poster_url && (
-                    <img src={filmForm.poster_url} alt="" className="h-8 w-6 rounded object-cover border border-border shrink-0" />
+                    <img
+                      src={getSafePreviewUrl(filmForm.poster_url)}
+                      referrerPolicy="no-referrer"
+                      alt=""
+                      className="h-8 w-6 rounded object-cover border border-border shrink-0"
+                    />
                   )}
+                  <label className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-muted hover:text-text-primary hover:border-brand cursor-pointer shrink-0 transition-colors">
+                    <Icon icon={isUploadingPoster ? 'solar:spinner-linear' : 'solar:upload-linear'} className={isUploadingPoster ? 'animate-spin text-brand' : ''} />
+                    <span>{isUploadingPoster ? 'Uploading…' : 'Upload'}</span>
+                    <input type="file" accept="image/*" onChange={handleCustomPosterUpload} disabled={isUploadingPoster} className="hidden" />
+                  </label>
                 </div>
               </div>
 
@@ -1088,7 +1796,7 @@ export default function AdminIntake() {
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted block mb-1">
                   Backdrop / Banner URL
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <input
                     type="text"
                     value={filmForm.backdrop_url}
@@ -1097,8 +1805,18 @@ export default function AdminIntake() {
                     className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-text-primary outline-none focus:border-brand font-mono"
                   />
                   {filmForm.backdrop_url && (
-                    <img src={filmForm.backdrop_url} alt="" className="h-8 w-12 rounded object-cover border border-border shrink-0" />
+                    <img
+                      src={getSafePreviewUrl(filmForm.backdrop_url)}
+                      referrerPolicy="no-referrer"
+                      alt=""
+                      className="h-8 w-12 rounded object-cover border border-border shrink-0"
+                    />
                   )}
+                  <label className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-muted hover:text-text-primary hover:border-brand cursor-pointer shrink-0 transition-colors">
+                    <Icon icon={isUploadingBackdrop ? 'solar:spinner-linear' : 'solar:upload-linear'} className={isUploadingBackdrop ? 'animate-spin text-brand' : ''} />
+                    <span>{isUploadingBackdrop ? 'Uploading…' : 'Upload'}</span>
+                    <input type="file" accept="image/*" onChange={handleCustomBackdropUpload} disabled={isUploadingBackdrop} className="hidden" />
+                  </label>
                 </div>
               </div>
             </div>
@@ -1296,26 +2014,189 @@ export default function AdminIntake() {
                 </div>
               )}
             </div>
+
+            {/* Crew & Production Ensemble */}
+            <div className="rounded-xl border border-border bg-surface-2/40 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-text-primary">
+                    Crew & Production Ensemble ({filmForm.crew?.length || 0})
+                  </h4>
+                  <p className="text-[10px] text-text-muted">
+                    Directors, Producers, Writers, DOPs, Editors & Key Heads.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddManualCrewRow}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary hover:border-brand transition-colors"
+                >
+                  <Icon icon="solar:user-plus-linear" />
+                  Add Row
+                </button>
+              </div>
+
+              {filmForm.crew?.length === 0 ? (
+                <p className="text-xs text-text-muted italic py-3 text-center">
+                  No crew members added yet. Quick-assign from @mentions above (+ Dir, + Prod, + Writer) or click "Add Row".
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {filmForm.crew.map((c, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-surface p-2 rounded-lg border border-border/60">
+                      <span className="text-[10px] font-black text-text-muted w-5 text-center">
+                        #{idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={c.name || ''}
+                        onChange={(e) => handleUpdateCrewRow(idx, 'name', e.target.value)}
+                        placeholder="Crew Name (e.g. Jade Osiberu)"
+                        className="flex-1 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-brand"
+                      />
+                      <select
+                        value={c.role || 'producer'}
+                        onChange={(e) => handleUpdateCrewRow(idx, 'role', e.target.value)}
+                        className="w-48 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                      >
+                        {FILM_CREW_ROLES.map(r => (
+                          <option key={r.id} value={r.id}>{r.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCrewRow(idx)}
+                        className="p-1.5 text-text-muted hover:text-red-400 transition-colors"
+                        title="Remove crew row"
+                      >
+                        <Icon icon="solar:trash-bin-trash-linear" width="16" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* 🎭 STAGE PLAY FORM */}
         {activeTab === 'play' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="border-b border-border/40 pb-3">
-              <h3 className="text-sm font-black uppercase tracking-wider text-brand">
-                1. Stage Play / Theatre Details
-              </h3>
-              <p className="text-xs text-text-muted">Extract and list theatre productions and stage performances.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border/40 pb-3">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-wider text-brand">
+                  1. Stage Play / Theatre Details
+                </h3>
+                <p className="text-xs text-text-muted">Extract and list theatre productions, stage performances, and creative teams.</p>
+              </div>
+              <span className="text-xs font-bold text-text-muted">
+                Live Theatre & Stage Play Hub
+              </span>
             </div>
 
-            {/* Poster & Banner */}
+            {/* Mode Switch: Create New Stage Play vs Link & Enrich Existing Play */}
+            <div className="p-3.5 rounded-xl bg-surface-2/60 border border-border space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlayMode('new');
+                      handleUnlinkPlay();
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      playMode === 'new' && !linkedPlay
+                        ? 'bg-brand text-white shadow-sm'
+                        : 'bg-surface text-text-muted hover:text-text-primary border border-border'
+                    }`}
+                  >
+                    <Icon icon="solar:mask-hamsa-linear" width="14" />
+                    <span>+ Create New Stage Play</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlayMode('link')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      playMode === 'link' || linkedPlay
+                        ? 'bg-brand text-white shadow-sm'
+                        : 'bg-surface text-text-muted hover:text-text-primary border border-border'
+                    }`}
+                  >
+                    <Icon icon="solar:link-circle-linear" width="14" />
+                    <span>Link & Enrich Existing Play</span>
+                  </button>
+                </div>
+
+                {linkedPlay && (
+                  <div className="flex items-center gap-2 text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-lg">
+                    <Icon icon="solar:check-circle-bold" width="15" />
+                    <span>Enriching: <strong>{linkedPlay.title} ({linkedPlay.venue})</strong></span>
+                    <button
+                      type="button"
+                      onClick={handleUnlinkPlay}
+                      className="ml-2 text-text-muted hover:text-red-400 p-0.5 transition-colors"
+                      title="Unlink and revert to new stage play"
+                    >
+                      <Icon icon="solar:close-circle-linear" width="16" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {playMode === 'link' && !linkedPlay && (
+                <div className="relative pt-1 animate-fadeIn">
+                  <div className="relative">
+                    <Icon icon="solar:magnifer-linear" className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" width="16" />
+                    <input
+                      type="text"
+                      value={playSearchQuery}
+                      onChange={(e) => setPlaySearchQuery(e.target.value)}
+                      placeholder="Type play title to search and enrich existing theatre production in MuviDB..."
+                      className="w-full rounded-xl border border-border bg-surface pl-9 pr-8 py-2.5 text-xs text-text-primary outline-none focus:border-brand font-medium placeholder:text-text-muted/50"
+                    />
+                    {isSearchingPlays && (
+                      <Icon icon="solar:spinner-linear" className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-brand" width="16" />
+                    )}
+                  </div>
+
+                  {playSearchResults.length > 0 && (
+                    <div className="absolute z-20 mt-1.5 w-full rounded-xl border border-border bg-surface p-2 shadow-2xl max-h-60 overflow-y-auto space-y-1">
+                      {playSearchResults.map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handleSelectExistingPlay(p)}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-surface-2 text-left transition-colors"
+                        >
+                          {p.poster_url ? (
+                            <img src={getSafePreviewUrl(p.poster_url)} referrerPolicy="no-referrer" alt="" className="h-10 w-7 rounded object-cover border border-border" />
+                          ) : (
+                            <div className="h-10 w-7 rounded bg-surface-2 border border-border flex items-center justify-center text-[10px] text-text-muted">
+                              🎭
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-text-primary truncate">{p.title}</p>
+                            <p className="text-[10px] text-text-muted">{p.venue} • {p.city || 'Lagos'}</p>
+                          </div>
+                          <span className="text-[10px] font-bold text-brand uppercase bg-brand/10 px-2.5 py-1 rounded-md">
+                            Select & Link
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Poster Flyer & Banner URLs with Upload File option */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted block mb-1">
                   Poster Flyer URL
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <input
                     type="text"
                     value={playForm.poster_url}
@@ -1324,8 +2205,18 @@ export default function AdminIntake() {
                     className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-text-primary outline-none focus:border-brand font-mono"
                   />
                   {playForm.poster_url && (
-                    <img src={playForm.poster_url} alt="" className="h-8 w-6 rounded object-cover border border-border shrink-0" />
+                    <img
+                      src={getSafePreviewUrl(playForm.poster_url)}
+                      referrerPolicy="no-referrer"
+                      alt=""
+                      className="h-8 w-6 rounded object-cover border border-border shrink-0"
+                    />
                   )}
+                  <label className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-muted hover:text-text-primary hover:border-brand cursor-pointer shrink-0 transition-colors">
+                    <Icon icon={isUploadingPoster ? 'solar:spinner-linear' : 'solar:upload-linear'} className={isUploadingPoster ? 'animate-spin text-brand' : ''} />
+                    <span>{isUploadingPoster ? 'Uploading…' : 'Upload'}</span>
+                    <input type="file" accept="image/*" onChange={handleCustomPosterUpload} disabled={isUploadingPoster} className="hidden" />
+                  </label>
                 </div>
               </div>
 
@@ -1333,7 +2224,7 @@ export default function AdminIntake() {
                 <label className="text-[10px] font-black uppercase tracking-wider text-text-muted block mb-1">
                   Banner / Venue Artwork URL
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <input
                     type="text"
                     value={playForm.banner_url}
@@ -1342,8 +2233,18 @@ export default function AdminIntake() {
                     className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-text-primary outline-none focus:border-brand font-mono"
                   />
                   {playForm.banner_url && (
-                    <img src={playForm.banner_url} alt="" className="h-8 w-12 rounded object-cover border border-border shrink-0" />
+                    <img
+                      src={getSafePreviewUrl(playForm.banner_url)}
+                      referrerPolicy="no-referrer"
+                      alt=""
+                      className="h-8 w-12 rounded object-cover border border-border shrink-0"
+                    />
                   )}
+                  <label className="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg border border-border bg-surface text-xs font-bold text-text-muted hover:text-text-primary hover:border-brand cursor-pointer shrink-0 transition-colors">
+                    <Icon icon={isUploadingBackdrop ? 'solar:spinner-linear' : 'solar:upload-linear'} className={isUploadingBackdrop ? 'animate-spin text-brand' : ''} />
+                    <span>{isUploadingBackdrop ? 'Uploading…' : 'Upload'}</span>
+                    <input type="file" accept="image/*" onChange={handleCustomBackdropUpload} disabled={isUploadingBackdrop} className="hidden" />
+                  </label>
                 </div>
               </div>
             </div>
@@ -1514,6 +2415,128 @@ export default function AdminIntake() {
                 placeholder="Storyline of the stage play..."
                 className="w-full rounded-xl border border-border bg-surface-2 p-3 text-xs leading-relaxed text-text-primary outline-none focus:border-brand"
               />
+            </div>
+
+            {/* Stage Cast Ensemble Table */}
+            <div className="rounded-xl border border-border bg-surface-2/40 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-text-primary">
+                    Stage Cast Ensemble ({playForm.cast?.length || 0})
+                  </h4>
+                  <p className="text-[10px] text-text-muted">
+                    Actors performing on stage in this theatre run.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddPlayCastRow}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary hover:border-brand transition-colors"
+                >
+                  <Icon icon="solar:user-plus-linear" />
+                  Add Row
+                </button>
+              </div>
+
+              {playForm.cast?.length === 0 ? (
+                <p className="text-xs text-text-muted italic py-3 text-center">
+                  No stage cast added yet. Quick-add from @mentions above or click "Add Row".
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {playForm.cast.map((c, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-surface p-2 rounded-lg border border-border/60">
+                      <span className="text-[10px] font-black text-text-muted w-5 text-center">
+                        #{idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={c.name || ''}
+                        onChange={(e) => handleUpdatePlayCastRow(idx, 'name', e.target.value)}
+                        placeholder="Actor Name (e.g. Bimbo Manuel)"
+                        className="flex-1 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-brand"
+                      />
+                      <input
+                        type="text"
+                        value={c.character_name || ''}
+                        onChange={(e) => handleUpdatePlayCastRow(idx, 'character_name', e.target.value)}
+                        placeholder="Role / Character"
+                        className="w-40 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-brand"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePlayCastRow(idx)}
+                        className="p-1.5 text-text-muted hover:text-red-400 transition-colors"
+                        title="Remove actor"
+                      >
+                        <Icon icon="solar:trash-bin-trash-linear" width="16" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Stage Crew & Creatives Table */}
+            <div className="rounded-xl border border-border bg-surface-2/40 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-text-primary">
+                    Stage Crew & Creatives ({playForm.crew?.length || 0})
+                  </h4>
+                  <p className="text-[10px] text-text-muted">
+                    Stage directors, playwrights, producers, lighting, costume, and crew.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddPlayCrewRow}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-border bg-surface text-xs font-bold text-text-primary hover:border-brand transition-colors"
+                >
+                  <Icon icon="solar:user-plus-linear" />
+                  Add Row
+                </button>
+              </div>
+
+              {playForm.crew?.length === 0 ? (
+                <p className="text-xs text-text-muted italic py-3 text-center">
+                  No stage crew added yet. Quick-assign from @mentions above or click "Add Row".
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {playForm.crew.map((c, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-surface p-2 rounded-lg border border-border/60">
+                      <span className="text-[10px] font-black text-text-muted w-5 text-center">
+                        #{idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={c.name || ''}
+                        onChange={(e) => handleUpdatePlayCrewRow(idx, 'name', e.target.value)}
+                        placeholder="Creative / Crew Name"
+                        className="flex-1 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-text-primary outline-none focus:border-brand"
+                      />
+                      <select
+                        value={c.role || 'stage_manager'}
+                        onChange={(e) => handleUpdatePlayCrewRow(idx, 'role', e.target.value)}
+                        className="w-48 rounded border border-border bg-surface-2 px-2.5 py-1.5 text-xs font-bold text-text-primary outline-none focus:border-brand"
+                      >
+                        {STAGE_CREW_ROLES.map(r => (
+                          <option key={r.id} value={r.id}>{r.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePlayCrewRow(idx)}
+                        className="p-1.5 text-text-muted hover:text-red-400 transition-colors"
+                        title="Remove crew row"
+                      >
+                        <Icon icon="solar:trash-bin-trash-linear" width="16" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

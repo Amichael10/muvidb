@@ -2754,11 +2754,12 @@ export async function deleteEditorialCalendarPost(
   if (targetSlot) {
     const shouldDeleteRow = input.deleteSlot !== false;
     if (shouldDeleteRow) {
-      await supabase
-        .from('social_drafts')
-        .delete()
-        .eq('calendar_id', targetSlot.id)
-        .catch(() => {});
+      try {
+        await supabase
+          .from('social_drafts')
+          .delete()
+          .eq('calendar_id', targetSlot.id);
+      } catch {}
 
       await supabase
         .from('social_calendar')
@@ -4333,7 +4334,7 @@ export async function generateAndAttachReelForContentItem(
 
   const { data: variants, error: varErr } = await supabase
     .from('social_platform_variants')
-    .select('id,platform,platform_options')
+    .select('id,platform,selected_asset_id,platform_options')
     .eq('content_item_id', item.id);
   if (varErr) throw varErr;
 

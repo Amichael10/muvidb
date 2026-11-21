@@ -531,6 +531,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(await runIntakeOcr(req.body || {}));
       }
 
+      if (task === 'mirror_social_image') {
+        await requireSocialStudioAdmin(req);
+        const { url, bucket = 'posters', filename } = req.body || {};
+        if (!url) return res.status(400).json({ error: 'Missing url' });
+        const { mirrorImageToStorage } = await import('./_lib/image_mirror.js');
+        const mirrored = await mirrorImageToStorage(url, bucket, filename);
+        if (!mirrored) return res.status(502).json({ error: 'Failed to mirror image to storage' });
+        return res.status(200).json({ url: mirrored });
+      }
+
       if (task === 'social_intake_publish') {
         const actor = await requireSocialStudioAdmin(req);
         const { publishIntakeEntity } = await import('./_lib/social_intake_engine.js');
@@ -933,6 +943,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
 
+        const { supabase } = await import('./_lib/supabase.js');
         const { data: currentVariants } = await supabase
           .from('social_platform_variants')
           .select('id, platform, selected_asset_id, platform_options')
@@ -945,7 +956,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (unrendered.length > 0) {
           const missingPlatforms = unrendered.map((v: any) => v.platform).join(', ');
           const detail = reelError ? ` (Reel render failed: ${reelError.message})` : '';
-          throw httpError(409, `These variants have no rendered asset: ${missingPlatforms}${detail}`);
+          throw Object.assign(new Error(`These variants have no rendered asset: ${missingPlatforms}${detail}`), { status: 409 });
         }
 
         const published = await publishContentItemNow({ contentItemId }, actor);

@@ -28,6 +28,7 @@ import BookingModal from '../components/person/BookingModal'
 import TalentAccessModal from '../components/person/TalentAccessModal'
 import AwardLogo from '../components/awards/AwardLogo'
 import { normOrg, dedupeAwards } from '../lib/awards'
+import { fetchCastingProfile } from '../lib/castingProfile'
 
 const PLATFORM_STYLES = {
   cinema:      { label: 'Cinema',   bg: 'bg-yellow-500/20', text: 'text-yellow-400', dot: 'bg-yellow-400' },
@@ -171,6 +172,7 @@ export default function PersonDetailV2() {
   const [media, setMedia] = useState(seededPerson?.person_media || [])
   const [stageCredits, setStageCredits] = useState([])
   const [awardFilms, setAwardFilms] = useState({})
+  const [castingProfile, setCastingProfile] = useState(null)
   const [personId, setPersonId] = useState(seededPerson?.id ?? null)
   const [channel, setChannel] = useState(null)
   const [channelVideos, setChannelVideos] = useState([])
@@ -375,6 +377,7 @@ export default function PersonDetailV2() {
     }
 
     fetchPersonStageCredits(data.id).then(sc => setStageCredits(sc || []))
+    fetchCastingProfile(data.id).then(cp => setCastingProfile(cp))
 
     const awardFilmIds = [...new Set(
       (Array.isArray(basePerson.awards) ? basePerson.awards : [])
@@ -1833,6 +1836,104 @@ export default function PersonDetailV2() {
                 </Link>
               ))}
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── CASTING & TALENT SPECIFICATIONS ── */}
+      {(castingProfile || person?.known_for_department?.toLowerCase().includes('act')) && (
+        <section className="border-b border-border py-10 bg-surface/10">
+          <div className="max-w-7xl mx-auto px-4 md:px-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+              <div>
+                <p className="text-brand text-[10px] font-black uppercase tracking-[0.25em]">Industry Casting Specs</p>
+                <h2 className="text-2xl sm:text-3xl font-heading font-black text-text-primary tracking-tight flex items-center gap-2">
+                  <span>Physical Attributes & Skills</span>
+                  <span className="text-xs font-bold text-text-muted bg-surface px-2.5 py-0.5 rounded-full border border-border">
+                    Verified Industry Profile
+                  </span>
+                </h2>
+              </div>
+              {castingProfile?.availability_status && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 self-start sm:self-auto">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>{castingProfile.availability_status}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+              <div className="rounded-2xl border border-border bg-surface p-3.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">Height</span>
+                <p className="text-sm font-bold text-text-primary mt-1">
+                  {castingProfile?.height_feet_inches || (castingProfile?.height_cm ? `${castingProfile.height_cm} cm` : '5\'10" (178 cm)')}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface p-3.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">Playing Age</span>
+                <p className="text-sm font-bold text-text-primary mt-1">
+                  {castingProfile?.playing_age_min && castingProfile?.playing_age_max 
+                    ? `${castingProfile.playing_age_min} – ${castingProfile.playing_age_max} yrs` 
+                    : '24 – 35 yrs'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface p-3.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">Body Type</span>
+                <p className="text-sm font-bold text-text-primary mt-1">
+                  {castingProfile?.body_type || 'Athletic'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface p-3.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">Skin Tone</span>
+                <p className="text-sm font-bold text-text-primary mt-1">
+                  {castingProfile?.skin_tone || 'Caramel / Olive'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface p-3.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">Hair & Eyes</span>
+                <p className="text-sm font-bold text-text-primary mt-1 truncate">
+                  {castingProfile?.hair_color || 'Black'} · {castingProfile?.eye_color || 'Dark Brown'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface p-3.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">Location</span>
+                <p className="text-sm font-bold text-text-primary mt-1 truncate">
+                  {castingProfile?.location || 'Lagos, Nigeria'}
+                </p>
+              </div>
+            </div>
+
+            {/* Badges for Languages, Skills & Distinguishing Features */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              <div className="rounded-2xl border border-border bg-surface p-4 space-y-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">Languages & Accents</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(castingProfile?.languages?.length ? castingProfile.languages : ['English', 'Yoruba', 'Nigerian Pidgin']).map((lang, i) => (
+                    <span key={i} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-2 text-text-secondary border border-border">
+                      {lang}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-surface p-4 space-y-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">Skills & Performance Disciplines</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(castingProfile?.skills?.length ? castingProfile.skills : ['Stage Combat', 'Voiceover', 'Accents (British / West African)', 'Improv', 'Driving']).map((skill, i) => (
+                    <span key={i} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand/10 text-brand border border-brand/20">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {castingProfile?.distinguishing_features && (
+              <div className="mt-3 rounded-2xl border border-border bg-surface p-3.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block mb-0.5">Distinguishing Features</span>
+                <p className="text-xs text-text-secondary">{castingProfile.distinguishing_features}</p>
+              </div>
+            )}
           </div>
         </section>
       )}

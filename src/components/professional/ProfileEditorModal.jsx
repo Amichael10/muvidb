@@ -8,6 +8,16 @@ import { getChangedProfileFields } from '../../lib/professionalProfile';
 import { extractChannelIdentifier, fetchChannelData } from '../../lib/youtube';
 import { formatViewCount } from '../../utils/youtube';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+import {
+  fetchCastingProfile,
+  saveCastingProfile,
+  BODY_TYPE_OPTIONS,
+  SKIN_TONE_OPTIONS,
+  HAIR_COLOR_OPTIONS,
+  EYE_COLOR_OPTIONS,
+  EXPERIENCE_LEVEL_OPTIONS,
+  AVAILABILITY_OPTIONS,
+} from '../../lib/castingProfile';
 
 const fieldClass = 'mt-2 w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10';
 
@@ -26,6 +36,7 @@ const fields = [
 export default function ProfileEditorModal({ person, onClose, onSaved }) {
   useBodyScrollLock(true);
   const initial = useMemo(() => Object.fromEntries(fields.map(([key]) => [key, person?.[key] || ''])), [person]);
+  const [activeTab, setActiveTab] = useState('general'); // 'general' | 'casting'
   const [values, setValues] = useState(initial);
   const [bio, setBio] = useState(person?.bio || '');
   const [photo, setPhoto] = useState(null);
@@ -33,6 +44,43 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
   const [youtubeInput, setYoutubeInput] = useState(person.youtube_channel_id ? `https://youtube.com/channel/${person.youtube_channel_id}` : (person.youtube_handle || ''));
   const [youtubePreview, setYoutubePreview] = useState(person.youtube_stats || null);
   const [checkingYoutube, setCheckingYoutube] = useState(false);
+
+  // Casting & Physical Specs State
+  const [casting, setCasting] = useState({
+    height_feet_inches: '',
+    height_cm: '',
+    body_type: 'Athletic',
+    skin_tone: 'Warm Brown',
+    hair_color: 'Black',
+    eye_color: 'Dark Brown',
+    distinguishing_features: '',
+    playing_age_min: 24,
+    playing_age_max: 35,
+    location: 'Lagos, Nigeria',
+    willing_to_travel: true,
+    languages_text: 'English, Yoruba, Nigerian Pidgin',
+    skills_text: 'Stage Combat, Voiceover, Accents, Driving',
+    experience_level: 'Professional',
+    availability_status: 'Available for Bookings',
+    preferences: 'Feature Films, High-End TV Drama, Lead / Supporting',
+    show_on_creator_link: true,
+    show_on_person_page: true,
+  });
+
+  useEffect(() => {
+    if (person?.id) {
+      fetchCastingProfile(person.id).then((cp) => {
+        if (cp) {
+          setCasting((prev) => ({
+            ...prev,
+            ...cp,
+            languages_text: Array.isArray(cp.languages) ? cp.languages.join(', ') : prev.languages_text,
+            skills_text: Array.isArray(cp.skills) ? cp.skills.join(', ') : prev.skills_text,
+          }));
+        }
+      });
+    }
+  }, [person?.id]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -61,38 +109,64 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
 
   const submit = async (event) => {
     event.preventDefault();
-    const changedFields = getChangedProfileFields(person, { ...values, bio });
-    if (!Object.keys(changedFields).length && !photo) return toast.error('Make at least one change before submitting.');
     setSaving(true);
     try {
-      let imagePath = null;
-      if (photo) {
-        const upload = await uploadContributionImage(photo);
-        if (upload.error) {
-          toast.error(upload.error);
-          return;
+      let savedSomething = false;
+
+      // 1. Save casting attributes if in casting tab or if edited
+      if (activeTab === 'casting') {
+        const result = await saveCastingProfile(person.id, {
+          ...casting,
+          languages: casting.languages_text.split(',').map((s) => s.trim()).filter(Boolean),
+          skills: casting.skills_text.split(',').map((s) => s.trim()).filter(Boolean),
+        });
+        if (result.ok) {
+          savedSomething = true;
+          toast.success('Casting & physical specifications saved successfully!');
         }
-        imagePath = upload.path;
       }
-      const result = await suggestPersonEdit({
-        personId: person.id,
-        fields: changedFields,
-        image_path: imagePath,
-        note: 'Submitted from the verified professional dashboard.',
-      });
-      if (!result.ok) throw result.error;
-      toast.success('Profile update sent to the MuviDB editorial team.');
-      notifyProAdminOnTelegram({
-        personId: person.id,
-        personName: person.name,
-        personSlug: person.slug,
-        updateType: 'profile',
-        summary: `Profile bio/details update: ${Object.keys(changedFields).join(', ')}`,
-        details: Object.entries(changedFields).map(([k, v]) => `${k}: ${v}`).join('\n'),
-        link: '/admin/contributions'
-      }).catch((err) => console.warn('Profile editor telegram notify error:', err));
-      onSaved();
-      onClose();
+
+      // 2. Save general profile edits if changed
+      const changedFields = getChangedProfileFields(person, { ...values, bio });
+      if (Object.keys(changedFields).length || photo) {
+        let imagePath = null;
+        if (photo) {
+          const upload = await uploadContributionImage(photo);
+          if (upload.error) {
+            toast.error(upload.error);
+            setSaving(false);
+            return;
+          }
+          imagePath = upload.path;
+        }
+        const result = await suggestPersonEdit({
+          personId: person.id,
+          fields: changedFields,
+          image_path: imagePath,
+          note: 'Submitted from the verified professional dashboard.',
+        });
+        if (!result.ok) throw result.error;
+        savedSomething = true;
+        toast.success('General profile update sent to the MuviDB editorial team.');
+        notifyProAdminOnTelegram({
+          personId: person.id,
+          personName: person.name,
+          personSlug: person.slug,
+          updateType: 'profile',
+          summary: `Profile bio/details update: ${Object.keys(changedFields).join(', ')}`,
+          details: Object.entries(changedFields).map(([k, v]) => `${k}: ${v}`).join('\n'),
+          link: '/admin/contributions',
+        }).catch((err) => console.warn('Profile editor telegram notify error:', err));
+      }
+
+      if (!savedSomething) {
+        toast.error('Make at least one change before submitting.');
+        setSaving(false);
+        return;
+      }
+
+      onSaved?.();
+      onClose?.();
     } catch (error) {
       console.error('Professional profile update failed', error);
       toast.error('We couldn’t submit your profile update. Please try again.');
@@ -120,49 +194,352 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
           <button type="button" onClick={onClose} aria-label="Close profile editor" className="grid h-8 w-8 place-items-center rounded-full bg-white/[.05] text-text-muted transition hover:bg-white/10 hover:text-white"><Icon icon="solar:close-circle-linear" width="20" /></button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-5 sm:p-8">
-          <div className="grid gap-8 md:grid-cols-[220px_1fr]">
-          <aside>
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-surface-2">
-              <img src={photo ? URL.createObjectURL(photo) : (person.photo_url || '/images/person-placeholder.png')} alt="Profile preview" className="aspect-[4/5] w-full object-cover" />
-            </div>
-            <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 text-xs font-black text-text-primary hover:border-brand hover:text-brand">
-              <Icon icon="solar:camera-add-linear" width="18" /> Choose headshot
-              <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] || null)} />
-            </label>
-            <p className="mt-2 text-center text-[10px] leading-4 text-text-muted">PNG, JPEG or WebP · large photos are compressed automatically</p>
-          </aside>
-
-          <div>
-            <div className="grid gap-5 sm:grid-cols-2">
-              {fields.map(([key, label, type, placeholder]) => (
-                <label key={key} className={key.includes('url') || key === 'youtube_handle' ? 'sm:col-span-2' : ''}>
-                  <span className="text-xs font-bold text-text-primary">{label}</span>
-                  <input type={type} value={values[key]} placeholder={placeholder} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className={fieldClass} />
-                </label>
-              ))}
-              <label className="sm:col-span-2">
-                <span className="flex items-center justify-between text-xs font-bold text-text-primary"><span>Professional bio</span><span className="font-medium text-text-muted">{bio.length}/1200</span></span>
-                <textarea value={bio} maxLength={1200} rows={7} onChange={(event) => setBio(event.target.value)} placeholder="Introduce your work, experience and career highlights in a few clear paragraphs." className={fieldClass} />
-              </label>
-              <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-5">
-                <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-red-500/10 text-red-400"><Icon icon="logos:youtube-icon" width="22" /></span><div><p className="text-sm font-black text-text-primary">Connect your YouTube channel</p><p className="mt-1 text-xs leading-5 text-text-muted">Enter a channel link, @handle or channel ID. MuviDB previews it now and starts syncing analytics after approval.</p></div></div>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row"><input value={youtubeInput} onChange={(event) => setYoutubeInput(event.target.value)} placeholder="https://youtube.com/@yourchannel" className={`${fieldClass} mt-0 flex-1`} /><button type="button" disabled={checkingYoutube} onClick={checkYoutube} className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3 text-xs font-black text-red-400 disabled:opacity-50">{checkingYoutube ? 'Checking…' : 'Preview channel'}</button></div>
-                {youtubePreview && <div className="mt-4 flex items-center gap-4 rounded-xl border border-white/10 bg-white/[.03] p-4"><img src={youtubePreview.thumbnail || '/images/person-placeholder.png'} alt="" className="h-12 w-12 rounded-full object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-text-primary">{youtubePreview.title || youtubePreview.handle || 'Connected channel'}</p><p className="mt-1 text-[10px] text-text-muted">{formatViewCount(youtubePreview.subscribers || 0)} subscribers · {formatViewCount(youtubePreview.views || 0)} channel views · {formatViewCount(youtubePreview.videos || 0)} videos</p></div><Icon icon="solar:verified-check-bold" width="22" className="text-emerald-400" /></div>}
-              </div>
-            </div>
-
-            <div className="mt-7 flex flex-col-reverse gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <p className="max-w-md text-[11px] leading-5 text-text-muted"><Icon icon="solar:shield-check-linear" className="mr-1 inline text-brand" /> Your public profile remains unchanged until an editor approves this request.</p>
-              <div className="flex gap-2">
-                <button type="button" onClick={onClose} className="rounded-xl border border-border px-5 py-3 text-xs font-black text-text-primary">Cancel</button>
-                <button disabled={saving} className="rounded-xl bg-brand px-5 py-3 text-xs font-black text-white disabled:opacity-50">{saving ? 'Sending update…' : 'Send for review'}</button>
-              </div>
-            </div>
-          </div>
+        {/* Tab Navigation */}
+        <div className="flex border-b border-white/10 bg-[#121212] px-5 sm:px-8">
+          <button
+            type="button"
+            onClick={() => setActiveTab('general')}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black transition ${
+              activeTab === 'general'
+                ? 'border-brand text-brand'
+                : 'border-transparent text-text-muted hover:text-white'
+            }`}
+          >
+            <Icon icon="solar:user-circle-bold" width="16" />
+            General Profile & Bio
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('casting')}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black transition ${
+              activeTab === 'casting'
+                ? 'border-brand text-brand'
+                : 'border-transparent text-text-muted hover:text-white'
+            }`}
+          >
+            <Icon icon="solar:clapperboard-play-bold" width="16" />
+            Casting & Physical Specs
+            <span className="rounded-full bg-brand/20 px-1.5 py-0.5 text-[9px] font-bold text-brand">NEW</span>
+          </button>
         </div>
-      </div>
-    </form>
-  </div>
-);
+
+        <div className="flex-1 overflow-y-auto p-5 sm:p-8">
+          {activeTab === 'general' ? (
+            <div className="grid gap-8 md:grid-cols-[220px_1fr]">
+              <aside>
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-surface-2">
+                  <img src={photo ? URL.createObjectURL(photo) : (person.photo_url || '/images/person-placeholder.png')} alt="Profile preview" className="aspect-[4/5] w-full object-cover" />
+                </div>
+                <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 text-xs font-black text-text-primary hover:border-brand hover:text-brand">
+                  <Icon icon="solar:camera-add-linear" width="18" /> Choose headshot
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => setPhoto(event.target.files?.[0] || null)} />
+                </label>
+                <p className="mt-2 text-center text-[10px] leading-4 text-text-muted">PNG, JPEG or WebP · large photos are compressed automatically</p>
+              </aside>
+
+              <div>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  {fields.map(([key, label, type, placeholder]) => (
+                    <label key={key} className={key.includes('url') || key === 'youtube_handle' ? 'sm:col-span-2' : ''}>
+                      <span className="text-xs font-bold text-text-primary">{label}</span>
+                      <input type={type} value={values[key]} placeholder={placeholder} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} className={fieldClass} />
+                    </label>
+                  ))}
+                  <label className="sm:col-span-2">
+                    <span className="flex items-center justify-between text-xs font-bold text-text-primary"><span>Professional bio</span><span className="font-medium text-text-muted">{bio.length}/1200</span></span>
+                    <textarea value={bio} maxLength={1200} rows={7} onChange={(event) => setBio(event.target.value)} placeholder="Introduce your work, experience and career highlights in a few clear paragraphs." className={fieldClass} />
+                  </label>
+                  <div className="sm:col-span-2 rounded-2xl border border-white/10 bg-black/20 p-5">
+                    <div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-red-500/10 text-red-400"><Icon icon="logos:youtube-icon" width="22" /></span><div><p className="text-sm font-black text-text-primary">Connect your YouTube channel</p><p className="mt-1 text-xs leading-5 text-text-muted">Enter a channel link, @handle or channel ID. MuviDB previews it now and starts syncing analytics after approval.</p></div></div>
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row"><input value={youtubeInput} onChange={(event) => setYoutubeInput(event.target.value)} placeholder="https://youtube.com/@yourchannel" className={`${fieldClass} mt-0 flex-1`} /><button type="button" disabled={checkingYoutube} onClick={checkYoutube} className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3 text-xs font-black text-red-400 disabled:opacity-50">{checkingYoutube ? 'Checking…' : 'Preview channel'}</button></div>
+                    {youtubePreview && <div className="mt-4 flex items-center gap-4 rounded-xl border border-white/10 bg-white/[.03] p-4"><img src={youtubePreview.thumbnail || '/images/person-placeholder.png'} alt="" className="h-12 w-12 rounded-full object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-text-primary">{youtubePreview.title || youtubePreview.handle || 'Connected channel'}</p><p className="mt-1 text-[10px] text-text-muted">{formatViewCount(youtubePreview.subscribers || 0)} subscribers · {formatViewCount(youtubePreview.views || 0)} channel views · {formatViewCount(youtubePreview.videos || 0)} videos</p></div><Icon icon="solar:verified-check-bold" width="22" className="text-emerald-400" /></div>}
+                  </div>
+                </div>
+
+                <div className="mt-7 flex flex-col-reverse gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="max-w-md text-[11px] leading-5 text-text-muted"><Icon icon="solar:shield-check-linear" className="mr-1 inline text-brand" /> Your public profile remains unchanged until an editor approves this request.</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={onClose} className="rounded-xl border border-border px-5 py-3 text-xs font-black text-text-primary">Cancel</button>
+                    <button disabled={saving} className="rounded-xl bg-brand px-5 py-3 text-xs font-black text-white disabled:opacity-50">{saving ? 'Sending update…' : 'Send for review'}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Casting & Physical Specifications Tab */
+            <div className="space-y-8">
+              <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4 text-xs text-text-secondary">
+                <p className="font-bold text-white flex items-center gap-2">
+                  <Icon icon="solar:info-circle-bold" className="text-brand" width="18" />
+                  Industry Standard Casting Dossier
+                </p>
+                <p className="mt-1 leading-relaxed">
+                  These details power casting directors, producers, and talent scouts searching for actors and talent across Nollywood and international productions. You control whether these appear on your verified Creator Link and MuviDB profile.
+                </p>
+              </div>
+
+              {/* Physical Dimensions */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
+                  <Icon icon="solar:ruler-bold" className="text-brand" width="16" />
+                  Physical Attributes & Build
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Height (Feet & Inches)</span>
+                    <input
+                      type="text"
+                      value={casting.height_feet_inches || ''}
+                      placeholder="e.g. 5' 11&quot;"
+                      onChange={(e) => setCasting((c) => ({ ...c, height_feet_inches: e.target.value }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Height (cm)</span>
+                    <input
+                      type="number"
+                      value={casting.height_cm || ''}
+                      placeholder="e.g. 180"
+                      onChange={(e) => setCasting((c) => ({ ...c, height_cm: e.target.value ? Number(e.target.value) : '' }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Body Type</span>
+                    <select
+                      value={casting.body_type || ''}
+                      onChange={(e) => setCasting((c) => ({ ...c, body_type: e.target.value }))}
+                      className={fieldClass}
+                    >
+                      <option value="">Select body type</option>
+                      {BODY_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Skin Tone</span>
+                    <select
+                      value={casting.skin_tone || ''}
+                      onChange={(e) => setCasting((c) => ({ ...c, skin_tone: e.target.value }))}
+                      className={fieldClass}
+                    >
+                      <option value="">Select skin tone</option>
+                      {SKIN_TONE_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Hair Color</span>
+                    <select
+                      value={casting.hair_color || ''}
+                      onChange={(e) => setCasting((c) => ({ ...c, hair_color: e.target.value }))}
+                      className={fieldClass}
+                    >
+                      <option value="">Select hair color</option>
+                      {HAIR_COLOR_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Eye Color</span>
+                    <select
+                      value={casting.eye_color || ''}
+                      onChange={(e) => setCasting((c) => ({ ...c, eye_color: e.target.value }))}
+                      className={fieldClass}
+                    >
+                      <option value="">Select eye color</option>
+                      {EYE_COLOR_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="sm:col-span-2 lg:col-span-3">
+                    <span className="text-xs font-bold text-text-primary">Distinguishing Features</span>
+                    <input
+                      type="text"
+                      value={casting.distinguishing_features || ''}
+                      placeholder="e.g. Left cheek dimple, athletic posture, scar on forearm"
+                      onChange={(e) => setCasting((c) => ({ ...c, distinguishing_features: e.target.value }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Casting Age & Representation */}
+              <div className="space-y-4 border-t border-white/10 pt-6">
+                <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
+                  <Icon icon="solar:users-group-rounded-bold" className="text-brand" width="16" />
+                  Playing Age Range & Base Location
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Playing Age (Min)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={casting.playing_age_min ?? ''}
+                      placeholder="e.g. 24"
+                      onChange={(e) => setCasting((c) => ({ ...c, playing_age_min: e.target.value ? Number(e.target.value) : '' }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Playing Age (Max)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={casting.playing_age_max ?? ''}
+                      placeholder="e.g. 35"
+                      onChange={(e) => setCasting((c) => ({ ...c, playing_age_max: e.target.value ? Number(e.target.value) : '' }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Primary Base / Location</span>
+                    <input
+                      type="text"
+                      value={casting.location || ''}
+                      placeholder="e.g. Lagos, Nigeria"
+                      onChange={(e) => setCasting((c) => ({ ...c, location: e.target.value }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                  <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-3 pt-1">
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={casting.willing_to_travel ?? true}
+                        onChange={(e) => setCasting((c) => ({ ...c, willing_to_travel: e.target.checked }))}
+                        className="h-4 w-4 rounded border-border bg-surface-2 text-brand focus:ring-brand/20"
+                      />
+                      <span className="text-xs font-bold text-text-primary">Willing to travel for domestic & international shoots</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Skills, Disciplines & Experience */}
+              <div className="space-y-4 border-t border-white/10 pt-6">
+                <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
+                  <Icon icon="solar:stars-bold" className="text-brand" width="16" />
+                  Skills, Languages & Experience
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Experience Level</span>
+                    <select
+                      value={casting.experience_level || 'Professional'}
+                      onChange={(e) => setCasting((c) => ({ ...c, experience_level: e.target.value }))}
+                      className={fieldClass}
+                    >
+                      {EXPERIENCE_LEVEL_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span className="text-xs font-bold text-text-primary">Current Availability</span>
+                    <select
+                      value={casting.availability_status || 'Available for Bookings'}
+                      onChange={(e) => setCasting((c) => ({ ...c, availability_status: e.target.value }))}
+                      className={fieldClass}
+                    >
+                      {AVAILABILITY_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="sm:col-span-2">
+                    <span className="text-xs font-bold text-text-primary">Languages & Accents (Comma-separated)</span>
+                    <input
+                      type="text"
+                      value={casting.languages_text || ''}
+                      placeholder="e.g. English, Yoruba, Nigerian Pidgin, British RP, Igbo"
+                      onChange={(e) => setCasting((c) => ({ ...c, languages_text: e.target.value }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                  <label className="sm:col-span-2">
+                    <span className="text-xs font-bold text-text-primary">Key Skills & Performance Talents (Comma-separated)</span>
+                    <input
+                      type="text"
+                      value={casting.skills_text || ''}
+                      placeholder="e.g. Stage Combat, Stunts, Voice Acting, Singing, Martial Arts, Stunt Driving"
+                      onChange={(e) => setCasting((c) => ({ ...c, skills_text: e.target.value }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                  <label className="sm:col-span-2">
+                    <span className="text-xs font-bold text-text-primary">Roles & Production Preferences</span>
+                    <textarea
+                      rows={2}
+                      value={casting.preferences || ''}
+                      placeholder="e.g. Open to Feature Films, High-End TV Drama, Lead / Supporting Roles."
+                      onChange={(e) => setCasting((c) => ({ ...c, preferences: e.target.value }))}
+                      className={fieldClass}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Public Display Controls */}
+              <div className="space-y-4 border-t border-white/10 pt-6">
+                <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
+                  <Icon icon="solar:eye-bold" className="text-brand" width="16" />
+                  Public Visibility
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.02] p-4 cursor-pointer hover:bg-white/[.04]">
+                    <input
+                      type="checkbox"
+                      checked={casting.show_on_creator_link ?? true}
+                      onChange={(e) => setCasting((c) => ({ ...c, show_on_creator_link: e.target.checked }))}
+                      className="h-4 w-4 rounded border-border bg-surface-2 text-brand focus:ring-brand/20"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-white block">Display on Creator Link Dossier</span>
+                      <span className="text-[10px] text-text-muted">Shows on your verified /portfolio/:handle page under Casting Specs</span>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.02] p-4 cursor-pointer hover:bg-white/[.04]">
+                    <input
+                      type="checkbox"
+                      checked={casting.show_on_person_page ?? true}
+                      onChange={(e) => setCasting((c) => ({ ...c, show_on_person_page: e.target.checked }))}
+                      className="h-4 w-4 rounded border-border bg-surface-2 text-brand focus:ring-brand/20"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-white block">Display on MuviDB Profile</span>
+                      <span className="text-[10px] text-text-muted">Shows on your official MuviDB person page</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Footer for Casting Tab */}
+              <div className="mt-7 flex flex-col-reverse gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <p className="max-w-md text-[11px] leading-5 text-text-muted">
+                  <Icon icon="solar:shield-check-linear" className="mr-1 inline text-brand" />
+                  Casting specifications update immediately on your Creator Link and profile.
+                </p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={onClose} className="rounded-xl border border-border px-5 py-3 text-xs font-black text-text-primary">Cancel</button>
+                  <button disabled={saving} className="rounded-xl bg-brand px-6 py-3 text-xs font-black text-white disabled:opacity-50 hover:bg-brand-light transition">
+                    {saving ? 'Saving Specs…' : 'Save Casting Specs'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </form>
+    </div>
+  );
 }

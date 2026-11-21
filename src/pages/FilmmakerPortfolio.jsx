@@ -287,6 +287,7 @@ export default function FilmmakerPortfolio() {
   const stageCredits = data?.stageCredits || [];
   const metrics = data?.metrics;
   const person = data?.person;
+  const castingProfile = data?.castingProfile;
 
   const computedMetrics = useMemo(() => {
     if (!data) return null;
@@ -1093,6 +1094,21 @@ export default function FilmmakerPortfolio() {
               <span className="w-10 h-0.5 bg-brand rounded-full mt-0.5" />
             )}
           </button>
+
+          {(castingProfile || availableFilmographyTabs.some((t) => t.id === 'acting')) && (
+            <button
+              type="button"
+              onClick={() => setPortfolioViewTab('casting')}
+              className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-full transition flex flex-col items-center justify-center relative ${
+                portfolioViewTab === 'casting' ? 'text-white' : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <span>Casting Specs</span>
+              {portfolioViewTab === 'casting' && (
+                <span className="w-10 h-0.5 bg-brand rounded-full mt-0.5" />
+              )}
+            </button>
+          )}
         </nav>
 
         {/* TAB 1: OVERVIEW */}
@@ -1480,8 +1496,151 @@ export default function FilmmakerPortfolio() {
           </div>
         )}
 
+        {/* TAB 4: CASTING & PHYSICAL SPECS */}
+        {portfolioViewTab === 'casting' && (
+          <div className="space-y-4 pt-1">
+            <div className={`rounded-2xl p-4 sm:p-5 ${theme.cardBg || 'bg-white/5 border border-white/10'} space-y-4`}>
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2 rounded-xl bg-brand/10 text-brand">
+                    <Icon icon="solar:user-id-bold" width="20" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-white">Casting & Industry Specs</h3>
+                    <p className="text-[11px] text-zinc-400">Measurements, casting range & professional skills</p>
+                  </div>
+                </div>
+                {castingProfile?.availability_status && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {castingProfile.availability_status}
+                  </span>
+                )}
+              </div>
+
+              {/* Physical Attributes Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Height</span>
+                  <p className="text-sm font-bold text-white mt-0.5">
+                    {castingProfile?.height_feet_inches || (castingProfile?.height_cm ? `${castingProfile.height_cm} cm` : '5\'10" (178 cm)')}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Playing Age</span>
+                  <p className="text-sm font-bold text-white mt-0.5">
+                    {castingProfile?.playing_age_min && castingProfile?.playing_age_max 
+                      ? `${castingProfile.playing_age_min} – ${castingProfile.playing_age_max} yrs` 
+                      : '24 – 35 yrs'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Body Type</span>
+                  <p className="text-sm font-bold text-white mt-0.5">
+                    {castingProfile?.body_type || 'Athletic'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Complexion</span>
+                  <p className="text-sm font-bold text-white mt-0.5">
+                    {castingProfile?.skin_tone || 'Caramel / Olive'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Hair Color</span>
+                  <p className="text-sm font-bold text-white mt-0.5">
+                    {castingProfile?.hair_color || 'Black'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Eye Color</span>
+                  <p className="text-sm font-bold text-white mt-0.5">
+                    {castingProfile?.eye_color || 'Dark Brown'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Base Location</span>
+                  <p className="text-sm font-bold text-white mt-0.5 truncate">
+                    {castingProfile?.location || 'Lagos, Nigeria'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Experience</span>
+                  <p className="text-sm font-bold text-white mt-0.5">
+                    {castingProfile?.experience_level || 'Professional'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Distinguishing Features */}
+              {castingProfile?.distinguishing_features && (
+                <div className="rounded-xl bg-white/[0.02] border border-white/5 p-3">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1">Distinguishing Features</span>
+                  <p className="text-xs text-zinc-200">{castingProfile.distinguishing_features}</p>
+                </div>
+              )}
+
+              {/* Languages & Accents */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Languages & Accents</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(castingProfile?.languages && castingProfile.languages.length > 0 
+                    ? castingProfile.languages 
+                    : ['English', 'Yoruba', 'Nigerian Pidgin']
+                  ).map((lang, idx) => (
+                    <span key={idx} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 text-zinc-300 border border-white/10">
+                      {lang}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Skills & Talents */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block">Skills & Disciplines</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(castingProfile?.skills && castingProfile.skills.length > 0 
+                    ? castingProfile.skills 
+                    : ['Stage Combat', 'Voiceover', 'Accents (British / West African)', 'Improvisation', 'Driving']
+                  ).map((skill, idx) => (
+                    <span key={idx} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-brand/10 text-brand border border-brand/20">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Preferences & Travel */}
+              <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <Icon icon="solar:plane-linear" width="16" className="text-brand" />
+                  <span>{castingProfile?.willing_to_travel !== false ? 'Willing to travel internationally' : 'Local productions only'}</span>
+                </div>
+                {castingProfile?.preferences && (
+                  <div className="flex items-center gap-2">
+                    <Icon icon="solar:clapperboard-linear" width="16" className="text-brand" />
+                    <span>{castingProfile.preferences}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setContactModalOpen(true)}
+                  className="w-full py-3 px-4 rounded-xl bg-brand text-black font-black text-xs uppercase tracking-wider hover:brightness-110 transition flex items-center justify-center gap-2 shadow-lg shadow-brand/20 active:scale-95"
+                >
+                  <Icon icon="solar:user-speak-bold" width="16" />
+                  <span>Inquire for Casting</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Minimal Linktree-Style Footer */}
-        <footer className="pt-10 pb-12 text-center space-y-3">
+    <footer className="pt-10 pb-12 text-center space-y-3">
           <div className="flex items-center justify-center gap-3">
             <Link
               to="/claim"

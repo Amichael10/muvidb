@@ -492,6 +492,29 @@ export async function publishIntakeEntity(input: {
     let filmId: string;
     let filmSlug: string;
 
+    // Auto-mirror external poster and backdrop images to Supabase storage
+    let posterUrl = cleanString(payload.poster_url, 2000) || null;
+    let backdropUrl = cleanString(payload.backdrop_url, 2000) || null;
+
+    if (posterUrl && !posterUrl.includes('supabase.co')) {
+      try {
+        const { mirrorIfExternal } = await import('./image_mirror.js');
+        const mirrored = await mirrorIfExternal(posterUrl, 'posters', `poster-${slugify(title)}-${Date.now()}`);
+        if (mirrored) posterUrl = mirrored;
+      } catch (err: any) {
+        console.warn('[social_intake_engine] Poster mirror warning:', err?.message);
+      }
+    }
+    if (backdropUrl && !backdropUrl.includes('supabase.co')) {
+      try {
+        const { mirrorIfExternal } = await import('./image_mirror.js');
+        const mirrored = await mirrorIfExternal(backdropUrl, 'backdrops', `backdrop-${slugify(title)}-${Date.now()}`);
+        if (mirrored) backdropUrl = mirrored;
+      } catch (err: any) {
+        console.warn('[social_intake_engine] Backdrop mirror warning:', err?.message);
+      }
+    }
+
     const filmData: Record<string, any> = {
       title,
       synopsis,
@@ -499,8 +522,8 @@ export async function publishIntakeEntity(input: {
       runtime_minutes: runtime,
       duration: runtime,
       genres,
-      poster_url: cleanString(payload.poster_url, 2000) || null,
-      backdrop_url: cleanString(payload.backdrop_url, 2000) || null,
+      poster_url: posterUrl,
+      backdrop_url: backdropUrl,
       release_date: cleanString(payload.release_date, 30) || null,
       status: ['released', 'upcoming', 'announced', 'filming', 'in_production', 'post-production'].includes(payload.status)
         ? payload.status
@@ -596,6 +619,31 @@ export async function publishIntakeEntity(input: {
       }
     }
 
+    // Crew (Producers, Writers, Cinematographers, Editors, Sound, etc.)
+    if (Array.isArray(payload.crew)) {
+      for (const crewMember of payload.crew) {
+        const crewName = typeof crewMember === 'string' ? crewMember.trim() : (crewMember?.name || '').trim();
+        if (!crewName) continue;
+        const cleanName = crewName.replace(/^@+/, '').trim();
+        const role = typeof crewMember === 'object' && crewMember?.role ? String(crewMember.role).trim().toLowerCase() : 'crew';
+
+        const { data: pId } = await supabase.rpc('upsert_person_by_name', {
+          p_name: cleanName,
+          p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
+        });
+
+        if (pId) {
+          creditsToInsert.push({
+            film_id: filmId,
+            person_id: pId as unknown as string,
+            role: role || 'crew',
+            character_name: null,
+            billing_order: 0,
+          });
+        }
+      }
+    }
+
     // Insert credits skipping existing combinations
     if (creditsToInsert.length > 0) {
       const { data: existingCredits } = await supabase
@@ -630,6 +678,28 @@ export async function publishIntakeEntity(input: {
     const year = payload.year ? Number(payload.year) : new Date().getFullYear();
     const playSlug = payload.slug || (await uniqueSlug('plays', title, year));
 
+    let posterUrl = cleanString(payload.poster_url, 2000) || null;
+    let bannerUrl = cleanString(payload.banner_url, 2000) || null;
+
+    if (posterUrl && !posterUrl.includes('supabase.co')) {
+      try {
+        const { mirrorIfExternal } = await import('./image_mirror.js');
+        const mirrored = await mirrorIfExternal(posterUrl, 'posters', `play-${playSlug}-${Date.now()}`);
+        if (mirrored) posterUrl = mirrored;
+      } catch (err: any) {
+        console.warn('[social_intake_engine] Play poster mirror warning:', err?.message);
+      }
+    }
+    if (bannerUrl && !bannerUrl.includes('supabase.co')) {
+      try {
+        const { mirrorIfExternal } = await import('./image_mirror.js');
+        const mirrored = await mirrorIfExternal(bannerUrl, 'backdrops', `play-banner-${playSlug}-${Date.now()}`);
+        if (mirrored) bannerUrl = mirrored;
+      } catch (err: any) {
+        console.warn('[social_intake_engine] Play banner mirror warning:', err?.message);
+      }
+    }
+
     const playData: Record<string, any> = {
       title,
       slug: playSlug,
@@ -639,8 +709,8 @@ export async function publishIntakeEntity(input: {
       venue: cleanString(payload.venue, 250) || null,
       city: cleanString(payload.city, 100) || 'Lagos',
       country: cleanString(payload.country, 100) || 'Nigeria',
-      poster_url: cleanString(payload.poster_url, 2000) || null,
-      banner_url: cleanString(payload.banner_url, 2000) || null,
+      poster_url: posterUrl,
+      banner_url: bannerUrl,
       synopsis: cleanString(payload.synopsis, 8000) || 'Stage production.',
       genre: cleanString(payload.genre, 100) || 'Drama',
       year,
@@ -670,6 +740,81 @@ export async function publishIntakeEntity(input: {
         .single();
       if (crtErr) throw crtErr;
       playId = created.id;
+    }
+
+    // Insert into stage_credits for cast & crew
+    const stageCreditsToInsert: Array<{
+      play_id: string;
+      person_id: string;
+      role: string;
+      character_name: string | null;
+      billing_order: number;
+    }> = [];
+
+    // Cast
+    if (Array.isArray(payload.cast)) {
+      let order = 1;
+      for (const actor of payload.cast) {
+        const actorName = typeof actor === 'string' ? actor.trim() : (actor?.name || '').trim();
+        if (!actorName) continue;
+        const cleanName = actorName.replace(/^@+/, '').trim();
+        const characterName = typeof actor === 'object' && actor.character_name ? String(actor.character_name).trim() : null;
+
+        const { data: pId } = await supabase.rpc('upsert_person_by_name', {
+          p_name: cleanName,
+          p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
+        });
+
+        if (pId) {
+          stageCreditsToInsert.push({
+            play_id: playId,
+            person_id: pId as unknown as string,
+            role: 'actor',
+            character_name: characterName,
+            billing_order: order++,
+          });
+        }
+      }
+    }
+
+    // Crew
+    if (Array.isArray(payload.crew)) {
+      for (const crewMember of payload.crew) {
+        const crewName = typeof crewMember === 'string' ? crewMember.trim() : (crewMember?.name || '').trim();
+        if (!crewName) continue;
+        const cleanName = crewName.replace(/^@+/, '').trim();
+        const role = typeof crewMember === 'object' && crewMember?.role ? String(crewMember.role).trim().toLowerCase() : 'crew';
+
+        const { data: pId } = await supabase.rpc('upsert_person_by_name', {
+          p_name: cleanName,
+          p_extra: { nationality: 'Nigerian', source: 'admin_intake' },
+        });
+
+        if (pId) {
+          stageCreditsToInsert.push({
+            play_id: playId,
+            person_id: pId as unknown as string,
+            role: role || 'crew',
+            character_name: null,
+            billing_order: 0,
+          });
+        }
+      }
+    }
+
+    if (stageCreditsToInsert.length > 0) {
+      const { data: existingCredits } = await supabase
+        .from('stage_credits')
+        .select('person_id, role')
+        .eq('play_id', playId);
+
+      const existingSet = new Set((existingCredits || []).map(c => `${c.person_id}-${c.role}`));
+      const newCredits = stageCreditsToInsert.filter(c => !existingSet.has(`${c.person_id}-${c.role}`));
+
+      if (newCredits.length > 0) {
+        const { error: credErr } = await supabase.from('stage_credits').insert(newCredits as any);
+        if (credErr) console.warn('[social_intake_engine] Stage credits insert warning:', credErr.message);
+      }
     }
 
     return {
