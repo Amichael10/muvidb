@@ -86,9 +86,6 @@ function instagramMediaKey(rawUrl: string): string {
 
 function pickBestResourceUrl(node: any): string | null {
   if (!node) return null;
-  if (typeof node.display_url === 'string' && node.display_url.startsWith('http')) {
-    return node.display_url;
-  }
   if (Array.isArray(node.display_resources) && node.display_resources.length > 0) {
     const sorted = [...node.display_resources].sort(
       (a, b) => Number(b?.config_width || 0) - Number(a?.config_width || 0),
@@ -100,6 +97,9 @@ function pickBestResourceUrl(node: any): string | null {
       (a, b) => Number(b?.width || 0) - Number(a?.width || 0),
     );
     if (sorted[0]?.url) return sorted[0].url;
+  }
+  if (typeof node.display_url === 'string' && node.display_url.startsWith('http')) {
+    return node.display_url;
   }
   return null;
 }
@@ -199,7 +199,7 @@ export function extractInstagramShortcode(url: string): string | null {
  */
 export function getInstagramSessionCookies(): string | null {
   const envCookie = (process.env.INSTAGRAM_SESSION_COOKIE || process.env.IG_COOKIE || '').trim();
-  if (envCookie) return envCookie;
+  if (envCookie && envCookie.includes('sessionid')) return envCookie;
 
   const sessionId = (process.env.INSTAGRAM_SESSION_ID || process.env.IG_SESSION_ID || '').trim();
   if (sessionId) return `sessionid=${sessionId}`;
@@ -209,6 +209,8 @@ export function getInstagramSessionCookies(): string | null {
     if (fs.existsSync(sessionFile)) {
       const parsed = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
       const cookies = parsed.cookies || [];
+      const hasSessionId = cookies.some((c: any) => c.name === 'sessionid' && c.value);
+      if (!hasSessionId) return null;
       const valid = cookies.filter((c: any) => c.name && c.value && (!c.expires || c.expires * 1000 > Date.now()));
       if (valid.length > 0) {
         return valid.map((c: any) => `${c.name}=${c.value}`).join('; ');
@@ -352,10 +354,17 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
   // ── Strategy 1: Embed Page Parser (Fastest & most reliable full-carousel extractor, works anonymously!) ──
   if (shortcode) {
     const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
+    // Bot / Crawler user agents are critical: Meta serves the complete SSR `contextJSON` payload
+    // containing all carousel slides and full captions to bots/curl, whereas standard browser UAs
+    // receive an interactive JS login shell.
     const userAgents = [
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
       'curl/8.4.0',
+      'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+      'Twitterbot/1.0',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
     ];
+
+    let lastHtml: string | null = null;
 
     for (const ua of userAgents) {
       try {
@@ -371,6 +380,7 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
 
         if (!embedRes.ok) continue;
         const html = await embedRes.text();
+        lastHtml = html;
 
         // Primary: structured contextJSON -> gql_data.shortcode_media (full carousel + unabridged caption)
         const parsedCtx = parseEmbedContextJson(html);
@@ -384,48 +394,52 @@ export async function extractInstagramMedia(url: string): Promise<ExtractedInsta
           }
           if (parsedCtx.authorUsername && !authorUsername) authorUsername = parsedCtx.authorUsername;
           if (parsedCtx.authorName && !authorName) authorName = parsedCtx.authorName;
-          break;
-        }
 
-        // Secondary HTML fallback inside embed page
-        if (!videoUrl) {
-          const vidMatch =
-            html.match(/<video[^>]+src="([^">]+)"/i) ||
-            html.match(/video_url\\":\\"([^"\\]+)\\"/i) ||
-            html.match(/"video_url":"([^"]+)"/i);
-          if (vidMatch?.[1]) recordVideo(vidMatch[1]);
-        }
-
-        const imgMatch =
-          html.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]+src="([^">]+)"/i) ||
-          html.match(/<meta property="og:image" content="([^"]*)"/i);
-        if (imgMatch?.[1]) recordImage(imgMatch[1]);
-
-        if (!caption) {
-          const captionMatch =
-            html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i) ||
-            html.match(/<div class="CaptionComments"[^>]*>([\s\S]*?)<\/div>/i);
-          if (captionMatch?.[1]) {
-            const stripped = captionMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-            if (stripped) caption = decodeHtmlEntities(stripped);
+          // If we got full carousel slides (more than 1) or a verified single post with caption, we are done
+          if (slides.length > 1 || (slides.length === 1 && caption)) {
+            break;
           }
         }
-
-        const userMatch = html.match(/class="UsernameText"[^>]*>([^<]+)<\/span>/i);
-        if (userMatch?.[1]) {
-          authorUsername = userMatch[1].trim();
-          if (!authorName) authorName = authorUsername;
-        }
-
-        if (images.length > 0 || videoUrl) break;
       } catch {
-        /* try next user-agent or strategy */
+        /* try next user-agent */
+      }
+    }
+
+    // Secondary fallback: if contextJSON was never parsed across any user agent, parse HTML tags from the last response
+    if (slides.length === 0 && lastHtml) {
+      if (!videoUrl) {
+        const vidMatch =
+          lastHtml.match(/<video[^>]+src="([^">]+)"/i) ||
+          lastHtml.match(/video_url\\":\\"([^"\\]+)\\"/i) ||
+          lastHtml.match(/"video_url":"([^"]+)"/i);
+        if (vidMatch?.[1]) recordVideo(vidMatch[1]);
+      }
+
+      const imgMatch =
+        lastHtml.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]+src="([^">]+)"/i) ||
+        lastHtml.match(/<meta property="og:image" content="([^"]*)"/i);
+      if (imgMatch?.[1]) recordImage(imgMatch[1]);
+
+      if (!caption) {
+        const captionMatch =
+          lastHtml.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i) ||
+          lastHtml.match(/<div class="CaptionComments"[^>]*>([\s\S]*?)<\/div>/i);
+        if (captionMatch?.[1]) {
+          const stripped = captionMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          if (stripped) caption = decodeHtmlEntities(stripped);
+        }
+      }
+
+      const userMatch = lastHtml.match(/class="UsernameText"[^>]*>([^<]+)<\/span>/i);
+      if (userMatch?.[1]) {
+        authorUsername = userMatch[1].trim();
+        if (!authorName) authorName = authorUsername;
       }
     }
   }
 
-  // ── Strategy 2: Dedicated Render Microservice (yt-dlp — mainly for Reels/videos or when embed failed) ──
-  const needsMicroservice = (isReel && !videoUrl) || images.length === 0;
+  // ── Strategy 2: Dedicated Render Microservice (yt-dlp — for Reels or when carousel not expanded) ──
+  const needsMicroservice = (isReel && !videoUrl) || slides.length <= 1;
   const extractorUrl = (process.env.MEDIA_EXTRACTOR_URL || process.env.RENDER_EXTRACTOR_URL || 'https://muvidb.onrender.com').replace(/\/$/, '');
   const extractorSecret = (process.env.EXTRACTOR_SECRET || '').trim();
 
