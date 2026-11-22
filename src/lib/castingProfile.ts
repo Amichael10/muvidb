@@ -23,6 +23,13 @@ export interface CastingProfileData {
   // Skills & Languages
   languages?: string[];
   skills?: string[];
+
+  // Department Craft & Employability Specs (Crew, Editors, Costume Designers, etc.)
+  department?: string | null;
+  software_tools?: string[];
+  equipment_gear?: string[];
+  craft_specializations?: string[];
+  portfolio_reel_url?: string | null;
   
   // Professional Status & Availability
   experience_level?: 'Professional' | 'Semi-Professional' | 'Emerging Talent' | 'Student' | string;
@@ -162,6 +169,11 @@ export async function saveCastingProfile(
     willing_to_travel: profile.willing_to_travel !== false,
     languages: Array.isArray(profile.languages) ? profile.languages : ['English'],
     skills: Array.isArray(profile.skills) ? profile.skills : [],
+    department: profile.department || null,
+    software_tools: Array.isArray(profile.software_tools) ? profile.software_tools : [],
+    equipment_gear: Array.isArray(profile.equipment_gear) ? profile.equipment_gear : [],
+    craft_specializations: Array.isArray(profile.craft_specializations) ? profile.craft_specializations : [],
+    portfolio_reel_url: profile.portfolio_reel_url || null,
     experience_level: profile.experience_level || 'Professional',
     availability_status: profile.availability_status || 'Available for Bookings',
     preferences: profile.preferences || null,

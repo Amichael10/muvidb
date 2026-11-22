@@ -134,7 +134,7 @@ export default function PersonSearchInput({
   );
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'} ${className}`}>
       <div className="relative flex items-center">
         <input
           type="text"
@@ -177,7 +177,7 @@ export default function PersonSearchInput({
       </div>
 
       {isOpen && trimmedQuery.length >= 2 && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-2xl">
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-2xl ring-1 ring-border">
           {isSearching && results.length === 0 ? (
             <div className="flex items-center gap-2 px-2.5 py-2 text-xs text-text-muted">
               <Icon icon="solar:spinner-linear" className="animate-spin text-brand" width="14" />

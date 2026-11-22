@@ -19,6 +19,16 @@ import {
   AVAILABILITY_OPTIONS,
 } from '../../lib/castingProfile';
 
+const PRO_DEPARTMENTS = [
+  { value: 'Acting', label: 'Acting / Screen Talent', icon: 'solar:clapperboard-play-bold' },
+  { value: 'Editing', label: 'Editing & Post-Production', icon: 'solar:scissors-bold' },
+  { value: 'Costume', label: 'Costume & Wardrobe Design', icon: 'solar:hanger-bold' },
+  { value: 'Camera', label: 'Cinematography & Camera', icon: 'solar:videocamera-record-bold' },
+  { value: 'Sound', label: 'Sound & Audio Engineering', icon: 'solar:headphones-round-sound-bold' },
+  { value: 'Directing', label: 'Directing & Producing', icon: 'solar:play-circle-bold' },
+  { value: 'Art', label: 'Art & Production Design', icon: 'solar:palette-bold' },
+];
+
 const fieldClass = 'mt-2 w-full rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-primary outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10';
 
 const fields = [
@@ -47,6 +57,7 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
 
   // Casting & Physical Specs State
   const [casting, setCasting] = useState({
+    department: 'Acting',
     height_feet_inches: '',
     height_cm: '',
     body_type: 'Athletic',
@@ -60,6 +71,9 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
     willing_to_travel: true,
     languages_text: 'English, Yoruba, Nigerian Pidgin',
     skills_text: 'Stage Combat, Voiceover, Accents, Driving',
+    software_tools_text: '',
+    equipment_gear_text: '',
+    craft_specializations_text: '',
     experience_level: 'Professional',
     availability_status: 'Available for Bookings',
     preferences: 'Feature Films, High-End TV Drama, Lead / Supporting',
@@ -74,8 +88,12 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
           setCasting((prev) => ({
             ...prev,
             ...cp,
+            department: cp.department || prev.department,
             languages_text: Array.isArray(cp.languages) ? cp.languages.join(', ') : prev.languages_text,
             skills_text: Array.isArray(cp.skills) ? cp.skills.join(', ') : prev.skills_text,
+            software_tools_text: Array.isArray(cp.software_tools) ? cp.software_tools.join(', ') : prev.software_tools_text,
+            equipment_gear_text: Array.isArray(cp.equipment_gear) ? cp.equipment_gear.join(', ') : prev.equipment_gear_text,
+            craft_specializations_text: Array.isArray(cp.craft_specializations) ? cp.craft_specializations.join(', ') : prev.craft_specializations_text,
           }));
         }
       });
@@ -117,12 +135,16 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
       if (activeTab === 'casting') {
         const result = await saveCastingProfile(person.id, {
           ...casting,
-          languages: casting.languages_text.split(',').map((s) => s.trim()).filter(Boolean),
-          skills: casting.skills_text.split(',').map((s) => s.trim()).filter(Boolean),
+          department: casting.department || 'Acting',
+          languages: (casting.languages_text || '').split(',').map((s) => s.trim()).filter(Boolean),
+          skills: (casting.skills_text || '').split(',').map((s) => s.trim()).filter(Boolean),
+          software_tools: (casting.software_tools_text || '').split(',').map((s) => s.trim()).filter(Boolean),
+          equipment_gear: (casting.equipment_gear_text || '').split(',').map((s) => s.trim()).filter(Boolean),
+          craft_specializations: (casting.craft_specializations_text || '').split(',').map((s) => s.trim()).filter(Boolean),
         });
         if (result.ok) {
           savedSomething = true;
-          toast.success('Casting & physical specifications saved successfully!');
+          toast.success('Industry specs & craft skills saved successfully!');
         }
       }
 
@@ -218,7 +240,7 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
             }`}
           >
             <Icon icon="solar:clapperboard-play-bold" width="16" />
-            Casting & Physical Specs
+            Industry Specs & Skills
             <span className="rounded-full bg-brand/20 px-1.5 py-0.5 text-[9px] font-bold text-brand">NEW</span>
           </button>
         </div>
@@ -266,109 +288,276 @@ export default function ProfileEditorModal({ person, onClose, onSaved }) {
               </div>
             </div>
           ) : (
-            /* Casting & Physical Specifications Tab */
+            /* Industry Specs & Employability Dossier */
             <div className="space-y-8">
               <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4 text-xs text-text-secondary">
                 <p className="font-bold text-white flex items-center gap-2">
                   <Icon icon="solar:info-circle-bold" className="text-brand" width="18" />
-                  Industry Standard Casting Dossier
+                  Industry Standard Employability & Casting Dossier
                 </p>
                 <p className="mt-1 leading-relaxed">
-                  These details power casting directors, producers, and talent scouts searching for actors and talent across Nollywood and international productions. You control whether these appear on your verified Creator Link and MuviDB profile.
+                  These details power casting directors, showrunners, heads of department, and production companies searching for talent and crew across Nollywood and international productions.
                 </p>
               </div>
 
-              {/* Physical Dimensions */}
-              <div className="space-y-4">
-                <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
-                  <Icon icon="solar:ruler-bold" className="text-brand" width="16" />
-                  Physical Attributes & Build
-                </h3>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <label>
-                    <span className="text-xs font-bold text-text-primary">Height (Feet & Inches)</span>
-                    <input
-                      type="text"
-                      value={casting.height_feet_inches || ''}
-                      placeholder="e.g. 5' 11&quot;"
-                      onChange={(e) => setCasting((c) => ({ ...c, height_feet_inches: e.target.value }))}
-                      className={fieldClass}
-                    />
-                  </label>
-                  <label>
-                    <span className="text-xs font-bold text-text-primary">Height (cm)</span>
-                    <input
-                      type="number"
-                      value={casting.height_cm || ''}
-                      placeholder="e.g. 180"
-                      onChange={(e) => setCasting((c) => ({ ...c, height_cm: e.target.value ? Number(e.target.value) : '' }))}
-                      className={fieldClass}
-                    />
-                  </label>
-                  <label>
-                    <span className="text-xs font-bold text-text-primary">Body Type</span>
-                    <select
-                      value={casting.body_type || ''}
-                      onChange={(e) => setCasting((c) => ({ ...c, body_type: e.target.value }))}
-                      className={fieldClass}
-                    >
-                      <option value="">Select body type</option>
-                      {BODY_TYPE_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span className="text-xs font-bold text-text-primary">Skin Tone</span>
-                    <select
-                      value={casting.skin_tone || ''}
-                      onChange={(e) => setCasting((c) => ({ ...c, skin_tone: e.target.value }))}
-                      className={fieldClass}
-                    >
-                      <option value="">Select skin tone</option>
-                      {SKIN_TONE_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span className="text-xs font-bold text-text-primary">Hair Color</span>
-                    <select
-                      value={casting.hair_color || ''}
-                      onChange={(e) => setCasting((c) => ({ ...c, hair_color: e.target.value }))}
-                      className={fieldClass}
-                    >
-                      <option value="">Select hair color</option>
-                      {HAIR_COLOR_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span className="text-xs font-bold text-text-primary">Eye Color</span>
-                    <select
-                      value={casting.eye_color || ''}
-                      onChange={(e) => setCasting((c) => ({ ...c, eye_color: e.target.value }))}
-                      className={fieldClass}
-                    >
-                      <option value="">Select eye color</option>
-                      {EYE_COLOR_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="sm:col-span-2 lg:col-span-3">
-                    <span className="text-xs font-bold text-text-primary">Distinguishing Features</span>
-                    <input
-                      type="text"
-                      value={casting.distinguishing_features || ''}
-                      placeholder="e.g. Left cheek dimple, athletic posture, scar on forearm"
-                      onChange={(e) => setCasting((c) => ({ ...c, distinguishing_features: e.target.value }))}
-                      className={fieldClass}
-                    />
-                  </label>
+              {/* Department / Discipline Switcher */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold uppercase tracking-wider text-text-muted">
+                  Primary Discipline / Department
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {PRO_DEPARTMENTS.map((dept) => {
+                    const isSelected = (casting.department || 'Acting') === dept.value;
+                    return (
+                      <button
+                        key={dept.value}
+                        type="button"
+                        onClick={() => setCasting((c) => ({ ...c, department: dept.value }))}
+                        className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-semibold transition-all text-left border ${
+                          isSelected
+                            ? 'border-brand bg-brand/10 text-brand shadow-sm shadow-brand/10'
+                            : 'border-border bg-surface-2 text-text-muted hover:border-border-subtle hover:text-white'
+                        }`}
+                      >
+                        <Icon icon={dept.icon} width="16" className="flex-shrink-0" />
+                        <span className="truncate">{dept.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* Physical Dimensions (For Actors & Performers) */}
+              {(casting.department || 'Acting') === 'Acting' && (
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
+                    <Icon icon="solar:ruler-bold" className="text-brand" width="16" />
+                    Physical Attributes & Build (Actor Casting)
+                  </h3>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Height (Feet & Inches)</span>
+                      <input
+                        type="text"
+                        value={casting.height_feet_inches || ''}
+                        placeholder="e.g. 5' 9&quot;"
+                        onChange={(e) => setCasting((c) => ({ ...c, height_feet_inches: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Height (cm)</span>
+                      <input
+                        type="number"
+                        value={casting.height_cm || ''}
+                        placeholder="e.g. 175"
+                        onChange={(e) => setCasting((c) => ({ ...c, height_cm: e.target.value ? Number(e.target.value) : '' }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Body Type</span>
+                      <select
+                        value={casting.body_type || ''}
+                        onChange={(e) => setCasting((c) => ({ ...c, body_type: e.target.value }))}
+                        className={fieldClass}
+                      >
+                        <option value="">Select body type</option>
+                        {BODY_TYPE_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Skin Tone</span>
+                      <select
+                        value={casting.skin_tone || ''}
+                        onChange={(e) => setCasting((c) => ({ ...c, skin_tone: e.target.value }))}
+                        className={fieldClass}
+                      >
+                        <option value="">Select skin tone</option>
+                        {SKIN_TONE_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Hair Color</span>
+                      <select
+                        value={casting.hair_color || ''}
+                        onChange={(e) => setCasting((c) => ({ ...c, hair_color: e.target.value }))}
+                        className={fieldClass}
+                      >
+                        <option value="">Select hair color</option>
+                        {HAIR_COLOR_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Eye Color</span>
+                      <select
+                        value={casting.eye_color || ''}
+                        onChange={(e) => setCasting((c) => ({ ...c, eye_color: e.target.value }))}
+                        className={fieldClass}
+                      >
+                        <option value="">Select eye color</option>
+                        {EYE_COLOR_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="sm:col-span-2 lg:col-span-3">
+                      <span className="text-xs font-bold text-text-primary">Distinguishing Features</span>
+                      <input
+                        type="text"
+                        value={casting.distinguishing_features || ''}
+                        placeholder="e.g. Left cheek dimple, athletic posture, scar on forearm"
+                        onChange={(e) => setCasting((c) => ({ ...c, distinguishing_features: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Editing & Post-Production Specs */}
+              {casting.department === 'Editing' && (
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
+                    <Icon icon="solar:scissors-bold" className="text-brand" width="16" />
+                    Editing Suites & Post-Production Skills
+                  </h3>
+                  <div className="grid gap-4">
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Software Suites & NLEs (Comma-separated)</span>
+                      <input
+                        type="text"
+                        value={casting.software_tools_text || ''}
+                        placeholder="e.g. DaVinci Resolve Studio, Adobe Premiere Pro, Avid Media Composer, After Effects"
+                        onChange={(e) => setCasting((c) => ({ ...c, software_tools_text: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Post Specializations (Comma-separated)</span>
+                      <input
+                        type="text"
+                        value={casting.craft_specializations_text || ''}
+                        placeholder="e.g. Color Grading / DI, Offline Assembly, VFX Assembly, Sound Sync"
+                        onChange={(e) => setCasting((c) => ({ ...c, craft_specializations_text: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Workstation Hardware Setup</span>
+                      <input
+                        type="text"
+                        value={casting.equipment_gear_text || ''}
+                        placeholder="e.g. Apple Silicon M3 Max, Blackmagic Mini Panel, calibrated 4K monitor"
+                        onChange={(e) => setCasting((c) => ({ ...c, equipment_gear_text: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Costume & Wardrobe Specs */}
+              {casting.department === 'Costume' && (
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
+                    <Icon icon="solar:hanger-bold" className="text-brand" width="16" />
+                    Costume Design, Styling & Wardrobe Kit
+                  </h3>
+                  <div className="grid gap-4">
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Costume & Period Specializations (Comma-separated)</span>
+                      <input
+                        type="text"
+                        value={casting.craft_specializations_text || ''}
+                        placeholder="e.g. Indigenous Yoruba / Igbo / Hausa Regalia, Historical Period Costuming, Contemporary Styling"
+                        onChange={(e) => setCasting((c) => ({ ...c, craft_specializations_text: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Technical Wardrobe Skills (Comma-separated)</span>
+                      <input
+                        type="text"
+                        value={casting.skills_text || ''}
+                        placeholder="e.g. Textile Distressing, Pattern Drafting, Continuity Tracking, Aso-Oke Sourcing"
+                        onChange={(e) => setCasting((c) => ({ ...c, skills_text: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Camera & Cinematography Specs */}
+              {casting.department === 'Camera' && (
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
+                    <Icon icon="solar:videocamera-record-bold" className="text-brand" width="16" />
+                    Camera Systems, Lenses & Rigging
+                  </h3>
+                  <div className="grid gap-4">
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Owned / Preferred Camera Packages</span>
+                      <input
+                        type="text"
+                        value={casting.equipment_gear_text || ''}
+                        placeholder="e.g. ARRI Alexa Mini LF, RED V-Raptor, Sony FX6 / Venice, Cine Primes"
+                        onChange={(e) => setCasting((c) => ({ ...c, equipment_gear_text: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Lensing & Motion Specializations</span>
+                      <input
+                        type="text"
+                        value={casting.craft_specializations_text || ''}
+                        placeholder="e.g. Anamorphic Glass, Steadicam, Ronin 2, Drone / Aerial Cinematography"
+                        onChange={(e) => setCasting((c) => ({ ...c, craft_specializations_text: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Sound & Audio Specs */}
+              {casting.department === 'Sound' && (
+                <div className="space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-text-muted flex items-center gap-2">
+                    <Icon icon="solar:headphones-round-sound-bold" className="text-brand" width="16" />
+                    Sound Recording, DAWs & Audio Engineering
+                  </h3>
+                  <div className="grid gap-4">
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">DAWs & Audio Software (Comma-separated)</span>
+                      <input
+                        type="text"
+                        value={casting.software_tools_text || ''}
+                        placeholder="e.g. Pro Tools Ultimate, iZotope RX, Logic Pro, Dolby Atmos"
+                        onChange={(e) => setCasting((c) => ({ ...c, software_tools_text: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                    <label>
+                      <span className="text-xs font-bold text-text-primary">Field Recording & Studio Kits</span>
+                      <input
+                        type="text"
+                        value={casting.equipment_gear_text || ''}
+                        placeholder="e.g. Sound Devices 833, Schoeps CMIT 5U, Wisycom wireless systems, Sennheiser 416"
+                        onChange={(e) => setCasting((c) => ({ ...c, equipment_gear_text: e.target.value }))}
+                        className={fieldClass}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Casting Age & Representation */}
               <div className="space-y-4 border-t border-white/10 pt-6">

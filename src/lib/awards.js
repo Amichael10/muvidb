@@ -29,6 +29,7 @@ export const AWARD_LOGOS = {
   REFFA: 'https://reffaawards.com/wp-content/uploads/2020/01/cropped-REFFA-1-192x192.png',
   FILM_AFRICA: 'https://www.filmafrica.org/wp-content/uploads/2022/02/cropped-favicon_FA-192x192.png',
   ENIFF: 'https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/lovp_63yzwegxh189stcshsa3sdenhv/44f6604b5084463ee722c5fd12fc97cb_1791215847407.png',
+  EHA: 'https://ekoheritageawards.com.ng/wp-content/uploads/2021/05/eko-logo.png',
 };
 
 /**
@@ -36,6 +37,34 @@ export const AWARD_LOGOS = {
  * Enriched with location, categories, entry plans, submission timelines, and official portals.
  */
 export const AWARD_ORGS = [
+  {
+    id: 'EHA',
+    label: 'EHA',
+    full: 'Eko Heritage Awards',
+    tagline: 'Celebrating Cultural Custodians & Nollywood Icons in Lagos',
+    category: 'awards',
+    location: 'Lagos, Nigeria',
+    frequency: 'Annual (July / August)',
+    founded: 2021,
+    accent: '#D97706',
+    about:
+      'The Eko Heritage Awards (EHA), founded by Ivory Forte Entertainment and officially endorsed by the Lagos State Ministry of Tourism, Arts and Culture, celebrates excellence in cultural preservation, business enterprise, and Nigerian entertainment. The film honors celebrate emerging Nollywood icons, standout actors, cultural producers, and visionary directors who elevate Lagos culture.',
+    when:
+      'Held annually in Lagos, Nigeria with an elaborate red-carpet gala and presentation ceremony.',
+    submissions:
+      'Nominations are compiled through cultural committee selection and open public voting across competitive creative categories.',
+    entryPlan: {
+      fees: 'Public & Committee Nominated',
+      eligibility: 'Nigerian actors, filmmakers, cultural producers, and screen creatives active in Lagos and the diaspora.',
+      formats: 'Film, television, and digital streaming appearances.',
+      categoriesCount: '15+ Cultural, Film, and Fashion Honors',
+      platform: 'Eko Heritage Awards Official Portal',
+    },
+    submitUrl: 'https://ekoheritageawards.com.ng/',
+    submitLabel: 'Eko Heritage Awards Portal',
+    tags: ['Lagos', 'Heritage', 'Culture', 'Next Rated', 'Nollywood', 'Actor of the Year'],
+  },
+
   {
     id: 'FILM_AFRICA',
     label: 'Film Africa',
@@ -1622,6 +1651,7 @@ export function normOrg(raw) {
   if (upper.includes('BIFF') || upper.includes('BAYELSA INTERNATIONAL') || upper.includes('BAYELSA FILM')) return 'BIFF';
   if (upper.includes('BCFF') || upper.includes('BENIN CITY FILM') || upper.includes('BENIN FILM')) return 'BCFF';
   if (upper.includes('LIFANIMA') || upper.includes('ANIMATION FESTIVAL') || upper.includes('LAGOS INTERNATIONAL FESTIVAL OF ANIMATION')) return 'LIFANIMA';
+  if (upper.includes('EKO HERITAGE') || upper.includes('EHA')) return 'EHA';
   if (upper.includes('EKO STAR') || upper.includes('EKO_STAR')) return 'EKO_STAR';
   if (upper.includes('SEPTIMIUS')) return 'SEPTIMIUS';
   if (upper.includes('ELOY') || upper.includes('EXQUISITE LADY')) return 'ELOY';

@@ -74,6 +74,8 @@ export default function AdminIntake() {
   // Extracted data
   const [postData, setPostData] = useState(null);
   const [selectedSlideIdx, setSelectedSlideIdx] = useState(0);
+  const [showAddSlideUrlInput, setShowAddSlideUrlInput] = useState(false);
+  const [newSlideUrl, setNewSlideUrl] = useState('');
 
   // Active destination tab
   const [activeTab, setActiveTab] = useState('film');
@@ -1217,6 +1219,34 @@ export default function AdminIntake() {
     });
   };
 
+  const handleAddSlideByUrl = () => {
+    const trimmed = newSlideUrl.trim();
+    if (!trimmed) return;
+    setPostData(prev => {
+      const currentMedia = prev?.media ? [...prev.media] : [];
+      currentMedia.push({ url: trimmed, type: 'image', isPrimary: currentMedia.length === 0 });
+      return {
+        ...(prev || { success: true, platform: 'manual', sourceUrl: '', caption: '', media: [], mentions: [] }),
+        media: currentMedia,
+      };
+    });
+    setNewSlideUrl('');
+    setShowAddSlideUrlInput(false);
+    toast.success('Added new slide!');
+  };
+
+  const handleRemoveSlide = (slideIndex) => {
+    setPostData(prev => {
+      if (!prev?.media) return prev;
+      const updated = prev.media.filter((_, i) => i !== slideIndex);
+      return { ...prev, media: updated };
+    });
+    if (selectedSlideIdx >= slideIndex && selectedSlideIdx > 0) {
+      setSelectedSlideIdx(prev => prev - 1);
+    }
+    toast.success('Removed slide');
+  };
+
   // Instant Publish / Create handler
   const handlePublish = async () => {
     setIsPublishing(true);
@@ -1558,6 +1588,33 @@ export default function AdminIntake() {
         </div>
       )}
 
+      {/* Telegram Forwarded Items Alert Banner */}
+      {openTelegramCount > 0 && !showTelegramInbox && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-sky-500/10 border border-sky-500/30 rounded-2xl px-4 py-3.5 animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/20 text-sky-400">
+              <Icon icon="ic:baseline-telegram" width="22" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-text-primary">
+                {openTelegramCount} Forwarded Post{openTelegramCount > 1 ? 's' : ''} in Telegram Inbox (@muvidb_bot)
+              </p>
+              <p className="text-[11px] text-text-muted mt-0.5">
+                Posts forwarded from @amichael.design & @muvidb_ are waiting for 1-click import into Films or Plays.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowTelegramInbox(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-sky-500 text-white font-bold text-xs hover:bg-sky-400 transition-colors shrink-0 flex items-center justify-center gap-1.5 shadow"
+          >
+            <span>Review Forwarded Posts ({openTelegramCount})</span>
+            <Icon icon="solar:arrow-right-linear" width="14" />
+          </button>
+        </div>
+      )}
+
       {/* ── STEP 1: URL Input & Fetcher ── */}
       <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
@@ -1682,10 +1739,63 @@ export default function AdminIntake() {
                 Extracted Media Slides ({currentMedia.length})
               </h2>
             </div>
-            <p className="text-xs text-text-muted">
-              Slide {selectedSlideIdx + 1} of {currentMedia.length} selected
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-xs text-text-muted mr-1">
+                Slide {selectedSlideIdx + 1} of {currentMedia.length}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowAddSlideUrlInput(!showAddSlideUrlInput)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-border bg-surface-2 text-text-primary hover:border-brand transition-colors"
+                title="Add another carousel slide by direct image link"
+              >
+                <Icon icon="solar:link-circle-linear" width="14" className="text-brand" />
+                <span>+ Add Slide URL</span>
+              </button>
+              <label
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border border-border bg-surface-2 text-text-primary hover:border-brand transition-colors cursor-pointer"
+                title="Upload local slide flyer or photo"
+              >
+                <Icon icon="solar:upload-linear" width="14" className="text-brand" />
+                <span>+ Upload Slide</span>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
           </div>
+
+          {showAddSlideUrlInput && (
+            <div className="flex items-center gap-2 bg-surface-2 p-2.5 rounded-xl border border-brand/50 animate-fadeIn">
+              <input
+                type="text"
+                value={newSlideUrl}
+                onChange={(e) => setNewSlideUrl(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddSlideByUrl()}
+                placeholder="Paste direct Instagram slide image URL (or image link)..."
+                className="flex-1 bg-surface px-3 py-1.5 rounded-lg border border-border text-xs text-text-primary outline-none focus:border-brand font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleAddSlideByUrl}
+                disabled={!newSlideUrl.trim()}
+                className="px-3 py-1.5 rounded-lg bg-brand text-white font-bold text-xs hover:brightness-110 disabled:opacity-50 transition-all shrink-0"
+              >
+                Add Slide
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowAddSlideUrlInput(false); setNewSlideUrl(''); }}
+                className="px-2.5 py-1.5 text-xs font-bold text-text-muted hover:text-text-primary transition-colors shrink-0"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
 
           <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
             {/* Horizontal / Grid Thumbnail Strip */}
@@ -1727,7 +1837,20 @@ export default function AdminIntake() {
                           Poster
                         </span>
                       )}
-                      {isBackdrop && (
+                      {currentMedia.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveSlide(idx);
+                          }}
+                          className="absolute top-1.5 right-1.5 z-10 p-1 rounded-full bg-black/70 text-white/80 hover:text-red-400 hover:bg-black transition-colors"
+                          title="Remove slide"
+                        >
+                          <Icon icon="solar:trash-bin-trash-linear" width="12" />
+                        </button>
+                      )}
+                      {isBackdrop && !currentMedia.length && (
                         <span className="absolute top-1.5 right-1.5 bg-purple-600 text-white px-1.5 py-0.5 rounded text-[8px] font-black uppercase shadow">
                           Backdrop
                         </span>

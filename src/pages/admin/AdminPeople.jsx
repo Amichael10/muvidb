@@ -16,6 +16,7 @@ import SearchableRolePicker from '../../components/admin/SearchableRolePicker';
 import { syncPersonAwardsToFilms } from '../../lib/awardsSync';
 import PersonMediaEditor from '../../components/admin/PersonMediaEditor';
 import PersonRepresentationEditor from '../../components/admin/PersonRepresentationEditor';
+import PersonCastingSpecsEditor from '../../components/admin/PersonCastingSpecsEditor';
 import { ALL_ROLES, CAST_ROLE, formatRole, normalizeRole } from '../../lib/creditRoles';
 import { Icon } from '@iconify/react';
 import { useAuth } from '../../context/AuthContext';
@@ -134,6 +135,7 @@ export default function AdminPeople() {
     social: true,
     media: true,
     representation: true,
+    castingSpecs: true,
     awards: true,
     settings: true,
   });
@@ -1799,7 +1801,23 @@ export default function AdminPeople() {
             </FoldableSection>
           )}
 
-          {/* 8. Awards & Honors */}
+          {/* 8. Industry Casting & Department Specs */}
+          {editingPerson && (
+            <FoldableSection
+              title="Casting, Industry Specs & Department Skills"
+              icon="🎭"
+              isOpen={!collapsedSections.castingSpecs}
+              onToggle={() => toggleSection('castingSpecs')}
+            >
+              <PersonCastingSpecsEditor
+                personId={editingPerson.id}
+                personName={formData.name}
+                knownDepartment={formData.known_for_department}
+              />
+            </FoldableSection>
+          )}
+
+          {/* 9. Awards & Honors */}
           <FoldableSection
             title="Awards & Nominations"
             icon="🏆"

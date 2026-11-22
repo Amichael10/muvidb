@@ -35,20 +35,27 @@ export async function matchPeopleByNameKey(query, { limit = 8 } = {}) {
     aliases: aliasRows.filter(row => row.person_id === person.id).map(row => row.alias),
     _matchKind: 'alias',
   }));
-  const { data, error } = await supabase.rpc('match_people_by_name', {
-    p_name: q,
-    p_limit: limit,
-  });
-  if (error) {
-    // Older envs without the RPC — fall through to lexical search.
-    if (/match_people_by_name|Could not find the function/i.test(error.message || '')) {
-      return aliasMatches;
+  let rpcData = null;
+  try {
+    const rpcPromise = supabase.rpc('match_people_by_name', {
+      p_name: q,
+      p_limit: limit,
+    });
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 1200)
+    );
+    const res = await Promise.race([rpcPromise, timeoutPromise]);
+    if (!res?.error && Array.isArray(res?.data)) {
+      rpcData = res.data;
     }
-    console.warn('match_people_by_name failed:', error.message);
-    return aliasMatches;
+  } catch (_) {
+    // Timeout or RPC unavailable — fall through to alias & lexical matches
   }
+
   const merged = new Map(aliasMatches.map(p => [p.id, p]));
-  for (const person of data || []) merged.set(person.id, { ...person, aliases: merged.get(person.id)?.aliases || [], _matchKind: person.match_kind });
+  for (const person of rpcData || []) {
+    merged.set(person.id, { ...person, aliases: merged.get(person.id)?.aliases || [], _matchKind: person.match_kind });
+  }
   return [...merged.values()];
 }
 
@@ -127,13 +134,13 @@ export async function searchPeopleByName(
     }
   };
 
-  // Fetch the full requested row even when the name-key RPC is unavailable.
-  const exactResult = await supabase.from('people').select(select).ilike('name', q.replace(/[%_]/g, ' ')).limit(limit);
-  if (exactResult.error) throw exactResult.error;
-
-  // 1) Authoritative order-insensitive RPC (exact + name_key swap)
-  addRows(await matchPeopleByNameKey(q, { limit }));
-  addRows(exactResult.data || []);
+  // Fetch exact and RPC matches concurrently
+  const [exactResult, rpcMatches] = await Promise.all([
+    supabase.from('people').select(select).ilike('name', q.replace(/[%_]/g, ' ')).limit(limit),
+    matchPeopleByNameKey(q, { limit }).catch(() => []),
+  ]);
+  addRows(rpcMatches || []);
+  if (!exactResult.error) addRows(exactResult.data || []);
 
   if (tokens.length === 1) {
     const { data, error } = await supabase
