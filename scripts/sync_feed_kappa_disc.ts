@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import path from 'path';
+import { findExistingPlatformFilm } from './lib/platform_film_matcher.js';
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -213,6 +214,20 @@ async function syncKava() {
         console.log(`🔄 Processing discovered Kava film: "${film.title}" (${slug})`);
 
         let filmId = existingMap.get(source_video_id);
+
+        if (!filmId) {
+          const matched = await findExistingPlatformFilm(supabase, {
+            platform: 'kava',
+            sourceVideoId: source_video_id,
+            url: watchUrl,
+            slug,
+            title: film.title
+          });
+          if (matched) {
+            filmId = matched.id;
+            existingMap.set(source_video_id, filmId);
+          }
+        }
         
         if (filmId) {
           const { error: filmError } = await supabase.from('films').update({
@@ -220,14 +235,18 @@ async function syncKava() {
             genres: film.genres,
             synopsis: film.synopsis,
             poster_url: film.poster_url,
-            backdrop_url: film.backdrop_url
+            backdrop_url: film.backdrop_url,
+            source_video_id: source_video_id,
+            streaming_links: { kava: watchUrl }
           }).eq('id', filmId);
           if (filmError) throw filmError;
+          console.log(`  ✅ Updated existing film: "${film.title}" (${filmId})`);
         } else {
           const { data: insertedFilm, error: filmError } = await supabase.from('films').insert([film]).select('id').single();
           if (filmError) throw filmError;
           filmId = insertedFilm.id;
           existingMap.set(source_video_id, filmId);
+          console.log(`  ✨ Inserted new film: "${film.title}" (${filmId})`);
         }
         inserted++;
 

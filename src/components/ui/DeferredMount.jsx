@@ -48,6 +48,14 @@ export default function DeferredMount({
       };
     }
 
+    const fallbackTimer = setTimeout(() => {
+      if (!activated.current) {
+        activated.current = true;
+        setActive(true);
+        onActivate?.();
+      }
+    }, 2500);
+
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry?.isIntersecting || activated.current) return;
@@ -59,7 +67,10 @@ export default function DeferredMount({
       { rootMargin },
     );
     io.observe(node);
-    return () => io.disconnect();
+    return () => {
+      clearTimeout(fallbackTimer);
+      io.disconnect();
+    };
   }, [onActivate, rootMargin]);
 
   return (

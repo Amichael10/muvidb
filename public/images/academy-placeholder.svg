@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14171d"/>
+      <stop offset="50%" stop-color="#0e1014"/>
+      <stop offset="100%" stop-color="#08090b"/>
+    </linearGradient>
+    <linearGradient id="orangeGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF5C00" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#FF8A00" stop-opacity="0.3"/>
+    </linearGradient>
+    <pattern id="gridPattern" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- Dark Architectural Background -->
+  <rect width="1200" height="800" fill="url(#bgGradient)"/>
+  <rect width="1200" height="800" fill="url(#gridPattern)"/>
+
+  <!-- Subtle Ambient Glow -->
+  <circle cx="600" cy="380" r="280" fill="#FF5C00" opacity="0.04" filter="blur(60px)"/>
+
+  <!-- Soundstage Clapperboard & Film Camera Vector Icon -->
+  <g transform="translate(600, 320)" text-anchor="middle">
+    <!-- Outer Shield / Disc -->
+    <circle cx="0" cy="0" r="72" fill="#181c24" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+    <circle cx="0" cy="0" r="56" fill="rgba(255,92,0,0.08)" stroke="rgba(255,92,0,0.3)" stroke-width="1.5"/>
+    
+    <!-- Clapperboard Graphic -->
+    <path d="M -24 -16 L 24 -16 C 26.2 -16 28 -14.2 28 -12 L 28 20 C 28 22.2 26.2 24 24 24 L -24 24 C -26.2 24 -28 22.2 -28 20 L -28 -12 C -28 -14.2 -26.2 -16 -24 -16 Z" fill="none" stroke="#FF5C00" stroke-width="2.5" stroke-linejoin="round"/>
+    <!-- Clapper Stripes -->
+    <line x1="-28" y1="-4" x2="28" y2="-4" stroke="#FF5C00" stroke-width="2"/>
+    <line x1="-20" y1="-16" x2="-14" y2="-4" stroke="#FF5C00" stroke-width="2"/>
+    <line x1="-8" y1="-16" x2="-2" y2="-4" stroke="#FF5C00" stroke-width="2"/>
+    <line x1="4" y1="-16" x2="10" y2="-4" stroke="#FF5C00" stroke-width="2"/>
+    <line x1="16" y1="-16" x2="22" y2="-4" stroke="#FF5C00" stroke-width="2"/>
+    <!-- Play Triangle -->
+    <polygon points="-4,5 -4,15 6,10" fill="#FF5C00"/>
+  </g>
+
+  <!-- Typography -->
+  <text x="600" y="445" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" font-weight="900" fill="#FF5C00" letter-spacing="4" text-anchor="middle">
+    ACCREDITED FILM ACADEMY &amp; STUDIO SLATE
+  </text>
+  <text x="600" y="480" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="800" fill="#FFFFFF" text-anchor="middle" letter-spacing="-0.5">
+    Studio Workshop &amp; Production Sets
+  </text>
+  <text x="600" y="510" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="rgba(255,255,255,0.45)" text-anchor="middle">
+    Verified On-Set Training · Faculty Masterclasses · Commercial Film Production
+  </text>
+
+  <!-- Bottom Brand Mark -->
+  <text x="600" y="740" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="10" font-weight="800" fill="rgba(255,255,255,0.2)" letter-spacing="3" text-anchor="middle">
+    MUVIDB INSTITUTIONAL CATALOGUE
+  </text>
+</svg>

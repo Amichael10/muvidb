@@ -30,14 +30,15 @@ describe('WhatsApp cast and crew alerts', () => {
     return queries;
   }
 
-  it('sends one message for followed cast and crew with the required dynamic button', async () => {
+  it('sends one message for followed cast and crew using the approved Utility template', async () => {
     setup(); mocks.send.mockResolvedValue({ ok: true, messageId: 'message' });
     const result = await dispatchMovieWhatsAppAlerts(context);
     expect(result.sentCount).toBe(1);
     expect(mocks.send).toHaveBeenCalledTimes(1);
     expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({
-      buttonUrlPayload: 'film-slug',
-      bodyParameters: ['Actor & Editor', 'Film', 'on YouTube', 'https://muvidb.com/film/film-slug'],
+      templateName: 'user_fav_movie',
+      buttonUrlPayload: undefined,
+      bodyParameters: ['Actor & Editor', 'Film', 'on YouTube', 'film-slug'],
     }));
   });
 

@@ -1,320 +1,593 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { Link, useLoaderData } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
+import { useLoaderData, useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { PUBLIC_PERSON_COLUMNS, PUBLIC_FILM_COLUMNS } from '../lib/publicSelects';
-import { getPersonYoutubeChannelUrl } from '../lib/youtube';
-import HeroSection from '../components/film/HeroSection';
-import FilmRow from '../components/film/FilmRow';
-import PlatformRail from '../components/film/PlatformRail';
-import DeferredMount from '../components/ui/DeferredMount';
-import { Icon } from '@iconify/react';
 import { useAuth } from '../context/AuthContext';
 import { PLATFORMS, platformFilter } from '../lib/platforms';
-import { toTitleCase } from '../utils/format';
-import { getZonedClock, getNextDate, isPublicCinemaShowtime, compareShowtimes, isLiveCinemaFilm } from '../utils/showtimes';
-import ImageWithFallback from '../components/ui/ImageWithFallback';
-import HomeIntroSection from '../components/film/HomeIntroSection';
-import { collapseSeriesFilms } from '../utils/series';
-import { fetchPlays, getPlayDateLabel } from '../lib/plays';
-import MobileHomeFeed from '../components/home/mobile/MobileHomeFeed';
+import {
+  getZonedClock,
+  getNextDate,
+  isPublicCinemaShowtime,
+  compareShowtimes,
+  isLiveCinemaFilm,
+} from '../utils/showtimes';
+import { fetchPlays } from '../lib/plays';
+import { filterAndSortFreshStreaming } from '../lib/ranking';
+import DeferredMount from '../components/ui/DeferredMount';
+import HomeCommandHero from '../components/home/HomeCommandHero';
+import HomeCinemaSection from '../components/home/HomeCinemaSection';
+import HomeNewReleases from '../components/home/HomeNewReleases';
+import HomeStreamingHub from '../components/home/HomeStreamingHub';
+import HomeIndustryTools from '../components/home/HomeIndustryTools';
+import HomeTheatreSection from '../components/home/HomeTheatreSection';
+import HomeSponsoredBanner from '../components/home/HomeSponsoredBanner';
+import HomeIndustryEcosystem from '../components/home/HomeIndustryEcosystem';
 
-// Below-fold sections — keep them out of the critical homepage JS chunk.
-const TopTenSection = lazy(() => import('../components/film/TopTenSection'));
-const GenreRail = lazy(() => import('../components/film/GenreRail'));
-const PersonCard = lazy(() => import('../components/person/PersonCard'));
-const FilmCard = lazy(() => import('../components/film/FilmCard'));
+// Below-fold sections — lazy loaded to keep initial bundle lean
 const CriticsLoungeSection = lazy(() => import('../components/film/CriticsLoungeSection'));
+const HomeUpcomingSlate = lazy(() => import('../components/home/HomeUpcomingSlate'));
+const HomePulseRails = lazy(() => import('../components/home/HomePulseRails'));
 
-const HOME_ROW_CAP = 12;
-
-// Platforms shown in the homepage "New to Stream" tabbed rail.
-const NEW_STREAM = PLATFORMS.filter(p => ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits', 'nollistream', 'homitv', 'filmporte'].includes(p.id));
-const NEW_STREAM_IDS = NEW_STREAM.map(p => p.id);
+const STREAMING_PLATFORMS = PLATFORMS.filter((p) =>
+  ['netflix', 'prime_video', 'kava', 'docuth', 'ebonylife', 'circuits', 'nollistream', 'homitv', 'filmporte'].includes(p.id)
+);
+const STREAMING_IDS = STREAMING_PLATFORMS.map((p) => p.id);
 const CINEMA_SHOWTIME_PAGE_SIZE = 1000;
 
-const cinemaFilmKey = (title = '') => title
-  .normalize('NFKD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .toLowerCase()
-  // Drop parentheticals so "Apaara" and "Apaara (The Outcast)" collapse to one card
-  .replace(/\([^)]*\)/g, ' ')
-  .replace(/\[[^\]]*\]/g, ' ')
-  .replace(/&/g, ' and ')
-  .replace(/[^a-z0-9]+/g, ' ')
-  .trim()
-  .replace(/\s+/g, ' ');
+const cinemaFilmKey = (title = '') =>
+  title
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 
-function formatStudioBoxOffice(amount) {
-  if (!amount || amount <= 0) return null;
-  if (amount >= 1_000_000_000) {
-    return `₦${(amount / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`;
-  }
-  if (amount >= 1_000_000) {
-    return `₦${(amount / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
-  }
-  if (amount >= 1_000) {
-    return `₦${(amount / 1_000).toFixed(0)}K`;
-  }
-  return `₦${amount.toLocaleString()}`;
-}
+const withNormalizedGenres = (f) => {
+  const related = f.film_genres?.map((fg) => fg.genres?.name).filter(Boolean) || [];
+  return {
+    ...f,
+    genres: related.length > 0 ? related : Array.isArray(f.genres) ? f.genres.filter(Boolean) : [],
+  };
+};
 
 export default function Home() {
-  const { isAuthenticated } = useAuth();
-  // Hero rail is server-rendered and edge-cached by the route loader in
-  // src/routes/home.tsx, so it's already in the HTML on first paint. Empty means
-  // the loader couldn't seed it (slow/failed DB) — the client fetch below then
-  // runs as a fallback exactly as it did before SSR.
-  const loaderData = useLoaderData();
-  // Priority rails (cinema / new releases / new to stream). Starts false so SSR
-  // does not emit a wall of skeleton rows under the hero.
-  const [isPriorityLoading, setIsPriorityLoading] = useState(false);
-  // Starts false when the loader already server-rendered the hero, otherwise the
-  // skeleton would be what gets server-rendered and SSR would buy us nothing.
-  const [isHeroLoading, setIsHeroLoading] = useState(!loaderData?.featuredFilms?.length);
-  const [isCinemaLoading, setIsCinemaLoading] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const loaderData = useLoaderData() || {};
+
+  // Above-the-fold Command Hero state (SSR-seeded)
+  const [featuredFilms, setFeaturedFilms] = useState(loaderData.featuredFilms ?? []);
+  const [boxOfficeRecent, setBoxOfficeRecent] = useState(loaderData.boxOfficeRecent ?? []);
+  const [boxOfficeAllTime, setBoxOfficeAllTime] = useState(loaderData.boxOfficeAllTime ?? []);
+  const [isHeroLoading, setIsHeroLoading] = useState(!(loaderData.featuredFilms?.length > 0));
+  const [isBoxOfficeLoading, setIsBoxOfficeLoading] = useState(
+    !(loaderData.boxOfficeAllTime?.length > 0 || loaderData.boxOfficeRecent?.length > 0)
+  );
+
+  // Core viewer utility sections
   const [inCinemas, setInCinemas] = useState([]);
-  const [newToStream, setNewToStream] = useState({}); // { netflix: [...], prime_video: [...], ... }
-  const [streamTab, setStreamTab] = useState('netflix');
-  const [youtubeFeed, setYoutubeFeed] = useState([]);
-  const [youtubeFilter, setYoutubeFilter] = useState('All');
-  const [upcomingPlays, setUpcomingPlays] = useState([]);
-  const [isTheatreLoading, setIsTheatreLoading] = useState(false);
-  const [spotlightPerson, setSpotlightPerson] = useState(null);
-  const [otherPeople, setOtherPeople] = useState([]);
-  const [creators, setCreators] = useState([]);
+  const [isCinemaLoading, setIsCinemaLoading] = useState(true);
   const [newReleases, setNewReleases] = useState([]);
-  const [isComingSoonLoading, setIsComingSoonLoading] = useState(false);
-  // Secondary (below-fold) rails — fetch only after DeferredMount activates.
-  const [isSecondaryLoading, setIsSecondaryLoading] = useState(false);
+  const [isNewReleasesLoading, setIsNewReleasesLoading] = useState(true);
+  const [streamingByPlatform, setStreamingByPlatform] = useState({});
+  const [youtubeFeed, setYoutubeFeed] = useState([]);
+  const [isStreamingLoading, setIsStreamingLoading] = useState(true);
+
+  // Below-fold sections (lazy mounted + fetched once near viewport)
   const secondaryFetched = useRef(false);
-
-  const [featuredFilms, setFeaturedFilms] = useState(loaderData?.featuredFilms ?? []);
   const [comingSoon, setComingSoon] = useState([]);
-  const [curatedCollection, setCuratedCollection] = useState(null);
-  const [recentlyAdded, setRecentlyAdded] = useState([]);
-  const [spotlightContent, setSpotlightContent] = useState(null);
-  const [top10Films, setTop10Films] = useState([]);
-  const [crewMembers, setCrewMembers] = useState([]);
-  const [productionCompanies, setProductionCompanies] = useState([]);
-  const [featuredSeries, setFeaturedSeries] = useState([]);
-  const [genreSections, setGenreSections] = useState([]);
+  const [isComingSoonLoading, setIsComingSoonLoading] = useState(false);
+  const [upcomingPlays, setUpcomingPlays] = useState([]);
+  const [isPlaysLoading, setIsPlaysLoading] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [talent, setTalent] = useState([]);
+  const [crew, setCrew] = useState([]);
+  const [birthdayPool, setBirthdayPool] = useState([]);
+  const [isIndustryLoading, setIsIndustryLoading] = useState(false);
 
-  // What's New consolidated tabs (Coming Soon / New Releases / Recently Added)
-  const [whatsNewTab, setWhatsNewTab] = useState('coming');
+  // Single batched watchlist state for all cards on the page (avoids N+1 card queries)
+  const [watchlistIds, setWatchlistIds] = useState(() => new Set());
+  const [watchlistStreamingAlerts, setWatchlistStreamingAlerts] = useState([]);
+  const [dismissedAlert, setDismissedAlert] = useState(false);
 
-  // Featured Talent consolidated tabs (Artist / Crew)
-  const [featuredTalentTab, setFeaturedTalentTab] = useState('artist');
+  useEffect(() => {
+    if (!user?.id) {
+      setWatchlistIds(new Set());
+      setWatchlistStreamingAlerts([]);
+      return;
+    }
+    let active = true;
+    supabase
+      .from('watchlist')
+      .select('film_id, films(id, slug, title, coming_soon, youtube_watch_url, streaming_links)')
+      .eq('user_id', user.id)
+      .then(({ data }) => {
+        if (active && Array.isArray(data)) {
+          setWatchlistIds(new Set(data.map((row) => row.film_id)));
+          const nowStreaming = data
+            .map((row) => row.films)
+            .filter(
+              (f) =>
+                f &&
+                !f.coming_soon &&
+                (f.youtube_watch_url ||
+                  f.streaming_links?.netflix ||
+                  f.streaming_links?.prime_video ||
+                  f.streaming_links?.kava)
+            )
+            .slice(0, 3);
+          setWatchlistStreamingAlerts(nowStreaming);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
-  // Accurate per-platform title counts (counted at the DB level — the client film
-  // list is capped at 1000 rows and undercounts the 19k+ catalogue).
-  const [platformCounts, setPlatformCounts] = useState({});
+  const handleToggleWatchlist = async (film) => {
+    if (!film?.id) return;
+    if (!user?.id) {
+      navigate('/login', { state: { from: `/films/${film.slug || film.id}` } });
+      return;
+    }
 
-  // External YouTube Channel warning dialog states (Issue 19)
-  const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
-  const [externalUrl, setExternalUrl] = useState('');
-  const [dontShowAgain, setDontShowAgain] = useState(false);
+    const alreadySaved = watchlistIds.has(film.id);
+    // Optimistic toggle
+    setWatchlistIds((prev) => {
+      const next = new Set(prev);
+      if (alreadySaved) next.delete(film.id);
+      else next.add(film.id);
+      return next;
+    });
 
-  // Priority wave: hero fallback + cinema + new releases + new-to-stream.
-  // Scheduled on idle so hydration of the SSR hero isn't competing with ~13 queries.
+    try {
+      if (alreadySaved) {
+        const { error } = await supabase
+          .from('watchlist')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('film_id', film.id);
+        if (error) throw error;
+        toast.success(`Removed "${film.title}" from watchlist`);
+      } else {
+        const { error } = await supabase
+          .from('watchlist')
+          .insert({ user_id: user.id, film_id: film.id });
+        if (error) throw error;
+        toast.success(`Saved "${film.title}" to watchlist`);
+      }
+    } catch (err) {
+      // Rollback on failure
+      setWatchlistIds((prev) => {
+        const next = new Set(prev);
+        if (alreadySaved) next.add(film.id);
+        else next.delete(film.id);
+        return next;
+      });
+      toast.error('Could not update watchlist.');
+    }
+  };
+
+  // Priority wave: Hero/BoxOffice fallback (if SSR didn't seed) + Live Cinemas + Streaming Hub
   useEffect(() => {
     const runPriority = () => {
-      fetchPriorityData().finally(() => fetchPlatformCounts());
+      const jobs = [
+        fetchInCinemasData().catch((e) => console.error('Cinema fetch error:', e)),
+        fetchNewReleasesData().catch((e) => console.error('New releases fetch error:', e)),
+        fetchStreamingHubData().catch((e) => console.error('Streaming fetch error:', e)),
+      ];
+      if (!loaderData.featuredFilms?.length) {
+        jobs.push(fetchFeaturedFallback().catch((e) => console.error('Hero fallback error:', e)));
+      }
+      if (!loaderData.boxOfficeAllTime?.length && !loaderData.boxOfficeRecent?.length) {
+        jobs.push(fetchBoxOfficeFallback().catch((e) => console.error('BoxOffice fallback error:', e)));
+      }
+      Promise.all(jobs).then(() => {
+        // Pre-warm below-fold industry & upcoming data
+        setTimeout(() => {
+          fetchSecondaryData().catch(() => {});
+        }, 300);
+      });
     };
+
     let idleId = null;
     let timeoutId = null;
     if (typeof requestIdleCallback === 'function') {
-      idleId = requestIdleCallback(runPriority, { timeout: 1200 });
+      idleId = requestIdleCallback(runPriority, { timeout: 600 });
     } else {
-      timeoutId = setTimeout(runPriority, 100);
+      timeoutId = setTimeout(runPriority, 50);
     }
 
     const cinemaRefresh = window.setInterval(() => {
-      fetchInCinemasData().catch(error => console.error('Error refreshing cinema data:', error));
-    }, 60_000);
+      fetchInCinemasData().catch(() => {});
+    }, 120_000);
 
     return () => {
-      if (idleId != null && typeof cancelIdleCallback === 'function') {
-        cancelIdleCallback(idleId);
-      }
+      if (idleId != null && typeof cancelIdleCallback === 'function') cancelIdleCallback(idleId);
       if (timeoutId != null) clearTimeout(timeoutId);
       window.clearInterval(cinemaRefresh);
     };
   }, []);
 
-  const fetchPriorityData = async () => {
-    setIsPriorityLoading(true);
-    // Don't flip the seeded hero back to a skeleton after hydration — that would
-    // make the server-rendered hero visibly flash away on every load.
-    if (!loaderData?.featuredFilms?.length) setIsHeroLoading(true);
-
-    setIsCinemaLoading(true);
-    const cinemaPromise = fetchInCinemasData()
-      .catch(e => console.error('Error fetching cinemas data:', e))
-      .finally(() => setIsCinemaLoading(false));
-
+  const fetchFeaturedFallback = async () => {
+    setIsHeroLoading(true);
     try {
-      await fetchFeaturedFilms().catch(e => console.error('Error fetching featured films:', e));
-    } catch (e) {
-      console.error('Error in critical fetches:', e);
+      const cols = `
+        id, slug, title, poster_url, backdrop_url, year, synopsis, tagline,
+        view_count, average_rating, audience_rating, imdb_rating, tmdb_rating, liked_percent,
+        release_type, source, is_in_cinemas, coming_soon, streaming_links,
+        youtube_watch_url, trailer_youtube_id, runtime_minutes,
+        film_genres(genres(name))
+      `;
+      let { data } = await supabase
+        .from('films')
+        .select(cols)
+        .eq('is_featured', true)
+        .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+        .order('is_in_cinemas', { ascending: false })
+        .order('year', { ascending: false })
+        .order('view_count', { ascending: false })
+        .limit(5);
+
+      if (!data || data.length === 0) {
+        const res = await supabase
+          .from('films')
+          .select(cols)
+          .not('backdrop_url', 'is', null)
+          .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+          .order('is_in_cinemas', { ascending: false })
+          .order('year', { ascending: false })
+          .order('view_count', { ascending: false })
+          .limit(5);
+        data = res.data;
+      }
+
+      if (data) setFeaturedFilms(data.map(withNormalizedGenres));
     } finally {
       setIsHeroLoading(false);
     }
-
-    try {
-      await Promise.all([
-        fetchNewReleases().catch(e => console.error('Error fetching new releases:', e)),
-        fetchNewToStream().catch(e => console.error('Error fetching new to stream:', e)),
-        fetchUpcomingPlays().catch(e => console.error('Error fetching theatre plays:', e)),
-      ]);
-    } catch (error) {
-      console.error('Error in priority fetches:', error);
-    } finally {
-      setIsPriorityLoading(false);
-    }
-
-    await cinemaPromise;
   };
 
+  const fetchBoxOfficeFallback = async () => {
+    setIsBoxOfficeLoading(true);
+    try {
+      const cols = 'id, slug, title, poster_url, year, distributor, box_office_domestic, box_office_currency';
+      const [allRes, recentRes] = await Promise.all([
+        supabase
+          .from('films')
+          .select(cols)
+          .gt('box_office_domestic', 0)
+          .order('box_office_domestic', { ascending: false })
+          .limit(5),
+        supabase
+          .from('films')
+          .select(cols)
+          .gt('box_office_domestic', 0)
+          .gte('year', 2025)
+          .order('box_office_domestic', { ascending: false })
+          .limit(5),
+      ]);
+      if (allRes.data) setBoxOfficeAllTime(allRes.data);
+      if (recentRes.data) setBoxOfficeRecent(recentRes.data);
+    } finally {
+      setIsBoxOfficeLoading(false);
+    }
+  };
+
+  const fetchInCinemasData = async () => {
+    setIsCinemaLoading(true);
+    try {
+      const cinemaClock = getZonedClock();
+      const tomorrow = getNextDate(cinemaClock.date);
+
+      const stRows = [];
+      let showtimePage = 0;
+
+      while (true) {
+        const pageStart = showtimePage * CINEMA_SHOWTIME_PAGE_SIZE;
+        const { data: pageRows, error: showtimeError } = await supabase
+          .from('showtimes')
+          .select(
+            'film_id, cinema_id, show_date, show_time, films(id, status, coming_soon, is_in_cinemas), cinemas(id, name, city, chain)'
+          )
+          .gte('show_date', cinemaClock.date)
+          .eq('is_available', true)
+          .order('show_date', { ascending: true })
+          .order('show_time', { ascending: true })
+          .range(pageStart, pageStart + CINEMA_SHOWTIME_PAGE_SIZE - 1);
+
+        if (showtimeError) {
+          console.error('Error fetching cinema showtimes:', showtimeError);
+          return;
+        }
+
+        stRows.push(...(pageRows || []));
+        if (!pageRows || pageRows.length < CINEMA_SHOWTIME_PAGE_SIZE) break;
+        showtimePage += 1;
+      }
+
+      const futureShowtimes = stRows.filter((st) => isPublicCinemaShowtime(st, cinemaClock));
+      const nowIds = new Set(futureShowtimes.map((r) => r.film_id).filter(Boolean));
+
+      const nextShowByFilm = {};
+      const upcomingShowsByFilm = {};
+      const cityNextShowByFilm = {};
+      const citiesByFilm = {};
+      const futureCountByFilm = {};
+
+      futureShowtimes.forEach((st) => {
+        const fId = st.film_id;
+        futureCountByFilm[fId] = (futureCountByFilm[fId] || 0) + 1;
+
+        const enrichedShow = {
+          ...st,
+          is_today: st.show_date === cinemaClock.date,
+          is_tomorrow: st.show_date === tomorrow,
+        };
+
+        if (!nextShowByFilm[fId] || compareShowtimes(st, nextShowByFilm[fId]) < 0) {
+          nextShowByFilm[fId] = enrichedShow;
+        }
+
+        // Track distinct cinema venue upcoming showtimes for dynamic rotation
+        if (!upcomingShowsByFilm[fId]) upcomingShowsByFilm[fId] = [];
+        const venueName = st.cinemas?.name || st.cinema_name || '';
+        if (
+          venueName &&
+          upcomingShowsByFilm[fId].length < 6 &&
+          !upcomingShowsByFilm[fId].some((s) => (s.cinemas?.name || s.cinema_name) === venueName)
+        ) {
+          upcomingShowsByFilm[fId].push(enrichedShow);
+        }
+
+        const rawCity = st.cinemas?.city?.trim();
+        if (rawCity) {
+          if (!citiesByFilm[fId]) citiesByFilm[fId] = new Set();
+          citiesByFilm[fId].add(rawCity);
+
+          if (!cityNextShowByFilm[fId]) cityNextShowByFilm[fId] = {};
+          const prevCityShow = cityNextShowByFilm[fId][rawCity];
+          if (!prevCityShow || compareShowtimes(st, prevCityShow) < 0) {
+            cityNextShowByFilm[fId][rawCity] = enrichedShow;
+          }
+        }
+      });
+
+      if (nowIds.size === 0) {
+        setInCinemas([]);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('films')
+        .select(`${PUBLIC_FILM_COLUMNS}, film_genres(genres(name))`)
+        .in('id', Array.from(nowIds))
+        .order('created_at', { ascending: false });
+
+      const candidates = (data || [])
+        .filter(isLiveCinemaFilm)
+        .map((film) => ({
+          ...withNormalizedGenres(film),
+          next_showtime: nextShowByFilm[film.id] || null,
+          upcoming_showtimes: upcomingShowsByFilm[film.id] || [],
+          active_cities: Array.from(citiesByFilm[film.id] || []),
+          city_next_showtime: cityNextShowByFilm[film.id] || {},
+          future_showtime_count: futureCountByFilm[film.id] || 0,
+        }));
+
+      // Deduplicate cinema chain spelling variants
+      const uniqueFilms = new Map();
+      candidates.forEach((candidate) => {
+        const key = cinemaFilmKey(candidate.title) || candidate.id;
+        const existing = uniqueFilms.get(key);
+        if (!existing) {
+          uniqueFilms.set(key, candidate);
+          return;
+        }
+        const primary =
+          candidate.future_showtime_count > existing.future_showtime_count ? candidate : existing;
+        const firstNextShow =
+          [existing.next_showtime, candidate.next_showtime]
+            .filter(Boolean)
+            .sort(compareShowtimes)[0] || null;
+
+        const mergedCities = Array.from(
+          new Set([...(existing.active_cities || []), ...(candidate.active_cities || [])])
+        );
+        const mergedShows = [...(existing.upcoming_showtimes || [])];
+        (candidate.upcoming_showtimes || []).forEach((s) => {
+          const vName = s.cinemas?.name || s.cinema_name;
+          if (vName && !mergedShows.some((x) => (x.cinemas?.name || x.cinema_name) === vName)) {
+            mergedShows.push(s);
+          }
+        });
+
+        const mergedCityShows = { ...(existing.city_next_showtime || {}) };
+        Object.entries(candidate.city_next_showtime || {}).forEach(([city, show]) => {
+          if (!mergedCityShows[city] || compareShowtimes(show, mergedCityShows[city]) < 0) {
+            mergedCityShows[city] = show;
+          }
+        });
+
+        uniqueFilms.set(key, {
+          ...primary,
+          next_showtime: firstNextShow,
+          upcoming_showtimes: mergedShows,
+          active_cities: mergedCities,
+          city_next_showtime: mergedCityShows,
+          future_showtime_count: existing.future_showtime_count + candidate.future_showtime_count,
+        });
+      });
+
+      setInCinemas(Array.from(uniqueFilms.values()));
+    } finally {
+      setIsCinemaLoading(false);
+    }
+  };
+
+  const fetchNewReleasesData = async () => {
+    setIsNewReleasesLoading(true);
+    try {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const minFreshYear = new Date().getFullYear() - 1;
+      const cols = `
+        id, slug, title, poster_url, backdrop_url, year, genres,
+        runtime_minutes, view_count, average_rating, liked_percent,
+        audience_rating, imdb_rating, tmdb_rating, content_type,
+        release_type, streaming_links, source, youtube_watch_url,
+        created_at, release_date, coming_soon, is_in_cinemas,
+        film_genres(genres(name))
+      `;
+
+      const { data, error } = await supabase
+        .from('films')
+        .select(cols)
+        .or('coming_soon.eq.false,coming_soon.is.null')
+        .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+        .is('series_id', null)
+        .gte('year', minFreshYear)
+        .not('poster_url', 'is', null)
+        .or(`release_date.lte.${todayIso},release_date.is.null`)
+        .order('release_date', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(36);
+
+      if (!error && Array.isArray(data)) {
+        const normalized = data.map(withNormalizedGenres);
+        setNewReleases(filterAndSortFreshStreaming(normalized, { minFallback: 12 }).slice(0, 24));
+      }
+    } finally {
+      setIsNewReleasesLoading(false);
+    }
+  };
+
+  const fetchStreamingHubData = async () => {
+    setIsStreamingLoading(true);
+    try {
+      const cols = `
+        id, slug, title, poster_url, backdrop_url, year, genres,
+        runtime_minutes, view_count, average_rating, liked_percent,
+        audience_rating, imdb_rating, tmdb_rating, content_type,
+        release_type, streaming_links, source, youtube_watch_url,
+        created_at, release_date, coming_soon, is_in_cinemas,
+        film_genres(genres(name))
+      `;
+
+      const minFreshYear = new Date().getFullYear() - 1;
+      const [queueRes, youtubeRes] = await Promise.all([
+        supabase.rpc('get_platform_new_releases', { p_platforms: STREAMING_IDS }),
+        supabase
+          .from('films')
+          .select(cols)
+          .eq('source', 'youtube')
+          .eq('content_type', 'movie')
+          .gte('year', minFreshYear)
+          .not('poster_url', 'is', null)
+          .order('release_date', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .order('view_count', { ascending: false, nullsFirst: false })
+          .limit(24),
+      ]);
+
+      const map = {};
+      STREAMING_IDS.forEach((id) => {
+        map[id] = [];
+      });
+
+      if (!queueRes.error && Array.isArray(queueRes.data)) {
+        const orderedQueue = [...queueRes.data].sort((a, b) => {
+          if (a.platform !== b.platform) return a.platform.localeCompare(b.platform);
+          if (a.display_order !== b.display_order) return a.display_order - b.display_order;
+          const dateA = new Date(a.film?.release_date || a.film?.created_at || a.queue_created_at).getTime();
+          const dateB = new Date(b.film?.release_date || b.film?.created_at || b.queue_created_at).getTime();
+          return dateB - dateA;
+        });
+
+        orderedQueue.forEach((row) => {
+          // Exclude child episodes so only the parent series card displays with episode counts
+          if (row.film && !row.film.series_id && map[row.platform]) {
+            map[row.platform].push(withNormalizedGenres(row.film));
+          }
+        });
+      }
+
+      // Fallback for any core platform that had an empty RPC queue (strictly fresh titles)
+      await Promise.all(
+        STREAMING_IDS.map(async (id) => {
+          if (map[id].length > 0) return;
+          const { data } = await supabase
+            .from('films')
+            .select(cols)
+            .or(platformFilter(id))
+            .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
+            .is('series_id', null)
+            .gte('year', minFreshYear)
+            .not('poster_url', 'is', null)
+            .order('release_date', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false })
+            .limit(16);
+          map[id] = (data || []).map(withNormalizedGenres);
+        })
+      );
+
+      STREAMING_IDS.forEach((id) => {
+        map[id] = filterAndSortFreshStreaming(map[id], { minFallback: 4 }).slice(0, 12);
+      });
+
+      setStreamingByPlatform(map);
+
+      if (!youtubeRes.error && youtubeRes.data) {
+        setYoutubeFeed(
+          filterAndSortFreshStreaming(youtubeRes.data.map(withNormalizedGenres), { minFallback: 6 }).slice(0, 12)
+        );
+      }
+    } finally {
+      setIsStreamingLoading(false);
+    }
+  };
+
+  // Below-fold fetches triggered once near viewport
   const fetchSecondaryData = async () => {
     if (secondaryFetched.current) return;
     secondaryFetched.current = true;
-    setIsSecondaryLoading(true);
+
     setIsComingSoonLoading(true);
+    setIsPlaysLoading(true);
+    setIsIndustryLoading(true);
 
-    try {
-      await Promise.all([
-        fetchFeaturedSeries().catch(e => console.error('Error fetching series:', e)),
-        fetchYoutubeFeed().catch(e => console.error('Error fetching youtube feed:', e)),
-        fetchPeople().catch(e => console.error('Error fetching people:', e)),
-        fetchCreators().catch(e => console.error('Error fetching creators:', e)),
-        fetchCuratedCollection().catch(e => console.error('Error fetching curated collection:', e)),
-        fetchSpotlightContent().catch(e => console.error('Error fetching spotlight content:', e)),
-        fetchTop10Films().catch(e => console.error('Error fetching top 10:', e)),
-        fetchCrewMembers().catch(e => console.error('Error fetching crew:', e)),
-        fetchCompanies().catch(e => console.error('Error fetching companies:', e)),
-        fetchRecentlyAdded().catch(e => console.error('Error fetching recently added:', e)),
-        fetchGenreSections().catch(e => console.error('Error fetching genre sections:', e)),
-      ]);
-    } catch (error) {
-      console.error('Error in secondary fetches:', error);
-    } finally {
-      setIsSecondaryLoading(false);
-    }
-
-    await fetchComingSoon().catch(e => console.error('Error fetching coming soon:', e));
+    await Promise.all([
+      fetchComingSoon().finally(() => setIsComingSoonLoading(false)),
+      fetchUpcomingPlays().finally(() => setIsPlaysLoading(false)),
+      Promise.all([fetchCompanies(), fetchIndustryPeople()]).finally(() => setIsIndustryLoading(false)),
+    ]);
   };
 
-  // Fetch films for the top genre sections at the bottom of the page.
-  const GENRE_SECTION_NAMES = ['Romance', 'Crime', 'Thriller', 'Comedy', 'Family'];
-  const fetchGenreSections = async () => {
-    const results = await Promise.all(
-      GENRE_SECTION_NAMES.map(async (genreName) => {
-        const { data } = await supabase
-          .from('films')
-          .select(`
-            id, slug, title, poster_url, backdrop_url, year, source,
-            content_type, streaming_links, view_count,
-            film_genres!inner(genres!inner(name))
-          `)
-          .eq('film_genres.genres.name', genreName)
-          .not('poster_url', 'is', null)
-          .order('view_count', { ascending: false })
-          .limit(8);
-        const films = (data || []).map(f => ({
-          ...f,
-          genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-        }));
-        return { genre: genreName, films };
-      })
-    );
-    setGenreSections(results.filter(s => s.films.length > 0));
-  };
-  const fetchPlatformCounts = async () => {
-    // Count one platform, retrying once on a statement timeout (57014). Returns
-    // null (unknown) only if it genuinely keeps failing, so a transient timeout
-    // never silently collapses a real count to 0 and hides the platform.
-    const countOne = async (p, attempt = 0) => {
-      const { count, error } = await supabase
-        .from('films')
-        .select('id', { count: 'exact', head: true })
-        .or(platformFilter(p.id));
-      if (error) {
-        if (attempt < 2 && error.code === '57014') {
-          await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
-          return countOne(p, attempt + 1);
-        }
-        console.error(`Error counting platform ${p.id}:`, error);
-        return null;
+  const fetchComingSoon = async (attempt = 0) => {
+    const { data, error } = await supabase.rpc('get_coming_soon_films', { p_limit: 16 });
+    if (error) {
+      if (attempt === 0 && error.code === '57014') {
+        await new Promise((r) => setTimeout(r, 1200));
+        return fetchComingSoon(attempt + 1);
       }
-      return count ?? 0;
-    };
-
-    // Let the initial homepage query burst settle before hammering the DB with
-    // exact-count scans — improves reliability of the first platform counted.
-    await new Promise(r => setTimeout(r, 800));
-
-    // Sequential, not parallel: 8 simultaneous exact-count scans over the 19k
-    // catalogue saturate the connection pool and time out. Running them one at a
-    // time keeps each well under the timeout. The tiles render immediately
-    // regardless; each count is applied as soon as it resolves.
-    const result = {};
-    for (const p of PLATFORMS) {
-      result[p.id] = await countOne(p);
-      setPlatformCounts({ ...result });
+      console.error('Error fetching coming soon:', error);
+      return;
     }
-  };
-
-  const fetchFeaturedFilms = async () => {
-    // Already server-rendered by the route loader — don't re-query the slow DB
-    // from the browser just to arrive at the same rows.
-    if (loaderData?.featuredFilms?.length) return;
-
-    const { data } = await supabase
-      .from('films')
-      .select(`
-        *,
-        film_genres(genres(name))
-      `)
-      .eq('is_featured', true)
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('view_count', { ascending: false });
-    
     if (data) {
-      setFeaturedFilms(data.map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      })));
-    }
-  };
-
-  const fetchFeaturedSeries = async () => {
-    const { data, error } = await supabase
-      .from('films')
-      .select(`
-        id, slug, title, poster_url, backdrop_url, year, language,
-        runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
-        is_featured, is_trending, release_type, streaming_links, source,
-        youtube_watch_url, content_type, season_count, episode_count,
-        series_id, episode_number, season_number,
-        film_genres(genres(name))
-      `)
-      .eq('content_type', 'series')
-      .eq('is_trending', true)
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('view_count', { ascending: false })
-      .limit(40);
-
-    if (!error && data) {
-      const mapped = data.map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      }));
-      setFeaturedSeries(collapseSeriesFilms(mapped).slice(0, HOME_ROW_CAP));
+      setComingSoon(
+        data.map((f) => ({
+          ...f,
+          genres: Array.isArray(f.genres) ? f.genres.filter(Boolean) : [],
+        }))
+      );
     }
   };
 
   const fetchUpcomingPlays = async () => {
-    setIsTheatreLoading(true);
     try {
       const rows = await fetchPlays();
       const today = new Date().toISOString().slice(0, 10);
@@ -322,10 +595,10 @@ export default function Home() {
         .filter((play) => {
           const status = String(play.status || '').toLowerCase();
           return (
-            status === 'upcoming'
-            || status === 'currently_running'
-            || (play.run_end_date && play.run_end_date >= today)
-            || (play.run_start_date && play.run_start_date >= today)
+            status === 'upcoming' ||
+            status === 'currently_running' ||
+            (play.run_end_date && play.run_end_date >= today) ||
+            (play.run_start_date && play.run_start_date >= today)
           );
         })
         .sort((a, b) => {
@@ -333,1507 +606,248 @@ export default function Home() {
           const bDate = b.run_start_date || b.run_end_date || '9999-12-31';
           return aDate.localeCompare(bDate);
         })
-        .slice(0, 8);
+        .slice(0, 6);
       setUpcomingPlays(upcoming);
-    } finally {
-      setIsTheatreLoading(false);
-    }
-  };
-
-  const fetchNewReleases = async () => {
-    // New Releases = newly added movies of year 2026, newest by release date first.
-    const { data, error } = await supabase
-      .from('films')
-      .select(`
-        id, slug, title, poster_url, backdrop_url, year, language,
-        runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
-        is_featured, is_trending, release_type, created_at, release_date,
-        youtube_watch_url,
-        film_genres(genres(name))
-      `)
-      .eq('content_type', 'movie')
-      .eq('year', 2026)
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('release_date', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (!error && data) {
-      setNewReleases(data.map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      })));
-    }
-  };
-
-  const fetchNewToStream = async () => {
-    // Automatic sync entries and admin overrides share one ordered queue.
-    const cols = `
-      id, slug, title, poster_url, backdrop_url, year, language, genres,
-      synopsis, tagline, runtime_minutes, view_count, average_rating, liked_percent, languages,
-      audience_rating, tmdb_rating, nfvcb_rating, content_type,
-      is_featured, is_trending, release_type, streaming_links, source,
-      youtube_watch_url, created_at, release_date,
-      film_genres(genres(name))
-    `;
-    const withGenres = (f) => {
-      const relatedGenres = f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
-      return {
-        ...f,
-        genres: relatedGenres.length > 0 ? relatedGenres : (Array.isArray(f.genres) ? f.genres.filter(Boolean) : [])
-      };
-    };
-
-    const map = {};
-    NEW_STREAM_IDS.forEach(id => { map[id] = []; });
-
-    const { data: queued, error: queueError } = await supabase
-      .rpc('get_platform_new_releases', { p_platforms: NEW_STREAM_IDS });
-
-    if (queueError) console.error('Error fetching New to Stream queue:', queueError);
-
-    const orderedQueue = [...(queued || [])].sort((a, b) => {
-      if (a.platform !== b.platform) return a.platform.localeCompare(b.platform);
-      if (a.display_order !== b.display_order) return a.display_order - b.display_order;
-      const dateA = new Date(a.film?.release_date || a.film?.created_at || a.queue_created_at).getTime();
-      const dateB = new Date(b.film?.release_date || b.film?.created_at || b.queue_created_at).getTime();
-      return dateB - dateA;
-    });
-
-    orderedQueue.forEach(row => {
-      if (row.film && map[row.platform]) map[row.platform].push(withGenres(row.film));
-    });
-
-    // Keep a resilient read-only fallback while a migration is deploying or a
-    // newly added platform has not completed its first queue refresh.
-    await Promise.all(NEW_STREAM_IDS.map(async (id) => {
-      if (map[id].length > 0) return;
-      const { data } = await supabase
-        .from('films')
-        .select(cols)
-        .or(platformFilter(id))
-        .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-        .order('release_date', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false })
-        .limit(10);
-      map[id] = (data || []).map(withGenres).slice(0, 10);
-    }));
-
-    NEW_STREAM_IDS.forEach(id => { map[id] = map[id].slice(0, 10); });
-
-    setNewToStream(map);
-  };
-
-  const fetchInCinemasData = async () => {
-    const cinemaClock = getZonedClock();
-    const tomorrow = getNextDate(cinemaClock.date);
-    const withGenres = (f) => ({
-      ...f,
-      genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-    });
-
-    // Build the complete set of films that still have an upcoming showtime.
-    const stRows = [];
-    let showtimePage = 0;
-
-    while (true) {
-      const pageStart = showtimePage * CINEMA_SHOWTIME_PAGE_SIZE;
-      const { data: pageRows, error: showtimeError } = await supabase
-        .from('showtimes')
-        .select('film_id, cinema_id, show_date, show_time, films(id, status, coming_soon, is_in_cinemas), cinemas(id, name, city, chain)')
-        .gte('show_date', cinemaClock.date)
-        .eq('is_available', true)
-        .order('show_date', { ascending: true })
-        .order('show_time', { ascending: true })
-        .range(pageStart, pageStart + CINEMA_SHOWTIME_PAGE_SIZE - 1);
-
-      if (showtimeError) {
-        console.error('Error fetching cinema showtimes:', showtimeError);
-        return;
-      }
-
-      stRows.push(...(pageRows || []));
-      if (!pageRows || pageRows.length < CINEMA_SHOWTIME_PAGE_SIZE) break;
-      showtimePage += 1;
-    }
-
-    // Showtimes are stored as local cinema dates/times. Compare them with the
-    // current WAT clock, then find the earliest remaining show across cinemas.
-    const futureShowtimes = (stRows || []).filter(showtime => isPublicCinemaShowtime(showtime, cinemaClock));
-    const nowIds = new Set(futureShowtimes.map(r => r.film_id).filter(Boolean));
-    const nextShowByFilm = {};
-    const todayShowtimesByFilm = {};
-    const futureShowtimeCountByFilm = {};
-    futureShowtimes.forEach(showtime => {
-      futureShowtimeCountByFilm[showtime.film_id] = (futureShowtimeCountByFilm[showtime.film_id] || 0) + 1;
-
-      if (showtime.show_date === cinemaClock.date) {
-        if (!todayShowtimesByFilm[showtime.film_id]) todayShowtimesByFilm[showtime.film_id] = new Set();
-        todayShowtimesByFilm[showtime.film_id].add(`${showtime.cinema_id}:${showtime.show_time}`);
-      }
-
-      const current = nextShowByFilm[showtime.film_id];
-      if (!current || compareShowtimes(showtime, current) < 0) {
-        nextShowByFilm[showtime.film_id] = {
-          ...showtime,
-          is_today: showtime.show_date === cinemaClock.date,
-          is_tomorrow: showtime.show_date === tomorrow
-        };
-      }
-    });
-
-    // A future date keeps the film visible after today's last show has passed.
-    let nowFilms = [];
-    if (nowIds.size > 0) {
-      const { data } = await supabase
-        .from('films')
-        .select(`${PUBLIC_FILM_COLUMNS}, film_genres(genres(name))`)
-        .in('id', Array.from(nowIds))
-        // Newest cinema arrivals first: a freshly-fetched title leads the slider
-        // so viewers slide right to reach the ones already showing.
-        .order('created_at', { ascending: false });
-      const candidates = (data || [])
-        .filter(isLiveCinemaFilm)
-        .map(film => ({
-          ...withGenres(film),
-          next_showtime: nextShowByFilm[film.id] || null,
-          remaining_today_showtime_count: todayShowtimesByFilm[film.id]?.size || 0,
-          future_showtime_count: futureShowtimeCountByFilm[film.id] || 0
-        }));
-
-      // Cinema chains frequently spell the same title differently (for example,
-      // "Remi & Nneoma" versus "Remi And Nneoma"). Keep one card per title and
-      // combine its showtime signal, preferring the best-supported catalog row.
-      const uniqueFilms = new Map();
-      candidates.forEach(candidate => {
-        const key = cinemaFilmKey(candidate.title) || candidate.id;
-        const existing = uniqueFilms.get(key);
-        if (!existing) {
-          uniqueFilms.set(key, candidate);
-          return;
-        }
-
-        const primary = candidate.future_showtime_count > existing.future_showtime_count
-          ? candidate
-          : existing;
-        const firstNextShow = [existing.next_showtime, candidate.next_showtime]
-          .filter(Boolean)
-          .sort(compareShowtimes)[0] || null;
-
-        uniqueFilms.set(key, {
-          ...primary,
-          next_showtime: firstNextShow,
-          remaining_today_showtime_count:
-            existing.remaining_today_showtime_count + candidate.remaining_today_showtime_count,
-          future_showtime_count: existing.future_showtime_count + candidate.future_showtime_count
-        });
-      });
-
-      nowFilms = Array.from(uniqueFilms.values());
-    }
-
-    setInCinemas(nowFilms.slice(0, HOME_ROW_CAP));
-  };
-
-  const fetchComingSoon = async (attempt = 0) => {
-    const { data, error } = await supabase.rpc('get_coming_soon_films', { p_limit: 20 });
-
-    if (error) {
-      if (attempt === 0 && error.code === '57014') {
-        await new Promise(r => setTimeout(r, 1500));
-        return fetchComingSoon(attempt + 1);
-      }
-      console.error('Error fetching coming soon:', error);
-      setIsComingSoonLoading(false);
-      return;
-    }
-
-    if (data) {
-      const normalizedFilms = data.map(f => ({
-        ...f,
-        genres: Array.isArray(f.genres) ? f.genres.filter(Boolean) : []
-      }));
-      setComingSoon(normalizedFilms);
-      setIsComingSoonLoading(false);
-    }
-    setIsComingSoonLoading(false);
-  };
-
-  const fetchCuratedCollection = async () => {
-    const { data: collection } = await supabase
-      .from('collections')
-      .select(`
-        *,
-        collection_films(
-          display_order,
-          films(*, film_genres(genres(name)))
-        )
-      `)
-      .eq('is_featured', true)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (collection) {
-      const films = (collection.collection_films || [])
-        .sort((a, b) => a.display_order - b.display_order)
-        .map(cf => ({
-          ...cf.films,
-          genres: cf.films?.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-        }))
-        .filter(f => f.id && (f.source !== 'mubi' || (f.countries && Array.isArray(f.countries) && f.countries.includes('Nigeria'))));
-      
-      setCuratedCollection({ ...collection, films });
-    }
-  };
-
-  const fetchSpotlightContent = async () => {
-    const { data, error } = await supabase
-      .from('spotlights')
-      .select(`
-        *,
-        people (*)
-      `)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Error fetching spotlight content:', error);
-      return;
-    }
-
-    if (data) {
-      if (data.featured_film_ids && data.featured_film_ids.length > 0) {
-        const { data: filmsData, error: filmsErr } = await supabase
-          .from('films')
-          .select('id, slug, title, poster_url, release_type, source, year')
-          .in('id', data.featured_film_ids);
-        
-        if (!filmsErr && filmsData) {
-          const sortedFilms = data.featured_film_ids
-            .map(id => filmsData.find(f => f.id === id))
-            .filter(Boolean);
-          
-          setSpotlightContent({
-            ...data,
-            featured_films: sortedFilms
-          });
-        } else {
-          setSpotlightContent({
-            ...data,
-            featured_films: []
-          });
-        }
-      } else {
-        setSpotlightContent({
-          ...data,
-          featured_films: []
-        });
-      }
-    } else {
-      setSpotlightContent(null);
-    }
-  };
-
-  const fetchTop10Films = async () => {
-    const { data, error } = await supabase
-      .from('top_10_films')
-      .select(`
-        rank,
-        films (
-          id, slug, title, poster_url, backdrop_url, year, language, synopsis,
-          runtime_minutes, view_count, average_rating, liked_percent, languages, audience_rating, audience_rating_count,
-          tmdb_rating, nfvcb_rating, content_type, episode_count, season_count, release_date,
-          is_featured, is_trending, release_type, created_at,
-          film_genres(genres(name))
-        )
-      `)
-      .order('rank', { ascending: true })
-      .limit(10);
-      
-    if (!error && data) {
-      setTop10Films(data.filter(item => item.films).map(item => ({
-        ...item.films,
-        genres: item.films.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [],
-        rank: item.rank
-      })));
-    }
-  };
-
-  const fetchCrewMembers = async () => {
-    const { data, error } = await supabase
-      .from('people')
-      .select(PUBLIC_PERSON_COLUMNS)
-      .not('known_for_department', 'in', '("Acting","Directing","Skit Maker","Unknown")')
-      .order('popularity_score', { ascending: false })
-      .limit(12);
-
-    if (!error && data) {
-      setCrewMembers(data);
+    } catch (err) {
+      console.error('Error fetching plays:', err);
     }
   };
 
   const fetchCompanies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select(`
-          id, name, logo_url, founded_year, description, website, company_type,
-          film_companies(
-            film:films(
-              id, title, poster_url, backdrop_url, view_count, average_rating, 
-              liked_percent, box_office_domestic, release_type, year
-            )
+      const { data, error } = await supabase.from('companies').select(`
+        id, name, logo_url, founded_year, company_type,
+        film_companies(
+          film:films(
+            id, title, poster_url, view_count, liked_percent, box_office_domestic, year
           )
-        `);
+        )
+      `);
 
-      if (!error && data && data.length > 0) {
-        const scored = data.map((c) => {
+      if (error || !data) return;
+
+      const scored = data
+        .map((c) => {
           const films = (c.film_companies || []).map((fc) => fc.film).filter(Boolean);
           const filmCount = films.length;
-          
+          if (filmCount === 0) return null;
+
           const isRealLogo = Boolean(
-            c.logo_url && 
-            !c.logo_url.includes('ui-avatars.com') && 
-            !c.logo_url.includes('placeholder') &&
-            !c.logo_url.includes('default')
+            c.logo_url &&
+              !c.logo_url.includes('ui-avatars.com') &&
+              !c.logo_url.includes('placeholder') &&
+              !c.logo_url.includes('default')
           );
 
           let totalBoxOffice = 0;
-          let maxBoxOffice = 0;
-          let totalLikes = 0;
-          let ratedCount = 0;
-          let totalViews = 0;
-          let highestLiked = 0;
           let topFilm = null;
           let topFilmScore = -1;
 
           for (const f of films) {
             const bo = Number(f.box_office_domestic) || 0;
             totalBoxOffice += bo;
-            if (bo > maxBoxOffice) maxBoxOffice = bo;
-
-            if (f.liked_percent) {
-              totalLikes += Number(f.liked_percent);
-              if (Number(f.liked_percent) > highestLiked) highestLiked = Number(f.liked_percent);
-              ratedCount++;
-            }
-            totalViews += Number(f.view_count) || 0;
-
-            const fScore = (bo > 0 ? bo / 100_000 : 0) + (f.liked_percent ? f.liked_percent * 10 : 0) + (f.view_count ? Math.log10(f.view_count) * 100 : 0) + (f.poster_url ? 500 : 0);
+            const fScore =
+              (bo > 0 ? bo / 100_000 : 0) +
+              (f.liked_percent ? Number(f.liked_percent) * 10 : 0) +
+              (f.view_count ? Math.log10(Number(f.view_count) + 1) * 100 : 0) +
+              (f.poster_url ? 500 : 0);
             if (fScore > topFilmScore) {
               topFilmScore = fScore;
               topFilm = f;
             }
           }
 
-          const avgLike = ratedCount > 0 ? Math.round(totalLikes / ratedCount) : null;
-
           let score = 0;
           if (isRealLogo) score += 6000;
-          if (filmCount > 0) score += Math.min(filmCount * 150, 4000);
-          
+          score += Math.min(filmCount * 180, 4500);
           if (totalBoxOffice >= 1_000_000_000) score += 8000;
-          else if (totalBoxOffice >= 500_000_000) score += 6000;
-          else if (totalBoxOffice >= 100_000_000) score += 4500;
+          else if (totalBoxOffice >= 200_000_000) score += 5000;
           else if (totalBoxOffice > 0) score += 3000;
-
-          if (highestLiked >= 85) score += 2000;
-          else if (highestLiked >= 70) score += 1000;
-
-          if (totalViews >= 5_000_000) score += 3000;
-          else if (totalViews >= 1_000_000) score += 2000;
-          else if (totalViews >= 100_000) score += 1000;
 
           return {
             ...c,
             filmCount,
             totalBoxOffice,
-            maxBoxOffice,
-            highestLiked,
-            avgLike,
-            totalViews,
             topFilm,
             score,
           };
-        });
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8);
 
-        // Filter and sort by prestige & popularity score
-        scored.sort((a, b) => b.score - a.score);
-
-        // Top pool of powerhouse studios
-        const topPool = scored.slice(0, 30);
-
-        // Weighted random rotation: top studios have strong chance while rotating dynamically
-        const shuffled = [...topPool]
-          .map((item) => ({ item, sortKey: Math.random() * 0.35 + (item.score / 25000) * 0.65 }))
-          .sort((a, b) => b.sortKey - a.sortKey)
-          .map((wrap) => wrap.item)
-          .slice(0, 12);
-
-        setProductionCompanies(shuffled);
-      }
-    } catch (e) {
-      console.error('Error fetching companies:', e);
+      setCompanies(scored);
+    } catch (err) {
+      console.error('Error fetching companies:', err);
     }
   };
 
-  const fetchYoutubeFeed = async () => {
-    // Free on YouTube = all fetched YouTube movies, newest first
-    const { data } = await supabase
-      .from('films')
-      .select(`
-        id, slug, title, poster_url, backdrop_url, year, language, genres,
-        runtime_minutes, view_count, average_rating, liked_percent, languages, audience_rating, tmdb_rating, nfvcb_rating, synopsis, tagline,
-        is_featured, is_trending, release_type, created_at, release_date,
-        youtube_watch_url,
-        film_genres(genres(name))
-      `)
-      .eq('source', 'youtube')
-      .eq('content_type', 'movie')
-      .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-      .order('created_at', { ascending: false })
-      .limit(20);
+  const fetchIndustryPeople = async () => {
+    try {
+      const [talentRes, crewRes, birthdayRes] = await Promise.all([
+        supabase
+          .from('people')
+          .select(PUBLIC_PERSON_COLUMNS)
+          .not('photo_url', 'is', null)
+          .order('is_verified', { ascending: false })
+          .order('film_count', { ascending: false, nullsFirst: false })
+          .order('popularity_score', { ascending: false, nullsFirst: false })
+          .limit(10),
+        supabase
+          .from('people')
+          .select(PUBLIC_PERSON_COLUMNS)
+          .not('known_for_department', 'in', '("Acting","Skit Maker","Unknown")')
+          .not('known_for_department', 'is', null)
+          .not('photo_url', 'is', null)
+          .order('is_verified', { ascending: false })
+          .order('film_count', { ascending: false, nullsFirst: false })
+          .order('popularity_score', { ascending: false, nullsFirst: false })
+          .limit(6),
+        supabase
+          .from('people')
+          .select(PUBLIC_PERSON_COLUMNS)
+          .not('date_of_birth', 'is', null)
+          .not('photo_url', 'is', null)
+          .order('popularity_score', { ascending: false, nullsFirst: false })
+          .limit(80),
+      ]);
 
-    if (data) {
-      const mapped = data.map(f => {
-        const relatedGenres = f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || [];
-        return {
-          ...f,
-          genres: relatedGenres.length > 0 ? relatedGenres : (Array.isArray(f.genres) ? f.genres.filter(Boolean) : []),
-          channel_name: 'YouTube Featured'
-        };
-      });
-      setYoutubeFeed(mapped);
+      if (!talentRes.error && talentRes.data) setTalent(talentRes.data);
+      if (!crewRes.error && crewRes.data) setCrew(crewRes.data);
+      if (!birthdayRes.error && birthdayRes.data) setBirthdayPool(birthdayRes.data);
+    } catch (err) {
+      console.error('Error fetching industry people:', err);
     }
   };
 
-  const fetchRecentlyAdded = async () => {
-    // Recently Added = all newly added films from all sources (netflix, prime, youtube, docuth, kava, cinema, etc.)
-    const { data, error } = await supabase
-      .from('films')
-      .select(`
-        id, slug, title, poster_url, backdrop_url, year, language,
-        runtime_minutes, view_count, average_rating, liked_percent, languages, nfvcb_rating,
-        is_featured, is_trending, release_type, created_at, release_date,
-        youtube_watch_url,
-        film_genres(genres(name))
-      `)
-      .or('source.neq.mubi,source.is.null,countries.cs.{Nigeria}')
-      .order('created_at', { ascending: false })
-      .limit(20);
+  // Deduplication set so Cinema films don't duplicate inside Streaming or Coming Soon
+  const cinemaFilmIds = useMemo(() => new Set(inCinemas.map((f) => f.id)), [inCinemas]);
 
-    if (!error && data) {
-      setRecentlyAdded(data.map(f => ({
-        ...f,
-        genres: f.film_genres?.map(fg => fg.genres?.name).filter(Boolean) || []
-      })));
-    }
-  };
-
-  const fetchPeople = async () => {
-    const { data } = await supabase
-      .from('people')
-      .select(PUBLIC_PERSON_COLUMNS)
-      .eq('is_spotlight', true)
-      .order('popularity_score', { ascending: false })
-      .limit(4);
-    
-    if (data && data.length > 0) {
-      setSpotlightPerson(data[0]);
-      setOtherPeople(data.slice(1));
-    }
-  };
-
-  const fetchCreators = async () => {
-    const { data } = await supabase
-      .from('people')
-      .select(PUBLIC_PERSON_COLUMNS)
-      .eq('is_spotlight', true)
-      .or('youtube_handle.neq.null,youtube_handle.neq."",youtube_channel_id.neq.null,youtube_channel_id.neq.""')
-      .order('popularity_score', { ascending: false })
-      .limit(6);
-    if (data) setCreators(data);
-  };
-
-  const filteredYoutube = youtubeFeed.filter(film => {
-    if (youtubeFilter === 'All') return true;
-    const runtime = film.runtime_minutes || 0;
-    if (youtubeFilter === 'Skits') return runtime > 0 && runtime < 15;
-    if (youtubeFilter === 'Movies') return runtime >= 15;
-    return true;
-  });
-
-  const handleExternalClick = (e, url) => {
-    if (!url || url === '#') return;
-    const hideWarning = localStorage.getItem('MuviDB_hide_external_warning') === 'true';
-    if (hideWarning) {
-      return; // Let the browser open the link normally
-    }
-    
-    e.preventDefault();
-    setExternalUrl(url);
-    setIsWarningModalOpen(true);
-  };
-
-  const proceedToExternal = () => {
-    if (dontShowAgain) {
-      localStorage.setItem('MuviDB_hide_external_warning', 'true');
-    }
-    window.open(externalUrl, '_blank', 'noopener,noreferrer');
-    setIsWarningModalOpen(false);
-  };
-
-  // What's New consolidated tabs
-  const whatsNewMap = { coming: comingSoon, new: newReleases, recent: recentlyAdded };
-
-  // Cover art for the "Where to watch" rail is best-effort: pick from the rails we
-  // already loaded instead of pulling the entire catalogue. Any platform without a
-  // match falls back to its gradient (handled inside PlatformRail).
-  const platformCoverPool = [
-    ...featuredFilms,
-    ...recentlyAdded,
-    ...(newToStream.netflix || []),
-    ...newReleases,
-    ...top10Films,
-  ];
+  // Auto-enhance hero slides with live in-cinema films if no manually featured films exist
+  const heroSlides = useMemo(() => {
+    if (featuredFilms.length > 0) return featuredFilms;
+    return inCinemas.filter((f) => f.backdrop_url || f.poster_url).slice(0, 5);
+  }, [featuredFilms, inCinemas]);
 
   return (
-    <div className="muvi-landing w-full pb-20 min-h-screen bg-[#0B0D10] text-[#E0E2E6]">
-      <h1 className="sr-only">MuviDB | The Ultimate African Film & Entertainment Database</h1>
+    <div className="w-full min-h-screen bg-bg text-text-primary pb-16">
+      {/* 1. COMMAND HERO: Cinematic Spotlight + Tri-Modal Commercial Chart (Cinema/Theatre/YouTube) */}
+      <HomeCommandHero
+        featuredFilms={heroSlides}
+        boxOfficeRecent={boxOfficeRecent}
+        boxOfficeAllTime={boxOfficeAllTime}
+        isLoadingHero={isHeroLoading && inCinemas.length === 0}
+        isLoadingBoxOffice={isBoxOfficeLoading}
+        stats={{ inCinemasCount: inCinemas.length }}
+      />
 
-      {/* Mobile-First Experience (< md) */}
-      <MobileHomeFeed
-        featuredFilms={featuredFilms}
-        isHeroLoading={isHeroLoading}
+      {/* 2. LIVE IN CINEMAS TODAY (18+ Locations, City Filter) */}
+      <HomeCinemaSection
         inCinemas={inCinemas}
-        isCinemaLoading={isCinemaLoading}
+        isLoading={isCinemaLoading}
+        watchlistIds={watchlistIds}
+        onToggleWatchlist={handleToggleWatchlist}
+      />
+
+      {/* 3. NEW RELEASES (Every Newly Released Movie Across Cinema, YouTube & Streaming) */}
+      <HomeNewReleases
         newReleases={newReleases}
-        newToStream={newToStream}
-        youtubeFeed={youtubeFeed}
-        upcomingPlays={upcomingPlays}
-        isTheatreLoading={isTheatreLoading}
-        top10Films={top10Films}
-        comingSoon={comingSoon}
-        isLoadingPriority={isPriorityLoading}
+        isLoading={isNewReleasesLoading}
+        watchlistIds={watchlistIds}
+        onToggleWatchlist={handleToggleWatchlist}
       />
 
-      {/* Desktop Experience (>= md) */}
-      <div className="hidden md:block">
-        {/* 1. HERO (Progressive Above-the-Fold Loading) */}
-      <HeroSection
-        featuredFilms={featuredFilms}
-        isLoading={isHeroLoading}
-      />
+      {/* 4. NATIVE MANAGED SPONSOR BILLBOARD: Upper Slot (Rotates all active Rectangle & Square campaigns) */}
+      <HomeSponsoredBanner format="rectangle" />
 
-      <HomeIntroSection />
-
-      <div className="muvi-landing-shell max-w-7xl mx-auto">
-        {/* 2. WHERE TO WATCH (signature, top-level entry point) */}
-        <div className="landing-band grided watch-platform-band">
-          <PlatformRail films={platformCoverPool} counts={platformCounts} />
-        </div>
-
-        {/* 3. IN CINEMAS NOW (promoted — larger cards + showtimes CTA) */}
-        {(isCinemaLoading || inCinemas.length > 0) && (
-          <div className="landing-band panel py-8 md:py-10">
-            <FilmRow
-              title="In Cinemas"
-              subtitle="Upcoming screenings across cinemas near you"
-              films={inCinemas}
-              isLoading={isCinemaLoading}
-              linkTo="/showtimes"
-              cardVariant="cinema"
-              maxItems={HOME_ROW_CAP}
-            />
-          </div>
-        )}
-
-        {(isTheatreLoading || upcomingPlays.length > 0) && (
-          <div className="landing-band alt grided py-8 md:py-10">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
-              <div className="flex items-end justify-between gap-4 mb-6">
-                <div className="space-y-1.5">
-                  <p className="text-text-muted text-[10px] font-bold uppercase tracking-[0.25em]">Live stage dates</p>
-                  <h2 className="font-heading text-3xl md:text-[2.5rem] font-bold text-text-primary tracking-tight leading-none">
-                    Upcoming Theatre
-                  </h2>
-                </div>
-                <Link
-                  to="/plays"
-                  className="group/see shrink-0 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold tracking-wide transition-colors whitespace-nowrap pb-1"
-                >
-                  See all
-                  <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4 transition-transform duration-300 group-hover/see:translate-x-1" />
-                </Link>
-              </div>
-
-              {isTheatreLoading && upcomingPlays.length === 0 ? (
-                <div className="flex gap-4 overflow-hidden">
-                  {[...Array(4)].map((_, index) => (
-                    <div key={index} className="w-[280px] sm:w-[340px] shrink-0 rounded-2xl border border-border bg-surface overflow-hidden animate-shimmer">
-                      <div className="grid grid-cols-[104px_1fr] min-h-[178px]">
-                        <div className="bg-surface-2 border-r border-border" />
-                        <div className="p-5 space-y-3">
-                          <div className="h-3 w-24 bg-surface-2 rounded" />
-                          <div className="h-5 w-2/3 bg-surface-2 rounded" />
-                          <div className="h-3 w-full bg-surface-2 rounded opacity-70" />
-                          <div className="h-3 w-3/4 bg-surface-2 rounded opacity-60" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex gap-5 overflow-x-auto pb-4 pt-1 scrollbar-hide snap-x snap-mandatory">
-                  {upcomingPlays.map((play) => (
-                    <Link
-                      key={play.id}
-                      to={`/plays/${play.slug || play.id}`}
-                      className="group flex w-[320px] sm:w-[390px] shrink-0 snap-start rounded-2xl border border-border bg-surface overflow-hidden hover:border-brand/60 transition-all duration-300 hover:shadow-2xl hover:shadow-brand/10 hover:-translate-y-1"
-                    >
-                      {/* Left Poster (Uncropped 2:3 Vertical Poster Aspect) */}
-                      <div className="relative w-[125px] sm:w-[145px] shrink-0 bg-surface-2 overflow-hidden border-r border-border/50">
-                        <ImageWithFallback
-                          src={play.poster_url || play.banner_url}
-                          alt={play.title}
-                          fallbackType="film"
-                          name={play.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          width={280}
-                          sizes="145px"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/20 pointer-events-none" />
-                      </div>
-
-                      {/* Right Content Column */}
-                      <div className="p-4 sm:p-5 min-w-0 flex-1 flex flex-col justify-between space-y-3">
-                        <div className="space-y-2">
-                          {/* Category & Status Badge Row */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-brand truncate">
-                              {play.genre || 'Stage Play'}
-                            </span>
-                            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[8px] font-black uppercase tracking-wider border backdrop-blur ${
-                              play.status === 'currently_running'
-                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                                : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-                            }`}>
-                              {play.status === 'currently_running' ? 'Running' : 'Upcoming'}
-                            </span>
-                          </div>
-
-                          {/* Play Title */}
-                          <h3 className="font-heading text-base sm:text-lg font-black tracking-tight text-text-primary group-hover:text-brand transition-colors line-clamp-2 leading-snug">
-                            {play.title}
-                          </h3>
-
-                          {/* Synopsis */}
-                          <p className="text-[11px] text-text-muted line-clamp-2 leading-relaxed">
-                            {play.synopsis || 'Live theatre production with stage dates, venue, and cast credits.'}
-                          </p>
-                        </div>
-
-                        {/* Footer Meta Details & Action Pill */}
-                        <div className="pt-2 border-t border-border/60 space-y-2.5">
-                          <div className="space-y-1.5 text-[11px] text-text-secondary">
-                            <div className="flex items-center gap-2">
-                              <Icon icon="solar:calendar-bold" className="text-brand text-xs shrink-0" />
-                              <span className="font-semibold truncate">{getPlayDateLabel(play, 'Date TBA')}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Icon icon="solar:map-point-bold" className="text-brand text-xs shrink-0" />
-                              <span className="truncate text-text-muted">{play.venue || play.city || 'Venue TBA'}</span>
-                            </div>
-                          </div>
-
-                          {/* Action Pill */}
-                          <div className="pt-1 flex items-center justify-between text-[10px] font-bold text-brand group-hover:translate-x-0.5 transition-transform">
-                            <span className="uppercase tracking-widest">Get Stage Info</span>
-                            <div className="w-6 h-6 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center group-hover:bg-brand group-hover:text-white transition-all shadow-xs">
-                              <Icon icon="solar:alt-arrow-right-linear" className="w-3.5 h-3.5" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 6b. NEW RELEASES (landscape single slideable row) */}
-        {(isPriorityLoading || newReleases.length > 0) && (
-          <div className="landing-band alt py-8 md:py-10">
-            <FilmRow
-              title="New Releases"
-              subtitle="Just dropped — the latest additions"
-              films={newReleases}
-              isLoading={isPriorityLoading}
-              linkTo="/browse?sort=newest"
-              cardVariant="landscape"
-              maxItems={HOME_ROW_CAP}
-            />
-          </div>
-        )}
-
-        {/* 4. STREAMING RAILS (turn watch-link data into a browse axis) */}
-        {(isPriorityLoading || NEW_STREAM_IDS.some(id => (newToStream[id] || []).length > 0)) && (
-          <div className="landing-band alt grided py-8 md:py-10">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20">
-              <div className="flex items-end justify-between gap-4 mb-6">
-                <div className="space-y-1.5">
-                  <p className="text-text-muted text-[10px] font-bold uppercase tracking-[0.25em]">Just added — stream tonight</p>
-                  <h2 className="font-heading text-3xl md:text-[2.5rem] font-bold text-text-primary tracking-tight leading-none">New to Stream</h2>
-                </div>
-                <Link
-                  to={`/watch/${streamTab}`}
-                  className="group/see shrink-0 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold tracking-wide transition-colors whitespace-nowrap pb-1"
-                >
-                  See all
-                  <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4 transition-transform duration-300 group-hover/see:translate-x-1" />
-                </Link>
-              </div>
-              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
-                {NEW_STREAM.map(p => {
-                  const active = streamTab === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => setStreamTab(p.id)}
-                      className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-200 ${
-                        active ? 'bg-brand border-brand text-white' : 'bg-surface border-border text-text-secondary hover:border-brand/40 hover:text-text-primary'
-                      }`}
-                    >
-                      <Icon icon={p.icon} className="text-sm" style={{ color: active ? '#fff' : p.color }} />
-                      {p.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="mt-6 md:mt-7">
-              <FilmRow
-                films={newToStream[streamTab] || []}
-                isLoading={isPriorityLoading}
-                noHeader
-                cardVariant="streaming"
-                platform={streamTab}
-                maxItems={HOME_ROW_CAP}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Below-fold discovery + editorial — mount/fetch only when near viewport */}
-        <DeferredMount
-          minHeight={480}
-          rootMargin="500px 0px"
-          onActivate={() => {
-            fetchSecondaryData();
-          }}
-        >
-        <Suspense fallback={<div className="min-h-[200px]" aria-hidden="true" />}>
-        {(isSecondaryLoading || featuredSeries.length > 0) && (
-          <div className="landing-band alt py-8 md:py-10">
-            <FilmRow
-              title="Popular TV Shows & Series"
-              subtitle="Must-watch African series and episodes"
-              films={featuredSeries}
-              isLoading={isSecondaryLoading}
-              linkTo="/tv-shows"
-              maxItems={HOME_ROW_CAP}
-            />
-          </div>
-        )}
-        {(isSecondaryLoading || youtubeFeed.length > 0) && (
-          <div className="landing-band panel py-8 md:py-10">
-            <FilmRow
-              title="Free on YouTube"
-              subtitle="No subscription needed"
-              films={youtubeFeed}
-              isLoading={isSecondaryLoading}
-              linkTo="/watch/youtube"
-              cardVariant="youtube"
-              maxItems={HOME_ROW_CAP}
-            />
-          </div>
-        )}
-        {/* 5. TOP 10 THIS WEEK */}
-        {(isSecondaryLoading || top10Films.length > 0) && (
-          <div className="landing-band panel py-8 md:py-10">
-            <TopTenSection
-              title="Top 10 This Week"
-              subtitle="The most-watched Nollywood stories right now"
-              films={top10Films}
-              isLoading={isSecondaryLoading}
-            />
-          </div>
-        )}
-
-        {/* 5b. THE CRITICS' LOUNGE */}
-        <CriticsLoungeSection />
-
-        {/* 6a. COMING SOON (keep existing horizontal scroll cards) */}
-        {(isSecondaryLoading || isComingSoonLoading || comingSoon.length > 0) && (
-          <div className="landing-band panel py-8 md:py-10">
-            <FilmRow
-              title="Coming Soon"
-              subtitle="Upcoming releases to look forward to"
-              films={comingSoon}
-              isLoading={isSecondaryLoading || isComingSoonLoading}
-              linkTo="/browse?sort=upcoming"
-              cardVariant="coming-soon"
-              maxItems={HOME_ROW_CAP}
-            />
-          </div>
-        )}
-
-        {/* 6c. RECENTLY ADDED (landscape single slideable row) */}
-        {(isSecondaryLoading || recentlyAdded.length > 0) && (
-          <div className="landing-band panel py-8 md:py-10">
-            <FilmRow
-              title="Recently Added"
-              subtitle="Fresh to the database — explore new additions"
-              films={recentlyAdded}
-              isLoading={isSecondaryLoading}
-              linkTo="/browse?sort=recent"
-              cardVariant="landscape"
-              maxItems={HOME_ROW_CAP}
-            />
-          </div>
-        )}
-
-        {/* 7. GENRE MOODS (visual poster grid) */}
-        <div className="landing-band alt grided">
-          <GenreRail variant="poster-grid" />
-        </div>
-
-        {/* 8. CURATED PICK (editorial film row — discovery) */}
-        {curatedCollection && curatedCollection.films.length > 0 && (
-          <div className="landing-band alt py-14 md:py-16 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-brand/10 blur-[100px] rounded-full -mr-32 -mt-32"></div>
-            <FilmRow
-              title={curatedCollection.name}
-              subtitle={curatedCollection.description}
-              films={curatedCollection.films}
-              isLoading={isSecondaryLoading}
-            />
-          </div>
-        )}
-
-        {/* ===================== EDITORIAL ZONE (the Nollywood moat — magazine treatment) ===================== */}
-        <div className="landing-band alt grided">
-
-          {/* — Zone label: People of Nollywood — */}
-          <div className="landing-zone-label max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <span>People of Nollywood</span>
-            <span />
-          </div>
-
-        {/* 9. SPOTLIGHT (Editorial) */}
-        {(isSecondaryLoading || spotlightContent) && (
-          <div className="relative z-10 border-b border-hairline py-14 md:py-16 bg-surface/40">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-2 mb-10">
-                <Icon icon="solar:star-linear" className="text-brand text-xl" />
-                <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                  Spotlight
-                </h2>
-              </div>
-
-              <div className="landing-module relative rounded-lg overflow-hidden">
-                {isSecondaryLoading ? (
-                  <div className="h-[400px] animate-pulse bg-surface-2" />
-                ) : spotlightContent && spotlightContent.people && (
-                  <div className="flex flex-col md:flex-row items-stretch min-h-[400px]">
-                    {/* 1. Artist Photo Cover (Left Pane) */}
-                    <div className="w-full md:w-[28%] relative h-64 md:h-auto overflow-hidden bg-surface-2 shrink-0">
-                      <ImageWithFallback
-                        src={spotlightContent.photo_url || spotlightContent.people.photo_url}
-                        alt={spotlightContent.people.name}
-                        fallbackType="avatar"
-                        name={spotlightContent.people.name}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        width={640}
-                        sizes="(max-width: 767px) 100vw, 28vw"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/40 via-transparent to-black/20 pointer-events-none" />
-                    </div>
-
-                    {/* 2. Editorial Story & Info (Middle Pane) */}
-                    <div className="w-full md:w-[42%] p-6 md:p-8 flex flex-col justify-center shrink-0">
-                      <span className="text-brand text-[9px] font-black uppercase tracking-widest mb-2 block">
-                        Spotlight
-                      </span>
-                      <Link
-                        to={`/people/${spotlightContent.people.slug || spotlightContent.people.id}`}
-                        className="font-heading font-bold text-3xl md:text-4xl text-text-primary tracking-tighter mb-4 block hover:text-brand transition-colors"
-                      >
-                        {spotlightContent.people.name}
-                      </Link>
-                      <p className="text-text-secondary text-xs md:text-sm mb-8 leading-relaxed whitespace-pre-wrap line-clamp-6 text-justify">
-                        {spotlightContent.story}
-                      </p>
-                      <div>
-                        <Link
-                          to={`/people/${spotlightContent.people.slug || spotlightContent.people.id}`}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface-2 hover:bg-brand/10 hover:text-brand border border-hairline rounded-lg text-[10px] font-black uppercase tracking-widest text-text-primary transition-all"
-                        >
-                          Explore More
-                          <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    </div>
-
-                    {/* 3. Pane Divider */}
-                    <div className="hidden md:block w-px bg-border my-8 shrink-0" />
-
-                    {/* 4. Featured Works (Right Pane) */}
-                    <div className="w-full md:w-[30%] p-6 md:p-8 flex flex-col justify-center flex-1">
-                      <h3 className="text-text-muted text-[10px] font-black uppercase tracking-widest mb-6">
-                        Featured Works
-                      </h3>
-                      {spotlightContent.featured_films && spotlightContent.featured_films.length > 0 ? (
-                        <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
-                          {spotlightContent.featured_films.map((film) => (
-                            <Link
-                              key={film.id}
-                              to={`/films/${film.slug || film.id}`}
-                              className="group flex flex-col gap-1.5 transition-all"
-                              title={film.title}
-                            >
-                              <div className="aspect-[2/3] w-full rounded-lg overflow-hidden border border-hairline bg-surface-2 relative shadow-md">
-                                <ImageWithFallback
-                                  src={film.poster_url}
-                                  alt={film.title}
-                                  fallbackType="film"
-                                  name={film.title}
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                  width={256}
-                                  sizes="(max-width: 767px) 22vw, 100px"
-                                  loading="lazy"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-2">
-                                  <span className="text-[8px] font-bold text-white line-clamp-2 leading-tight">
-                                    {film.title}
-                                  </span>
-                                </div>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-hairline p-6 text-center text-xs text-text-muted py-8">
-                          No featured works curated.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 10. & 11. FEATURED TALENT (Artist & Crew Tabs) */}
-        {(isSecondaryLoading || spotlightPerson || crewMembers.length > 0) && (
-          <div className="relative z-10 border-b border-hairline">
-            <section className="py-16">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
-                  <div className="space-y-1">
-                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                      Featured Talent
-                    </h2>
-                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The creative force of Nollywood</p>
-                  </div>
-                  
-                  {/* Talent Tabs */}
-                  <div className="flex items-center gap-6 border-b border-hairline pb-2 self-start md:self-auto">
-                    <button
-                      onClick={() => setFeaturedTalentTab('artist')}
-                      className={`text-[11px] font-bold uppercase tracking-widest pb-2 -mb-[9px] transition-colors relative ${featuredTalentTab === 'artist' ? 'text-brand' : 'text-text-muted hover:text-text-primary'}`}
-                    >
-                      Featured Artist
-                      {featuredTalentTab === 'artist' && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-brand"></span>}
-                    </button>
-                    <button
-                      onClick={() => setFeaturedTalentTab('crew')}
-                      className={`text-[11px] font-bold uppercase tracking-widest pb-2 -mb-[9px] transition-colors relative ${featuredTalentTab === 'crew' ? 'text-brand' : 'text-text-muted hover:text-text-primary'}`}
-                    >
-                      Behind the Magic
-                      {featuredTalentTab === 'crew' && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-brand"></span>}
-                    </button>
-                  </div>
-
-                  <Link
-                    to={featuredTalentTab === 'artist' ? "/people" : "/people?craft=crew"}
-                    className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline hidden md:block"
-                  >
-                    View all {featuredTalentTab === 'artist' ? 'Artists' : 'Crew'}
-                  </Link>
-                </div>
-
-                {/* Tab Content: Featured Artist */}
-                {featuredTalentTab === 'artist' && (
-                  <div className="landing-module relative rounded-lg p-8 md:p-12 overflow-hidden page-fade-in">
-                    <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
-                    <div className="relative z-10 flex flex-col xl:flex-row gap-12 xl:items-center">
-                      <div className="xl:flex-1">
-                        <PersonCard person={spotlightPerson} variant="full" isLoading={isSecondaryLoading} />
-                      </div>
-                      <div className="h-px xl:w-px xl:h-64 bg-border"></div>
-                      <div className="w-full xl:w-80 grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-2 gap-4">
-                        {isSecondaryLoading ? (
-                          [...Array(4)].map((_, i) => (
-                            <PersonCard key={i} variant="compact" isLoading={true} />
-                          ))
-                        ) : (
-                          otherPeople.map(person => (
-                            <PersonCard key={person.id} person={person} variant="compact" />
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Tab Content: Behind the Magic (Crew) */}
-                {featuredTalentTab === 'crew' && (
-                  <div data-lenis-prevent className="flex overflow-x-auto gap-6 pb-6 pt-2 scrollbar-hide overscroll-x-contain page-fade-in">
-                    {isSecondaryLoading ? (
-                      [...Array(6)].map((_, i) => (
-                        <div key={i} className="shrink-0 w-44 bg-surface border border-hairline rounded-2xl p-5 text-center flex flex-col items-center gap-4">
-                          <div className="w-24 h-24 rounded-full bg-surface-2 animate-pulse" />
-                          <div className="w-24 h-4 bg-surface-2 animate-pulse rounded" />
-                          <div className="w-16 h-3 bg-surface-2 animate-pulse rounded" />
-                        </div>
-                      ))
-                    ) : (
-                      crewMembers.map((crew) => (
-                        <Link
-                          key={crew.id}
-                          to={`/people/${crew.slug || crew.id}`}
-                          className="shrink-0 w-44 bg-surface border border-hairline hover:border-brand rounded-2xl p-5 text-center transition-all group shadow-sm flex flex-col items-center gap-4"
-                        >
-                          <div className="relative">
-                            <ImageWithFallback
-                              src={crew.photo_url}
-                              alt={crew.name}
-                              fallbackType="avatar"
-                              name={crew.name}
-                              className="w-24 h-24 rounded-full object-cover border-2 border-transparent group-hover:border-brand transition-all duration-300"
-                              width={192}
-                              sizes="96px"
-                              loading="lazy"
-                            />
-                          </div>
-                          <div className="space-y-2 w-full">
-                            <h3 className="font-bold text-text-primary text-sm group-hover:text-brand transition-colors line-clamp-1">
-                              {crew.name}
-                            </h3>
-                            <span className="inline-block bg-brand/10 text-brand text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl">
-                              {crew.known_for_department || 'Crew'}
-                            </span>
-                          </div>
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                )}
-                
-                {/* Mobile View All Link */}
-                <div className="mt-6 md:hidden">
-                  <Link
-                    to={featuredTalentTab === 'artist' ? "/people" : "/people?craft=crew"}
-                    className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline"
-                  >
-                    View all {featuredTalentTab === 'artist' ? 'Artists' : 'Crew'}
-                  </Link>
-                </div>
-
-              </div>
-            </section>
-          </div>
-        )}
-
-
-          {/* — Zone label: The Industry — */}
-          <div className="landing-zone-label max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <span>The Industry</span>
-            <span />
-          </div>
-
-        {/* 12. NOLLYWOOD STUDIOS (Production Companies) */}
-        {(isSecondaryLoading || productionCompanies.length > 0) && (
-          <div className="relative z-10 border-b border-hairline py-14 md:py-16 bg-surface/30">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-end justify-between mb-8">
-                <div className="space-y-1">
-                  <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                    Nollywood Studios
-                  </h2>
-                  <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-65">
-                    The creative production powerhouses
-                  </p>
-                </div>
-                <Link to="/companies" className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline flex items-center gap-1">
-                  <span>View all</span>
-                  <Icon icon="solar:arrow-right-linear" className="text-xs" />
-                </Link>
-              </div>
-
-              <div data-lenis-prevent className="flex overflow-x-auto gap-5 pb-6 pt-2 scrollbar-hide overscroll-x-contain">
-                {isSecondaryLoading ? (
-                  [...Array(4)].map((_, i) => (
-                    <div key={i} className="shrink-0 w-72 sm:w-80 bg-surface border border-hairline rounded-2xl p-5 flex flex-col justify-between animate-pulse">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-14 h-14 rounded-xl bg-surface-2 shrink-0" />
-                        <div className="space-y-2 flex-1">
-                          <div className="h-4 w-3/4 bg-surface-2 rounded" />
-                          <div className="h-3 w-1/2 bg-surface-2 rounded" />
-                        </div>
-                      </div>
-                      <div className="h-12 w-full bg-surface-2/60 rounded-xl my-3" />
-                      <div className="h-3 w-1/3 bg-surface-2 rounded pt-2" />
-                    </div>
-                  ))
-                ) : (
-                  productionCompanies.map((company) => {
-                    const filmCount = company.filmCount || company.film_companies?.length || 0;
-                    return (
-                      <Link 
-                        key={company.id}
-                        to={`/companies/${company.id}`}
-                        className="shrink-0 w-72 sm:w-80 group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-hairline/80 bg-surface/90 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-brand/50 hover:shadow-xl hover:shadow-brand/5"
-                      >
-                        {/* Ambient Backdrop Banner */}
-                        <div className="relative h-24 w-full overflow-hidden bg-surface-2">
-                          {company.topFilm?.backdrop_url || company.topFilm?.poster_url ? (
-                            <img
-                              src={company.topFilm.backdrop_url || company.topFilm.poster_url}
-                              alt=""
-                              className="h-full w-full object-cover opacity-20 filter blur-[1px] group-hover:scale-105 group-hover:opacity-35 transition-all duration-700"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="h-full w-full bg-gradient-to-tr from-brand/10 via-surface-2 to-surface-3" />
-                          )}
-                          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-surface/60 to-surface" />
-
-                          {/* Top Right Highlight Badges */}
-                          <div className="absolute top-2.5 right-3 flex items-center gap-1.5 flex-wrap justify-end">
-                            {company.totalBoxOffice > 0 ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 backdrop-blur-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-300 border border-amber-500/30 shadow-xs">
-                                <Icon icon="solar:cup-star-bold" className="text-[11px] text-amber-400" />
-                                {formatStudioBoxOffice(company.totalBoxOffice)} BO
-                              </span>
-                            ) : company.avgLike ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 backdrop-blur-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-300 border border-emerald-500/30">
-                                <Icon icon="solar:like-bold" className="text-[11px] text-emerald-400" />
-                                {company.avgLike}% Liked
-                              </span>
-                            ) : company.founded_year ? (
-                              <span className="inline-flex items-center rounded-full bg-black/40 backdrop-blur-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-text-muted border border-white/10">
-                                Est. {company.founded_year}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {/* Card Body & Studio Branding */}
-                        <div className="relative px-5 pb-4 pt-0 flex flex-col gap-3 -mt-8">
-                          <div className="flex items-end gap-3.5">
-                            {/* Studio Logo */}
-                            <div className="relative h-13 w-13 shrink-0 overflow-hidden rounded-xl border border-hairline bg-surface-2 p-1.5 shadow-md group-hover:border-brand/40 group-hover:shadow-brand/20 transition-all duration-300 flex items-center justify-center">
-                              <ImageWithFallback
-                                src={company.logo_url}
-                                alt={toTitleCase(company.name)}
-                                fallbackType="company"
-                                name={toTitleCase(company.name)}
-                                className={`h-full w-full transition-transform duration-500 group-hover:scale-110 ${company.logo_url && !company.logo_url.includes('placeholder') ? 'object-contain' : 'object-cover'}`}
-                                width={104}
-                                sizes="52px"
-                                loading="lazy"
-                              />
-                            </div>
-
-                            <div className="min-w-0 flex-1 pb-0.5">
-                              <h3 className="font-bold text-text-primary text-sm tracking-tight group-hover:text-brand transition-colors line-clamp-1 leading-snug">
-                                {toTitleCase(company.name)}
-                              </h3>
-                              <p className="text-[9px] font-extrabold uppercase tracking-widest text-text-muted opacity-70 truncate mt-0.5">
-                                {company.company_type ? company.company_type.replace(/_/g, ' ') : 'Production Studio'}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Top Production Release Preview (if any) */}
-                          {company.topFilm && (
-                            <div className="rounded-xl bg-surface-2/60 border border-hairline/60 px-3 py-2 flex items-center gap-2.5 transition-colors group-hover:bg-surface-2/80">
-                              {company.topFilm.poster_url && (
-                                <img
-                                  src={company.topFilm.poster_url}
-                                  alt=""
-                                  className="w-5 h-7 rounded object-cover shrink-0 border border-hairline/40 shadow-xs"
-                                  loading="lazy"
-                                />
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[8px] font-black uppercase tracking-wider text-text-muted opacity-60">Featured Hit</p>
-                                <p className="text-xs font-semibold text-text-primary truncate">{company.topFilm.title}</p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Card Footer: Metrics & Navigation CTA */}
-                          <div className="pt-2.5 border-t border-hairline/70 flex items-center justify-between mt-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <Icon icon="solar:clapperboard-play-linear" className="text-text-muted text-xs" />
-                              <span className="text-text-muted text-[9px] font-black uppercase tracking-widest">
-                                {filmCount} {filmCount === 1 ? 'Film' : 'Films'} Produced
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 text-brand text-[9px] font-black uppercase tracking-wider group-hover:translate-x-0.5 transition-transform">
-                              <span>Explore</span>
-                              <Icon icon="solar:arrow-right-linear" className="text-xs" />
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 13. FEATURED CHANNELS */}
-        {(isSecondaryLoading || creators.length > 0) && (
-          <div className="relative z-10 border-b border-hairline bg-surface/40 overflow-hidden">
-             <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
-            <section className="py-16 relative z-10">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-end justify-between mb-12">
-                  <div className="space-y-1">
-                    <h2 className="font-heading font-bold text-2xl md:text-3xl text-text-primary tracking-tighter">
-                      Featured Channels
-                    </h2>
-                    <p className="text-text-muted text-[10px] font-bold uppercase tracking-widest mt-1 opacity-60">The storytellers of YouTube</p>
-                  </div>
-                  <Link to="/channels" className="text-brand text-[10px] font-bold uppercase tracking-widest hover:underline">View all</Link>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-t border-l border-hairline rounded-xl overflow-hidden shadow-sm">
-                  {isSecondaryLoading ? (
-                    [...Array(6)].map((_, i) => (
-                      <div key={i} className="bg-surface p-8 border-r border-b border-hairline flex items-center gap-5">
-                        <div className="w-16 h-16 rounded-lg bg-surface-2 animate-shimmer shrink-0"></div>
-                        <div className="flex-1 space-y-3">
-                          <div className="w-2/3 h-5 bg-surface-2 animate-shimmer rounded"></div>
-                          <div className="w-1/2 h-3 bg-surface-2 animate-shimmer rounded opacity-60"></div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    creators.map((creator) => {
-                      const stats = creator.youtube_stats || {};
-                      const channelUrl = getPersonYoutubeChannelUrl(creator);
-                      return (
-                        <a 
-                          key={creator.id}
-                          href={channelUrl || '#'}
-                          onClick={(e) => handleExternalClick(e, channelUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group bg-surface p-8 hover:bg-surface-2/50 transition-all duration-500 flex flex-col gap-6 border-r border-b border-hairline animate-in fade-in"
-                        >
-                          <div className="flex items-center gap-5">
-                            <ImageWithFallback
-                              src={stats.thumbnail || creator.photo_url}
-                              alt={creator.name} 
-                              fallbackType="avatar"
-                              name={creator.name}
-                              className="w-16 h-16 rounded-lg object-cover shadow-sm border border-hairline group-hover:scale-105 transition-transform" 
-                              width={128}
-                              sizes="64px"
-                              loading="lazy"
-                            />
-                            <div>
-                              <h3 className="text-lg font-black text-text-primary group-hover:text-brand transition-colors tracking-tight flex items-center gap-1.5">
-                                {creator.name}
-                                <Icon icon="solar:arrow-right-up-linear" className="text-xs opacity-40 group-hover:opacity-100 group-hover:text-brand transition-all shrink-0" />
-                              </h3>
-                              <div className="mt-2 flex items-center gap-4">
-                                {(parseInt(stats.subscribers) > 0) && (
-                                  <span className="text-[9px] font-bold text-brand">{parseInt(stats.subscribers).toLocaleString()} subs</span>
-                                )}
-                                {(parseInt(stats.videos) > 0) && (
-                                  <span className="text-[9px] font-bold text-text-muted flex items-center gap-1.5">
-                                    {parseInt(stats.videos).toLocaleString()} videos
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </a>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        </div>{/* ===================== end editorial zone ===================== */}
-
-        {/* 15. GENRE-SPECIFIC FILM SECTIONS */}
-        {genreSections.length > 0 && (
-          <div className="landing-band panel">
-            {/* Zone label */}
-            <div className="landing-zone-label max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <span>Browse by Genre</span>
-              <span />
-            </div>
-
-            {genreSections.map((section) => (
-              <div key={section.genre} className="border-b border-hairline py-10 md:py-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                  {/* Section header */}
-                  <div className="flex items-end justify-between mb-6">
-                    <h2 className="font-heading font-bold text-brand text-sm uppercase tracking-widest">
-                      {section.genre}
-                    </h2>
-                    <Link
-                      to={`/browse?genre=${encodeURIComponent(section.genre)}`}
-                      className="group/see shrink-0 inline-flex items-center gap-1.5 text-text-secondary hover:text-brand text-xs font-bold tracking-wide transition-colors whitespace-nowrap"
-                    >
-                      See all
-                      <Icon icon="solar:alt-arrow-right-linear" className="w-4 h-4 transition-transform duration-300 group-hover/see:translate-x-1" />
-                    </Link>
-                  </div>
-
-                  {/* Film grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5">
-                    {section.films.slice(0, 4).map((film) => (
-                      <div key={film.id}>
-                        <FilmCard film={film} variant="landscape" fullWidth={true} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        </Suspense>
-        </DeferredMount>
-
-        {/* 14. NEW MEMBER CTA BANNER (Issue 29) */}
-        {!isAuthenticated && (
-          <div className="landing-band alt grided px-4 sm:px-6 lg:px-8 py-14 md:py-16 border-t border-hairline/40">
-            <div className="landing-module relative rounded-lg p-8 md:p-16 overflow-hidden text-center max-w-5xl mx-auto group">
-              {/* Decorative Glow */}
-              <div className="absolute -top-32 -left-32 w-96 h-96 bg-brand/10 rounded-full blur-[120px] transition-all group-hover:bg-brand/20 pointer-events-none"></div>
-              <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-brand/10 rounded-full blur-[120px] transition-all group-hover:bg-brand/20 pointer-events-none"></div>
-              
-              <div className="relative z-10 max-w-2xl mx-auto space-y-6">
-                <span className="text-brand text-xs font-bold tracking-[0.3em] uppercase block">Join the Nollywood Movement</span>
-                <h2 className="font-heading font-bold text-3xl md:text-5xl text-text-primary tracking-tighter leading-tight">
-                  Preserve the legacy. Celebrate the future.
-                </h2>
-                <p className="text-text-secondary text-sm md:text-base leading-relaxed">
-                  Join MuviDB today to rate films, write reviews, follow your favourite artists, and build your own custom library of African cinematic excellence.
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
-                  <Link 
-                    to="/signup" 
-                    className="bg-brand hover:bg-brand-hover text-white px-8 py-4 rounded-xl font-bold text-[11px] uppercase tracking-widest transition-all shadow-lg hover:shadow-brand/20 active:scale-95 shrink-0"
-                  >
-                    Join MuviDB
-                  </Link>
-                  <Link 
-                    to="/browse" 
-                    className="bg-white/5 hover:bg-white/10 text-text-primary border border-hairline px-8 py-4 rounded-xl font-bold text-[11px] uppercase tracking-widest transition-all active:scale-95 shrink-0"
-                  >
-                    Browse Database
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </div>
-      </div>
-
-      {/* 12. EXTERNAL LINK WARNING DIALOG MODAL (Issue 19) */}
-      {isWarningModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/85 backdrop-blur-sm"
-            onClick={() => setIsWarningModalOpen(false)}
-          />
-          
-          {/* Modal Content Card */}
-          <div className="relative bg-surface border border-hairline rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl z-10 space-y-6 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-4 text-brand">
-              <div className="w-12 h-12 rounded-2xl bg-brand/10 flex items-center justify-center text-brand">
-                <Icon icon="solar:danger-triangle-linear" width="28" height="28" />
-              </div>
-              <h3 className="font-heading font-bold text-lg md:text-xl text-text-primary tracking-tight">
-                Leaving MuviDB
-              </h3>
-            </div>
-            
-            <p className="text-text-secondary text-sm leading-relaxed">
-              You are about to open an external YouTube channel in a new tab. MuviDB does not control external websites or content.
-            </p>
-            
-            {/* Don't show again checkbox */}
-            <label className="flex items-center gap-3 cursor-pointer select-none group w-fit">
-              <input 
-                type="checkbox"
-                checked={dontShowAgain}
-                onChange={(e) => setDontShowAgain(e.target.checked)}
-                className="hidden"
-              />
-              <div className={`w-5 h-5 rounded border transition-all flex items-center justify-center ${dontShowAgain ? 'bg-brand border-brand' : 'border-hairline bg-surface-2 group-hover:border-brand/50'}`}>
-                {dontShowAgain && <Icon icon="solar:check-read-linear" className="text-white text-xs" />}
-              </div>
-              <span className="text-xs text-text-muted font-bold group-hover:text-text-secondary transition-colors uppercase tracking-wider">
-                Don't show this reminder again
+      {/* Watchlist "Now Streaming" Automated Alert Strip */}
+      {watchlistStreamingAlerts.length > 0 && !dismissedAlert && (
+        <div className="bg-surface-2 border-y border-border">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+              <span className="font-black uppercase tracking-wider text-emerald-400 shrink-0">
+                Watchlist Alert
               </span>
-            </label>
-            
-            <div className="flex gap-4 pt-2">
-              <button 
-                onClick={() => setIsWarningModalOpen(false)}
-                className="flex-1 bg-white/5 hover:bg-white/10 text-text-primary py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all active:scale-95 border border-hairline"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={proceedToExternal}
-                className="flex-1 bg-brand hover:bg-brand-hover text-white py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-brand/10"
-              >
-                Proceed
-              </button>
+              <span className="text-text-secondary truncate">
+                Now streaming:{' '}
+                <Link
+                  to={`/films/${watchlistStreamingAlerts[0].slug || watchlistStreamingAlerts[0].id}`}
+                  className="font-bold text-text-primary hover:text-brand underline"
+                >
+                  {watchlistStreamingAlerts[0].title}
+                </Link>
+                {watchlistStreamingAlerts.length > 1
+                  ? ` (+${watchlistStreamingAlerts.length - 1} more saved)`
+                  : ''}
+              </span>
             </div>
+            <button
+              type="button"
+              onClick={() => setDismissedAlert(true)}
+              className="text-text-muted hover:text-text-primary text-[11px] font-bold shrink-0 cursor-pointer"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}
+
+      {/* 4. WHERE TO WATCH TONIGHT (Unified Streaming + Free on YouTube) */}
+      <HomeStreamingHub
+        streamingByPlatform={streamingByPlatform}
+        youtubeFeed={youtubeFeed}
+        cinemaFilmIds={cinemaFilmIds}
+        isLoading={isStreamingLoading}
+        watchlistIds={watchlistIds}
+        onToggleWatchlist={handleToggleWatchlist}
+      />
+
+      {/* Below-fold utility & industry sections */}
+      <DeferredMount minHeight={400} rootMargin="450px 0px" onActivate={fetchSecondaryData}>
+        <Suspense fallback={<div className="min-h-[240px]" aria-hidden="true" />}>
+          {/* 5. CRITICS' VERDICT (Strictly Recency-First + Zero-Falsification) */}
+          <CriticsLoungeSection />
+
+          {/* 6. NOW ON STAGE & LIVE THEATRE (Dedicated Section, Portrait Cards) */}
+          <HomeTheatreSection
+            plays={upcomingPlays}
+            isLoading={isPlaysLoading}
+          />
+
+          {/* 7. UPCOMING MOVIES SLATE (Pure Portrait Film Cards) */}
+          <HomeUpcomingSlate
+            comingSoon={comingSoon}
+            cinemaFilmIds={cinemaFilmIds}
+            isLoadingFilms={isComingSoonLoading}
+            watchlistIds={watchlistIds}
+            onToggleWatchlist={handleToggleWatchlist}
+          />
+        </Suspense>
+      </DeferredMount>
+
+      {/* 8. NATIVE MANAGED SPONSOR BILLBOARD: Lower Slot (Rotates all active Panorama campaigns) */}
+      <HomeSponsoredBanner format="panorama" />
+
+      {/* 9. THE NOLLYWOOD ECOSYSTEM: BENTO STUDIOS & VERIFIED CAST/CREW PASSPORTS */}
+      <HomeIndustryEcosystem
+        companies={companies}
+        talent={talent}
+        crew={crew}
+        isLoading={isIndustryLoading}
+      />
+
+      {/* 10. MUVIBD POWER MOVERS (Δ) & BORN TODAY (DAILY AUTOMATED PULSE) */}
+      <Suspense fallback={<div className="min-h-[200px]" aria-hidden="true" />}>
+        <HomePulseRails
+          powerPeople={talent}
+          birthdayPool={birthdayPool}
+          isLoading={isIndustryLoading}
+        />
+      </Suspense>
+
+      {/* 11. BUILT FOR AFRICAN CINEMA: GENRES + INDUSTRY TOOLKIT */}
+      <HomeIndustryTools isAuthenticated={isAuthenticated} />
     </div>
   );
 }

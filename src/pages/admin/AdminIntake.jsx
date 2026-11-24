@@ -29,14 +29,25 @@ const FILM_CREW_ROLES = [
   { id: 'director', label: 'Director' },
   { id: 'producer', label: 'Producer' },
   { id: 'executive_producer', label: 'Executive Producer' },
+  { id: 'associate_producer', label: 'Associate Producer' },
+  { id: 'line_producer', label: 'Line Producer' },
   { id: 'writer', label: 'Writer / Screenplay' },
   { id: 'cinematographer', label: 'Cinematographer (DOP)' },
   { id: 'editor', label: 'Editor' },
-  { id: 'sound', label: 'Sound Designer' },
-  { id: 'costume', label: 'Costume Designer' },
+  { id: 'sound', label: 'Sound Designer / Recordist' },
+  { id: 'costume', label: 'Costume & Wardrobe' },
+  { id: 'makeup', label: 'Makeup & SFX Artist' },
   { id: 'production_designer', label: 'Production Designer' },
-  { id: 'composer', label: 'Music Composer' },
+  { id: 'composer', label: 'Music Composer / Music' },
+  { id: 'gaffer', label: 'Gaffer / Chief Lighting' },
+  { id: 'script_supervisor', label: 'Script Supervisor / Continuity' },
+  { id: 'first_ad', label: '1st Assistant Director' },
+  { id: 'second_ad', label: '2nd Assistant Director' },
   { id: 'casting', label: 'Casting Director' },
+  { id: 'colorist', label: 'Colorist' },
+  { id: 'visual_effects', label: 'VFX / Visual Effects' },
+  { id: 'location_manager', label: 'Location Manager' },
+  { id: 'stunts', label: 'Stunt Coordinator' },
   { id: 'crew', label: 'Other Crew' },
 ];
 
@@ -48,9 +59,40 @@ const STAGE_CREW_ROLES = [
   { id: 'lighting', label: 'Lighting Designer' },
   { id: 'choreographer', label: 'Choreographer' },
   { id: 'costume', label: 'Costume & Wardrobe' },
+  { id: 'makeup', label: 'Makeup & SFX Artist' },
   { id: 'sound', label: 'Sound & Music' },
+  { id: 'production_designer', label: 'Scenic / Set Designer' },
   { id: 'crew', label: 'Stage Crew' },
 ];
+
+const normalizeCrewRole = (rawRole) => {
+  if (!rawRole) return 'crew';
+  const r = String(rawRole).toLowerCase().trim();
+  if (/director of photography|cinematograph|dop|camera/i.test(r)) return 'cinematographer';
+  if (/executive\s*producer/i.test(r)) return 'executive_producer';
+  if (/associate\s*producer/i.test(r)) return 'associate_producer';
+  if (/line\s*producer/i.test(r)) return 'line_producer';
+  if (/co-producer|co\s*producer/i.test(r)) return 'producer';
+  if (/producer/i.test(r)) return 'producer';
+  if (/1st\s*a\.?d\.?|first\s*assistant\s*director/i.test(r)) return 'first_ad';
+  if (/2nd\s*a\.?d\.?|second\s*assistant\s*director/i.test(r)) return 'second_ad';
+  if (/director/i.test(r)) return 'director';
+  if (/screenplay|writer|scriptwriter|story/i.test(r)) return 'writer';
+  if (/editor|editing/i.test(r)) return 'editor';
+  if (/gaffer|lighting|best boy electric/i.test(r)) return 'gaffer';
+  if (/sound|audio|boom|mixer|recordist/i.test(r)) return 'sound';
+  if (/makeup|make-up|sfx|prosthetic|special effects/i.test(r)) return 'makeup';
+  if (/costume|wardrobe|stylist|fashion/i.test(r)) return 'costume';
+  if (/production\s*design|art\s*director|set\s*design|props|scenic/i.test(r)) return 'production_designer';
+  if (/music|composer|soundtrack|score/i.test(r)) return 'composer';
+  if (/script\s*supervisor|continuity/i.test(r)) return 'script_supervisor';
+  if (/casting/i.test(r)) return 'casting';
+  if (/colorist|colourist|grading/i.test(r)) return 'colorist';
+  if (/vfx|visual\s*effects|cgi/i.test(r)) return 'visual_effects';
+  if (/location/i.test(r)) return 'location_manager';
+  if (/stunt/i.test(r)) return 'stunts';
+  return 'crew';
+};
 
 // Helper to reliably preview images in browser without Instagram hotlinking blocks
 export function getSafePreviewUrl(rawUrl) {
@@ -932,15 +974,37 @@ export default function AdminIntake() {
     }
   };
 
-  // Merge OCR cast into the film cast
+  // Merge OCR cast into the film / stage play cast
   const handleApplyOcrToCast = () => {
     if (!ocrResult?.cast?.length) {
       toast.error('No cast items found in OCR result.');
       return;
     }
 
+    if (activeTab === 'play') {
+      const currentCast = [...(playForm.cast || [])];
+      const existingNames = new Set(currentCast.map(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim()));
+      let addedCount = 0;
+      for (const item of ocrResult.cast) {
+        if (!item.name || !item.name.trim()) continue;
+        const lower = item.name.toLowerCase().trim();
+        if (!existingNames.has(lower)) {
+          currentCast.push({
+            name: item.name.trim(),
+            character_name: item.character_name ? item.character_name.trim() : null,
+            person_id: null,
+          });
+          existingNames.add(lower);
+          addedCount++;
+        }
+      }
+      setPlayForm(prev => ({ ...prev, cast: currentCast }));
+      toast.success(`Merged ${addedCount} stage cast members from OCR!`);
+      return;
+    }
+
     const currentCast = [...(filmForm.cast || [])];
-    const existingNames = new Set(currentCast.map(c => (typeof c === 'string' ? c : c.name).toLowerCase().trim()));
+    const existingNames = new Set(currentCast.map(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim()));
 
     let addedCount = 0;
     for (const item of ocrResult.cast) {
@@ -950,13 +1014,14 @@ export default function AdminIntake() {
         currentCast.push({
           name: item.name.trim(),
           character_name: item.character_name ? item.character_name.trim() : null,
+          person_id: null,
         });
         existingNames.add(lower);
         addedCount++;
       }
     }
 
-    // Also check crew for Director
+    // Also check crew for Director if not already set
     const directorEntry = ocrResult.crew?.find(c => /director/i.test(c.role));
     if (directorEntry?.name && !filmForm.director) {
       setFilmForm(prev => ({ ...prev, director: directorEntry.name.trim() }));
@@ -964,6 +1029,253 @@ export default function AdminIntake() {
 
     setFilmForm(prev => ({ ...prev, cast: currentCast }));
     toast.success(`Merged ${addedCount} new cast members from OCR billing block!`);
+  };
+
+  // Merge OCR crew into the film / stage play crew
+  const handleApplyOcrToCrew = () => {
+    if (!ocrResult?.crew?.length) {
+      toast.error('No crew items found in OCR result.');
+      return;
+    }
+
+    if (activeTab === 'play') {
+      const currentCrew = [...(playForm.crew || [])];
+      const existing = new Set(
+        currentCrew.map(c => `${(c.name || '').toLowerCase().trim()}_${(c.role || '').toLowerCase().trim()}`)
+      );
+      let addedCount = 0;
+      for (const item of ocrResult.crew) {
+        if (!item.name || !item.name.trim()) continue;
+        const normalizedRole = normalizeCrewRole(item.role);
+        const key = `${item.name.toLowerCase().trim()}_${normalizedRole}`;
+        if (!existing.has(key)) {
+          currentCrew.push({
+            name: item.name.trim(),
+            person_id: null,
+            role: normalizedRole,
+          });
+          existing.add(key);
+          addedCount++;
+        }
+      }
+      const dir = ocrResult.crew.find(c => /director/i.test(c.role));
+      const updates = { crew: currentCrew };
+      if (dir?.name && !playForm.director) {
+        updates.director = dir.name.trim();
+      }
+      setPlayForm(prev => ({ ...prev, ...updates }));
+      toast.success(`Merged ${addedCount} stage crew members from OCR!`);
+      return;
+    }
+
+    // Film crew
+    const currentCrew = [...(filmForm.crew || [])];
+    const existing = new Set(
+      currentCrew.map(c => `${(c.name || '').toLowerCase().trim()}_${(c.role || '').toLowerCase().trim()}`)
+    );
+
+    let addedCount = 0;
+    for (const item of ocrResult.crew) {
+      if (!item.name || !item.name.trim()) continue;
+      const normalizedRole = normalizeCrewRole(item.role);
+      const key = `${item.name.toLowerCase().trim()}_${normalizedRole}`;
+      if (!existing.has(key)) {
+        currentCrew.push({
+          name: item.name.trim(),
+          person_id: null,
+          role: normalizedRole,
+        });
+        existing.add(key);
+        addedCount++;
+      }
+    }
+
+    const dir = ocrResult.crew.find(c => /director/i.test(c.role));
+    const updates = { crew: currentCrew };
+    if (dir?.name && !filmForm.director) {
+      updates.director = dir.name.trim();
+    }
+    setFilmForm(prev => ({ ...prev, ...updates }));
+    toast.success(`Merged ${addedCount} crew members from OCR billing block!`);
+  };
+
+  // Merge BOTH Cast and Crew in one click
+  const handleApplyAllOcr = () => {
+    const castCount = ocrResult?.cast?.length || 0;
+    const crewCount = ocrResult?.crew?.length || 0;
+    if (castCount === 0 && crewCount === 0) {
+      toast.error('No cast or crew items found in OCR result.');
+      return;
+    }
+
+    let addedCast = 0;
+    let addedCrew = 0;
+
+    if (activeTab === 'play') {
+      if (castCount > 0) {
+        const currentCast = [...(playForm.cast || [])];
+        const existingNames = new Set(currentCast.map(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim()));
+        for (const item of ocrResult.cast) {
+          if (!item.name || !item.name.trim()) continue;
+          const lower = item.name.toLowerCase().trim();
+          if (!existingNames.has(lower)) {
+            currentCast.push({
+              name: item.name.trim(),
+              character_name: item.character_name ? item.character_name.trim() : null,
+              person_id: null,
+            });
+            existingNames.add(lower);
+            addedCast++;
+          }
+        }
+        setPlayForm(prev => ({ ...prev, cast: currentCast }));
+      }
+      if (crewCount > 0) {
+        const currentCrew = [...(playForm.crew || [])];
+        const existing = new Set(
+          currentCrew.map(c => `${(c.name || '').toLowerCase().trim()}_${(c.role || '').toLowerCase().trim()}`)
+        );
+        for (const item of ocrResult.crew) {
+          if (!item.name || !item.name.trim()) continue;
+          const normalizedRole = normalizeCrewRole(item.role);
+          const key = `${item.name.toLowerCase().trim()}_${normalizedRole}`;
+          if (!existing.has(key)) {
+            currentCrew.push({
+              name: item.name.trim(),
+              person_id: null,
+              role: normalizedRole,
+            });
+            existing.add(key);
+            addedCrew++;
+          }
+        }
+        const dir = ocrResult.crew.find(c => /director/i.test(c.role));
+        const updates = { crew: currentCrew };
+        if (dir?.name && !playForm.director) {
+          updates.director = dir.name.trim();
+        }
+        setPlayForm(prev => ({ ...prev, ...updates }));
+      }
+    } else {
+      if (castCount > 0) {
+        const currentCast = [...(filmForm.cast || [])];
+        const existingNames = new Set(currentCast.map(c => (typeof c === 'string' ? c : c.name || '').toLowerCase().trim()));
+        for (const item of ocrResult.cast) {
+          if (!item.name || !item.name.trim()) continue;
+          const lower = item.name.toLowerCase().trim();
+          if (!existingNames.has(lower)) {
+            currentCast.push({
+              name: item.name.trim(),
+              character_name: item.character_name ? item.character_name.trim() : null,
+              person_id: null,
+            });
+            existingNames.add(lower);
+            addedCast++;
+          }
+        }
+        setFilmForm(prev => ({ ...prev, cast: currentCast }));
+      }
+      if (crewCount > 0) {
+        const currentCrew = [...(filmForm.crew || [])];
+        const existing = new Set(
+          currentCrew.map(c => `${(c.name || '').toLowerCase().trim()}_${(c.role || '').toLowerCase().trim()}`)
+        );
+        for (const item of ocrResult.crew) {
+          if (!item.name || !item.name.trim()) continue;
+          const normalizedRole = normalizeCrewRole(item.role);
+          const key = `${item.name.toLowerCase().trim()}_${normalizedRole}`;
+          if (!existing.has(key)) {
+            currentCrew.push({
+              name: item.name.trim(),
+              person_id: null,
+              role: normalizedRole,
+            });
+            existing.add(key);
+            addedCrew++;
+          }
+        }
+        const dir = ocrResult.crew.find(c => /director/i.test(c.role));
+        const updates = { crew: currentCrew };
+        if (dir?.name && !filmForm.director) {
+          updates.director = dir.name.trim();
+        }
+        setFilmForm(prev => ({ ...prev, ...updates }));
+      }
+    }
+
+    toast.success(`Merged ${addedCast} cast and ${addedCrew} crew members from OCR!`);
+  };
+
+  // Add a single cast member from OCR item
+  const handleAddSingleCastFromOcr = (item) => {
+    const name = item.name?.trim();
+    if (!name) return;
+    const charName = item.character_name ? item.character_name.trim() : null;
+
+    if (activeTab === 'play') {
+      const currentCast = [...(playForm.cast || [])];
+      if (currentCast.some(c => (typeof c === 'string' ? c : c.name || '').toLowerCase() === name.toLowerCase())) {
+        toast.error(`${name} is already in the cast list.`);
+        return;
+      }
+      setPlayForm(prev => ({
+        ...prev,
+        cast: [...(prev.cast || []), { name, character_name: charName, person_id: null }],
+      }));
+      toast.success(`Added ${name} to stage cast!`);
+    } else {
+      const currentCast = [...(filmForm.cast || [])];
+      if (currentCast.some(c => (typeof c === 'string' ? c : c.name || '').toLowerCase() === name.toLowerCase())) {
+        toast.error(`${name} is already in the cast list.`);
+        return;
+      }
+      setFilmForm(prev => ({
+        ...prev,
+        cast: [...(prev.cast || []), { name, character_name: charName, person_id: null }],
+      }));
+      toast.success(`Added ${name} to cast!`);
+    }
+  };
+
+  // Add a single crew member from OCR item
+  const handleAddSingleCrewFromOcr = (item) => {
+    const name = item.name?.trim();
+    if (!name) return;
+    const normalizedRole = normalizeCrewRole(item.role);
+
+    if (activeTab === 'play') {
+      const currentCrew = [...(playForm.crew || [])];
+      if (currentCrew.some(c => (c.name || '').toLowerCase() === name.toLowerCase() && c.role === normalizedRole)) {
+        toast.error(`${name} is already listed as ${normalizedRole}.`);
+        return;
+      }
+      const updates = {};
+      if (/director/i.test(item.role) && !playForm.director) {
+        updates.director = name;
+      }
+      setPlayForm(prev => ({
+        ...prev,
+        ...updates,
+        crew: [...currentCrew, { name, role: normalizedRole, person_id: null }],
+      }));
+      toast.success(`Added ${name} as ${normalizedRole}!`);
+    } else {
+      const currentCrew = [...(filmForm.crew || [])];
+      if (currentCrew.some(c => (c.name || '').toLowerCase() === name.toLowerCase() && c.role === normalizedRole)) {
+        toast.error(`${name} is already listed as ${normalizedRole}.`);
+        return;
+      }
+      const updates = {};
+      if (/director/i.test(item.role) && !filmForm.director) {
+        updates.director = name;
+      }
+      setFilmForm(prev => ({
+        ...prev,
+        ...updates,
+        crew: [...currentCrew, { name, role: normalizedRole, person_id: null }],
+      }));
+      toast.success(`Added ${name} as ${normalizedRole}!`);
+    }
   };
 
   // Add mention directly to cast
@@ -2097,34 +2409,91 @@ export default function AdminIntake() {
       {/* ── STEP 4: OCR Extraction Results (Collapsible) ── */}
       {ocrResult && (
         <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm space-y-4 animate-fadeIn">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border/50 pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/50 pb-3">
             <div className="flex items-center gap-2">
               <Icon icon="solar:document-text-bold" className="text-brand" width="18" />
-              <h2 className="text-xs font-black uppercase tracking-wider text-text-primary">
-                OCR Billing Block Extraction
-              </h2>
+              <div>
+                <h2 className="text-xs font-black uppercase tracking-wider text-text-primary">
+                  OCR Billing Block Extraction
+                </h2>
+                <span className="text-[10px] text-text-muted">
+                  Detected {ocrResult.cast?.length || 0} cast members & {ocrResult.crew?.length || 0} crew roles
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Merge ALL (if both exist) */}
+              {Boolean((ocrResult.cast?.length || 0) > 0 && (ocrResult.crew?.length || 0) > 0) && (
+                <button
+                  type="button"
+                  onClick={handleApplyAllOcr}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-sm"
+                  title="Merge both cast and crew into the form at once"
+                >
+                  <Icon icon="solar:check-read-bold" />
+                  Merge All ({(ocrResult.cast?.length || 0) + (ocrResult.crew?.length || 0)})
+                </button>
+              )}
+
+              {/* Merge Cast */}
               <button
                 type="button"
                 onClick={handleApplyOcrToCast}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all shadow-sm"
+                disabled={!ocrResult.cast?.length}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                  ocrResult.cast?.length
+                    ? 'bg-emerald-600 text-white hover:brightness-110 active:scale-95 cursor-pointer'
+                    : 'bg-surface-2 text-text-muted/60 border border-border/60 cursor-not-allowed opacity-60'
+                }`}
+                title={ocrResult.cast?.length ? `Merge ${ocrResult.cast.length} actors into cast table` : 'No cast identified in this pass'}
               >
-                <Icon icon="solar:check-circle-bold" />
-                Merge {ocrResult.cast?.length || 0} Actors into Cast Table
+                <Icon icon="solar:users-group-two-rounded-bold" />
+                Merge {ocrResult.cast?.length || 0} Cast
+              </button>
+
+              {/* Merge Crew */}
+              <button
+                type="button"
+                onClick={handleApplyOcrToCrew}
+                disabled={!ocrResult.crew?.length}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                  ocrResult.crew?.length
+                    ? 'bg-blue-600 text-white hover:brightness-110 active:scale-95 cursor-pointer'
+                    : 'bg-surface-2 text-text-muted/60 border border-border/60 cursor-not-allowed opacity-60'
+                }`}
+                title={ocrResult.crew?.length ? `Merge ${ocrResult.crew.length} crew roles into crew table` : 'No crew identified in this pass'}
+              >
+                <Icon icon="solar:clapperboard-bold" />
+                Merge {ocrResult.crew?.length || 0} Crew
               </button>
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-border bg-surface-2 p-3 space-y-2">
-              <span className="text-[10px] font-black uppercase text-text-muted">Detected Cast & Characters</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-text-muted">Detected Cast & Characters</span>
+                <span className="text-[10px] font-bold text-text-muted">{ocrResult.cast?.length || 0} actors</span>
+              </div>
               {ocrResult.cast?.length ? (
                 <div className="space-y-1.5 max-h-56 overflow-y-auto scrollbar-thin">
                   {ocrResult.cast.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-surface border border-border/40">
-                      <span className="font-bold text-text-primary">{c.name}</span>
-                      <span className="text-text-muted italic">{c.character_name || 'No character'}</span>
+                    <div key={i} className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded bg-surface border border-border/40 hover:border-border transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
+                        <span className="font-bold text-text-primary truncate">{c.name}</span>
+                        {c.character_name && (
+                          <span className="text-text-muted italic text-[11px] truncate">as {c.character_name}</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddSingleCastFromOcr(c)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-surface-2 text-text-secondary hover:text-white hover:bg-emerald-600 transition-colors shrink-0 ml-2"
+                        title={`Add ${c.name} to cast table`}
+                      >
+                        <Icon icon="solar:add-circle-linear" width="13" />
+                        <span>Add</span>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -2134,13 +2503,27 @@ export default function AdminIntake() {
             </div>
 
             <div className="rounded-xl border border-border bg-surface-2 p-3 space-y-2">
-              <span className="text-[10px] font-black uppercase text-text-muted">Detected Crew Roles</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-text-muted">Detected Crew Roles</span>
+                <span className="text-[10px] font-bold text-text-muted">{ocrResult.crew?.length || 0} crew</span>
+              </div>
               {ocrResult.crew?.length ? (
                 <div className="space-y-1.5 max-h-56 overflow-y-auto scrollbar-thin">
                   {ocrResult.crew.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-surface border border-border/40">
-                      <span className="text-brand font-bold uppercase text-[10px]">{c.role}</span>
-                      <span className="text-text-primary font-medium">{c.name}</span>
+                    <div key={i} className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded bg-surface border border-border/40 hover:border-border transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
+                        <span className="text-brand font-black uppercase text-[10px] tracking-wide shrink-0">{c.role}</span>
+                        <span className="text-text-primary font-medium truncate">{c.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddSingleCrewFromOcr(c)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-surface-2 text-text-secondary hover:text-white hover:bg-blue-600 transition-colors shrink-0 ml-2"
+                        title={`Add ${c.name} as ${c.role}`}
+                      >
+                        <Icon icon="solar:add-circle-linear" width="13" />
+                        <span>Add</span>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -2599,6 +2982,9 @@ export default function AdminIntake() {
                         {FILM_CREW_ROLES.map(r => (
                           <option key={r.id} value={r.id}>{r.label}</option>
                         ))}
+                        {c.role && !FILM_CREW_ROLES.some(r => r.id === c.role) && (
+                          <option value={c.role}>{c.role}</option>
+                        )}
                       </select>
                       <button
                         type="button"
@@ -3087,6 +3473,9 @@ export default function AdminIntake() {
                         {STAGE_CREW_ROLES.map(r => (
                           <option key={r.id} value={r.id}>{r.label}</option>
                         ))}
+                        {c.role && !STAGE_CREW_ROLES.some(r => r.id === c.role) && (
+                          <option value={c.role}>{c.role}</option>
+                        )}
                       </select>
                       <button
                         type="button"

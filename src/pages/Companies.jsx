@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Link, useLoaderData } from 'react-router';
+import { Link, useLoaderData, useSearchParams } from 'react-router';
 import { supabase } from '../lib/supabase';
 import { Icon } from '@iconify/react';
 import { toTitleCase, toSentenceCase, formatFilmTitle } from '../utils/format';
@@ -161,15 +161,24 @@ const CompanySkeleton = () => (
 
 export default function Companies() {
   const loaderData = useLoaderData();
+  const [searchParams, setSearchParams] = useSearchParams();
   const seeded = !!loaderData?.seeded && (loaderData.companies?.length ?? 0) > 0;
   const [companies, setCompanies] = useState(loaderData?.companies ?? []);
   const [companyMetrics, setCompanyMetrics] = useState(loaderData?.companyMetrics ?? {});
   const [loading, setLoading] = useState(!seeded);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const initialType = searchParams.get('type') || 'all';
+  const [typeFilter, setTypeFilter] = useState(initialType);
   const [metricFilter, setMetricFilter] = useState('all'); // 'all' | 'box_office' | 'youtube' | 'with_films'
   const [sortBy, setSortBy] = useState('box_office'); // 'box_office' | 'views' | 'films' | 'founded' | 'name'
   const skipInitialFetch = useRef(seeded);
+
+  useEffect(() => {
+    const urlType = searchParams.get('type');
+    if (urlType) {
+      setTypeFilter(urlType);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (skipInitialFetch.current) {
@@ -291,8 +300,16 @@ export default function Companies() {
       if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
 
       const type = (c.company_type || '').toLowerCase();
-      if (typeFilter !== 'all' && type !== typeFilter) {
-        return false;
+      if (typeFilter !== 'all') {
+        if (typeFilter === 'academy') {
+          const isAcad = type.includes('academy') || type.includes('institute') || c.name.toLowerCase().includes('academy') || c.name.toLowerCase().includes('institute');
+          if (!isAcad) return false;
+        } else if (typeFilter === 'agency') {
+          const isAgency = type.includes('agency') || type.includes('management') || c.name.toLowerCase().includes('agency');
+          if (!isAgency) return false;
+        } else if (type !== typeFilter) {
+          return false;
+        }
       }
 
       const m = companyMetrics[c.id] || {};
@@ -342,12 +359,16 @@ export default function Companies() {
 
       {/* ─── 1. PAGE HEADER & COMPACT METRICS ─── */}
       <PageHeader
-        icon="solar:buildings-2-bold"
-        eyebrow="Industry Directory"
-        title="Studios & Distributors"
-        description="The production powerhouses, theatrical distribution networks, and digital streaming creators shaping African cinema."
-        count={companies.length}
-        countLabel="studios tracked"
+        icon={typeFilter === 'academy' ? 'solar:diploma-bold' : 'solar:buildings-2-bold'}
+        eyebrow={typeFilter === 'academy' ? 'Creative Education' : 'Industry Directory'}
+        title={typeFilter === 'academy' ? 'Film Academies & Institutions' : 'Studios & Distributors'}
+        description={
+          typeFilter === 'academy'
+            ? "Africa's premier screen craft academies, cinematic faculties, and capacity-building institutions preparing talents for global sets."
+            : 'The production powerhouses, theatrical distribution networks, and digital streaming creators shaping African cinema.'
+        }
+        count={filtered.length}
+        countLabel={typeFilter === 'academy' ? 'academies tracked' : 'studios tracked'}
         actions={
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             {industryStats.cumulativeBoxOffice > 0 && (
@@ -389,9 +410,9 @@ export default function Companies() {
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar text-xs font-semibold">
             <button
               type="button"
-              onClick={() => setMetricFilter('all')}
+              onClick={() => { setMetricFilter('all'); setTypeFilter('all'); }}
               className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 cursor-pointer ${
-                metricFilter === 'all'
+                metricFilter === 'all' && typeFilter === 'all'
                   ? 'bg-surface-2 border-brand/50 text-text-primary font-bold shadow-xs'
                   : 'bg-surface/50 border-border text-text-muted hover:text-text-primary hover:border-border/80'
               }`}
@@ -400,7 +421,19 @@ export default function Companies() {
             </button>
             <button
               type="button"
-              onClick={() => { setMetricFilter('box_office'); setSortBy('box_office'); }}
+              onClick={() => { setTypeFilter('academy'); setMetricFilter('all'); }}
+              className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                typeFilter === 'academy'
+                  ? 'bg-brand/15 border-brand/50 text-brand font-bold shadow-xs'
+                  : 'bg-surface/50 border-border text-text-muted hover:text-brand hover:border-brand/30'
+              }`}
+            >
+              <Icon icon="solar:diploma-bold" className="w-3.5 h-3.5 text-brand" />
+              <span>Film Academies</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMetricFilter('box_office'); setSortBy('box_office'); setTypeFilter('all'); }}
               className={`px-3 py-1.5 rounded-lg border transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                 metricFilter === 'box_office'
                   ? 'bg-amber-500/10 border-amber-500/40 text-amber-400 font-bold shadow-xs'

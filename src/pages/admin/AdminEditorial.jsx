@@ -4,9 +4,18 @@ import { toast } from 'react-hot-toast';
 import { Icon } from '@iconify/react';
 import { authHeaders } from '../../lib/apiAuth';
 import { getFriendlyErrorMessage } from '../../utils/errors';
+import { getAdSettings, setAdSetting } from '../../lib/adSettings';
 
 export default function AdminEditorial() {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'calendar' | 'ideas' | 'drafts' | 'published' | 'series' | 'settings'
+  const [adSettings, setAdSettingsState] = useState(getAdSettings);
+
+  const handleToggleAd = (key, title) => {
+    const nextVal = !adSettings[key];
+    setAdSetting(key, nextVal);
+    setAdSettingsState((prev) => ({ ...prev, [key]: nextVal }));
+    toast.success(`${title} ad campaign ${nextVal ? 'enabled' : 'paused'} on homepage`);
+  };
 
   // Overview Data
   const [overviewData, setOverviewData] = useState({
@@ -563,6 +572,117 @@ export default function AdminEditorial() {
               <p className="text-sm font-medium">No active brief selected. Generate a brief from the Calendar tab first.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 7: EDITORIAL & SPONSORED BANNER SETTINGS */}
+      {activeTab === 'settings' && (
+        <div className="space-y-6">
+          <div className="card-cal p-6 space-y-4">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand">
+                Commercial Display &amp; Placement
+              </span>
+              <h3 className="font-heading font-black text-lg text-text-primary mt-1">
+                Sponsored Banners &amp; Film School Ads
+              </h3>
+              <p className="text-xs text-text-muted mt-1 max-w-2xl leading-relaxed">
+                Control active native advertising campaigns and academy partner banners displayed across the MuviDB homepage.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              {/* Del-York Academy School Ad */}
+              <div className="p-5 rounded-xl border border-border bg-surface-2/40 flex flex-col justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/30">
+                      Film Academy Ad
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${
+                      adSettings.delyork !== false ? 'text-green-400' : 'text-text-muted'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        adSettings.delyork !== false ? 'bg-green-400 animate-pulse' : 'bg-border'
+                      }`} />
+                      {adSettings.delyork !== false ? 'Active on Homepage' : 'Paused / Hidden'}
+                    </span>
+                  </div>
+
+                  <h4 className="font-heading font-black text-sm text-text-primary">
+                    Del-York Creative Academy Campaign
+                  </h4>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Editorial Rectangle Bento ad showcasing DCA Hollywood/Nollywood bootcamps, official campus reel, and admissions desk.
+                  </p>
+                  <p className="text-[11px] text-text-secondary font-mono truncate">
+                    Destination: https://delyorkcreative.academy
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-border/80 flex items-center justify-between">
+                  <span className="text-xs font-bold text-text-muted">Display Status</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAd('delyork', 'Del-York Creative Academy')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
+                      adSettings.delyork !== false
+                        ? 'bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500/30'
+                        : 'bg-surface border border-border text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <Icon icon={adSettings.delyork !== false ? 'solar:eye-bold' : 'solar:eye-closed-bold'} className="w-4 h-4" />
+                    <span>{adSettings.delyork !== false ? 'Visible (Turn Off)' : 'Hidden (Turn On)'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* OAFP Guild Gala Banner */}
+              <div className="p-5 rounded-xl border border-border bg-surface-2/40 flex flex-col justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      Guild Event Ribbon
+                    </span>
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${
+                      adSettings.oafp !== false ? 'text-green-400' : 'text-text-muted'
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${
+                        adSettings.oafp !== false ? 'bg-green-400 animate-pulse' : 'bg-border'
+                      }`} />
+                      {adSettings.oafp !== false ? 'Active on Homepage' : 'Paused / Hidden'}
+                    </span>
+                  </div>
+
+                  <h4 className="font-heading font-black text-sm text-text-primary">
+                    The OAFP Honors 2026 Gala Ribbon
+                  </h4>
+                  <p className="text-xs text-text-muted leading-relaxed">
+                    Panorama ribbon celebrating 30+ years of Nollywood legends with presidential banquet RSVP.
+                  </p>
+                  <p className="text-[11px] text-text-secondary font-mono truncate">
+                    Destination: https://oafp-awards.example.com
+                  </p>
+                </div>
+
+                <div className="pt-3 border-t border-border/80 flex items-center justify-between">
+                  <span className="text-xs font-bold text-text-muted">Display Status</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAd('oafp', 'OAFP Honors')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
+                      adSettings.oafp !== false
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                        : 'bg-surface border border-border text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    <Icon icon={adSettings.oafp !== false ? 'solar:eye-bold' : 'solar:eye-closed-bold'} className="w-4 h-4" />
+                    <span>{adSettings.oafp !== false ? 'Visible (Turn Off)' : 'Hidden (Turn On)'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

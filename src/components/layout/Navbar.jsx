@@ -11,6 +11,7 @@ export default function Navbar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState(['King of Boys', 'Funke Akindele', 'Anikulapo', 'Wole Soyinka']);
   const [unreadNotifications, setUnreadNotifications] = useState(false);
@@ -82,6 +83,7 @@ export default function Navbar() {
     setIsSearchOpen(false);
     setIsUserMenuOpen(false);
     setIsMoreOpen(false);
+    setIsMobileMenuOpen(false);
   }, [location]);
 
   useEffect(() => {
@@ -111,33 +113,24 @@ export default function Navbar() {
     { name: 'People', path: '/people' },
   ];
 
-  // Grouped secondary links for the More dropdown
-  const moreCategories = [
-    {
-      title: 'Industry & Box Office',
-      items: [
-        { name: 'Box Office Tracker', path: '/box-office', icon: 'solar:ticket-bold', desc: 'Weekend & historical grosses' },
-        { name: 'Awards Hub', path: '/awards', icon: 'solar:cup-star-linear', desc: 'AMVCA, AMAA & major honours' },
-        { name: 'Critics Lounge', path: '/critics', icon: 'solar:pen-new-square-linear', desc: 'Verified reviews & scorecards' },
-      ],
-    },
-    {
-      title: 'Directory & Ecosystem',
-      items: [
-        { name: 'Cinema Venues', path: '/cinemas', icon: 'solar:videocamera-linear', desc: 'Multiplexes & indie screens' },
-        { name: 'Channels & Networks', path: '/channels', icon: 'solar:tv-linear', desc: 'Broadcasters & streaming platforms' },
-        { name: 'Production Companies', path: '/companies', icon: 'solar:case-linear', desc: 'Studios & distributors' },
-      ],
-    },
-    {
-      title: 'Tools & Intelligence',
-      items: [
-        { name: 'Advanced Search', path: '/advanced-search', icon: 'solar:tuning-square-2-linear', desc: 'Deep filters & talent discovery' },
-      ],
-    },
+  // Mega-Menu structured categories matching user reference architecture
+  const megaDirectory = [
+    { name: 'Film Academies', path: '/companies?type=academy', icon: 'solar:diploma-bold', desc: 'Directing, acting bootcamps & VFX institutes', badge: 'NEW', badgeColor: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    { name: 'Production Studios', path: '/companies?type=production', icon: 'solar:clapperboard-play-bold', desc: 'Studios, soundstages & distribution slates' },
+    { name: 'Talent Agencies & Guilds', path: '/companies?type=talent_agency', icon: 'solar:users-group-two-rounded-bold', desc: 'Actor management, creative reps & talent rosters' },
+    { name: 'Cinema Venues', path: '/cinemas', icon: 'solar:videocamera-record-bold', desc: 'Multiplexes & independent screen schedules' },
+    { name: 'Channels & Networks', path: '/channels', icon: 'solar:tv-bold', desc: 'Broadcasters & streaming channels' },
   ];
 
-  const allMoreLinks = moreCategories.flatMap((c) => c.items);
+  const megaTools = [
+    { name: 'Box Office Leaderboard', path: '/box-office', icon: 'solar:ticket-bold', desc: 'Weekend grosses & all-time cinema charts', badge: 'LIVE', badgeColor: 'bg-green-500/20 text-green-400 border-green-500/30' },
+    { name: 'Live Stage Plays', path: '/plays', icon: 'solar:masks-bold', desc: 'Terra Kulture, Muson & National Theatre' },
+    { name: 'Critics Lounge', path: '/critics', icon: 'solar:pen-new-square-bold', desc: 'Verified scorecards & video roundtables' },
+    { name: 'Awards & Honors Hub', path: '/awards', icon: 'solar:cup-star-bold', desc: 'AMVCA, AMAA, AFRIFF & guild honorees' },
+    { name: 'Advanced Search', path: '/advanced-search', icon: 'solar:tuning-square-2-bold', desc: 'Deep filtered cast, crew & genre search' },
+  ];
+
+  const allMoreLinks = [...megaDirectory, ...megaTools];
   const isMoreActive = allMoreLinks.some(
     (link) => location.pathname === link.path || location.pathname.startsWith(`${link.path}/`)
   );
@@ -208,45 +201,140 @@ export default function Navbar() {
                 />
               </button>
 
-              {/* More Dropdown */}
+              {/* ─── EDITORIAL MEGA-MENU DROPDOWN ─── */}
               {isMoreOpen && (
                 <div
                   role="menu"
-                  className="absolute left-0 top-full mt-1 w-80 bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]"
+                  className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-[840px] max-w-[calc(100vw-2rem)] bg-surface/98 backdrop-blur-2xl border border-border/80 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[110]"
                 >
-                  <div className="p-3 divide-y divide-border/40 space-y-3">
-                    {moreCategories.map((cat, idx) => (
-                      <div key={cat.title} className={idx > 0 ? 'pt-3' : ''}>
-                        <p className="px-2.5 pb-1 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
-                          {cat.title}
-                        </p>
-                        <div className="space-y-0.5">
-                          {cat.items.map((item) => {
-                            const isActive =
-                              location.pathname === item.path ||
-                              location.pathname.startsWith(`${item.path}/`);
-                            return (
-                              <Link
-                                key={item.name}
-                                to={item.path}
-                                role="menuitem"
-                                className={`flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                                  isActive
-                                    ? 'bg-brand/10 text-brand'
-                                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
-                                }`}
-                              >
-                                <Icon icon={item.icon} width="18" height="18" className="mt-0.5 shrink-0 text-brand" />
-                                <div className="min-w-0">
-                                  <p className="text-xs font-bold leading-tight">{item.name}</p>
-                                  <p className="text-[11px] text-text-muted leading-tight mt-0.5 truncate">{item.desc}</p>
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+                    
+                    {/* Column 1: Directory & Ecosystem */}
+                    <div className="md:col-span-4 space-y-3">
+                      <p className="px-2 text-[10.5px] font-black uppercase tracking-[0.2em] text-brand flex items-center gap-1.5">
+                        <Icon icon="solar:folder-with-files-bold" className="text-xs" />
+                        <span>Public Directory</span>
+                      </p>
+                      <div className="space-y-1">
+                        {megaDirectory.map((item) => {
+                          const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+                          return (
+                            <Link
+                              key={item.name}
+                              to={item.path}
+                              role="menuitem"
+                              onClick={() => setIsMoreOpen(false)}
+                              className={`flex items-start gap-3 p-2.5 rounded-xl transition-all group ${
+                                isActive
+                                  ? 'bg-brand/10 text-brand'
+                                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-2/60'
+                              }`}
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-surface-2 border border-border flex items-center justify-center shrink-0 text-text-muted group-hover:text-brand group-hover:border-brand/40 transition-colors">
+                                <Icon icon={item.icon} className="text-base" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-bold leading-tight group-hover:text-brand transition-colors">{item.name}</p>
+                                  {item.badge && (
+                                    <span className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider border ${item.badgeColor}`}>
+                                      {item.badge}
+                                    </span>
+                                  )}
                                 </div>
-                              </Link>
-                            );
-                          })}
+                                <p className="text-[11px] text-text-muted leading-tight mt-0.5 line-clamp-1">{item.desc}</p>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Column 2: Commercial Intelligence & Tools */}
+                    <div className="md:col-span-4 space-y-3">
+                      <p className="px-2 text-[10.5px] font-black uppercase tracking-[0.2em] text-amber-400 flex items-center gap-1.5">
+                        <Icon icon="solar:chart-square-bold" className="text-xs" />
+                        <span>Commercial &amp; Tools</span>
+                      </p>
+                      <div className="space-y-1">
+                        {megaTools.map((item) => {
+                          const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+                          return (
+                            <Link
+                              key={item.name}
+                              to={item.path}
+                              role="menuitem"
+                              onClick={() => setIsMoreOpen(false)}
+                              className={`flex items-start gap-3 p-2.5 rounded-xl transition-all group ${
+                                isActive
+                                  ? 'bg-amber-500/10 text-amber-400'
+                                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-2/60'
+                              }`}
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-surface-2 border border-border flex items-center justify-center shrink-0 text-text-muted group-hover:text-amber-400 group-hover:border-amber-400/40 transition-colors">
+                                <Icon icon={item.icon} className="text-base" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-bold leading-tight group-hover:text-amber-400 transition-colors">{item.name}</p>
+                                  {item.badge && (
+                                    <span className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider border ${item.badgeColor}`}>
+                                      {item.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-text-muted leading-tight mt-0.5 line-clamp-1">{item.desc}</p>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Column 3: Featured Spotlight Card */}
+                    <div className="md:col-span-4 rounded-xl border border-border/80 bg-gradient-to-b from-[#180F0D] to-[#0E0706] p-4 flex flex-col justify-between gap-3 shadow-inner relative overflow-hidden group">
+                      <div className="absolute -top-12 -right-12 w-32 h-32 bg-red-600/15 rounded-full blur-2xl pointer-events-none" />
+                      <div className="relative z-10 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-widest bg-red-600/25 text-red-400 border border-red-500/30">
+                            Institutional Spotlight
+                          </span>
+                          <span className="text-[10px] text-amber-300 font-bold">Warner Bros. Co-Lab</span>
+                        </div>
+
+                        <div className="aspect-[16/9] w-full rounded-lg overflow-hidden border border-white/10 relative bg-black">
+                          <img
+                            src="/media/delyork/shot_cinematography.jpg"
+                            alt="Del-York Creative Academy"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between text-white text-[9.5px] font-bold">
+                            <span>Victoria Island, Lagos</span>
+                            <span className="text-red-400">Accredited Academy</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="font-heading font-black text-sm text-white group-hover:text-brand transition-colors">
+                            Del-York Creative Academy
+                          </h4>
+                          <p className="text-[11px] text-text-muted leading-relaxed mt-1">
+                            Africa's foremost capacity-building institution for film, directing, cinematography &amp; VFX soundstages.
+                          </p>
                         </div>
                       </div>
-                    ))}
+
+                      <Link
+                        to="/companies/del-york-creative-academy"
+                        onClick={() => setIsMoreOpen(false)}
+                        className="relative z-10 w-full py-2 px-3 rounded-lg bg-surface border border-border hover:border-brand text-xs font-bold text-brand flex items-center justify-between group-hover:bg-brand group-hover:text-black transition-all"
+                      >
+                        <span>Explore Academy Profile</span>
+                        <Icon icon="solar:arrow-right-linear" className="text-sm" />
+                      </Link>
+                    </div>
+
                   </div>
                 </div>
               )}
@@ -377,14 +465,171 @@ export default function Navbar() {
             ) : (
               <Link 
                 to="/login"
-                className="px-5 h-11 inline-flex items-center bg-brand hover:bg-brand/90 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-brand/20"
+                className="hidden sm:inline-flex px-5 h-10 items-center bg-brand hover:bg-brand/90 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-brand/20"
               >
                 Sign In
               </Link>
             )}
+
+            {/* Mobile Hamburger Drawer Button (lg:hidden) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen((open) => !open)}
+              className="lg:hidden w-10 h-10 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-2 rounded-xl border border-border/70 transition-all active:scale-90 cursor-pointer"
+              aria-label={isMobileMenuOpen ? 'Close navigation drawer' : 'Open navigation drawer'}
+              aria-expanded={isMobileMenuOpen}
+            >
+              <Icon icon={isMobileMenuOpen ? 'solar:close-circle-bold' : 'solar:hamburger-menu-linear'} width="22" height="22" className={isMobileMenuOpen ? 'text-brand' : ''} />
+            </button>
           </div>
         </div>
       </nav>
+
+      {/* ─── APP-LIKE MOBILE NAVIGATION DRAWER (lg:hidden) ─── */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-[140] lg:hidden animate-in fade-in duration-200">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+
+          {/* Drawer Sheet */}
+          <div className="absolute right-0 top-0 bottom-0 w-[84vw] max-w-sm bg-surface border-l border-border shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-300">
+            {/* Top Bar inside Drawer */}
+            <div className="p-4 border-b border-border/80 flex items-center justify-between">
+              <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center">
+                <img 
+                  src={theme === 'light' ? "/images/MuviDB Brand/Wordmark.svg" : "/images/MuviDB Brand/White Wordmark.svg"}
+                  alt="MuviDB" 
+                  className="h-7 object-contain" 
+                />
+              </Link>
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-9 h-9 rounded-xl bg-surface-2 flex items-center justify-center text-text-secondary hover:text-text-primary border border-border cursor-pointer"
+              >
+                <Icon icon="solar:close-circle-bold" className="text-xl" />
+              </button>
+            </div>
+
+            {/* Drawer Body Links */}
+            <div className="p-4 space-y-6 flex-1">
+              {/* Quick Search Tap Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsSearchOpen(true);
+                }}
+                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-xs text-text-muted hover:text-text-primary hover:border-brand/40 transition-colors cursor-pointer"
+              >
+                <Icon icon="solar:magnifer-linear" className="text-base text-brand" />
+                <span>Search films, plays, talent...</span>
+              </button>
+
+              {/* Primary Pages */}
+              <div className="space-y-1">
+                <p className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                  Primary Channels
+                </p>
+                {primaryLinks.map((link) => {
+                  const isActive = location.pathname === link.path || (link.path !== '/' && location.pathname.startsWith(`${link.path}/`));
+                  return (
+                    <Link
+                      key={link.name}
+                      to={link.path}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors ${
+                        isActive
+                          ? 'bg-brand/10 text-brand border border-brand/20'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
+                      }`}
+                    >
+                      <span>{link.name}</span>
+                      <Icon icon="solar:arrow-right-linear" className="text-xs opacity-60" />
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Directory & Institutions */}
+              <div className="space-y-1">
+                <p className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-brand">
+                  Directory &amp; Academies
+                </p>
+                {megaDirectory.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.path}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors"
+                  >
+                    <Icon icon={item.icon} className="text-base text-brand shrink-0" />
+                    <span className="truncate">{item.name}</span>
+                    {item.badge && (
+                      <span className={`ml-auto px-1.5 py-0.2 rounded text-[8px] font-black uppercase border ${item.badgeColor}`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+
+              {/* Intelligence & Tools */}
+              <div className="space-y-1">
+                <p className="px-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">
+                  Commercial &amp; Intelligence
+                </p>
+                {megaTools.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.path}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors"
+                  >
+                    <Icon icon={item.icon} className="text-base text-amber-400 shrink-0" />
+                    <span className="truncate">{item.name}</span>
+                    {item.badge && (
+                      <span className={`ml-auto px-1.5 py-0.2 rounded text-[8px] font-black uppercase border ${item.badgeColor}`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom Actions inside Drawer */}
+            <div className="p-4 border-t border-border/80 bg-surface-2/40 space-y-3">
+              {isAuthenticated ? (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-text-primary truncate">{user.name}</p>
+                    <p className="text-[10px] text-text-muted truncate">{user.email}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="px-3 py-1.5 rounded-lg bg-surface border border-border text-xs font-bold text-red-400 hover:border-red-400/50 cursor-pointer"
+                  >
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  to="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full py-2.5 rounded-xl bg-brand hover:bg-brand/90 text-white font-bold text-xs uppercase tracking-wider text-center block shadow-md shadow-brand/20"
+                >
+                  Sign In
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Global Search Overlay */}
       {isSearchOpen && (

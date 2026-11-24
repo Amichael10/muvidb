@@ -1032,6 +1032,51 @@ const PeopleList = () => {
       />
       {showSuggest && <SuggestPersonModal onClose={() => setShowSuggest(false)} />}
 
+      {/* Institutional Alumni Filter Banner */}
+      {searchParams.get('institution') && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+          <div className="p-4 sm:p-5 rounded-2xl border border-brand/40 bg-surface/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-brand/15 text-brand flex items-center justify-center shrink-0">
+                <Icon icon="solar:diploma-bold" className="text-xl" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-brand">Institutional Registry</span>
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Verified Alumni</span>
+                </div>
+                <h2 className="font-heading font-black text-base sm:text-lg text-text-primary">
+                  Alumni &amp; Fellows of {searchParams.get('name') || toTitleCase(searchParams.get('institution').replace(/-/g, ' '))}
+                </h2>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Showing verified screen practitioners, directors, and actors with certified training from this institution.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                to={`/companies/${searchParams.get('institution')}`}
+                className="px-3.5 py-1.5 rounded-lg bg-surface border border-border hover:border-brand text-xs font-bold text-text-primary hover:text-brand transition-colors cursor-pointer"
+              >
+                View Academy Profile
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams);
+                  next.delete('institution');
+                  next.delete('name');
+                  setSearchParams(next);
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-surface-2 border border-border hover:border-border/80 text-xs font-bold text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                Clear Filter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Full Roles Selection Modal (Unclipped & Mobile-Friendly) */}
       <RolesModal
         isOpen={isRolesModalOpen}

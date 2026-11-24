@@ -236,11 +236,24 @@ export async function fetchPlayBySlug(slug) {
     console.error('Error fetching play images:', imgError);
   }
 
+  // Fetch linked production company if producer exists
+  let company = null;
+  if (play.producer && play.producer.trim()) {
+    const { data: comp } = await supabase
+      .from('companies')
+      .select('id, name, slug, logo_url, company_type')
+      .ilike('name', `%${play.producer.trim()}%`)
+      .limit(1)
+      .maybeSingle();
+    company = comp || null;
+  }
+
   return {
     ...play,
     status: derivePlayStatus(play),
     credits: credits || [],
-    images: images || []
+    images: images || [],
+    company,
   };
 }
 

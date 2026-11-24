@@ -228,9 +228,8 @@ export default function FilmDetail() {
       if (seriesId) {
         const { data, error } = await supabase
           .from('films')
-          .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug')
-          .eq('series_id', seriesId)
-          .order('title', { ascending: true });
+          .select('id, title, poster_url, backdrop_url, youtube_watch_url, streaming_links, episode_number, season_number, synopsis, runtime_minutes, slug')
+          .eq('series_id', seriesId);
         if (error) throw error;
         linked = data || [];
       }
@@ -239,10 +238,9 @@ export default function FilmDetail() {
       if (showName) {
         const { data, error } = await supabase
           .from('films')
-          .select('id, title, poster_url, youtube_watch_url, episode_number, season_number, synopsis, runtime_minutes, slug')
-          .eq('content_type', 'series')
-          .ilike('title', `${showName}%`)
-          .order('title', { ascending: true });
+          .select('id, title, poster_url, backdrop_url, youtube_watch_url, streaming_links, episode_number, season_number, synopsis, runtime_minutes, slug')
+          .or('content_type.eq.series,content_type.eq.mini_series,content_type.eq.tv_series')
+          .ilike('title', `${showName}%`);
         if (error) throw error;
         byTitle = data || [];
       }
@@ -253,6 +251,18 @@ export default function FilmDetail() {
         seen.add(ep.id);
         return true;
       });
+
+      // Sort by season number (asc), then episode number (asc), then title
+      merged.sort((a, b) => {
+        const sA = a.season_number ?? 1;
+        const sB = b.season_number ?? 1;
+        if (sA !== sB) return sA - sB;
+        const eA = a.episode_number ?? 999;
+        const eB = b.episode_number ?? 999;
+        if (eA !== eB) return eA - eB;
+        return (a.title || '').localeCompare(b.title || '');
+      });
+
       setEpisodes(merged);
     } catch (error) {
       console.error('Error fetching episodes:', error);
@@ -495,9 +505,16 @@ export default function FilmDetail() {
         fetchCredits(data.id);
       }
       fetchCriticSummary(data.id);
-      if (data.content_type === 'series') {
+      const isSeriesContent =
+        data.content_type === 'series' ||
+        data.content_type === 'mini_series' ||
+        data.content_type === 'tv_series' ||
+        (data.episode_count != null && data.episode_count > 0);
+
+      if (isSeriesContent) {
         fetchEpisodes(data.id, getShowName(data.title));
-      } else if (data.series_id) {
+      }
+      if (data.series_id) {
         fetchParentSeries(data.series_id);
       }
       fetchRelated(data);
@@ -1357,6 +1374,32 @@ export default function FilmDetail() {
             
             {/* Left 8 Cols: Genres + Tagline + Synopsis + Credits */}
             <div className="lg:col-span-8 space-y-4">
+
+              {/* Parent Series Context Banner (for individual episodes) */}
+              {parentSeries && (
+                <div className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-brand/15 via-surface-2 to-surface border border-brand/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-brand/20 border border-brand/40 flex items-center justify-center text-brand shrink-0">
+                      <Icon icon="solar:playlist-play-bold" className="text-xl" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                        {film.episode_number ? `Episode ${film.episode_number}` : 'Series Chapter'}
+                      </div>
+                      <div className="text-sm font-bold text-text-primary">
+                        Part of <span className="text-brand">{parentSeries.title}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Link
+                    to={`/films/${parentSeries.slug || parentSeries.id}`}
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-brand hover:bg-brand-light text-white text-xs font-bold transition-colors shrink-0 shadow"
+                  >
+                    <span>View All Episodes</span>
+                    <Icon icon="solar:arrow-right-linear" className="text-xs" />
+                  </Link>
+                </div>
+              )}
               
               {/* Genre Pills */}
               {film.genres && film.genres.length > 0 && (
@@ -1838,84 +1881,132 @@ export default function FilmDetail() {
                   </div>
                 ) : (
                 <div className="flex flex-col gap-4">
-                  {filteredEpisodes.map((episode) => (
-                    <div 
-                      key={episode.id} 
-                      className="flex flex-col sm:flex-row gap-4 bg-surface p-4 rounded-xl border border-border hover:border-brand/40 hover:shadow-xl transition-all duration-300 group"
-                    >
-                      {/* Episode Thumbnail */}
-                      <div className="relative w-full sm:w-48 aspect-video rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-white/5">
-                        <ImageWithFallback
-                          src={episode.poster_url || film.poster_url || film.poster}
-                          alt={episode.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          fallbackType="film"
-                          name={episode.title}
-                          width={384}
-                          sizes="(max-width: 639px) 100vw, 192px"
-                          loading="lazy"
-                        />
-                        {episode.youtube_watch_url && (
-                          <a 
-                            href={episode.youtube_watch_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                          >
-                            <span className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform duration-300">
-                              <Icon icon="solar:play-bold" className="text-sm" />
-                            </span>
-                          </a>
-                        )}
-                      </div>
-                      
-                      {/* Episode Info */}
-                      <div className="flex-1 flex flex-col justify-between py-1">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                            {episode.season_number != null && (
-                              <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
-                                S{episode.season_number}
-                              </span>
-                            )}
-                            <span className="text-[10px] font-black uppercase tracking-wider text-brand">
-                              Episode {episode.episode_number || 'N/A'}
-                            </span>
-                            {episode.runtime_minutes && (
-                              <>
-                                <span className="w-1 h-1 rounded-full bg-white/20" />
-                                <span className="text-[10px] font-bold text-text-muted">
-                                  {episode.runtime_minutes} min
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          <h3 className="font-heading font-bold text-base text-text-primary tracking-tight leading-snug group-hover:text-brand transition-colors mb-2">
-                            <Link to={`/films/${episode.slug || episode.id}`}>
-                              {formatFilmTitle(episode.title)}
-                            </Link>
-                          </h3>
-                          <p className="text-xs text-text-muted line-clamp-2 leading-relaxed font-medium">
-                            {toSentenceCase(episode.synopsis || film.synopsis)}
-                          </p>
-                        </div>
-                        
-                        {episode.youtube_watch_url && (
-                          <div className="mt-3 sm:mt-0">
+                  {filteredEpisodes.map((episode) => {
+                    const epPath = `/films/${episode.slug || episode.id}`;
+                    const kavaUrl = episode.streaming_links?.kava;
+                    const netflixUrl = episode.streaming_links?.netflix;
+                    const primeUrl = episode.streaming_links?.prime;
+                    return (
+                      <div 
+                        key={episode.id} 
+                        className="flex flex-col sm:flex-row gap-4 bg-surface p-4 rounded-xl border border-border hover:border-brand/40 hover:shadow-xl transition-all duration-300 group"
+                      >
+                        {/* Episode Thumbnail */}
+                        <div className="relative w-full sm:w-48 aspect-video rounded-lg overflow-hidden bg-surface-2 shrink-0 border border-white/5">
+                          <Link to={epPath} className="block w-full h-full">
+                            <ImageWithFallback
+                              src={episode.backdrop_url || episode.poster_url || film.backdrop_url || film.poster_url}
+                              alt={episode.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              fallbackType="film"
+                              name={episode.title}
+                              width={384}
+                              sizes="(max-width: 639px) 100vw, 192px"
+                              loading="lazy"
+                            />
+                          </Link>
+                          {episode.youtube_watch_url && (
                             <a 
                               href={episode.youtube_watch_url} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-brand hover:text-white transition-colors"
+                              className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                             >
-                              <Icon icon="simple-icons:youtube" className="text-[#FF0000] text-xs" />
-                              <span>Watch Episode</span>
+                              <span className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform duration-300">
+                                <Icon icon="solar:play-bold" className="text-sm" />
+                              </span>
                             </a>
+                          )}
+                        </div>
+                        
+                        {/* Episode Info */}
+                        <div className="flex-1 flex flex-col justify-between py-1">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                              {episode.season_number != null && (
+                                <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">
+                                  S{episode.season_number}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-black uppercase tracking-wider text-brand">
+                                Episode {episode.episode_number || 'N/A'}
+                              </span>
+                              {episode.runtime_minutes && (
+                                <>
+                                  <span className="w-1 h-1 rounded-full bg-white/20" />
+                                  <span className="text-[10px] font-bold text-text-muted">
+                                    {episode.runtime_minutes} min
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                            <h3 className="font-heading font-bold text-base text-text-primary tracking-tight leading-snug group-hover:text-brand transition-colors mb-2">
+                              <Link to={epPath}>
+                                {formatFilmTitle(episode.title)}
+                              </Link>
+                            </h3>
+                            <p className="text-xs text-text-muted line-clamp-2 leading-relaxed font-medium">
+                              {toSentenceCase(episode.synopsis || film.synopsis)}
+                            </p>
                           </div>
-                        )}
+                          
+                          <div className="mt-3 flex items-center gap-2.5 flex-wrap">
+                            <Link
+                              to={epPath}
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-text-primary hover:text-brand bg-surface-2 hover:bg-surface-3 px-3 py-1.5 rounded-lg border border-border transition-colors"
+                            >
+                              <span>View Episode Details &amp; Cast</span>
+                              <Icon icon="solar:arrow-right-linear" className="text-xs" />
+                            </Link>
+                            {episode.youtube_watch_url && (
+                              <a 
+                                href={episode.youtube_watch_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-red-600/90 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                <Icon icon="simple-icons:youtube" className="text-white text-xs" />
+                                <span>Watch on YouTube</span>
+                              </a>
+                            )}
+                            {kavaUrl && (
+                              <a 
+                                href={kavaUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-700/90 hover:bg-emerald-600 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                <Icon icon="solar:play-circle-bold" className="text-white text-xs" />
+                                <span>Watch on Kava</span>
+                              </a>
+                            )}
+                            {netflixUrl && (
+                              <a 
+                                href={netflixUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-red-700/90 hover:bg-red-700 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                <Icon icon="simple-icons:netflix" className="text-white text-xs" />
+                                <span>Watch on Netflix</span>
+                              </a>
+                            )}
+                            {primeUrl && (
+                              <a 
+                                href={primeUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-sky-700/90 hover:bg-sky-600 px-3 py-1.5 rounded-lg transition-colors"
+                              >
+                                <Icon icon="simple-icons:primevideo" className="text-white text-xs" />
+                                <span>Watch on Prime</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 )}
               </section>

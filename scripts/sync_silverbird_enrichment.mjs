@@ -55,9 +55,10 @@ async function scrapeSilverbirdMovie(url) {
   if (!title) return null;
 
   // Rating / PG
+  const VALID_RATINGS = new Set(["G", "PG", "12", "12A", "PG-13", "15", "18", "RE"]);
   const pgMatch = html.match(/<span class=["']pg["']>([\s\S]*?)<\/span>/i);
-  let rating = pgMatch ? cleanStr(pgMatch[1].replace(/<[^>]+>/g, '')) : '';
-  if (rating === 'TBC' || rating.length > 5) rating = null;
+  let rating = pgMatch ? cleanStr(pgMatch[1].replace(/<[^>]+>/g, '')) : null;
+  if (!VALID_RATINGS.has(rating)) rating = null;
 
   // Duration
   const durMatch = html.match(/<span class=["']duration["']>([\s\S]*?)<\/span>/i);
@@ -129,7 +130,7 @@ async function scrapeSilverbirdMovie(url) {
 
   // Synopsis
   let synopsis = null;
-  const synMatch = html.match(/<div class=["']entry-content["']>([\s\S]*?)<\/div>/i);
+  const synMatch = html.match(/<div[^>]+class=["'][^"']*\bentry-content\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
   if (synMatch) {
     let rawSyn = synMatch[1];
     rawSyn = rawSyn.replace(/<h3>Synopsis<\/h3>/i, '');
@@ -137,14 +138,15 @@ async function scrapeSilverbirdMovie(url) {
     rawSyn = rawSyn.replace(/\*NB:[\s\S]*/i, '');
     rawSyn = rawSyn.replace(/<div class=["']entry-showtime[\s\S]*/i, '');
     rawSyn = rawSyn.replace(/<[^>]+>/g, '').trim();
+    rawSyn = rawSyn.replace(/^Synopsis\s*/i, '').trim();
     if (rawSyn.length > 20) {
       synopsis = cleanStr(rawSyn);
     }
   }
 
-  const isNollywood = genres.some(g => /nollywood/i.test(g)) ||
-                      /yoruba|hausa|igbo/i.test(language) ||
-                      /nigeria/i.test(synopsis || '');
+  const isNollywood = genres.some(g => /nollywood|ghallywood|ghollywood|african|africa/i.test(g)) ||
+                      /yoruba|hausa|igbo|twi|akan|ga|ewe|pidgin/i.test(language) ||
+                      /\b(nigeria|nigerian|lagos|accra|ghana|ghanaian|african)\b/i.test(synopsis || '');
 
   return {
     url,

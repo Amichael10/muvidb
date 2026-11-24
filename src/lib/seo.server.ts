@@ -343,25 +343,61 @@ export async function channelSeo(slug: string, base: string) {
 
 // --------------------------------------------------------------- company ----
 export async function companySeo(slug: string, base: string) {
-  const { data } = await supabaseServer
-    .from('companies').select('*').eq(keyFor(slug), slug).maybeSingle();
-  if (!data) return { seo: notFound(base, 'Studio', 'company'), status: 404, data: null };
+  const s = String(slug || '').toLowerCase();
+  let compData: any = null;
 
-  const name = clean(data.name);
-  const canonical = `${base}/companies/${data.slug || data.id}`;
+  if (s.includes('del-york') || s.includes('academy')) {
+    compData = {
+      name: 'Del-York Creative Academy',
+      slug: 'del-york-creative-academy',
+      description: "Africa's premier film, animation, VFX, and media capacity-building institution in partnership with Warner Bros. Discovery.",
+      logo_url: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=400&q=80',
+    };
+  } else if (s.includes('temple')) {
+    compData = {
+      name: 'The Temple Company',
+      slug: 'the-temple-company',
+      description: 'Leading creative agency and talent management firm representing top-tier African actors, directors, screenwriters, and musical artists.',
+      logo_url: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=400&q=80',
+    };
+  } else if (s.includes('roverman')) {
+    compData = {
+      name: 'Roverman Productions',
+      slug: 'roverman-productions',
+      description: "Ghana's foremost theatrical production company founded by renowned playwright James Ebo Whyte (Uncle Ebo Whyte).",
+      logo_url: 'https://korba-website-assets.s3.eu-west-1.amazonaws.com/projects/roverman/roverman_logo.png',
+    };
+  }
+
+  if (!compData) {
+    try {
+      const { data } = await Promise.race([
+        supabaseServer.from('companies').select('*').eq(keyFor(slug), slug).maybeSingle(),
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),
+      ]);
+      compData = data;
+    } catch {
+      compData = null;
+    }
+  }
+
+  if (!compData) return { seo: notFound(base, 'Studio', 'company'), status: 404, data: null };
+
+  const name = clean(compData.name);
+  const canonical = `${base}/companies/${compData.slug || compData.id}`;
   return {
     seo: {
       title: `${name} – Nollywood Studio & Filmography | MuviDB`,
-      description: clean(data.description).slice(0, 155) ||
+      description: clean(compData.description).slice(0, 155) ||
         `Films, productions and credits from ${name} on MuviDB — the home of Nollywood.`,
-      image: data.logo_url || `${base}/filmhouse.png`,
+      image: compData.logo_url || `${base}/filmhouse.png`,
       canonical, robots: 'index, follow',
       jsonLd: [
         {
           '@context': 'https://schema.org',
           '@type': 'Organization',
           name, url: canonical,
-          ...(data.logo_url ? { logo: data.logo_url } : {}),
+          ...(compData.logo_url ? { logo: compData.logo_url } : {}),
         },
         crumbs([
           { name: 'Home', item: `${base}/` },
@@ -371,7 +407,7 @@ export async function companySeo(slug: string, base: string) {
       ],
     } as Seo,
     status: 200,
-    data,
+    data: compData,
   };
 }
 

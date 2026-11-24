@@ -3,6 +3,7 @@ import stealth from 'puppeteer-extra-plugin-stealth';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { cleanTitle } from '../api/_lib/yt_service.js';
+import { findExistingPlatformFilm } from './lib/platform_film_matcher.js';
 
 // Load stealth plugin
 const stealthPlugin = stealth();
@@ -176,8 +177,13 @@ async function syncFeedGamma() {
 
         console.log(`🔄 Matching: ${cleanedTitle}`);
         
-        let { data: results } = await supabase.from('films').select('*').ilike('title', cleanedTitle);
-        const existing = results?.[0];
+        const existing = await findExistingPlatformFilm(supabase, {
+          platform: 'irokotv',
+          sourceVideoId: source_video_id,
+          url: link,
+          slug: data.slug,
+          title: cleanedTitle
+        });
         let filmId;
 
         const filmPayload: any = {

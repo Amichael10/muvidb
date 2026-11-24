@@ -197,6 +197,28 @@ export default function MobilePlayDetailView({
                     {play.director || 'N/A'}
                   </span>
                 </div>
+                <div className="bg-surface-2/60 p-3 rounded-xl border border-border/40 col-span-2">
+                  <span className="text-[10px] font-bold text-text-muted uppercase block">Production Company</span>
+                  {play.company ? (
+                    <Link
+                      to={`/companies/${play.company.slug || play.company.id}`}
+                      className="font-bold text-brand hover:underline mt-0.5 inline-flex items-center gap-1.5"
+                    >
+                      {play.company.logo_url && (
+                        <img
+                          src={play.company.logo_url}
+                          alt={play.company.name}
+                          className="w-4 h-4 object-contain rounded shrink-0 bg-white/10"
+                        />
+                      )}
+                      <span className="truncate">{play.company.name}</span>
+                    </Link>
+                  ) : (
+                    <span className="font-bold text-text-primary mt-0.5 block truncate">
+                      {play.producer || 'N/A'}
+                    </span>
+                  )}
+                </div>
                 <div className="bg-surface-2/60 p-3 rounded-xl border border-border/40">
                   <span className="text-[10px] font-bold text-text-muted uppercase block">Run Schedule</span>
                   <span className="font-bold text-text-primary mt-0.5 block truncate">

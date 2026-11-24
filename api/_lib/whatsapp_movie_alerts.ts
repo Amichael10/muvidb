@@ -221,21 +221,21 @@ export async function dispatchMovieWhatsAppAlerts(
     }
 
     // Send Meta Cloud API Template Message
-    // Template name: "movie_release_alert"
-    // Parameters:
-    // {{1}} = Followed Actor(s) (e.g., "Lateef Olofin")
-    // {{2}} = Movie Title (e.g., "Jagun Jagun")
-    // {{3}} = Where to watch (e.g., "In Cinemas")
-    // {{4}} = Film Page Link (e.g., "https://muvidb.com/film/jagun-jagun")
+    // Default Utility template: "user_fav_movie" (Image header + {{1}} actor, {{2}} title, {{3}} availability, {{4}} slug)
+    // Legacy Marketing template: "movie_release_alert" (passes full filmUrl in {{4}} + buttonUrlPayload)
+    const templateName = process.env.WHATSAPP_MOVIE_ALERT_TEMPLATE || 'user_fav_movie';
+    const isUtilityFavTemplate = templateName === 'user_fav_movie';
     const existingLog = existingLogs?.find(l => l.user_id === uId);
     const attempts = (existingLog?.attempts || 0) + 1;
     const attemptedAt = new Date().toISOString();
     const sendRes = await sendMetaWhatsAppTemplate({
       to: phone,
-      templateName: process.env.WHATSAPP_MOVIE_ALERT_TEMPLATE || 'movie_release_alert',
+      templateName,
       headerImageUrl: poster,
-      bodyParameters: [actorsSummary, title, platformLabel, filmUrl],
-      buttonUrlPayload: slug || filmId,
+      bodyParameters: isUtilityFavTemplate
+        ? [actorsSummary, title, platformLabel, slug || filmId]
+        : [actorsSummary, title, platformLabel, filmUrl],
+      buttonUrlPayload: isUtilityFavTemplate ? undefined : (slug || filmId),
     });
 
     if (sendRes.ok) {

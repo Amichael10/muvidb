@@ -73,7 +73,7 @@ export default function CookieConsent() {
       <div className="absolute inset-x-0 bottom-0 -top-8 bg-gradient-to-t from-bg via-bg/80 to-transparent pointer-events-none" />
 
       <div className="relative pointer-events-auto max-w-2xl lg:max-w-3xl mx-auto bg-surface/95 backdrop-blur-xl border border-border rounded-xl sm:rounded-2xl shadow-2xl shadow-black/80 overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/60 to-transparent pointer-events-none"></div>
+
         <div className="absolute inset-0 grid-bg opacity-10 pointer-events-none"></div>
         <div className="relative z-10 p-4 sm:p-6 flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-6">
           {/* Copy */}

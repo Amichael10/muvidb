@@ -159,7 +159,7 @@ async function scrapeMoviePage(url: string): Promise<SilverbirdEnrichment | null
       }
     }
 
-    const isNollywood = genres.some(g => /nollywood|ghollywood|african/i.test(g)) ||
+    const isNollywood = genres.some(g => /nollywood|ghallywood|ghollywood|african|africa/i.test(g)) ||
                         /yoruba|hausa|igbo|twi|akan|ga|ewe|swahili|zulu|xhosa|amharic|wolof/i.test(language) ||
                         /\b(nigeria|nigerian|lagos|abuja|ghana|ghanaian|accra|kumasi|kenya|kenyan|nairobi|south africa|johannesburg|cameroon|uganda|kampala|rwanda|zimbabwe)\b/i.test(synopsis || '');
 

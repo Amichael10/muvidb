@@ -221,7 +221,7 @@ export default function PlayDetail() {
               </h1>
 
               {/* Key Crew Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-xs bg-surface border border-border p-4 rounded-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 text-xs bg-surface border border-border p-4 rounded-xl">
                 <div>
                   <span className="text-text-muted uppercase font-semibold block">Playwright</span>
                   <span className="text-text-primary font-bold text-sm">{play.playwright || 'N/A'}</span>
@@ -229,6 +229,29 @@ export default function PlayDetail() {
                 <div>
                   <span className="text-text-muted uppercase font-semibold block">Director</span>
                   <span className="text-text-primary font-bold text-sm">{play.director || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-text-muted uppercase font-semibold block">Production House</span>
+                  {play.company ? (
+                    <Link
+                      to={`/companies/${play.company.slug || play.company.id}`}
+                      className="text-brand hover:underline font-bold text-sm inline-flex items-center gap-1.5 mt-0.5 group"
+                      title={`View ${play.company.name} profile`}
+                    >
+                      {play.company.logo_url && (
+                        <img
+                          src={play.company.logo_url}
+                          alt={play.company.name}
+                          className="w-4 h-4 object-contain rounded shrink-0 bg-white/10"
+                        />
+                      )}
+                      <span className="group-hover:text-brand-light truncate">{play.company.name}</span>
+                    </Link>
+                  ) : (
+                    <span className="text-text-primary font-bold text-sm mt-0.5 block truncate">
+                      {play.producer || 'N/A'}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <span className="text-text-muted uppercase font-semibold block">Run Dates</span>

@@ -226,6 +226,19 @@ export default function ImageWithFallback({
       );
     }
 
+    if (fallbackType === 'company') {
+      return (
+        <div
+          className={`relative flex items-center justify-center text-white/90 font-heading font-bold select-none bg-surface-2 border border-hairline @container ${className}`}
+          {...props}
+        >
+          <span className="drop-shadow-sm text-[36cqi] leading-none uppercase font-black text-brand">
+            {initials}
+          </span>
+        </div>
+      );
+    }
+
     // Default 'avatar' fallback - Uses @container query styling for scaling font size automatically
     return (
       <div
@@ -283,9 +296,11 @@ export default function ImageWithFallback({
   const hasUsefulPreview = Boolean(lqip && lqip !== mainUrl);
   const placeholderStyle = isBrandedPlaceholder
     ? { background: imgSrc === FILM_PLACEHOLDER ? '#111111' : '#e8e8e8' }
-    : hasUsefulPreview
-      ? { backgroundImage: `url("${lqip}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
-      : { background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})` };
+    : fallbackType === 'company'
+      ? { background: 'transparent' }
+      : hasUsefulPreview
+        ? { backgroundImage: `url("${lqip}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+        : { background: '#181a20' };
   const generatedSrcSet = (!isBrandedPlaceholder && (srcSet || (width
     ? getImageSrcSet(imgSrc, [Math.max(32, Math.round(width / 2)), width], quality)
     : undefined))) || undefined;

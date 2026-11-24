@@ -5,6 +5,7 @@ import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import path from 'path';
+import { findExistingPlatformFilm } from './lib/platform_film_matcher.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -231,45 +232,30 @@ async function syncFeedKappa() {
           continue;
         }
 
-        // 1. Check existing film in DB
-        // First check by source_video_id
-        let existingFilm: any = null;
-        const { data: bySource } = await supabase
-          .from('films')
-          .select('id, title, source_video_id, streaming_links, poster_url, backdrop_url, synopsis, release_type')
-          .eq('source_video_id', sourceVideoId)
-          .maybeSingle();
-
-        if (bySource) {
-          existingFilm = bySource;
-        } else {
-          // Check by exact or case-insensitive title
-          const { data: byTitle } = await supabase
-            .from('films')
-            .select('id, title, source_video_id, streaming_links, poster_url, backdrop_url, synopsis, release_type')
-            .ilike('title', cleanedTitle)
-            .limit(1)
-            .maybeSingle();
-
-          if (byTitle) {
-            existingFilm = byTitle;
-          } else {
-            // Check by normalized title match (ignoring punctuation/spaces)
-            const norm = normalizeTitleForMatch(cleanedTitle);
-            const words = cleanedTitle.split(/[:\s-]+/).filter(w => w.length > 2);
-            if (words.length > 0) {
-              const { data: candidates } = await supabase
-                .from('films')
-                .select('id, title, source_video_id, streaming_links, poster_url, backdrop_url, synopsis, release_type')
-                .ilike('title', `%${words[0]}%`)
-                .limit(20);
-
-              if (candidates) {
-                existingFilm = candidates.find(c => normalizeTitleForMatch(c.title) === norm) || null;
-              }
-            }
-          }
+        // 1. Check existing film in DB using robust multi-platform ID matching
+        // (source_video_id -> streaming_links.kava -> series hierarchy -> title match)
+        let urlSeriesSlug: string | null = null;
+        const seriesUrlMatch = item.url.match(/watch\.kava\.tv\/([^/]+)\/(?:season:\d+\/)?videos\//i);
+        if (seriesUrlMatch && seriesUrlMatch[1] !== 'videos') {
+          urlSeriesSlug = seriesUrlMatch[1];
         }
+
+        let epNum = detectAndNormalizeSeries(item.title).episodeNum;
+        if (epNum == null) {
+          const epUrlMatch = item.slug.match(/episode[-_]?(\d+)/i);
+          if (epUrlMatch) epNum = parseInt(epUrlMatch[1], 10);
+        }
+
+        const existingFilm = await findExistingPlatformFilm(supabase, {
+          platform: 'kava',
+          sourceVideoId,
+          url: watchUrl,
+          slug: item.slug,
+          title: cleanedTitle,
+          year: item.year,
+          seriesSlug: urlSeriesSlug,
+          episodeNum: epNum
+        });
 
         let filmId: string;
 
@@ -294,7 +280,8 @@ async function syncFeedKappa() {
           if ((!existingFilm.synopsis || existingFilm.synopsis.length < 40) && item.synopsis) {
             updatePayload.synopsis = item.synopsis;
           }
-          if (!existingFilm.source_video_id) {
+          // Ensure source_video_id is updated so future runs match on step 1 instantly
+          if (!existingFilm.source_video_id || existingFilm.source_video_id !== sourceVideoId) {
             updatePayload.source_video_id = sourceVideoId;
           }
 
@@ -304,7 +291,7 @@ async function syncFeedKappa() {
             errors++;
             continue;
           }
-          console.log(`  ✅ Updated existing film: ${existingFilm.title} (${filmId}) -> Added Kava link.`);
+          console.log(`  ✅ Updated existing film: "${existingFilm.title}" (${filmId}) -> Matched & preserved.`);
           updated++;
         } else {
           // Insert new film
