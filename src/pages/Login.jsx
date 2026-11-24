@@ -36,11 +36,11 @@ export default function Login() {
       if (nextPath) {
         navigate(nextPath, { replace: true });
       } else if (user.role === 'professional') {
-        navigate('/pro-dashboard');
+        navigate('/pro-dashboard', { replace: true });
       } else if (user.role === 'admin' || user.role === 'admin_limited') {
-        navigate('/admin');
+        navigate('/admin', { replace: true });
       } else {
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       }
     }
   }, [user, navigate, nextPath]);
@@ -72,13 +72,14 @@ export default function Login() {
       navigate(target, { replace: true });
     } catch (err) {
       setError(getFriendlyErrorMessage(err));
+    } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
     try {
-      await loginWithGoogle();
+      await loginWithGoogle(nextPath || '/dashboard');
     } catch (err) {
       setError(getFriendlyErrorMessage(err));
     }

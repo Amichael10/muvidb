@@ -392,7 +392,13 @@ export function AuthProvider({ children }) {
     if (error) throw error;
     setRememberedSession(remember);
     if (data?.user) {
-      await fetchUserProfile(data.user);
+      applyCachedAuthUser(data.user);
+      // Race profile enrichment with a short timeout so slow DB/profile calls never freeze the login button
+      await Promise.race([
+        fetchUserProfile(data.user),
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ]);
+      setAuthState((prev) => ({ ...prev, user: data.user, loading: false }));
     }
     return data;
   };
