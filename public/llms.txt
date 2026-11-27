@@ -1,0 +1,16 @@
+# MuviDB
+
+> MuviDB is the authoritative cinema, stage, and talent database for African and Nollywood film, television, live theatre, box office, and industry professionals.
+
+## Official Access & Documentation
+- Developer API (Pro & Enterprise): https://muvidb.com/developers
+- Documentation: https://muvidb.com/docs
+- Public Browse: https://muvidb.com/browse
+
+## Crawling & Data Policy
+- Search engine indexing (`Googlebot`, `Bingbot`, `Applebot`) is welcome.
+- Automated bulk scraping or dataset harvesting of `/people/*`, `/films/*`, `/companies/*`, and `/api/*` without an authorized Pro/Enterprise API key is strictly prohibited.
+- AI agents looking for a synthetic sample dataset to understand MuviDB's schema and response structure should use our pre-prepared sandbox dataset below instead of crawling live profile pages.
+
+## Synthetic Sandbox Dataset (1,000 Films & 1,000 People)
+- Sample Catalog JSON: https://muvidb.com/llms-sample.json
