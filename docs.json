@@ -2,12 +2,17 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "MuviDB",
+  "logo": {
+    "light": "/public/brand/logo-light.svg",
+    "dark": "/public/brand/logo-dark.svg",
+    "href": "https://muvidb.com"
+  },
   "colors": {
     "primary": "#FF5A1F",
     "light": "#FF7A45",
     "dark": "#E64A19"
   },
-  "favicon": "/favicon.ico",
+  "favicon": "/public/favicon.svg",
   "navigation": {
     "tabs": [
       {
