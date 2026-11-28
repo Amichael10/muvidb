@@ -3,8 +3,8 @@
   "theme": "mint",
   "name": "MuviDB",
   "logo": {
-    "light": "/public/brand/logo-light.svg",
-    "dark": "/public/brand/logo-dark.svg",
+    "light": "/logo-light.svg",
+    "dark": "/logo-dark.svg",
     "href": "https://muvidb.com"
   },
   "colors": {
@@ -12,7 +12,7 @@
     "light": "#FF7A45",
     "dark": "#E64A19"
   },
-  "favicon": "/public/favicon.svg",
+  "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
@@ -21,23 +21,23 @@
           {
             "group": "Getting Started",
             "pages": [
-              "docs/mintlify/introduction",
-              "docs/mintlify/quickstart",
-              "docs/mintlify/authentication"
+              "introduction",
+              "quickstart",
+              "authentication"
             ]
           },
           {
             "group": "Platform & Marketplace",
             "pages": [
-              "docs/mintlify/people-vs-talents",
-              "docs/mintlify/casting-calls",
-              "docs/mintlify/equipment-rentals"
+              "people-vs-talents",
+              "casting-calls",
+              "equipment-rentals"
             ]
           },
           {
             "group": "AI & MCP",
             "pages": [
-              "docs/mintlify/mcp-server"
+              "mcp-server"
             ]
           }
         ]
