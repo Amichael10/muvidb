@@ -1,0 +1,21 @@
+---
+title: "Authentication"
+description: "How to authenticate REST API and MCP requests."
+---
+
+## REST API Keys
+
+Pro and Enterprise API keys are managed in the [MuviDB Developer Portal](https://muvidb.com/developers).
+
+Send your key using either header:
+
+- `x-api-key: muv_live_...`
+- `Authorization: Bearer muv_live_...`
+
+<Warning>
+Never expose your Pro or Enterprise API key in client-side browser bundles. Route API requests through your backend server.
+</Warning>
+
+## Marketplace Public Endpoints
+
+Read-only marketplace discovery (`GET /api/marketplace?resource=talents|opportunities|equipment`) is publicly accessible without an API key. Creating or updating listings requires a signed-in Supabase session token.

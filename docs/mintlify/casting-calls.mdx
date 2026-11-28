@@ -1,0 +1,12 @@
+---
+title: "Casting Calls & Auditions"
+description: "Browse and query open casting calls and crew opportunities on MuviDB."
+---
+
+## Fetching Open Opportunities
+
+```bash
+curl "https://muvidb.com/api/marketplace?resource=opportunities&limit=20"
+```
+
+Each opportunity includes `title`, `role_type` (`acting`, `crew`, `writing`, etc.), `location`, `compensation`, `deadline`, and `company` details.

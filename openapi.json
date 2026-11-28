@@ -1,0 +1,149 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MuviDB API",
+    "version": "1.0.0",
+    "description": "The authoritative African cinema, Nollywood, stage, talent, box office, and production marketplace API."
+  },
+  "servers": [
+    {
+      "url": "https://muvidb.com",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyHeader": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Pro or Enterprise API key issued from https://muvidb.com/developers"
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/status": {
+      "get": {
+        "summary": "API Status",
+        "description": "Verify your API key and check service availability.",
+        "responses": {
+          "200": {
+            "description": "API online"
+          }
+        }
+      }
+    },
+    "/api/v1/films": {
+      "get": {
+        "summary": "List Films & Series",
+        "description": "Query the MuviDB film and television catalog with optional search, year, genre, or country filters.",
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Search query" },
+          { "name": "year", "in": "query", "schema": { "type": "integer" }, "description": "Release year" },
+          { "name": "genre", "in": "query", "schema": { "type": "string" }, "description": "Genre filter" },
+          { "name": "country", "in": "query", "schema": { "type": "string" }, "description": "Country of origin" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": {
+          "200": { "description": "List of films" }
+        }
+      }
+    },
+    "/api/v1/films/{id}": {
+      "get": {
+        "summary": "Get Film Details",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Film UUID or slug" }
+        ],
+        "responses": {
+          "200": { "description": "Film record" },
+          "404": { "description": "Film not found" }
+        }
+      }
+    },
+    "/api/v1/films/{id}/credits": {
+      "get": {
+        "summary": "Get Film Cast & Crew",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Film UUID or slug" }
+        ],
+        "responses": {
+          "200": { "description": "Ordered cast and crew credits" }
+        }
+      }
+    },
+    "/api/v1/people": {
+      "get": {
+        "summary": "List People",
+        "description": "Search actors, directors, writers, and crew in the MuviDB database.",
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string" } },
+          { "name": "department", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": {
+          "200": { "description": "List of people" }
+        }
+      }
+    },
+    "/api/v1/people/{id}": {
+      "get": {
+        "summary": "Get Person Profile",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Person UUID or slug" }
+        ],
+        "responses": {
+          "200": { "description": "Person profile & metadata" }
+        }
+      }
+    },
+    "/api/v1/credits": {
+      "get": {
+        "summary": "Query Credits",
+        "parameters": [
+          { "name": "film_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "person_id", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } }
+        ],
+        "responses": {
+          "200": { "description": "Credits list" }
+        }
+      }
+    },
+    "/api/v1/boxoffice": {
+      "get": {
+        "summary": "Box Office Rankings",
+        "description": "Retrieve tracked Nigerian and African theatrical box office rankings.",
+        "responses": {
+          "200": { "description": "Box office data" }
+        }
+      }
+    },
+    "/api/marketplace": {
+      "get": {
+        "summary": "Query Marketplace (Talents, Casting Calls, Equipment)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "resource",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["talents", "opportunities", "equipment"] }
+          },
+          { "name": "q", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 24 } }
+        ],
+        "responses": {
+          "200": { "description": "Marketplace resource list" }
+        }
+      }
+    }
+  }
+}

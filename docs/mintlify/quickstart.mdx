@@ -1,0 +1,27 @@
+---
+title: "Quickstart"
+description: "Make your first request to the MuviDB REST API in under 2 minutes."
+---
+
+## Base URL
+
+```text
+https://muvidb.com/api/v1
+```
+
+## Your First Request
+
+Pass your API key in the `x-api-key` header (or `Authorization: Bearer <key>`).
+
+```bash
+curl -X GET "https://muvidb.com/api/v1/films?limit=5" \
+  -H "x-api-key: YOUR_MUVIDB_API_KEY"
+```
+
+```javascript
+const res = await fetch('https://muvidb.com/api/v1/films?limit=5', {
+  headers: { 'x-api-key': process.env.MUVIDB_API_KEY },
+});
+const data = await res.json();
+console.log(data);
+```

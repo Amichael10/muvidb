@@ -1,0 +1,25 @@
+---
+title: "MCP Server"
+description: "Connect Claude, ChatGPT, and AI agents to MuviDB via Model Context Protocol."
+---
+
+## Endpoint
+
+MuviDB exposes a remote **Streamable HTTP** MCP server at:
+
+```text
+https://muvidb.com/api/mcp
+```
+
+Authentication uses **OAuth 2.1 / Bearer Token** (`https://muvidb.com/.well-known/oauth-protected-resource`).
+
+## Available Tools
+
+- `search_films` — Search African films & series by title, year, genre, or country
+- `get_film_details` — Full film metadata, synopsis, runtime, ratings, and release info
+- `get_film_credits` — Complete cast & crew with character names and billing order
+- `get_where_to_watch` — Streaming platforms (Netflix, Prime Video, YouTube, YAKWETU™, Moviezetu, Circuits.tv, etc.) & cinema showtimes
+- `search_people` — Find actors, directors, writers, and crew
+- `get_person_filmography` — Full verified filmography for any person
+- `get_awards_and_nominations` — AMVCA, AMAA, AFRIFF, and festival honors
+- `get_box_office_rankings` — Theatrical box office charts
