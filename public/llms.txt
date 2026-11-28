@@ -4,7 +4,7 @@
 
 ## Official Access & Documentation
 - Developer API (Pro & Enterprise): https://muvidb.com/developers
-- Documentation: https://muvidb.com/docs
+- Documentation: https://docs.muvidb.com
 - Public Browse: https://muvidb.com/browse
 
 ## Crawling & Data Policy
